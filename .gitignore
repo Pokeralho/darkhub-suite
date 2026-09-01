@@ -1,0 +1,109 @@
+# ==========================================
+# DarkHub Suite - Strict Production .gitignore
+# ==========================================
+
+# ── Dependencies & Package Managers ──
+node_modules/
+.pnpm-store/
+.yarn/
+package-lock.json.bak
+
+# ── Build Outputs & Distributions ──
+dist/
+dist-ssr/
+dist_app/
+release/
+out/
+target/
+*.local
+*.tsbuildinfo
+
+# Keep build assets (icons, nsis hooks)
+build/*
+!build/icon.ico
+!build/installer.nsh
+!build/icon.png
+
+# ── Heavy Binaries & Bundled Portables ──
+resources/
+Static/
+*.sav
+*.susres.sav
+*.susresvalid.sav
+PGE Portable/
+PGEPortable/
+PGEPortable.zip
+*.zip
+*.7z
+*.tar.gz
+*.iso
+
+# ── Native Compiler & Debugger Artifacts ──
+*.exp
+*.lib
+*.pdb
+*.ilk
+*.obj
+*.o
+*.a
+*.dylib
+*.so
+native_pacer/build/
+native_pacer/bin/
+native_pacer/obj/
+unins*.*
+
+# ── OCR Trained Models ──
+*.traineddata
+
+# ── Logs & Debug Files ──
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.stackdump
+
+# ── Environment & Secrets ──
+.env
+.env.*
+!.env.example
+*.dat
+*.secret
+*.key
+*.pem
+*.pfx
+*.cert
+
+# ── Internal Manifests, Agent Artifacts & Scratch Files ──
+GIT_COMMIT_MANIFEST.md
+*MANIFEST*.md
+*manifest*
+scratch/
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+.gemini/
+.antigravity/
+.system_generated/
+brain/
+
+# ── IDEs & Operating System ──
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+.DS_Store
+Thumbs.db
+desktop.ini
+

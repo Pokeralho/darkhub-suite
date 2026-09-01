@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' local-resource:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: local-resource:; connect-src 'self' https:;">
+    <title>DarkHub Suite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+      html,
+      body,
+      #app {
+        width: 100%;
+        min-height: 100%;
+        margin: 0;
+        background: #09090b;
+        color: #f4f4f5;
+      }
+
+      body {
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      }
+
+      .boot-fallback {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #09090b;
+      }
+
+      .boot-titlebar {
+        height: 40px;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        background: #020617;
+        border-bottom: 1px solid #1e293b;
+        box-sizing: border-box;
+      }
+
+      .boot-brand {
+        width: 120px;
+        height: 16px;
+        border-radius: 4px;
+        background: #1e293b;
+      }
+
+      .boot-body {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 256px 1fr;
+        min-height: 0;
+      }
+
+      .boot-sidebar {
+        padding: 24px 16px;
+        border-right: 1px solid #1e293b;
+        background: #0f172a;
+        box-sizing: border-box;
+      }
+
+      .boot-nav {
+        height: 36px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        background: #1e293b;
+      }
+
+      .boot-nav:nth-child(n+4) {
+        background: #111827;
+      }
+
+      .boot-content {
+        padding: 32px;
+        background: #111827;
+        box-sizing: border-box;
+      }
+
+      .boot-heading {
+        width: min(360px, 45vw);
+        height: 34px;
+        margin-bottom: 24px;
+        border-radius: 8px;
+        background: #1e293b;
+      }
+
+      .boot-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        max-width: 920px;
+      }
+
+      .boot-panel {
+        height: 132px;
+        border: 1px solid #1e293b;
+        border-radius: 8px;
+        background: #0f172a;
+      }
+
+      @media (max-width: 760px) {
+        .boot-body {
+          grid-template-columns: 72px 1fr;
+        }
+
+        .boot-sidebar {
+          padding: 18px 12px;
+        }
+
+        .boot-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body class="bg-dark-bg text-gray-100">
+    <div id="app">
+      <div class="boot-fallback" aria-hidden="true">
+        <div class="boot-titlebar"><div class="boot-brand"></div></div>
+        <div class="boot-body">
+          <aside class="boot-sidebar">
+            <div class="boot-nav"></div>
+            <div class="boot-nav"></div>
+            <div class="boot-nav"></div>
+            <div class="boot-nav"></div>
+            <div class="boot-nav"></div>
+            <div class="boot-nav"></div>
+          </aside>
+          <main class="boot-content">
+            <div class="boot-heading"></div>
+            <div class="boot-grid">
+              <div class="boot-panel"></div>
+              <div class="boot-panel"></div>
+              <div class="boot-panel"></div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

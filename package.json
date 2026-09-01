@@ -1,0 +1,135 @@
+{
+  "name": "darkhub-suite",
+  "version": "0.4.5",
+  "description": "High-performance modular Windows utility suite for gamers and power users.",
+  "author": "DarkHub Team",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev:renderer": "vite",
+    "dev:electron": "wait-on http://localhost:5173 && electron .",
+    "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\"",
+    "build:native": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.LatencyEngine.exe electron\\services\\DarkHub.LatencyEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.FrameLimiter.exe electron\\services\\DarkHub.FrameLimiter.cs\"",
+    "build:renderer": "vite build",
+    "build": "npm run build:native && npm run build:renderer && electron-builder",
+    "build:setup-sfx": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create-sfx-setup.ps1",
+    "build:setup-nsis": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$nsis=Join-Path $env:LOCALAPPDATA 'electron-builder\\Cache\\nsis\\nsis-3.0.4.1-nsis-3.0.4.1\\Bin\\makensis.exe'; & $nsis installer\\darkhub.nsi\"",
+    "build:setup-inno": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-inno-setup.ps1",
+    "build:portable": "npm run build:renderer && electron-builder --dir && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create-portable.ps1",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "diff": "^9.0.0",
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.8.3",
+    "exifr": "^7.1.3",
+    "ffmpeg-static": "^5.2.0",
+    "sharp": "^0.34.3",
+    "systeminformation": "^5.27.7",
+    "tesseract.js": "^7.0.0",
+    "ytdl-core": "^4.11.5"
+  },
+  "devDependencies": {
+    "exiftool-vendored": "^30.3.0",
+    "@tailwindcss/vite": "^4.2.4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/diff": "^7.0.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
+    "crypto-js": "^4.2.0",
+    "cypress": "^15.14.2",
+    "electron": "^41.5.0",
+    "electron-builder": "^26.8.1",
+    "fluent-ffmpeg": "^2.1.3",
+    "jest": "^30.3.0",
+    "jsdom": "^29.1.1",
+    "lucide-react": "^1.14.0",
+    "pdf-parse": "^2.4.5",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "tailwindcss": "^4.2.4",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.10",
+    "vitest": "^3.2.1",
+    "wait-on": "^8.0.2",
+    "winston": "^3.19.0"
+  },
+  "build": {
+    "appId": "com.darkhub.app",
+    "productName": "DarkHub",
+    "electronFuses": {
+      "enableEmbeddedAsarIntegrityValidation": false,
+      "onlyLoadAppFromAsar": false
+    },
+    "directories": {
+      "output": "dist_app"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json"
+    ],
+    "compression": "maximum",
+    "electronLanguages": [
+      "pt-BR",
+      "pt-PT",
+      "en-US",
+      "en"
+    ],
+    "asarUnpack": [
+      "electron/services/*.exe",
+      "electron/services/*.dll",
+      "electron/services/*.ps1",
+      "node_modules/sharp/**",
+      "node_modules/@img/**",
+      "node_modules/ffmpeg-static/**"
+    ],
+    "extraResources": [
+      {
+        "from": "PGE Portable",
+        "to": "PGE Portable",
+        "filter": [
+          "**/*",
+          "!**/Static/**",
+          "!**/Static.zip"
+        ]
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator",
+      "target": [
+        "nsis",
+        "dir"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DarkHub",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "uninstallDisplayName": "DarkHub Suite",
+      "include": "build/installer.nsh",
+      "differentialPackage": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Pokeralho",
+        "repo": "darkhub-suite"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Pokeralho/darkhub-suite.git"
+  }
+}
