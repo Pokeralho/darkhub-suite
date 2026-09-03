@@ -405,7 +405,12 @@ class SystemOptimizerService {
       compatibility: 'Windows 10/11',
       estimatedTimeMs: 400,
       execute: async (eventSender) => {
-        const res = await DeepTweaksEngine.applyTweaks(['tweak:taskbarTweaks'], eventSender || (() => {}));
+        const res = await DeepTweaksEngine.applyTweaks([
+          'tweak:taskbarAlignLeft',
+          'tweak:hideSearchBox',
+          'tweak:hideTaskViewButton',
+          'tweak:taskbarEndTask'
+        ], eventSender || (() => {}));
         return {
           status: res.ok ? 'Success' : 'Error',
           message: res.ok ? 'Barra de tarefas otimizada com sucesso' : res.error,
@@ -419,7 +424,7 @@ class SystemOptimizerService {
       id: 'optimizer:taskbarEndTask',
       name: 'Habilitar "Finalizar Tarefa" na Barra de Tarefas',
       description: 'Permite finalizar aplicativos travados com o botão direito diretamente no ícone da barra de tarefas.',
-      technicalDescription: 'Define TaskbarDeveloperSettings=1 em HKCU e HKLM sob Explorer\\Advanced.',
+      technicalDescription: 'Define TaskbarEndTask=1 sob Explorer\\Advanced\\TaskbarDeveloperSettings.',
       category: 'system',
       risk: 'safe',
       requiresAdmin: false,
@@ -474,7 +479,12 @@ class SystemOptimizerService {
       compatibility: 'Windows 10/11',
       estimatedTimeMs: 400,
       execute: async (eventSender) => {
-        const res = await DeepTweaksEngine.applyTweaks(['tweak:explorerTweaks'], eventSender || (() => {}));
+        const res = await DeepTweaksEngine.applyTweaks([
+          'tweak:explorerOpenThisPC',
+          'tweak:showFileExtensions',
+          'tweak:showHiddenFiles',
+          'tweak:explorerCompactMode'
+        ], eventSender || (() => {}));
         return {
           status: res.ok ? 'Success' : 'Error',
           message: res.ok ? 'Explorador configurado para máxima produtividade' : res.error,

@@ -48,12 +48,12 @@ class DeepTweaksEngine {
         title: 'Habilitar "Finalizar Tarefa" na Barra de Tarefas',
         description: 'Adiciona a opção de finalizar qualquer aplicativo travado diretamente com o botão direito no ícone da barra de tarefas.',
         changes: [
-          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced', name: 'TaskbarDeveloperSettings', type: 'REG_DWORD', data: '1' },
-          { key: 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced', name: 'TaskbarDeveloperSettings', type: 'REG_DWORD', data: '1' }
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarDeveloperSettings', name: 'TaskbarEndTask', type: 'REG_DWORD', data: '1' },
+          { key: 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarDeveloperSettings', name: 'TaskbarEndTask', type: 'REG_DWORD', data: '1' }
         ],
         revertChanges: [
-          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced', name: 'TaskbarDeveloperSettings', type: 'REG_DWORD', data: '0' },
-          { key: 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced', name: 'TaskbarDeveloperSettings', type: 'REG_DWORD', data: '0' }
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarDeveloperSettings', name: 'TaskbarEndTask', type: 'REG_DWORD', data: '0' },
+          { key: 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarDeveloperSettings', name: 'TaskbarEndTask', type: 'REG_DWORD', data: '0' }
         ]
       },
       {
@@ -395,6 +395,38 @@ class DeepTweaksEngine {
           { key: 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Error Reporting', name: 'Disabled', type: 'REG_DWORD', data: '0' }
         ]
       },
+      {
+        id: 'tweak:blockAdsAndSuggestions',
+        category: 'privacy',
+        risk: 'low',
+        requiresAdmin: false,
+        title: 'Bloqueio de Anúncios e Sugestões do Windows',
+        description: 'Bloqueia anúncios embutidos, sugestões no menu Iniciar, dicas da tela de bloqueio e rastreamento de ID de publicidade.',
+        changes: [
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager', name: 'SystemPaneSuggestionsEnabled', type: 'REG_DWORD', data: '0' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager', name: 'SoftLandingEnabled', type: 'REG_DWORD', data: '0' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager', name: 'RotatingLockScreenEnabled', type: 'REG_DWORD', data: '0' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager', name: 'RotatingLockScreenOverlayEnabled', type: 'REG_DWORD', data: '0' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager', name: 'SubscribedContent-338388Enabled', type: 'REG_DWORD', data: '0' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager', name: 'SubscribedContent-338389Enabled', type: 'REG_DWORD', data: '0' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager', name: 'SubscribedContent-353694Enabled', type: 'REG_DWORD', data: '0' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager', name: 'SubscribedContent-353696Enabled', type: 'REG_DWORD', data: '0' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo', name: 'Enabled', type: 'REG_DWORD', data: '0' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Privacy', name: 'TailoredExperiencesWithDiagnosticDataEnabled', type: 'REG_DWORD', data: '0' }
+        ],
+        revertChanges: [
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager', name: 'SystemPaneSuggestionsEnabled', type: 'REG_DWORD', data: '1' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager', name: 'SoftLandingEnabled', type: 'REG_DWORD', data: '1' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager', name: 'RotatingLockScreenEnabled', type: 'REG_DWORD', data: '1' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager', name: 'RotatingLockScreenOverlayEnabled', type: 'REG_DWORD', data: '1' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager', name: 'SubscribedContent-338388Enabled', type: 'REG_DWORD', data: '1' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager', name: 'SubscribedContent-338389Enabled', type: 'REG_DWORD', data: '1' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager', name: 'SubscribedContent-353694Enabled', type: 'REG_DWORD', data: '1' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager', name: 'SubscribedContent-353696Enabled', type: 'REG_DWORD', data: '1' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo', name: 'Enabled', type: 'REG_DWORD', data: '1' },
+          { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Privacy', name: 'TailoredExperiencesWithDiagnosticDataEnabled', type: 'REG_DWORD', data: '1' }
+        ]
+      },
 
       // ==========================================
       // 5. PERFORMANCE, KERNEL & GAMING (DarkHub Suite Pro)
@@ -536,6 +568,28 @@ class DeepTweaksEngine {
         revertChanges: [
           { key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\BackgroundAccessApplications', name: 'GlobalUserDisabled', type: 'REG_DWORD', data: '0' }
         ]
+      },
+      {
+        id: 'tweak:edgeOptimizations',
+        category: 'system',
+        risk: 'low',
+        requiresAdmin: true,
+        title: 'Otimização do Microsoft Edge',
+        description: 'Desativa processos em segundo plano do Edge, Startup Boost e telas iniciais desnecessárias.',
+        changes: [
+          { key: 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Edge', name: 'BackgroundModeEnabled', type: 'REG_DWORD', data: '0' },
+          { key: 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Edge', name: 'StartupBoostEnabled', type: 'REG_DWORD', data: '0' },
+          { key: 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Edge', name: 'HideFirstRunExperience', type: 'REG_DWORD', data: '1' },
+          { key: 'HKCU\\Software\\Policies\\Microsoft\\Edge', name: 'BackgroundModeEnabled', type: 'REG_DWORD', data: '0' },
+          { key: 'HKCU\\Software\\Policies\\Microsoft\\Edge', name: 'StartupBoostEnabled', type: 'REG_DWORD', data: '0' }
+        ],
+        revertChanges: [
+          { key: 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Edge', name: 'BackgroundModeEnabled', type: 'REG_DWORD', data: '1' },
+          { key: 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Edge', name: 'StartupBoostEnabled', type: 'REG_DWORD', data: '1' },
+          { key: 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Edge', name: 'HideFirstRunExperience', type: 'REG_DWORD', data: '0' },
+          { key: 'HKCU\\Software\\Policies\\Microsoft\\Edge', name: 'BackgroundModeEnabled', type: 'REG_DWORD', data: '1' },
+          { key: 'HKCU\\Software\\Policies\\Microsoft\\Edge', name: 'StartupBoostEnabled', type: 'REG_DWORD', data: '1' }
+        ]
       }
     ];
   }
@@ -587,7 +641,12 @@ class DeepTweaksEngine {
 
   parseRegQueryValue(stdout, valueName) {
     const lines = String(stdout || '').split(/\r?\n/g).map((l) => l.trim()).filter(Boolean);
-    const matchLine = lines.find((l) => l.toLowerCase().startsWith(valueName.toLowerCase() + ' '));
+    const matchLine = lines.find((l) => {
+      if (!valueName) {
+        return l.toLowerCase().startsWith('(default)') || l.toLowerCase().startsWith('(padrão)') || l.toLowerCase().startsWith('<sem nome>');
+      }
+      return l.toLowerCase().startsWith(valueName.toLowerCase() + ' ');
+    });
     if (!matchLine) return null;
     const parts = matchLine.split(/\s+/g);
     if (parts.length < 3) return null;
@@ -595,7 +654,10 @@ class DeepTweaksEngine {
   }
 
   async readRegistryValue(key, name) {
-    const { code, stdout } = await this.runCommand('reg', ['query', `"${key}"`, '/v', `"${name}"`], { timeout: 8000 });
+    const args = !name
+      ? ['query', `"${key}"`, '/ve']
+      : ['query', `"${key}"`, '/v', `"${name}"`];
+    const { code, stdout } = await this.runCommand('reg', args, { timeout: 8000 });
     if (code !== 0) return { existed: false };
     const parsed = this.parseRegQueryValue(stdout, name);
     if (!parsed) return { existed: false };
@@ -615,7 +677,7 @@ class DeepTweaksEngine {
       try {
         const firstChange = tweak.changes[0];
         const res = await this.readRegistryValue(firstChange.key, firstChange.name);
-        if (res.existed && String(res.data).trim() === String(firstChange.data).trim()) {
+        if (res.existed && String(res.data).trim().toLowerCase() === String(firstChange.data).trim().toLowerCase()) {
           statusMap[tweak.id] = true;
         } else {
           statusMap[tweak.id] = false;
@@ -637,31 +699,60 @@ class DeepTweaksEngine {
     const runId = `darkHubTweaks_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     eventSender('optimizer:runEvent', { runId, type: 'run-start', total: selected.length, concurrency: 1, startedAt: Date.now() });
 
-    let batchScript = '$ErrorActionPreference = "SilentlyContinue";\r\n';
+    let elevatedScript = '$ErrorActionPreference = "SilentlyContinue";\r\n';
+    let needsElevation = false;
 
-    for (const tweak of selected) {
+    for (let i = 0; i < selected.length; i++) {
+      const tweak = selected[i];
+      eventSender('optimizer:runEvent', { runId, type: 'op-start', opId: tweak.id, index: i, startedAt: Date.now() });
+
       for (const change of tweak.changes) {
-        if (change.deleteKey) {
-          batchScript += `reg delete "${change.key}" /f;\r\n`;
-        } else {
-          batchScript += `reg add "${change.key}" /v "${change.name}" /t ${change.type} /d "${change.data}" /f;\r\n`;
+        const isHkcu = change.key.toUpperCase().startsWith('HKCU');
+
+        // Apply HKCU changes directly in current user process (instant, reliable, no UAC needed for user hive)
+        if (isHkcu) {
+          try {
+            if (change.deleteKey) {
+              await this.runCommand('reg', ['delete', `"${change.key}"`, '/f']);
+            } else if (!change.name) {
+              await this.runCommand('reg', ['add', `"${change.key}"`, '/ve', '/t', change.type || 'REG_SZ', '/d', `"${change.data || ''}"`, '/f']);
+            } else {
+              await this.runCommand('reg', ['add', `"${change.key}"`, '/v', `"${change.name}"`, '/t', change.type, '/d', `"${change.data}"`, '/f']);
+            }
+          } catch (err) {
+            Logger.warn('DeepTweaksEngine', `Falha ao aplicar HKCU direto para ${tweak.id}`, err);
+          }
+        }
+
+        // Prepare elevated script for HKLM/HKCR or administrative changes
+        if (!isHkcu || tweak.requiresAdmin) {
+          needsElevation = true;
+          if (change.deleteKey) {
+            elevatedScript += `reg delete "${change.key}" /f;\r\n`;
+          } else if (!change.name) {
+            elevatedScript += `reg add "${change.key}" /ve /t ${change.type || 'REG_SZ'} /d "${change.data || ''}" /f;\r\n`;
+          } else {
+            elevatedScript += `reg add "${change.key}" /v "${change.name}" /t ${change.type} /d "${change.data}" /f;\r\n`;
+          }
         }
       }
     }
 
-    // Restart Explorer if any taskbar/explorer tweaks applied
+    if (needsElevation) {
+      const elevRes = await this.runElevatedCommand(elevatedScript);
+      if (elevRes.code !== 0) {
+        Logger.warn('DeepTweaksEngine', 'Aviso: Script elevado falhou ou UAC foi cancelado', elevRes.stderr);
+      }
+    }
+
+    // Restart Explorer cleanly if any customization/taskbar tweak was applied
     const hasExplorerTweaks = selected.some(t => t.category === 'customization');
     if (hasExplorerTweaks) {
-      batchScript += 'Stop-Process -Name explorer -Force;\r\n';
-    }
-
-    for (let i = 0; i < selected.length; i++) {
-      eventSender('optimizer:runEvent', { runId, type: 'op-start', opId: selected[i].id, index: i, startedAt: Date.now() });
-    }
-
-    const elevRes = await this.runElevatedCommand(batchScript);
-    if (elevRes.code !== 0) {
-      return { ok: false, error: 'Falha ao aplicar alterações no registro (Permissão UAC negada).' };
+      try {
+        await execAsync('powershell -NoProfile -Command "Stop-Process -Name explorer -Force; Start-Sleep -Milliseconds 600; Start-Process explorer"');
+      } catch (err) {
+        Logger.warn('DeepTweaksEngine', 'Falha ao reiniciar explorer', err);
+      }
     }
 
     for (let i = 0; i < selected.length; i++) {
@@ -681,31 +772,58 @@ class DeepTweaksEngine {
     const runId = `darkHubRevert_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     eventSender('optimizer:runEvent', { runId, type: 'run-start', total: selected.length, concurrency: 1, startedAt: Date.now() });
 
-    let batchScript = '$ErrorActionPreference = "SilentlyContinue";\r\n';
+    let elevatedScript = '$ErrorActionPreference = "SilentlyContinue";\r\n';
+    let needsElevation = false;
 
-    for (const tweak of selected) {
+    for (let i = 0; i < selected.length; i++) {
+      const tweak = selected[i];
+      eventSender('optimizer:runEvent', { runId, type: 'op-start', opId: tweak.id, index: i, startedAt: Date.now() });
+
       const reverts = tweak.revertChanges || [];
       for (const change of reverts) {
-        if (change.deleteKey) {
-          batchScript += `reg delete "${change.key}" /f;\r\n`;
-        } else {
-          batchScript += `reg add "${change.key}" /v "${change.name}" /t ${change.type} /d "${change.data}" /f;\r\n`;
+        const isHkcu = change.key.toUpperCase().startsWith('HKCU');
+
+        if (isHkcu) {
+          try {
+            if (change.deleteKey) {
+              await this.runCommand('reg', ['delete', `"${change.key}"`, '/f']);
+            } else if (!change.name) {
+              await this.runCommand('reg', ['add', `"${change.key}"`, '/ve', '/t', change.type || 'REG_SZ', '/d', `"${change.data || ''}"`, '/f']);
+            } else {
+              await this.runCommand('reg', ['add', `"${change.key}"`, '/v', `"${change.name}"`, '/t', change.type, '/d', `"${change.data}"`, '/f']);
+            }
+          } catch (err) {
+            Logger.warn('DeepTweaksEngine', `Falha ao reverter HKCU direto para ${tweak.id}`, err);
+          }
         }
+
+        if (!isHkcu || tweak.requiresAdmin) {
+          needsElevation = true;
+          if (change.deleteKey) {
+            elevatedScript += `reg delete "${change.key}" /f;\r\n`;
+          } else if (!change.name) {
+            elevatedScript += `reg add "${change.key}" /ve /t ${change.type || 'REG_SZ'} /d "${change.data || ''}" /f;\r\n`;
+          } else {
+            elevatedScript += `reg add "${change.key}" /v "${change.name}" /t ${change.type} /d "${change.data}" /f;\r\n`;
+          }
+        }
+      }
+    }
+
+    if (needsElevation) {
+      const elevRes = await this.runElevatedCommand(elevatedScript);
+      if (elevRes.code !== 0) {
+        Logger.warn('DeepTweaksEngine', 'Aviso: Script elevado de reversão falhou ou UAC foi cancelado', elevRes.stderr);
       }
     }
 
     const hasExplorerTweaks = selected.some(t => t.category === 'customization');
     if (hasExplorerTweaks) {
-      batchScript += 'Stop-Process -Name explorer -Force;\r\n';
-    }
-
-    for (let i = 0; i < selected.length; i++) {
-      eventSender('optimizer:runEvent', { runId, type: 'op-start', opId: selected[i].id, index: i, startedAt: Date.now() });
-    }
-
-    const elevRes = await this.runElevatedCommand(batchScript);
-    if (elevRes.code !== 0) {
-      return { ok: false, error: 'Falha ao reverter alterações (Permissão UAC negada).' };
+      try {
+        await execAsync('powershell -NoProfile -Command "Stop-Process -Name explorer -Force; Start-Sleep -Milliseconds 600; Start-Process explorer"');
+      } catch (err) {
+        Logger.warn('DeepTweaksEngine', 'Falha ao reiniciar explorer', err);
+      }
     }
 
     for (let i = 0; i < selected.length; i++) {
