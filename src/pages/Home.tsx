@@ -77,7 +77,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
         <div>
           <h1 className="text-lg font-bold text-zinc-100 tracking-tight flex items-center gap-2">
             {t('home.title', 'Home Dashboard')}
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono font-normal">v0.4.5</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono font-normal">v0.4.6</span>
           </h1>
           <p className="text-xs text-zinc-400">{t('home.subtitle', 'Control Center, Kernel Optimization & Frame Pacing')}</p>
         </div>

@@ -177,7 +177,7 @@ const NetworkTools = () => {
             <div className="bg-zinc-800/50 rounded-xl p-5 border border-zinc-700/50">
               <label className="block text-sm font-medium text-zinc-300 mb-2">{t('net.hostIp', 'Host / IP')}</label>
               <input type="text" value={pingHost} onChange={e => setPingHost(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-zinc-200 focus:outline-none focus:border-blue-500" />
-              <button onClick={runPing} disabled={pinging} className="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2 disabled:opacity-50">
+              <button onClick={runPing} disabled={pinging} className="w-full mt-4 bg-rose-600 hover:bg-rose-500 text-white py-2 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2 disabled:opacity-50">
                 <Activity size={18} />
                 <span>{pinging ? t('net.running', 'Executando...') : t('net.startPing', 'Iniciar Ping')}</span>
               </button>
@@ -244,7 +244,7 @@ const NetworkTools = () => {
                   <Activity size={48} className="text-blue-400" />
                 </div>
                 <h3 className="text-2xl font-bold text-zinc-100">{t('net.readyToStart', 'Pronto para iniciar')}</h3>
-                <button onClick={runSpeedTest} className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold text-lg transition-transform hover:scale-105 active:scale-95 shadow-lg shadow-blue-500/25 flex items-center space-x-2">
+                <button onClick={runSpeedTest} className="px-8 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-full font-bold text-lg transition-transform hover:scale-105 active:scale-95 shadow-lg shadow-blue-500/25 flex items-center space-x-2">
                   <Play fill="currentColor" size={20} />
                   <span>INICIAR TESTE</span>
                 </button>

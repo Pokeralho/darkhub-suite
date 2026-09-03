@@ -149,7 +149,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-4 max-w-5xl mx-auto p-1 md:p-2 animate-fadeIn">
+    <div className="space-y-4 w-full max-w-6xl mx-auto p-1 md:p-2 animate-fadeIn">
       <div className="pb-3 border-b border-zinc-800/80 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-zinc-100 tracking-tight">{t('settings.title')}</h1>
@@ -308,7 +308,7 @@ export default function SettingsPage() {
                   setTranslateMsg({ ok: false, msg: 'JSON inválido: ' + e.message });
                 }
               }}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/20"
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/20"
             >
               <CheckCircle2 size={13} /> Aplicar Tradução Imediatamente
             </button>
@@ -340,7 +340,7 @@ export default function SettingsPage() {
           </label>
         </div>
 
-        <div className="flex items-center justify-between pt-1 border-t border-zinc-800/60">
+        <div className="flex items-center justify-between pt-1 border-t border-zinc-800/80">
           <span className="text-[11px] text-zinc-500">Dados sensíveis e caminhos de usuário são redigidos automaticamente.</span>
           <button
             onClick={saveTelemetry}
@@ -407,7 +407,7 @@ export default function SettingsPage() {
           </label>
         </div>
 
-        <div className="flex justify-end pt-1 border-t border-zinc-800/60">
+        <div className="flex justify-end pt-1 border-t border-zinc-800/80">
           <button
             onClick={saveLiveServices}
             disabled={liveServicesBusy}

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Pokeralho/darkhub-suite/releases"><img src="https://img.shields.io/badge/Release-v0.4.5-blue?style=flat-square" alt="Release Version" /></a>
+  <a href="https://github.com/Pokeralho/darkhub-suite/releases"><img src="https://img.shields.io/badge/Release-v0.4.6-blue?style=flat-square" alt="Release Version" /></a>
   <a href="https://github.com/Pokeralho/darkhub-suite/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" /></a>
   <img src="https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011%20(x64)-zinc?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/badge/PRs-Welcome-green?style=flat-square" alt="PRs Welcome" />
@@ -57,40 +57,45 @@ All operations execute locally on the host machine. No user telemetry, telemetry
 
 ## Core Modules
 
-### 1. System Optimizer and Hardware Telemetry
-- **Hardware Telemetry Engine**: Real-time polling of CPU frequency, core utilization, physical memory allocation, GPU load, storage health, and thermal sensors.
-- **Process Scheduling Quanta**: Configures `Win32PrioritySeparation` (0x26) to prioritize foreground application execution.
-- **Memory Management**: Enforces `DisablePagingExecutive` to maintain kernel-mode drivers and system code within physical RAM.
-- **MSI Mode (Message Signaled Interrupts)**: Direct registry configuration of PCIe GPU and network interfaces for line-based or MSI vector interrupts.
-- **Core Parking Control**: Power policy overrides to mitigate CPU core unparking latency.
-- **Network Stack Tuning**: Configures TCP Window Autotuning, Compound TCP (CTCP), and Receive Side Scaling (RSS).
+### 1. Steam Lua & Depot Tools Suite (Primary Feature)
+- **Library & Manifest Management**: High-speed inspection, download, and installation of Steam `.lua` scripts, depot keys, and manifests with automatic `stplug-in` directory synchronization.
+- **Steam Store CEF Bridge**: Automated Chromium Embedded Framework (CEF) debugging bridge injecting 1-click unlock and package download buttons directly into the official Steam Store client.
+- **Online Fix (Spacewar 480)**: Native 1-click multiplayer redirection enabling online co-op and matchmaking through the Spacewar AppID.
+- **Depot & DLC Granular Locking**: Per-depot version pin toggle (Manifest Lock) and auto-update toggle with visual configuration editor and raw Lua code editor.
+- **Steam Auto-Restart & Hot Reload**: Instant client reloading with graceful termination and hot-swapped depot caches.
 
-### 2. DarkPacer and Ultra-Low Latency Engine
-- **Hardware Frame Limiter**: Enforces stable frame pacing via high-resolution QueryPerformanceCounter (QPC) spin loops and driver integration.
+### 2. System Optimizer & Hardware Telemetry
+- **Hardware Telemetry Engine**: Real-time polling of CPU frequency, per-core utilization, physical memory allocation, GPU load, storage health, and high-accuracy thermal sensors (Core Temp shared memory mapping and DTS thermal curves).
+- **Software Uninstaller with Deep Leftovers Cleaner**: Runs official uninstallers and executes thorough heuristic scanning of residual traces in `%APPDATA%`, `%LOCALAPPDATA%`, `%PROGRAMDATA%`, and Windows Registry keys.
+- **Advanced Network Stack Tuning**: Configures TCP NoDelay, multithreaded Receive Side Scaling (RSS 4 queues), MTU 1500, disables Energy Efficient Ethernet (EEE), and unlocks 100% QoS Psched bandwidth.
+- **Process Scheduling Quanta & GPU Priority**: Configures `Win32PrioritySeparation` (0x26), CPU process scheduling priority, and DirectX `UserGpuPreferences` to force dedicated GPU execution.
+- **Memory Management & RAM Cleaner**: 1-click working set flush, standby memory purge, and `DisablePagingExecutive` enforcement to maintain kernel-mode drivers in physical RAM.
+- **Windows Debloat & Service Control**: 35+ fully reversible Windows registry and kernel tweaks with instant snapshot rollback (Undo).
+
+### 3. DarkPacer & Low-Latency Gaming Engine
+- **Hardware Frame Limiter**: Enforces ultra-stable frame pacing via high-resolution QueryPerformanceCounter (QPC) spin loops and driver integration.
 - **Frametime Oscilloscope Overlay**: Real-time transparent DirectX overlay rendering frametime metrics, 1% low, 0.1% low, and frame variance.
-- **Audio Scheduling Priority**: Configures MMCSS scheduling for `audiodg.exe` to eliminate audio buffer underruns under heavy CPU loads.
+- **Low-Level Native AutoClicker**: Dedicated C# background engine utilizing Win32 `SendInput` with `mouse_event` fallback for sub-millisecond precision, zero jitter, and global hotkeys (<kbd>F6</kbd>) functional in full-screen games.
+- **Global Timer Resolution**: Enforces high-precision 0.5ms system timer resolution for input latency reduction.
 - **OptiScaler Manager**: Detection, configuration, and injection of upscaling libraries (DLSS, FSR, XeSS) for supported titles.
-- **Global Timer Resolution**: Configures high-precision 0.5ms system timer resolution for input latency reduction.
 
-### 3. Endpoint Defensive Security and Privacy
+### 4. Endpoint Defensive Security & Hardening
 - **DNS Sinkhole (Hosts)**: Local filtering of tracking, telemetry, and malicious domains by routing queries to `0.0.0.0`.
 - **URL Heuristic Analyzer**: Scans URLs for IDN homograph punycode attacks, typosquatting signatures, and credential harvester patterns.
 - **Network Port Sentry**: Audits active TCP and UDP listening sockets with associated process identifiers and executable paths.
-- **System Hardening Helpers**: Audits Volume Shadow Copy (VSS) status and verifies deprecation of legacy SMBv1 networking.
+- **Windows Defender & SmartScreen Control**: Elevation engine managing Microsoft Defender and telemetry services via TrustedInstaller privileges.
 
-### 4. Media Processing and YouTube Engine
+### 5. Media Processing & YouTube Engine
 - **YouTube and Media Downloader**: Multi-fragment media extraction powered by integrated yt-dlp and FFmpeg binaries.
 - **Format and Codec Presets**: Direct export to MP3 (320 kbps), AAC, WAV, FLAC, and high-resolution video streams (up to 4K/2K/1080p).
 - **Metadata and Cover Art Injection**: Automatic extraction and embedding of ID3 tags, artist/album metadata, and high-resolution album thumbnails.
 - **Playlist Management**: Structured multi-track extraction with ordered index formatting and custom output directory routing.
-- **Anti-Bot Mechanism**: Automated rotation across Android, iOS, and Web player clients with optional browser cookie synchronization.
 
-### 5. Offline Productivity and Privacy Utilities
+### 6. Universal Offline Privacy & Productivity Tools
+- **Universal Non-Destructive Metadata & Exif Editor**: Safe viewing, editing, and stripping of metadata across Images, Audio (`MP3, FLAC, WAV`), Video (`MP4, MKV, AVI`), and Documents (`PDF, DOCX`) using embedded ExifTool without stream re-encoding or corruption.
+- **Offline OCR Text Extractor**: Offline text recognition supporting drag-and-drop, clipboard paste (<kbd>Ctrl+V</kbd>), Sharp preprocessing, and dual-language extraction (English + Portuguese).
 - **Universal File Converter**: Local offline conversion between image, audio, video, and document formats.
-- **Offline OCR**: Text recognition engine executing locally through WebAssembly Tesseract models.
-- **Metadata Scrubber**: Local EXIF inspection and sanitization using embedded ExifTool.
 - **Encrypted Password Vault**: Local credential repository utilizing AES-256-GCM encryption with master key derivation.
-- **Hardware Profile Setup Hub**: Winget post-formatting package manager and driver verification.
 
 ---
 

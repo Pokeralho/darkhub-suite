@@ -168,6 +168,16 @@ export function GameEditorModal({
                     className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg px-3 py-2.5 focus:outline-none focus:border-blue-500 transition-colors"
                   />
                 </div>
+                <div>
+                  <div className="text-xs font-semibold text-zinc-500 mb-1.5 uppercase tracking-wider">Steam AppID (Opcional)</div>
+                  <input
+                    type="number"
+                    value={editing.steamAppId || ''}
+                    onChange={(e) => setEditing({ ...editing, steamAppId: e.target.value ? Number(e.target.value) : undefined })}
+                    placeholder="ex: 1245620"
+                    className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg px-3 py-2.5 focus:outline-none focus:border-blue-500 transition-colors font-mono text-sm"
+                  />
+                </div>
               </div>
             </div>
           )}

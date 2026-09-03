@@ -329,7 +329,7 @@ const FileConverter = () => {
             <div className="flex gap-2">
               <button
                 type="button"
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold shadow transition-colors flex items-center gap-1.5"
               >
                 <FolderOpen size={14} />
                 Selecionar Arquivos
@@ -369,7 +369,7 @@ const FileConverter = () => {
                   return (
                     <div
                       key={idx}
-                      className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800/60 hover:border-zinc-700 transition-colors text-xs"
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800/80 hover:border-zinc-700 transition-colors text-xs"
                     >
                       <div className="flex items-center gap-2.5 min-w-0 pr-2">
                         <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[10px] font-bold shrink-0">

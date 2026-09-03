@@ -62,7 +62,7 @@ export const useJunkScanner = () => {
       } catch (e) {
         if (!alive) return
         setJunk(null)
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
           console.warn('[Dashboard] Falha ao buscar Lixo Residual:', e)
         }
       } finally {

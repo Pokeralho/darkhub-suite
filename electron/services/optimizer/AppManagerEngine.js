@@ -450,6 +450,127 @@ class AppManagerEngine {
     if (code !== 0) return { ok: false, error: stderr || 'Falha ao ajustar HAGS' };
     return { ok: true, msg: `HAGS ${enabled ? 'ativado' : 'desativado'}. Reinicie o Windows para surtir efeito completo.` };
   }
+
+  async getInstalledPrograms() {
+    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows', programs: [] };
+    const script = `
+      $paths = @(
+        'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
+        'HKLM:\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
+        'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*'
+      )
+      $list = @()
+      Get-ItemProperty $paths -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne '' -and $_.SystemComponent -ne 1 -and $_.ParentKeyName -eq $null } | ForEach-Object {
+        $name = $_.DisplayName.Trim()
+        $unStr = if ($_.QuietUninstallString) { $_.QuietUninstallString } else { $_.UninstallString }
+        if ($unStr) {
+          $list += [PSCustomObject]@{
+            name = $name
+            version = if ($_.DisplayVersion) { $_.DisplayVersion } else { '' }
+            publisher = if ($_.Publisher) { $_.Publisher } else { '' }
+            installDate = if ($_.InstallDate) { $_.InstallDate } else { '' }
+            installLocation = if ($_.InstallLocation) { $_.InstallLocation } else { '' }
+            uninstallString = $unStr
+            isQuiet = [bool]$_.QuietUninstallString
+          }
+        }
+      }
+      $unique = $list | Sort-Object name -Unique
+      $unique | ConvertTo-Json -Compress
+    `;
+    const { data } = await this.runPowerShellJson(script, []);
+    const items = Array.isArray(data) ? data : (data && data.name ? [data] : []);
+    return { ok: true, programs: items };
+  }
+
+  async uninstallProgramWithLeftovers({ name, uninstallString, installLocation, publisher }) {
+    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (!name || !uninstallString) return { ok: false, error: 'Dados do programa inválidos' };
+
+    const safeName = name.replace(/'/g, "''").replace(/["*?]/g, '');
+    const safePub = (publisher || '').replace(/'/g, "''").replace(/["*?]/g, '');
+    const safeLoc = (installLocation || '').replace(/'/g, "''");
+
+    const script = `
+      $ErrorActionPreference = 'SilentlyContinue'
+      
+      # 1. Executa desinstalador oficial
+      $unCmd = '${uninstallString.replace(/'/g, "''")}'
+      if ($unCmd -match '^msiexec') {
+        Start-Process -FilePath "msiexec.exe" -ArgumentList ($unCmd -replace '^msiexec(\\.exe)?\\s*', '') -Wait
+      } else {
+        Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "\\"$unCmd\\"" -Wait
+      }
+
+      Start-Sleep -Seconds 2
+
+      $leftoverCount = 0
+      $cleanedPaths = @()
+
+      # 2. Limpeza profunda de pastas residuais (AppData, ProgramData, InstallLocation)
+      $foldersToClean = @(
+        "$env:APPDATA\\${safeName}",
+        "$env:LOCALAPPDATA\\${safeName}",
+        "$env:ProgramData\\${safeName}",
+        "${safeLoc}"
+      )
+      if ('${safePub}' -ne '') {
+        $foldersToClean += "$env:APPDATA\\${safePub}\\${safeName}"
+        $foldersToClean += "$env:LOCALAPPDATA\\${safePub}\\${safeName}"
+      }
+
+      foreach ($f in $foldersToClean) {
+        if ($f -and (Test-Path -LiteralPath $f) -and $f -ne "$env:SystemDrive\\" -and $f -ne "$env:ProgramFiles" -and $f -ne "$env:ProgramFiles(x86)") {
+          try {
+            Remove-Item -LiteralPath $f -Recurse -Force -ErrorAction SilentlyContinue
+            $leftoverCount++
+            $cleanedPaths += $f
+          } catch {}
+        }
+      }
+
+      # 3. Limpeza profunda de chaves no Registro
+      $regKeys = @(
+        "HKCU:\\Software\\${safeName}",
+        "HKLM:\\SOFTWARE\\${safeName}",
+        "HKLM:\\SOFTWARE\\WOW6432Node\\${safeName}"
+      )
+      if ('${safePub}' -ne '') {
+        $regKeys += "HKCU:\\Software\\${safePub}\\${safeName}"
+        $regKeys += "HKLM:\\SOFTWARE\\${safePub}\\${safeName}"
+      }
+
+      foreach ($rk in $regKeys) {
+        if (Test-Path -LiteralPath $rk) {
+          try {
+            Remove-Item -LiteralPath $rk -Recurse -Force -ErrorAction SilentlyContinue
+            $leftoverCount++
+            $cleanedPaths += $rk
+          } catch {}
+        }
+      }
+
+      [PSCustomObject]@{
+        ok = $true
+        leftoverCount = $leftoverCount
+        cleanedPaths = $cleanedPaths
+      } | ConvertTo-Json -Compress
+    `;
+
+    const { code, stdout, stderr } = await ElevationHelper.runElevatedPowerShell(script);
+    if (code !== 0) return { ok: false, error: stderr || 'Falha ao desinstalar programa' };
+
+    let result = { leftoverCount: 0, cleanedPaths: [] };
+    try {
+      if (stdout) result = JSON.parse(stdout);
+    } catch {}
+
+    return {
+      ok: true,
+      msg: `"${name}" desinstalado com sucesso! Removidos ${result.leftoverCount || 0} resíduos e sobras do sistema.`,
+      leftoversRemoved: result.leftoverCount || 0
+    };
+  }
 }
 
 export default new AppManagerEngine();

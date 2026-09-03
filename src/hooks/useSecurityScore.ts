@@ -44,7 +44,7 @@ export const useSecurityScore = () => {
         }
         setSecurityScore(null);
         setSecurityChecks(null);
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
           console.warn('[Dashboard] Falha ao buscar Security Score:', e);
         }
       } finally {

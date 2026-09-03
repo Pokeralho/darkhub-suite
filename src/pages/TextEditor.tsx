@@ -84,7 +84,7 @@ const TextEditor = () => {
             <FolderOpen size={18} />
             <span>{t('text.open')}</span>
           </button>
-          <button onClick={handleSave} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg flex items-center space-x-2 transition-colors">
+          <button onClick={handleSave} className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg flex items-center space-x-2 transition-colors">
             <Save size={18} />
             <span>{t('text.save')}</span>
           </button>

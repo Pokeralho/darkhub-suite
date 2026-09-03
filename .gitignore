@@ -12,6 +12,7 @@ package-lock.json.bak
 dist/
 dist-ssr/
 dist_app/
+dist_app_release/
 release/
 out/
 target/

@@ -41,10 +41,11 @@ import ToolboxEngine from './services/optimizer/ToolboxEngine.js'
 import AppManagerEngine from './services/optimizer/AppManagerEngine.js'
 import DeepTweaksEngine from './services/optimizer/DeepTweaksEngine.js'
 import ServicesEngine from './services/optimizer/ServicesEngine.js'
-import DefenderControlEngine from './services/optimizer/DefenderControlEngine.js'
 import { registerLatencyGuardian } from './latencyGuardian.js'
 import FramePacerEngine from './services/FramePacerEngine.js'
 import { createFramePacerOverlay, closeFramePacerOverlay, toggleFramePacerOverlay, setOverlayClickThrough, setOverlayConfig, getOverlayStatus } from './services/FramePacerOverlay.js'
+import { steamLuaService, SteamLocator } from './services/SteamLuaService.js'
+import { steamUnlockerService } from './services/SteamUnlockerService.js'
 protocol.registerSchemesAsPrivileged([
   { scheme: 'local-resource', privileges: { bypassCSP: true, secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }
 ])
@@ -248,7 +249,7 @@ function psSingleQuote(value) {
 }
 
 function normalizeRegistryPath(value) {
-  return String(value ?? '').replace(/\
+  return String(value ?? '').trim().replace(/\//g, '\\').toUpperCase()
 }
 
 const allowedStartupRegistryPaths = new Set([
@@ -346,7 +347,7 @@ function normalizeTelemetryError(payload = {}) {
 
 async function postDiscord(content, options = {}) {
   const url = options.webhookUrl || appConfig?.discordWebhookUrl
-  if (typeof url !== 'string' || !url.startsWith('https:
+  if (typeof url !== 'string' || !url.startsWith('https://')) return { ok: false, error: 'Discord webhook not configured' }
   const key = options.rateKey || crypto.createHash('sha1').update(content).digest('hex')
   if (!canSendDiscord(key)) return { ok: false, error: 'Rate limited' }
 
@@ -2047,7 +2048,12 @@ ipcMain.handle('optimizer:getGpuInfo', async () => AppManagerEngine.getGpuInfo()
 ipcMain.handle('optimizer:getHagsStatus', async () => AppManagerEngine.getHagsStatus());
 ipcMain.handle('optimizer:setHagsStatus', async (_event, payload) => AppManagerEngine.setHagsStatus(payload));
 
+ipcMain.handle('optimizer:uninstallProgramWithLeftovers', async (_event, payload) => AppManagerEngine.uninstallProgramWithLeftovers(payload));
+ipcMain.handle('optimizer:advancedNetworkApply', async () => NetworkEngine.advancedNetworkApply());
+ipcMain.handle('optimizer:advancedNetworkRevert', async () => NetworkEngine.advancedNetworkRevert());
+
 ipcMain.handle('optimizer:deepTweaksList', async () => DeepTweaksEngine.listTweaks());
+ipcMain.handle('optimizer:deepTweaksStatus', async () => DeepTweaksEngine.checkTweaksStatus());
 ipcMain.handle('optimizer:deepTweaksAnalyze', async (_event, payload) => {
   const ids = payload?.tweakIds || [];
   const selected = DeepTweaksEngine.listTweaks().filter((t) => ids.includes(t.id));
@@ -2055,8 +2061,9 @@ ipcMain.handle('optimizer:deepTweaksAnalyze', async (_event, payload) => {
   return { ok: true, summary: { count: selected.length, requiresAdmin: selected.some(t => t.requiresAdmin) }, changes };
 });
 ipcMain.handle('optimizer:deepTweaksApply', async (event, payload) => DeepTweaksEngine.applyTweaks(payload?.tweakIds || [], (channel, msg) => event.sender.send(channel, msg)));
+ipcMain.handle('optimizer:deepTweaksRevert', async (event, payload) => DeepTweaksEngine.revertTweaks(payload?.tweakIds || [], (channel, msg) => event.sender.send(channel, msg)));
 ipcMain.handle('optimizer:deepTweaksUndo', async (_event, payload) => DeepTweaksEngine.undoTweaks(payload?.undoToken));
-ipcMain.handle('optimizer:winUtilTweaks', async (event) => DeepTweaksEngine.applyTweaks(DeepTweaksEngine.listTweaks().map(t => t.id), (channel, msg) => event.sender.send(channel, msg)));
+ipcMain.handle('optimizer:globalRecommendedTweaks', async (event) => DeepTweaksEngine.applyTweaks(DeepTweaksEngine.listTweaks().map(t => t.id), (channel, msg) => event.sender.send(channel, msg)));
 
 function isValidIpv4(value) {
   if (typeof value !== 'string') return false
@@ -3002,29 +3009,149 @@ ipcMain.handle('youtube:download', async (event, payload) => {
   }
 })
 
+ipcMain.handle('youtube:cancel', async () => {
+  try {
+    const { cancelActiveYtDlp } = await import('./ytdlp.js')
+    const stopped = cancelActiveYtDlp()
+    return { ok: true, stopped }
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err) }
+  }
+})
+
+// --- Steam Lua & Depot Tools ---
+ipcMain.handle('steamLua:getStatus', async () => {
+  return steamLuaService.getSteamStatus()
+})
+
+ipcMain.handle('steamLua:listInstalled', async () => {
+  return steamLuaService.listInstalledLuas()
+})
+
+ipcMain.handle('steamLua:getDetails', async (_event, appId) => {
+  return steamLuaService.getLuaDetails(Number(appId))
+})
+
+ipcMain.handle('steamLua:saveLuaText', async (_event, payload) => {
+  const appId = payload?.appId
+  const rawText = payload?.rawText
+  if (!Number.isFinite(Number(appId)) || typeof rawText !== 'string') {
+    throw new Error('Invalid saveLuaText payload')
+  }
+  return steamLuaService.saveLuaText(Number(appId), String(rawText))
+})
+
+ipcMain.handle('steamLua:toggleDepot', async (_event, payload) => {
+  const { appId, depotId, options } = payload || {}
+  if (!Number.isFinite(Number(appId)) || !Number.isFinite(Number(depotId))) {
+    throw new Error('Invalid toggleDepot payload')
+  }
+  return steamLuaService.toggleDepot(Number(appId), Number(depotId), options || {})
+})
+
+ipcMain.handle('steamLua:toggleOnlineFix', async (_event, payload) => {
+  const appId = payload?.appId
+  const enable = Boolean(payload?.enable)
+  if (!Number.isFinite(Number(appId))) {
+    throw new Error('Invalid toggleOnlineFix payload')
+  }
+  return steamLuaService.toggleOnlineFix(Number(appId), enable)
+})
+
+ipcMain.handle('steamLua:deleteLua', async (_event, appId) => {
+  return steamLuaService.deleteLua(Number(appId))
+})
+
+ipcMain.handle('steamLua:installLua', async (_event, payload) => {
+  const { filePath, appId, options } = payload || {}
+  if (typeof filePath !== 'string' || !Number.isFinite(Number(appId))) {
+    throw new Error('Invalid installLua payload')
+  }
+  return steamLuaService.installLuaFile(filePath, Number(appId), options || {})
+})
+
+ipcMain.handle('steamLua:installManifest', async (_event, filePath) => {
+  return steamLuaService.installManifestFile(filePath)
+})
+
+ipcMain.handle('steamLua:restartSteam', async () => {
+  const status = steamLuaService.getSteamStatus()
+  if (!status.steamPath) return false
+  return SteamLocator.restartSteam(status.steamPath)
+})
+
+ipcMain.handle('steamLua:openStPlugInFolder', async () => {
+  const status = steamLuaService.getSteamStatus()
+  if (status.stPlugInDir && fsRaw.existsSync(status.stPlugInDir)) {
+    shell.openPath(status.stPlugInDir)
+    return true
+  }
+  if (status.steamPath && fsRaw.existsSync(status.steamPath)) {
+    shell.openPath(status.steamPath)
+    return true
+  }
+  return false
+})
+
+ipcMain.handle('steamLua:fetchStoreInfo', async (_event, appId) => {
+  return steamLuaService.fetchSteamStoreInfo(Number(appId))
+})
+
+ipcMain.handle('steamLua:downloadAndInstallPackage', async (_event, payload) => {
+  const appId = payload?.appId || payload
+  const autoUpdate = payload?.autoUpdate !== false
+  const onlineFix = Boolean(payload?.onlineFix)
+  return steamLuaService.downloadAndInstallPackage(appId, { autoUpdate, onlineFix })
+})
+
+ipcMain.handle('steamUnlocker:getStatus', async () => {
+  return steamUnlockerService.getUnlockerStatus()
+})
+
+ipcMain.handle('steamUnlocker:install', async (_event, mode) => {
+  return steamUnlockerService.installUnlocker(mode || 'OST')
+})
+
+ipcMain.handle('steamUnlocker:uninstall', async () => {
+  return steamUnlockerService.uninstallUnlocker()
+})
+
 ipcMain.handle('ocr:extractText', async (_event, payload) => {
   const imagePath = typeof payload === 'string' ? payload : payload?.imagePath
+  const base64Data = typeof payload === 'object' && payload?.base64 ? String(payload.base64) : null
   const lang = typeof payload === 'object' && payload?.lang ? String(payload.lang) : 'eng+por'
   const preprocess = typeof payload === 'object' ? Boolean(payload?.preprocess ?? true) : true
 
-  if (typeof imagePath !== 'string' || imagePath.trim().length === 0) throw new Error('OCR failed: invalid imagePath')
-  assertFileAccessGranted(imagePath, 'imagem')
-
   let worker = null
   try {
-    let input = imagePath
-    if (preprocess) {
-      const sharp = await getSharp()
-      const buf = await sharp(imagePath).grayscale().normalize().sharpen().toBuffer()
-      input = buf
+    let inputBuffer = null
+    if (base64Data) {
+      const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '')
+      inputBuffer = Buffer.from(cleanBase64, 'base64')
+    } else if (imagePath) {
+      assertFileAccessGranted(imagePath, 'imagem')
+      inputBuffer = await fs.readFile(imagePath)
+    } else {
+      throw new Error('Nenhuma imagem fornecida para o OCR')
     }
+
+    if (preprocess) {
+      try {
+        const sharp = await getSharp()
+        inputBuffer = await sharp(inputBuffer)
+          .grayscale()
+          .linear(1.3, -20)
+          .sharpen()
+          .toBuffer()
+      } catch {}
+    }
+
     worker = await createOcrWorker(lang)
-    const ret = await worker.recognize(input)
-    return { ok: true, text: ret.data.text, confidence: ret.data.confidence }
+    const ret = await worker.recognize(inputBuffer)
+    return { ok: true, text: ret?.data?.text || '', confidence: ret?.data?.confidence || 0 }
   } catch (err) {
     throw new Error(`OCR failed: ${err.message}`)
   } finally {
-
     if (worker) {
       try {
         await worker.terminate()
@@ -3349,7 +3476,7 @@ ipcMain.handle('security:scanMalware', async () => {
     const processes = await si.processes()
     const suspicious = []
 
-    const safeRegex = /c:\\windows\\|\/usr\/bin\/|\/bin\/|\/sbin\/|\/system\/library\/|\/usr\/sbin\
+    const safeRegex = /c:\\windows\\|\/usr\/bin\/|\/bin\/|\/sbin\/|\/system\/library\/|\/usr\/sbin\//i
 
     for (const p of processes.list) {
       if (!p.path) continue
@@ -3873,10 +4000,9 @@ function registerAutoClickerHotkey() {
   try {
     unregisterAutoClickerHotkey()
     const ok = globalShortcut.register(autoClickerHotkey, async () => {
-      if (!autoClickerTabActive) return
       try {
         if (autoClickerProc) await stopAutoClicker()
-        else await startAutoClicker(autoClickerState ?? { intervalMs: 100, button: 'left' })
+        else await startAutoClicker(autoClickerState ?? { intervalMs: 50, button: 'left' })
       } catch {}
     })
     if (!ok) return { ok: false, error: 'Falha ao registrar atalho global (atalho inválido ou em uso).' }
@@ -3886,16 +4012,50 @@ function registerAutoClickerHotkey() {
   }
 }
 
+function getClickEnginePath() {
+  const candidate1 = path.join(__dirname, 'services', 'DarkHub.ClickEngine.exe')
+  if (fsRaw.existsSync(candidate1)) return candidate1
+  const candidate2 = path.join(process.resourcesPath, 'app.asar.unpacked', 'electron', 'services', 'DarkHub.ClickEngine.exe')
+  if (fsRaw.existsSync(candidate2)) return candidate2
+  const candidate3 = path.join(app.getAppPath(), 'electron', 'services', 'DarkHub.ClickEngine.exe')
+  if (fsRaw.existsSync(candidate3)) return candidate3
+  return null
+}
+
 async function startAutoClicker(payload) {
-  const button = payload?.button === 'right' ? 'right' : 'left'
+  const button = payload?.button === 'right' || payload?.button === 'middle' || payload?.button === 'double' ? payload.button : 'left'
   const intervalMsRaw = Number(payload?.intervalMs)
   const intervalMs = Number.isFinite(intervalMsRaw) ? Math.max(1, Math.min(10000, Math.trunc(intervalMsRaw))) : 100
 
   if (autoClickerProc) {
     try {
+      if (autoClickerProc.stdin?.writable) {
+        autoClickerProc.stdin.write('STOP\nEXIT\n')
+      }
       autoClickerProc.kill()
     } catch {}
     autoClickerProc = null
+  }
+
+  const nativeExe = getClickEnginePath()
+  if (nativeExe && fsRaw.existsSync(nativeExe)) {
+    const p = spawn(nativeExe, [], {
+      windowsHide: true,
+      stdio: ['pipe', 'pipe', 'pipe']
+    })
+
+    autoClickerProc = p
+    autoClickerState = { button, intervalMs, startedAt: Date.now(), isNative: true }
+
+    p.stdin?.write(`START ${button} ${intervalMs}\n`)
+
+    p.on('exit', () => {
+      autoClickerProc = null
+      autoClickerState = null
+    })
+
+    await saveAutoClickerConfig().catch(() => {})
+    return { ok: true, msg: 'AutoClicker iniciado com Engine Nativa C# (Baixo Nível)', state: autoClickerState }
   }
 
   const ps = [
@@ -3935,7 +4095,7 @@ async function startAutoClicker(payload) {
   })
 
   autoClickerProc = p
-  autoClickerState = { button, intervalMs, startedAt: Date.now() }
+  autoClickerState = { button, intervalMs, startedAt: Date.now(), isNative: false }
 
   p.on('exit', () => {
     autoClickerProc = null
@@ -3949,6 +4109,9 @@ async function startAutoClicker(payload) {
 async function stopAutoClicker() {
   if (autoClickerProc) {
     try {
+      if (autoClickerProc.stdin?.writable) {
+        autoClickerProc.stdin.write('STOP\nEXIT\n')
+      }
       autoClickerProc.kill()
     } catch {}
     autoClickerProc = null
@@ -4039,11 +4202,18 @@ ipcMain.handle('metadata:read', async (_event, imagePath) => {
 ipcMain.handle('metadata:remove', async (_event, payload) => {
   const { inputPath, outputPath } = payload
   try {
-    assertFileAccessGranted(inputPath, 'imagem de entrada')
+    assertFileAccessGranted(inputPath, 'arquivo de entrada')
     assertFileAccessGranted(outputPath, 'arquivo de saída')
-    const sharp = await getSharp()
-    await sharp(inputPath).withMetadata(false).toFile(outputPath)
-    return { ok: true, path: outputPath }
+    await fs.copyFile(inputPath, outputPath)
+    try {
+      const exiftool = await getExiftool()
+      await exiftool.write(outputPath, {}, ['-all=', '-overwrite_original'])
+      return { ok: true, path: outputPath }
+    } catch {
+      const sharp = await getSharp()
+      await sharp(inputPath).withMetadata(false).toFile(outputPath)
+      return { ok: true, path: outputPath }
+    }
   } catch (err) {
     return { ok: false, error: err.message }
   }
@@ -4259,12 +4429,19 @@ app.whenReady().then(async () => {
         }
       })
     }
+
+    try {
+      const steamStatus = steamLuaService.getSteamStatus()
+      if (steamStatus.isValid && steamStatus.steamPath && steamStoreInjector.isCdpJunctionInstalled(steamStatus.steamPath)) {
+        steamStoreInjector.startDaemon(steamStatus.steamPath)
+      }
+    } catch {}
   }
 
   protocol.registerFileProtocol('local-resource', (request, callback) => {
-    let url = request.url.replace(/^local-resource:\/\
+    let url = request.url.replace(/^local-resource:\/\//, '')
 
-    if (url.match(/^[a-zA-Z]\
+    if (url.match(/^[a-zA-Z]:/)) {
       url = url.charAt(0) + ':' + url.slice(1)
     } else if (url.match(/^\/[a-zA-Z]:/)) {
       url = url.slice(1)

@@ -183,7 +183,7 @@ export default function TextSummarizer() {
           <button
             onClick={handleSummarize}
             disabled={busy || !text.trim()}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
           >
             {busy ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
             <span>{t('summarizer.summarize')}</span>

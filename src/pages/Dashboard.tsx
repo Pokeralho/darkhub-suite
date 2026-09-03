@@ -50,7 +50,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const metrics = useSystemMetrics();
   const { securityScore, securityChecks, loading: securityLoading } = useSecurityScore();
   const { junk, loading: junkLoading, refresh: refreshJunk } = useJunkScanner() as any;
-  const { activities, addActivity } = useRecentActivity();
+  const { activities, push: addActivity } = useRecentActivity() as any;
   const [securityOpen, setSecurityOpen] = useState(false);
   const [isCleaningJunk, setIsCleaningJunk] = useState(false);
   const [isOptimizingRam, setIsOptimizingRam] = useState(false);
@@ -60,11 +60,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [cpuTopology, setCpuTopology] = useState<any>(null);
 
   useEffect(() => {
-    window.darkhub?.latency?.queryTimer?.().then((res: any) => {
+    (window.darkhub?.latency as any)?.queryTimer?.().then((res: any) => {
       if (res?.ok && res?.data) setTimerInfo(res.data);
     }).catch(() => {});
 
-    window.darkhub?.latency?.getCpuTopology?.().then((res: any) => {
+    (window.darkhub?.latency as any)?.getCpuTopology?.().then((res: any) => {
       if (res?.ok && res?.data) setCpuTopology(res.data);
     }).catch(() => {});
   }, []);
@@ -691,10 +691,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
         ) : (
           <div className="space-y-1">
-            {activities.slice(0, 6).map((a) => (
-              <div key={a.id} className="flex items-center justify-between py-2 border-b border-zinc-800/60 last:border-b-0">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="flex-shrink-0">{activityIcon[a.type] ?? activityIcon.system}</span>
+            {activities.slice(0, 6).map((a: any) => (
+               <div key={a.id} className="flex items-center justify-between py-2 border-b border-zinc-800/80 last:border-b-0">
+                 <div className="flex items-center gap-2.5 min-w-0">
+                   <span className="flex-shrink-0">{(activityIcon as any)[a.type] ?? activityIcon.system}</span>
                   <div className="min-w-0">
                     <span className="text-zinc-200 text-xs font-medium truncate block">{a.label}</span>
                     {a.sublabel && <span className="text-zinc-500 text-[11px]">{a.sublabel}</span>}

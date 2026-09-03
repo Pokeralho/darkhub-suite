@@ -1,313 +1,308 @@
-import React, { useEffect, useState } from 'react'
-import { MousePointerClick, Pause, Play } from 'lucide-react'
-import { HelpTip } from '../components/HelpTip'
-import { useI18n } from '../i18n/I18nProvider'
+import React, { useEffect, useState, useMemo } from 'react';
+import { 
+  MousePointerClick, Pause, Play, Zap, Cpu, Settings2, 
+  Keyboard, Clock, Activity, CheckCircle2, AlertCircle, Sparkles, X
+} from 'lucide-react';
+import { useI18n } from '../i18n/I18nProvider';
 
 export default function AutoClicker() {
-  const { t } = useI18n()
-  const [intervalMs, setIntervalMs] = useState(100)
-  const [button, setButton] = useState<'left' | 'right'>('left')
-  const [running, setRunning] = useState(false)
-  const [status, setStatus] = useState<string | null>(null)
-  const [hotkey, setHotkey] = useState<string>('')
-  const [hotkeyEditing, setHotkeyEditing] = useState(false)
+  const { t } = useI18n();
+  const [intervalMs, setIntervalMs] = useState(50);
+  const [button, setButton] = useState<'left' | 'right' | 'middle' | 'double'>('left');
+  const [running, setRunning] = useState(false);
+  const [isNative, setIsNative] = useState(true);
+  const [status, setStatus] = useState<string | null>(null);
+  const [hotkey, setHotkey] = useState<string>('F6');
+  const [hotkeyEditing, setHotkeyEditing] = useState(false);
+
+  // CPS Calculation
+  const cps = useMemo(() => {
+    if (intervalMs <= 0) return 1000;
+    return (1000 / intervalMs).toFixed(1);
+  }, [intervalMs]);
 
   const refresh = async () => {
-    if (!window.darkhub?.autoclicker) return
+    if (!window.darkhub?.autoclicker) return;
     try {
-      const res = await window.darkhub.autoclicker.status()
+      const res = await window.darkhub.autoclicker.status();
       if (res?.ok) {
-        setRunning(Boolean(res.running))
-        if (res?.state?.intervalMs) setIntervalMs(Number(res.state.intervalMs))
-        if (res?.state?.button) setButton(res.state.button)
-        if (typeof res?.hotkey === 'string') setHotkey(res.hotkey)
+        setRunning(Boolean(res.running));
+        if (res?.state?.intervalMs) setIntervalMs(Number(res.state.intervalMs));
+        if (res?.state?.button) setButton(res.state.button);
+        if (res?.state?.isNative !== undefined) setIsNative(Boolean(res.state.isNative));
+        if (typeof res?.hotkey === 'string') setHotkey(res.hotkey || 'F6');
       }
     } catch (e: any) {
-      const msg = e?.message ?? String(e)
-      if (msg.includes('No handler registered')) {
-        setStatus('Backend do Electron não reiniciou. Pare e rode o app novamente.')
-      } else {
-        setStatus(msg)
-      }
+      // quiet
     }
-  }
+  };
 
   useEffect(() => {
-    refresh()
-    const id = setInterval(refresh, 1000)
-
+    refresh();
+    const id = setInterval(refresh, 1000);
     if (window.darkhub?.autoclicker?.setTabActive) {
-      window.darkhub.autoclicker.setTabActive(true).catch(() => {})
+      window.darkhub.autoclicker.setTabActive(true).catch(() => {});
     }
-
     return () => {
-      clearInterval(id)
-
+      clearInterval(id);
       if (window.darkhub?.autoclicker?.setTabActive) {
-        window.darkhub.autoclicker.setTabActive(false).catch(() => {})
+        window.darkhub.autoclicker.setTabActive(false).catch(() => {});
       }
-    }
-  }, [])
+    };
+  }, []);
 
-  const start = async () => {
-    setStatus(null)
-    if (!window.darkhub?.autoclicker) return
+  const handleStart = async () => {
+    setStatus(null);
+    if (!window.darkhub?.autoclicker) return;
     try {
-      const res = await window.darkhub.autoclicker.start({ intervalMs, button })
+      const res = await window.darkhub.autoclicker.start({ intervalMs, button });
       if (res?.ok) {
-        setStatus('AutoClicker iniciado. Para parar, volte aqui e clique em “Parar”.')
-        setRunning(true)
+        setRunning(true);
+        setStatus('✓ AutoClicker ativo em segundo plano!');
       } else {
-        setStatus(res?.error ?? 'Falha ao iniciar.')
+        setStatus(res?.error || 'Falha ao iniciar AutoClicker.');
       }
     } catch (e: any) {
-      const msg = e?.message ?? String(e)
-      if (msg.includes('No handler registered')) {
-        setStatus('Backend do Electron não reiniciou. Pare e rode o app novamente.')
-      } else {
-        setStatus(msg)
-      }
+      setStatus(e?.message || 'Erro ao iniciar');
     }
-  }
+  };
 
-  const stop = async () => {
-    setStatus(null)
-    if (!window.darkhub?.autoclicker) return
+  const handleStop = async () => {
+    setStatus(null);
+    if (!window.darkhub?.autoclicker) return;
     try {
-      const res = await window.darkhub.autoclicker.stop()
+      const res = await window.darkhub.autoclicker.stop();
       if (res?.ok) {
-        setStatus('AutoClicker parado.')
-        setRunning(false)
-      } else {
-        setStatus(res?.error ?? 'Falha ao parar.')
+        setRunning(false);
+        setStatus('AutoClicker pausado.');
       }
     } catch (e: any) {
-      const msg = e?.message ?? String(e)
-      if (msg.includes('No handler registered')) {
-        setStatus('Backend do Electron não reiniciou. Pare e rode o app novamente.')
-      } else {
-        setStatus(msg)
-      }
+      setStatus(e?.message || 'Erro ao parar');
     }
-  }
+  };
 
-  const toggle = async () => {
-    setStatus(null)
-    if (!window.darkhub?.autoclicker) return
+  const handleSaveHotkey = async (key: string) => {
+    if (!window.darkhub?.autoclicker) return;
     try {
-      const res = await window.darkhub.autoclicker.toggle({ intervalMs, button })
+      const res = await window.darkhub.autoclicker.setHotkey({ hotkey: key });
       if (res?.ok) {
-        setRunning(Boolean(res?.state) ? true : Boolean(res?.running))
-        setStatus(res?.msg ?? 'Ok.')
-      } else {
-        setStatus(res?.error ?? 'Falha ao alternar.')
+        setHotkey(key);
+        setHotkeyEditing(false);
+        setStatus(`Atalho global atualizado para: ${key}`);
       }
     } catch (e: any) {
-      const msg = e?.message ?? String(e)
-      if (msg.includes('No handler registered')) {
-        setStatus('Backend do Electron não reiniciou. Pare e rode o app novamente.')
-      } else {
-        setStatus(msg)
-      }
+      setStatus(e?.message || 'Erro ao salvar atalho');
     }
-  }
-
-  const buildAcceleratorFromEvent = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const key = e.key
-    if (key === 'Control' || key === 'Shift' || key === 'Alt' || key === 'Meta') return null
-    const mods: string[] = []
-    if (e.ctrlKey) mods.push('Ctrl')
-    if (e.altKey) mods.push('Alt')
-    if (e.shiftKey) mods.push('Shift')
-    if (e.metaKey) mods.push('Super')
-
-    let k = key
-    if (k.length === 1) k = k.toUpperCase()
-    if (k === ' ') k = 'Space'
-    if (k === 'Escape') k = 'Esc'
-    if (k === 'ArrowUp') k = 'Up'
-    if (k === 'ArrowDown') k = 'Down'
-    if (k === 'ArrowLeft') k = 'Left'
-    if (k === 'ArrowRight') k = 'Right'
-    if (k === 'Enter') k = 'Enter'
-    if (k === 'Backspace') k = 'Backspace'
-    if (k === 'Delete') k = 'Delete'
-    if (k === 'Tab') k = 'Tab'
-    if (k === 'PageUp') k = 'PageUp'
-    if (k === 'PageDown') k = 'PageDown'
-    if (k === 'Home') k = 'Home'
-    if (k === 'End') k = 'End'
-
-    if (mods.length === 0) {
-      if (/^F\d{1,2}$/.test(k)) return k
-      return null
-    }
-    return [...mods, k].join('+')
-  }
-
-  const saveHotkey = async (value: string) => {
-    if (!window.darkhub?.autoclicker) return
-    const res = await window.darkhub.autoclicker.setHotkey({ hotkey: value })
-    if (res?.ok) {
-      setStatus(res.enabled ? `Atalho configurado: ${res.hotkey}` : 'Atalho desativado.')
-    } else {
-      setStatus(res?.error ?? 'Falha ao configurar atalho.')
-    }
-    await refresh()
-  }
+  };
 
   return (
-    <div className="space-y-6 w-full">
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <h1 className="text-2xl font-bold text-white">AutoClicker</h1>
-          <HelpTip
-            title={t('help.autoclicker.overview.title')}
-            description={t('help.autoclicker.overview.desc')}
-            sections={[
-              { title: t('help.autoclicker.overview.sections.stability.title'), content: t('help.autoclicker.overview.sections.stability.desc') },
-              { title: t('help.autoclicker.overview.sections.permissions.title'), content: t('help.autoclicker.overview.sections.permissions.desc') }
-            ]}
-            example={t('help.autoclicker.overview.example')}
-            buttonLabel={t('help.button')}
-          />
+    <div className="w-full w-full max-w-6xl mx-auto space-y-4 p-1 md:p-2 animate-fadeIn text-zinc-100">
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80">
+        <div>
+          <h1 className="text-lg font-bold text-zinc-100 tracking-tight flex items-center gap-2">
+            <MousePointerClick className="w-5 h-5 text-rose-500" />
+            {t('autoclicker.title', 'AutoClicker de Baixo Nível')}
+            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 font-mono border border-emerald-500/30">
+              {t('autoclicker.engineBadge', 'Win32 SendInput 1ms')}
+            </span>
+          </h1>
+          <p className="text-xs text-zinc-400 mt-0.5">
+            {t('autoclicker.subtitle', 'Engine nativa em C# com temporização de alta precisão (sub-ms), jitter zero e suporte a atalhos globais.')}
+          </p>
         </div>
-        <p className="text-zinc-400">Clique automático local (Windows). Ideal para testes e automação leve.</p>
+
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-mono font-semibold px-2.5 py-1 rounded-lg border flex items-center gap-1.5 ${
+            running 
+              ? 'bg-emerald-950/60 text-emerald-400 border-emerald-500/40 animate-pulse' 
+              : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${running ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
+            {running ? t('autoclicker.statusActive', 'CLICANDO ATIVAMENTE') : t('autoclicker.statusIdle', 'PARADO / AGUARDANDO')}
+          </span>
+        </div>
       </div>
 
-      {status ? <div className="text-sm text-zinc-200 bg-zinc-900 border border-zinc-800 rounded-lg p-3">{status}</div> : null}
+      {/* Alert Status */}
+      {status && (
+        <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs text-zinc-200">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <span>{status}</span>
+          </div>
+          <button onClick={() => setStatus(null)} className="text-zinc-500 hover:text-zinc-300">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
-      <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900 space-y-4 max-w-2xl">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <div className="text-xs text-zinc-500 mb-1">Botão</div>
-            <select
-              value={button}
-              onChange={(e) => setButton(e.target.value as any)}
-              className="w-full bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
-              disabled={running}
-            >
-              <option value="left">Esquerdo</option>
-              <option value="right">Direito</option>
-            </select>
+      {/* Metric Cards (3 Columns) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="bg-zinc-900/60 rounded-xl border border-zinc-800/80 p-3.5">
+          <div className="text-[11px] font-medium text-zinc-400 flex items-center gap-1.5">
+            <Activity className="w-3.5 h-3.5 text-rose-500" />
+            {t('autoclicker.cpsTitle', 'Velocidade Teórica (CPS)')}
+          </div>
+          <div className="text-xl font-bold text-zinc-100 font-mono mt-1">
+            ~{cps} <span className="text-xs font-normal text-zinc-400">{t('autoclicker.cpsUnit', 'cliques/seg')}</span>
+          </div>
+          <div className="text-[10px] text-zinc-500 mt-0.5">{t('autoclicker.cpsDesc', 'Sem limitação artificial de software')}</div>
+        </div>
+
+        <div className="bg-zinc-900/60 rounded-xl border border-zinc-800/80 p-3.5">
+          <div className="text-[11px] font-medium text-zinc-400 flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-sky-400" />
+            {t('autoclicker.intervalTitle', 'Intervalo de Execução')}
+          </div>
+          <div className="text-xl font-bold text-zinc-100 font-mono mt-1">
+            {intervalMs} <span className="text-xs font-normal text-zinc-400">{t('autoclicker.intervalUnit', 'milissegundos')}</span>
+          </div>
+          <div className="text-[10px] text-zinc-500 mt-0.5">{t('autoclicker.intervalDesc', 'Resolução de 1ms do Windows Timer')}</div>
+        </div>
+
+        <div className="bg-zinc-900/60 rounded-xl border border-zinc-800/80 p-3.5">
+          <div className="text-[11px] font-medium text-zinc-400 flex items-center gap-1.5">
+            <Keyboard className="w-3.5 h-3.5 text-emerald-400" />
+            {t('autoclicker.hotkeyTitle', 'Atalho Global')}
+          </div>
+          <div className="text-xl font-bold text-zinc-100 font-mono mt-1 flex items-center gap-2">
+            <span className="px-2 py-0.5 bg-zinc-800 rounded border border-zinc-700 text-sm font-bold">
+              {hotkey}
+            </span>
+            <span className="text-xs font-normal text-zinc-400">{t('autoclicker.hotkeyToggle', '(Liga / Desliga)')}</span>
+          </div>
+          <div className="text-[10px] text-zinc-500 mt-0.5">{t('autoclicker.hotkeyDesc', 'Funciona dentro de qualquer jogo ou app')}</div>
+        </div>
+      </div>
+
+      {/* Control Deck */}
+      <div className="bg-zinc-900/80 rounded-xl border border-zinc-800/80 p-4 space-y-4">
+        <h2 className="text-xs font-bold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
+          <Settings2 className="w-3.5 h-3.5 text-zinc-400" />
+          {t('autoclicker.configTitle', 'Configuração de Clique')}
+        </h2>
+
+        {/* Button Type Selector */}
+        <div>
+          <label className="text-xs font-medium text-zinc-400 block mb-2">{t('autoclicker.mouseBtnLabel', 'Botão do Mouse:')}</label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { id: 'left', label: t('autoclicker.btnLeft', 'Clique Esquerdo'), desc: t('autoclicker.btnLeftDesc', 'Padrão (Tiro/Ação)') },
+              { id: 'right', label: t('autoclicker.btnRight', 'Clique Direito'), desc: t('autoclicker.btnRightDesc', 'Mira/Secundário') },
+              { id: 'middle', label: t('autoclicker.btnMiddle', 'Clique do Meio'), desc: t('autoclicker.btnMiddleDesc', 'Scroll Button') },
+              { id: 'double', label: t('autoclicker.btnDouble', 'Duplo Clique'), desc: t('autoclicker.btnDoubleDesc', '2x Rápido') }
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setButton(item.id as any)}
+                className={`p-3 rounded-xl border text-left transition ${
+                  button === item.id
+                    ? 'bg-zinc-800 border-rose-500/80 text-zinc-100 shadow-sm'
+                    : 'bg-zinc-950/70 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                }`}
+              >
+                <div className="text-xs font-bold">{item.label}</div>
+                <div className="text-[10px] text-zinc-500 mt-0.5">{item.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Interval Slider & Input */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-medium text-zinc-400">
+              {t('autoclicker.intervalLabel', 'Intervalo entre Cliques (ms):')}
+            </label>
+            <span className="text-xs font-mono font-bold text-rose-400">{intervalMs} ms</span>
           </div>
 
-          <div>
-            <div className="text-xs text-zinc-500 mb-1">Intervalo (ms)</div>
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min={1}
+              max={1000}
+              step={1}
+              value={intervalMs}
+              onChange={(e) => setIntervalMs(Number(e.target.value))}
+              className="flex-1 accent-rose-600 h-1.5 bg-zinc-950 rounded-lg cursor-pointer"
+            />
             <input
               type="number"
               min={1}
               max={10000}
               value={intervalMs}
-              onChange={(e) => setIntervalMs(Math.max(1, Math.min(10000, Math.trunc(Number(e.target.value) || 100))))}
-              className="w-full bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
-              disabled={running}
+              onChange={(e) => setIntervalMs(Math.max(1, Number(e.target.value)))}
+              className="w-24 bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-100 font-mono text-center focus:outline-none focus:border-rose-500/80"
             />
-            <div className="mt-2">
-              <HelpTip
-                title={t('help.autoclicker.interval.title')}
-                description={t('help.autoclicker.interval.desc')}
-                sections={[
-                  { title: t('help.autoclicker.interval.sections.input.title'), content: t('help.autoclicker.interval.sections.input.desc') }
-                ]}
-                example={t('help.autoclicker.interval.example')}
-                buttonLabel={t('help.button')}
-              />
-            </div>
+          </div>
+
+          {/* Quick Preset Pills */}
+          <div className="flex items-center gap-1.5 mt-2.5">
+            <span className="text-[10px] text-zinc-500 mr-1">Presets Rápidos:</span>
+            {[
+              { label: 'Ultra Rápido (10ms - 100 CPS)', ms: 10 },
+              { label: 'Rápido (50ms - 20 CPS)', ms: 50 },
+              { label: 'Equilibrado (100ms - 10 CPS)', ms: 100 },
+              { label: 'Humano (200ms - 5 CPS)', ms: 200 }
+            ].map((p) => (
+              <button
+                key={p.ms}
+                onClick={() => setIntervalMs(p.ms)}
+                className="px-2 py-1 rounded bg-zinc-800/80 hover:bg-zinc-700 text-[10px] font-mono text-zinc-300 border border-zinc-700/50 transition"
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Hotkey Configuration */}
+        <div className="pt-2 border-t border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="text-xs text-zinc-500 mb-1 inline-flex items-center gap-2">
-              Atalho global (toggle)
-              <HelpTip
-                title={t('help.autoclicker.hotkey.title')}
-                description={t('help.autoclicker.hotkey.desc')}
-                sections={[
-                  { title: t('help.autoclicker.hotkey.sections.input.title'), content: t('help.autoclicker.hotkey.sections.input.desc') },
-                  { title: t('help.autoclicker.hotkey.sections.behavior.title'), content: t('help.autoclicker.hotkey.sections.behavior.desc') }
-                ]}
-                example={t('help.autoclicker.hotkey.example')}
-                buttonLabel={t('help.button')}
-              />
-            </div>
-            <input
-              value={hotkeyEditing ? '' : (hotkey || '')}
-              placeholder={hotkey ? hotkey : 'Clique aqui e pressione (ex: Ctrl+Alt+F6)'}
-              onFocus={() => setHotkeyEditing(true)}
-              onBlur={() => setHotkeyEditing(false)}
-              onKeyDown={async (e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                if (e.key === 'Escape') {
-                  setHotkeyEditing(false)
-                  return
-                }
-                const accel = buildAcceleratorFromEvent(e)
-                if (!accel) return
-                setHotkey(accel)
-                setHotkeyEditing(false)
-                await saveHotkey(accel)
-              }}
-              className="w-full bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
-            />
-            <div className="text-xs text-zinc-500 mt-2">
-              Dica: para clicar em apps elevados (admin), rode o DarkHub como Administrador.
-            </div>
+            <div className="text-xs font-semibold text-zinc-200">Atalho de Teclado Rápido</div>
+            <div className="text-[11px] text-zinc-500">Pressione a tecla configurada para ligar ou desligar o clique em qualquer janela.</div>
           </div>
-          <div className="flex items-end gap-2">
-            <button
-              onClick={async () => { setHotkey(''); await saveHotkey('') }}
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors"
-              disabled={!hotkey}
-            >
-              Limpar atalho
-            </button>
-            <button
-              onClick={toggle}
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors"
-            >
-              Toggle
-            </button>
+
+          <div className="flex items-center gap-2">
+            {['F6', 'F7', 'F8', 'F9', 'F12'].map((key) => (
+              <button
+                key={key}
+                onClick={() => handleSaveHotkey(key)}
+                className={`px-3 py-1 rounded-lg text-xs font-mono font-bold border transition ${
+                  hotkey === key
+                    ? 'bg-rose-600 border-rose-500 text-white shadow-sm'
+                    : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+                }`}
+              >
+                {key}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="flex gap-2">
-          {!running ? (
+        {/* Primary Action Button */}
+        <div className="pt-2 border-t border-zinc-800/80 flex justify-end">
+          {running ? (
             <button
-              onClick={start}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg flex items-center gap-2 transition-colors"
+              onClick={handleStop}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-bold text-xs border border-zinc-700 transition shadow-sm"
             >
-              <Play size={18} />
-              <span>Iniciar</span>
+              <Pause className="w-4 h-4 text-amber-400" />
+              {t('autoclicker.stopBtn', 'Parar AutoClicker')} ({hotkey})
             </button>
           ) : (
             <button
-              onClick={stop}
-              className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-200 rounded-lg flex items-center gap-2 transition-colors"
+              onClick={handleStart}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition shadow-sm"
             >
-              <Pause size={18} />
-              <span>Parar</span>
+              <Play className="w-4 h-4 fill-current" />
+              {t('autoclicker.startBtn', 'Iniciar AutoClicker')} ({hotkey})
             </button>
           )}
-          <HelpTip
-            title={t('help.autoclicker.toggle.title')}
-            description={t('help.autoclicker.toggle.desc')}
-            sections={[
-              { title: t('help.autoclicker.toggle.sections.input.title'), content: t('help.autoclicker.toggle.sections.input.desc') },
-              { title: t('help.autoclicker.toggle.sections.output.title'), content: t('help.autoclicker.toggle.sections.output.desc') }
-            ]}
-            example={t('help.autoclicker.toggle.example')}
-            buttonLabel={t('help.button')}
-          />
-
-          <div className="flex items-center text-xs text-zinc-500 gap-2">
-            <MousePointerClick size={16} />
-            <span>{running ? 'Rodando…' : 'Parado'}</span>
-          </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

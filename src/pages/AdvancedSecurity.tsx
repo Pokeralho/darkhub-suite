@@ -285,7 +285,7 @@ export default function AdvancedSecurity() {
   );
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto p-1 md:p-2 animate-fadeIn">
+    <div className="space-y-6 w-full max-w-6xl mx-auto p-1 md:p-2 animate-fadeIn">
       {}
       <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
         <div>
@@ -320,7 +320,7 @@ export default function AdvancedSecurity() {
         <button
           onClick={() => { setActiveTab('malware'); setHasScanned(false); setStatusMsg(null); }}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-            activeTab === 'malware' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+            activeTab === 'malware' ? 'bg-zinc-700 text-zinc-100 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
           }`}
         >
           <Activity size={15} /> Varredura de Processos
@@ -329,7 +329,7 @@ export default function AdvancedSecurity() {
         <button
           onClick={() => { setActiveTab('phishing'); setStatusMsg(null); loadPhishingStatus(); }}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-            activeTab === 'phishing' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+            activeTab === 'phishing' ? 'bg-zinc-700 text-zinc-100 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
           }`}
         >
           <Globe size={15} /> Anti-Phishing & Scanner
@@ -338,7 +338,7 @@ export default function AdvancedSecurity() {
         <button
           onClick={() => { setActiveTab('network'); setStatusMsg(null); handleScanNetworkConnections(); }}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-            activeTab === 'network' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+            activeTab === 'network' ? 'bg-zinc-700 text-zinc-100 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
           }`}
         >
           <Radio size={15} /> Sentinela de Rede
@@ -347,7 +347,7 @@ export default function AdvancedSecurity() {
         <button
           onClick={() => { setActiveTab('ransomware'); setStatusMsg(null); loadRansomwareStatus(); }}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-            activeTab === 'ransomware' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+            activeTab === 'ransomware' ? 'bg-zinc-700 text-zinc-100 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
           }`}
         >
           <Lock size={15} /> Blindagem Anti-Ransomware
@@ -356,7 +356,7 @@ export default function AdvancedSecurity() {
         <button
           onClick={() => { setActiveTab('tracking'); setHasScanned(false); setStatusMsg(null); }}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-            activeTab === 'tracking' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+            activeTab === 'tracking' ? 'bg-zinc-700 text-zinc-100 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
           }`}
         >
           <Eye size={15} /> Bloqueador de Tracking
@@ -365,7 +365,7 @@ export default function AdvancedSecurity() {
         <button
           onClick={() => { setActiveTab('community'); setStatusMsg(null); loadCommunityRulesStats(); }}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-            activeTab === 'community' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+            activeTab === 'community' ? 'bg-zinc-700 text-zinc-100 shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
           }`}
         >
           <Users size={15} /> Regras da Comunidade
@@ -399,7 +399,7 @@ export default function AdvancedSecurity() {
             <button
               onClick={handleScan}
               disabled={isScanning}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-all shadow-md shadow-blue-600/20 disabled:opacity-50"
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-all shadow-md shadow-blue-600/20 disabled:opacity-50"
             >
               {isScanning ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
               {isScanning ? 'Escaneando...' : 'Iniciar Varredura Heurística'}
@@ -547,7 +547,7 @@ export default function AdvancedSecurity() {
               <button
                 type="submit"
                 disabled={isScanning || !urlInput.trim()}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all disabled:opacity-50 shrink-0"
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all disabled:opacity-50 shrink-0"
               >
                 {isScanning ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
                 Analisar Link
@@ -730,7 +730,7 @@ export default function AdvancedSecurity() {
             <button
               onClick={handleAuditTracking}
               disabled={isScanning}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-all shadow-md shadow-blue-600/20 disabled:opacity-50"
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-all shadow-md shadow-blue-600/20 disabled:opacity-50"
             >
               {isScanning ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
               {t('security.tracking.auditButton') || 'Auditar Rastreadores'}
@@ -859,7 +859,7 @@ export default function AdvancedSecurity() {
               <button
                 onClick={handleImportCommunityRules}
                 disabled={isScanning || !communityJsonInput.trim()}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-blue-600/20 disabled:opacity-50"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-blue-600/20 disabled:opacity-50"
               >
                 <Upload size={14} /> Importar & Ativar no Escudo de Segurança
               </button>

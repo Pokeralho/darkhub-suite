@@ -1,8 +1,7 @@
-import { useI18n } from '../i18n/I18nProvider';
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import Layout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
-import { I18nProvider } from './i18n/I18nProvider';
+import { I18nProvider, useI18n } from './i18n/I18nProvider';
 import UpdaterOverlay from './components/UpdaterOverlay';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -29,6 +28,7 @@ const OptiScalerManager = lazy(() => import('./pages/OptiScalerManager'));
 const SetupHub = lazy(() => import('./pages/SetupHub'));
 const DllInjector = lazy(() => import('./pages/DllInjector'));
 const FramePacer = lazy(() => import('./pages/FramePacer'));
+const SteamLuaTools = lazy(() => import('./pages/SteamLuaTools'));
 const Home = lazy(() => import('./pages/Home'));
 
 const App = () => {
@@ -124,6 +124,9 @@ const App = () => {
         return <SetupHub />;
       case 'dll-injector':
         return <DllInjector />;
+      case 'steam-lua':
+      case 'steamlua':
+        return <SteamLuaTools />;
       case 'settings':
         return <SettingsPage />;
       default:

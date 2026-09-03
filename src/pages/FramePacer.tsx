@@ -295,21 +295,21 @@ export default function FramePacerPage() {
 
           {}
           <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800/60">
+            <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800/80">
               <div className="text-[10px] font-bold text-amber-400 uppercase">1% Low</div>
               <div className="text-base font-black font-mono text-zinc-100 mt-0.5">
                 {isRunning ? Math.round(metrics.low1Percent) : '--'} <span className="text-[9px] text-zinc-500">FPS</span>
               </div>
             </div>
 
-            <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800/60">
+            <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800/80">
               <div className="text-[10px] font-bold text-purple-400 uppercase">Jitter</div>
               <div className="text-base font-black font-mono text-zinc-100 mt-0.5">
                 ±{isRunning ? metrics.frametimeJitterMs : '0.0'}<span className="text-[9px] text-zinc-500">ms</span>
               </div>
             </div>
 
-            <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800/60">
+            <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800/80">
               <div className="text-[10px] font-bold text-rose-400 uppercase">Stutters</div>
               <div className="text-base font-black font-mono text-zinc-100 mt-0.5">
                 {isRunning ? metrics.stutterCount : '0'}

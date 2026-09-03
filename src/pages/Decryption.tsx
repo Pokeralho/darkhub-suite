@@ -105,7 +105,7 @@ const Decryption = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="w-full max-w-6xl mx-auto space-y-6">
       <div className="flex items-center space-x-3 mb-8">
         <div className="p-3 bg-emerald-500/10 rounded-xl">
           <Shield className="text-emerald-400" size={28} />

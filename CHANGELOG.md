@@ -4,6 +4,38 @@ All notable changes to the DarkHub Suite project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.6] - 2026-09-02
+
+### Added
+- **Steam Lua & Depot Tools Suite**:
+  - Full-featured Steam `.lua` script manager, manifest installer, and depot key inspector.
+  - Chromium Embedded Framework (CEF) store injection bridge with 1-click package downloader.
+  - Spacewar (AppID 480) Online Fix integration for multiplayer support.
+  - Depot version pin locking, auto-update switches, and live Steam client restart.
+- **Software Uninstaller with Deep Leftovers Cleaner**:
+  - Official silent and interactive uninstaller execution with elevated privileges.
+  - Deep heuristic scanning and cleanup of residual files in `%APPDATA%`, `%LOCALAPPDATA%`, `%PROGRAMDATA%`, and Registry keys.
+- **Universal Metadata & Exif Editor**:
+  - Universal media format support across Images, Audio (`MP3, FLAC, WAV`), Video (`MP4, MKV, AVI`), and Documents (`PDF, DOCX`).
+  - Lossless and non-destructive metadata stripping via embedded ExifTool without stream corruption.
+- **Low-Level Native AutoClicker**:
+  - High-precision C# engine utilizing Win32 `SendInput` and `mouse_event` fallback with 1ms timer resolution.
+  - Global hotkeys (<kbd>F6</kbd>) functional in full-screen games and background windows.
+- **Advanced Network Stack Tuning**:
+  - Kernel TCP NoDelay, Receive Side Scaling (RSS 4 queues), MTU 1500, EEE disabling, and 100% QoS bandwidth unlocking.
+- **Accurate CPU Thermal Telemetry**:
+  - Core Temp shared memory mapping and calibrated DTS thermal curves for precise CPU package readings.
+- **Full Internationalization (i18n)**:
+  - 100% complete English (`en-US`) and Portuguese (`pt-BR`) translations across all new tools, tabs, uninstaller, network, and modal interfaces.
+
+### Fixed
+- Fixed main process startup syntax exception in `DeepTweaksEngine.js`.
+- Resolved duplicate IPC handler registration for `optimizer:getInstalledPrograms`.
+- Fixed OCR preview loading with base64 Data URLs and added clipboard paste (<kbd>Ctrl+V</kbd>) and drag-and-drop.
+- Resolved TypeScript compiler type checks (`tsc --noEmit` passing with 0 errors).
+
+---
+
 ## [0.4.5] - 2026-09-01
 
 ### Added

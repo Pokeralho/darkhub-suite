@@ -181,13 +181,35 @@ export async function ensureFfmpeg(toolsDir, platform) {
   return dest
 }
 
+let activeYtDlpChild = null
+
+export function cancelActiveYtDlp() {
+  if (activeYtDlpChild) {
+    try {
+      const pid = activeYtDlpChild.pid
+      if (process.platform === 'win32' && pid) {
+        import('node:child_process').then(cp => {
+          try {
+            cp.execSync(`taskkill /F /T /PID ${pid}`, { windowsHide: true })
+          } catch {}
+        })
+      }
+      activeYtDlpChild.kill('SIGKILL')
+    } catch {}
+    activeYtDlpChild = null
+    return true
+  }
+  return false
+}
+
 export function runYtDlp(ytdlpPath, args, { timeoutMs = 0, onProgress = null } = {}) {
   return new Promise((resolve, reject) => {
-
     const finalArgs = onProgress && !args.includes('--newline') ? ['--newline', ...args] : args
     const child = spawn(ytdlpPath, finalArgs, { windowsHide: true })
+    activeYtDlpChild = child
     let stdout = ''
     let stderr = ''
+    let isCanceled = false
 
     const timer =
       typeof timeoutMs === 'number' && timeoutMs > 0
@@ -204,7 +226,6 @@ export function runYtDlp(ytdlpPath, args, { timeoutMs = 0, onProgress = null } =
       const text = chunk.toString()
       stdout += text
       if (onProgress) {
-
         const lines = text.split(/\r?\n/)
         for (const line of lines) {
           const trimmed = line.trim()
@@ -261,13 +282,16 @@ export function runYtDlp(ytdlpPath, args, { timeoutMs = 0, onProgress = null } =
       stderr += chunk.toString()
     })
     child.on('error', (err) => {
+      if (activeYtDlpChild === child) activeYtDlpChild = null
       if (timer) clearTimeout(timer)
       reject(err)
     })
     child.on('close', (code) => {
+      if (activeYtDlpChild === child) activeYtDlpChild = null
       if (timer) clearTimeout(timer)
-      resolve({ code, stdout, stderr })
+      resolve({ code, stdout, stderr, canceled: isCanceled })
     })
   })
 }
+
 

@@ -63,6 +63,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
       items: [
         { id: 'darkpacer', label: t('nav.darkpacer', 'DarkPacer (FPS Lock)'), icon: Activity, badge: 'DXGI' },
         { id: 'optiscaler', label: t('nav.optiscaler', 'OptiScaler Manager'), icon: Cpu },
+        { id: 'steam-lua', label: t('nav.steamLua', 'Steam Lua Tools'), icon: Gamepad2, badge: 'stplug-in' },
         { id: 'pge-portable', label: 'PGE Portable', icon: Gamepad2 },
         { id: 'optimizer', label: t('nav.optimizer', 'System Optimizer'), icon: Zap },
         { id: 'ultra-latency', label: t('nav.ultralatency', 'Ultra Low Latency'), icon: Flame },
@@ -129,7 +130,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
             DarkHub Suite
           </span>
-          <span className="text-[10px] text-zinc-500 font-mono">v0.4.5</span>
+          <span className="text-[10px] text-zinc-500 font-mono">v0.4.6</span>
         </div>
 
         <div className="flex-1 h-full drag-region" />
@@ -257,4 +258,3 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
 };
 
 export default MainLayout;
-

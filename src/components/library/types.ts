@@ -46,6 +46,7 @@ export type Game = {
   profiles?: GameProfile[]
   defaultProfileId?: string
   optiscaler?: OptiScalerConfig
+  steamAppId?: number
   playtimeSeconds?: number
   playCount?: number
   lastPlayedAt?: number | null

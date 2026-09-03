@@ -74,10 +74,11 @@ contextBridge.exposeInMainWorld('darkhub', {
     getGpuInfo: () => ipcRenderer.invoke('optimizer:getGpuInfo'),
     getHagsStatus: () => ipcRenderer.invoke('optimizer:getHagsStatus'),
     setHagsStatus: (payload) => ipcRenderer.invoke('optimizer:setHagsStatus', payload),
-    winUtilTweaks: () => ipcRenderer.invoke('optimizer:winUtilTweaks'),
     deepTweaksList: () => ipcRenderer.invoke('optimizer:deepTweaksList'),
+    deepTweaksStatus: () => ipcRenderer.invoke('optimizer:deepTweaksStatus'),
     deepTweaksAnalyze: (payload) => ipcRenderer.invoke('optimizer:deepTweaksAnalyze', payload),
     deepTweaksApply: (payload) => ipcRenderer.invoke('optimizer:deepTweaksApply', payload),
+    deepTweaksRevert: (payload) => ipcRenderer.invoke('optimizer:deepTweaksRevert', payload),
     deepTweaksUndo: (payload) => ipcRenderer.invoke('optimizer:deepTweaksUndo', payload),
     setDnsServers: (payload) => ipcRenderer.invoke('optimizer:setDnsServers', payload),
     getStartupItems: () => ipcRenderer.invoke('optimizer:getStartupItems'),
@@ -86,6 +87,10 @@ contextBridge.exposeInMainWorld('darkhub', {
     disableService: (name) => ipcRenderer.invoke('optimizer:disableService', name),
     getInstalledPrograms: () => ipcRenderer.invoke('optimizer:getInstalledPrograms'),
     uninstallProgram: (uninstallString) => ipcRenderer.invoke('optimizer:uninstallProgram', uninstallString),
+    uninstallProgramWithLeftovers: (payload) => ipcRenderer.invoke('optimizer:uninstallProgramWithLeftovers', payload),
+    advancedNetworkApply: () => ipcRenderer.invoke('optimizer:advancedNetworkApply'),
+    advancedNetworkRevert: () => ipcRenderer.invoke('optimizer:advancedNetworkRevert'),
+    globalRecommendedTweaks: () => ipcRenderer.invoke('optimizer:globalRecommendedTweaks'),
     getDefenderControlStatus: () => ipcRenderer.invoke('optimizer:getDefenderControlStatus'),
     applyDefenderControl: (payload) => ipcRenderer.invoke('optimizer:applyDefenderControl', payload),
     openTamperSettings: () => ipcRenderer.invoke('optimizer:openTamperSettings'),
@@ -110,6 +115,7 @@ contextBridge.exposeInMainWorld('darkhub', {
   youtube: {
     getVideoInfo: (payload) => ipcRenderer.invoke('youtube:getVideoInfo', payload),
     download: (payload) => ipcRenderer.invoke('youtube:download', payload),
+    cancel: () => ipcRenderer.invoke('youtube:cancel'),
     onProgress: (callback) => {
       const listener = (_event, data) => callback(data)
       ipcRenderer.on('youtube:downloadProgress', listener)
@@ -313,5 +319,25 @@ contextBridge.exposeInMainWorld('darkhub', {
     tracert: (host) => ipcRenderer.invoke('network:tracert', host),
     adapterInfo: () => ipcRenderer.invoke('network:adapterInfo'),
     renewIp: () => ipcRenderer.invoke('network:renewIp')
+  },
+  steamLua: {
+    getStatus: () => ipcRenderer.invoke('steamLua:getStatus'),
+    listInstalled: () => ipcRenderer.invoke('steamLua:listInstalled'),
+    getDetails: (appId) => ipcRenderer.invoke('steamLua:getDetails', appId),
+    saveLuaText: (payload) => ipcRenderer.invoke('steamLua:saveLuaText', payload),
+    toggleDepot: (payload) => ipcRenderer.invoke('steamLua:toggleDepot', payload),
+    toggleOnlineFix: (payload) => ipcRenderer.invoke('steamLua:toggleOnlineFix', payload),
+    deleteLua: (appId) => ipcRenderer.invoke('steamLua:deleteLua', appId),
+    installLua: (payload) => ipcRenderer.invoke('steamLua:installLua', payload),
+    installManifest: (filePath) => ipcRenderer.invoke('steamLua:installManifest', filePath),
+    restartSteam: () => ipcRenderer.invoke('steamLua:restartSteam'),
+    fetchStoreInfo: (appId) => ipcRenderer.invoke('steamLua:fetchStoreInfo', appId),
+    openStPlugInFolder: () => ipcRenderer.invoke('steamLua:openStPlugInFolder'),
+    downloadAndInstallPackage: (params) => ipcRenderer.invoke('steamLua:downloadAndInstallPackage', params)
+  },
+  steamUnlocker: {
+    getStatus: () => ipcRenderer.invoke('steamUnlocker:getStatus'),
+    install: (mode) => ipcRenderer.invoke('steamUnlocker:install', mode),
+    uninstall: () => ipcRenderer.invoke('steamUnlocker:uninstall')
   }
 })

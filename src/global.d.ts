@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 export interface DarkHubAPI {
   hardware: {
     onUpdate: (callback: (data: any) => void) => () => void;
@@ -64,7 +66,8 @@ export interface DarkHubAPI {
     undoDns: (payload: any) => Promise<any>;
     onRunEvent: (callback: (payload: any) => void) => () => void;
     listBloatware: () => Promise<any>;
-    removeSelectedBloatware: (apps: string[]) => Promise<any>;
+    removeSelectedBloatware: (payload: { appIds: string[] } | string[]) => Promise<any>;
+    applyTweak?: (id: string, options?: any) => Promise<any>;
     getRunningProcesses: () => Promise<any>;
     setProcessPriority: (payload: {pid: number, priority: string}) => Promise<any>;
     getGpuPreferences: () => Promise<{ ok: boolean; preferences?: Array<{ appPath: string; appName: string; preference: string; rawValue: string }>; error?: string }>;
@@ -73,18 +76,23 @@ export interface DarkHubAPI {
     getGpuInfo: () => Promise<{ ok: boolean; controllers?: Array<{ model: string; vendor: string; vram: number; bus: string; isDedicated: boolean }>; error?: string }>;
     getHagsStatus: () => Promise<{ ok: boolean; enabled: boolean; value: string; error?: string }>;
     setHagsStatus: (payload: { enabled: boolean }) => Promise<{ ok: boolean; msg?: string; error?: string }>;
-    winUtilTweaks: () => Promise<any>;
     deepTweaksList: () => Promise<any>;
+    deepTweaksStatus: () => Promise<{ ok: boolean; status: Record<string, boolean> }>;
     deepTweaksAnalyze: (payload: { tweakIds: string[] }) => Promise<any>;
     deepTweaksApply: (payload: { tweakIds: string[] }) => Promise<any>;
+    deepTweaksRevert: (payload: { tweakIds: string[] }) => Promise<any>;
     deepTweaksUndo: (payload: { undoToken: string }) => Promise<any>;
     setDnsServers: (payload: { primary: string; secondary: string }) => Promise<any>;
     getStartupItems: () => Promise<any>;
     disableStartupItem: (payload: {name: string, type: string, path: string}) => Promise<any>;
     getServices: () => Promise<any>;
     disableService: (name: string) => Promise<any>;
-    getInstalledPrograms: () => Promise<any>;
+    getInstalledPrograms: () => Promise<{ ok: boolean; programs?: Array<{ name: string; version: string; publisher: string; installDate: string; installLocation: string; uninstallString: string; isQuiet: boolean }>; error?: string }>;
     uninstallProgram: (uninstallString: string) => Promise<any>;
+    uninstallProgramWithLeftovers: (payload: { name: string; uninstallString: string; installLocation?: string; publisher?: string }) => Promise<{ ok: boolean; msg?: string; leftoversRemoved?: number; error?: string }>;
+    advancedNetworkApply: () => Promise<{ ok: boolean; msg?: string; error?: string }>;
+    advancedNetworkRevert: () => Promise<{ ok: boolean; msg?: string; error?: string }>;
+    globalRecommendedTweaks: () => Promise<any>;
     getDefenderControlStatus: () => Promise<any>;
     applyDefenderControl: (payload: { action: 'disable' | 'enable' | 'check' }) => Promise<any>;
     openTamperSettings: () => Promise<any>;
@@ -109,6 +117,7 @@ export interface DarkHubAPI {
   youtube: {
     getVideoInfo: (payload: any) => Promise<any>;
     download: (payload: any) => Promise<any>;
+    cancel: () => Promise<{ ok: boolean; stopped?: boolean; error?: string }>;
     onProgress: (callback: (data: { percent: number; totalSize: string; speed: string; eta: string; line: string }) => void) => () => void;
   };
   ocr: {
@@ -296,7 +305,136 @@ export interface DarkHubAPI {
     adapterInfo: () => Promise<any>;
     renewIp: () => Promise<any>;
   };
+  steamLua: {
+    getStatus: () => Promise<{
+      isValid: boolean;
+      isRunning: boolean;
+      steamPath: string | null;
+      stPlugInDir: string | null;
+      depotCacheDir: string | null;
+      language: string | null;
+      luaCount: number;
+    }>;
+    listInstalled: () => Promise<Array<{
+      appId: number;
+      fileName: string;
+      filePath: string;
+      updatedAt: number;
+      sizeBytes: number;
+      depotCount: number;
+      dlcCount: number;
+      hasActivePins: boolean;
+      entriesCount: number;
+      disabledCount: number;
+      baseAppId: number;
+    }>>;
+    getDetails: (appId: number) => Promise<{
+      baseAppId: number;
+      entries: Array<{
+        id: number;
+        key: string | null;
+        hasKey: boolean;
+        manifestId: string | null;
+        commentedManifestId: string | null;
+        comment: string | null;
+        sizeOnDisk: number | null;
+        isEnabled: boolean;
+        isLocked: boolean;
+      }>;
+      disabledEntries: Array<{
+        id: number;
+        key: string | null;
+        hasKey: boolean;
+        manifestId: string | null;
+        commentedManifestId: string | null;
+        comment: string | null;
+        sizeOnDisk: number | null;
+        isEnabled: boolean;
+        isLocked: boolean;
+      }>;
+      activePins: Record<string, string>;
+      commentedPins: Record<string, string>;
+      depotCount: number;
+      dlcCount: number;
+      hasActivePins: boolean;
+      rawText: string;
+      appId: number;
+      filePath: string;
+    } | null>;
+    saveLuaText: (payload: { appId: number; rawText: string }) => Promise<boolean>;
+    toggleDepot: (payload: { appId: number; depotId: number; options: { enabled?: boolean; locked?: boolean } }) => Promise<any>;
+    deleteLua: (appId: number) => Promise<boolean>;
+    installLua: (payload: { filePath: string; appId: number; options?: { autoUpdate?: boolean; forceLocked?: boolean } }) => Promise<{ ok: boolean; targetFile?: string }>;
+    installManifest: (filePath: string) => Promise<{ ok: boolean; targetFile?: string }>;
+    restartSteam: () => Promise<boolean>;
+    fetchStoreInfo: (appId: number) => Promise<{
+      appId: number;
+      name: string;
+      headerImage: string;
+      dlcList: number[];
+      developers: string[];
+      publishers: string[];
+      genres: string[];
+    } | null>;
+    getStorePluginStatus: () => Promise<{
+      isInstalled: boolean;
+      isDaemonRunning: boolean;
+      rpcReachable?: boolean;
+      cdpReachable?: boolean;
+      storeTabsDetected?: number;
+      storeTabsInjected?: number;
+      lastInjectionError?: string;
+    }>;
+    toggleStorePlugin: (enable: boolean) => Promise<{
+      ok: boolean;
+      isInstalled: boolean;
+      isDaemonRunning?: boolean;
+      rpcReachable?: boolean;
+      cdpReachable?: boolean;
+      storeTabsDetected?: number;
+      storeTabsInjected?: number;
+      requiresRestart?: boolean;
+      error?: string;
+      lastInjectionError?: string;
+    }>;
+    refreshLibrary: () => Promise<{ ok: boolean }>;
+    openStPlugInFolder?: () => Promise<any>;
+    toggleOnlineFix?: (payload: { appId: number; enable: boolean }) => Promise<any>;
+    downloadAndInstallPackage: (params: {
+      appId: number;
+      autoUpdate?: boolean;
+      onlineFix?: boolean;
+    }) => Promise<{
+      ok: boolean;
+      appId?: number;
+      packageDownloaded?: boolean;
+      manifestsCount?: number;
+      error?: string;
+      message?: string;
+    }>;
+  };
+  steamUnlocker: {
+    getStatus: () => Promise<{
+      isInstalled: boolean;
+      mode: string;
+      filesPresent: string[];
+      steamPath?: string;
+      error?: string;
+    }>;
+    install: (mode?: string) => Promise<{
+      ok: boolean;
+      mode?: string;
+      version?: string;
+      error?: string;
+    }>;
+    uninstall: () => Promise<{
+      ok: boolean;
+      error?: string;
+    }>;
+  };
 }
+
+declare module 'crypto-js';
 
 declare global {
   interface Window {

@@ -37,7 +37,7 @@ function shouldMigrateVerifyUrl(value) {
   if (!value) return true
   const normalized = String(value).trim()
   return (
-    /^(http:\/\/)?(127\.0\.0\.1|localhost)(:\d+)?\
+    /^(http:\/\/)?(127\.0\.0\.1|localhost)(:\d+)?/i.test(normalized)
     || /your-domain\.com/i.test(normalized)
     || /example\.(com|org|net)/i.test(normalized)
     || /luluhub\.shop/i.test(normalized)

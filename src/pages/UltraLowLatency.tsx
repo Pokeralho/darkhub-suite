@@ -746,7 +746,7 @@ export default function UltraLowLatency() {
             <button
               onClick={save}
               disabled={saving}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition-colors disabled:opacity-50"
             >
               {saving ? 'Salvando…' : 'Salvar'}
             </button>

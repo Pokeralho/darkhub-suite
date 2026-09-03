@@ -152,6 +152,18 @@ const YoutubeDownloader = () => {
     setIsSearching(false);
   };
 
+  const handleCancelDownload = async () => {
+    if (!window.darkhub?.youtube?.cancel) return;
+    try {
+      await window.darkhub.youtube.cancel();
+      setIsDownloading(false);
+      setProgress(null);
+      setDownloadStatus({ ok: false, msg: 'Download cancelado pelo usuário.' });
+    } catch (err: any) {
+      console.error('Failed to cancel download:', err);
+    }
+  };
+
   const handleDownload = async () => {
     if (!url || !info) return;
     setIsDownloading(true);
@@ -226,7 +238,7 @@ const YoutubeDownloader = () => {
     : [];
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12">
+    <div className="w-full max-w-6xl mx-auto space-y-6 pb-12">
       {}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
@@ -405,25 +417,31 @@ const YoutubeDownloader = () => {
 
       {}
       {progress && (
-        <div className="p-5 rounded-2xl border border-red-500/30 bg-zinc-900/90 shadow-xl space-y-3">
+        <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/90 shadow-sm space-y-3 animate-fadeIn">
           <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <Zap size={15} className="text-red-400 animate-bounce" />
-              <span className="font-semibold text-zinc-200">
+            <div className="flex items-center gap-2 min-w-0 flex-1 mr-3">
+              <Loader2 className="w-4 h-4 text-rose-500 animate-spin flex-shrink-0" />
+              <span className="font-semibold text-zinc-100 truncate">
                 {progress.line || t('youtube.downloading', 'Baixando...')}
               </span>
             </div>
-            <div className="flex items-center gap-3 font-mono">
-              {progress.speed && <span className="text-emerald-400">{progress.speed}</span>}
-              {progress.eta && <span className="text-zinc-400">ETA: {progress.eta}</span>}
-              <span className="text-red-400 font-bold">{Math.round(progress.percent)}%</span>
+            <div className="flex items-center gap-3 font-mono flex-shrink-0">
+              {progress.speed && <span className="text-emerald-400 text-[11px]">{progress.speed}</span>}
+              {progress.eta && <span className="text-zinc-400 text-[11px]">ETA: {progress.eta}</span>}
+              <span className="text-rose-400 font-bold">{Math.round(progress.percent)}%</span>
+              <button
+                onClick={handleCancelDownload}
+                className="ml-2 px-2.5 py-1 bg-zinc-800 hover:bg-rose-950 text-rose-400 hover:text-rose-300 border border-zinc-700/60 hover:border-rose-500/40 rounded-lg text-xs font-semibold transition"
+              >
+                Parar / Cancelar
+              </button>
             </div>
           </div>
 
-          <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden">
+          <div className="h-2 w-full bg-zinc-950 rounded-full overflow-hidden border border-zinc-800/80">
             <div
-              className="h-full bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 rounded-full transition-all duration-300"
-              style={{ width: `${Math.max(5, progress.percent)}%` }}
+              className="h-full bg-rose-600 rounded-full transition-all duration-300"
+              style={{ width: `${Math.max(2, progress.percent)}%` }}
             />
           </div>
         </div>
@@ -648,7 +666,7 @@ const YoutubeDownloader = () => {
               </div>
 
               {}
-              <div className="flex items-center justify-between pt-2 border-t border-zinc-800/60">
+              <div className="flex items-center justify-between pt-2 border-t border-zinc-800/80">
                 <div className="flex items-center gap-2">
                   {!info.isPlaylist && videoFormats.length > 0 && (
                     <select

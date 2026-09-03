@@ -22,10 +22,10 @@ const formatBytes = (bytes: number | null | undefined) => {
 };
 
 const PropertyRow = ({ label, value, status }: { label: string, value: React.ReactNode, status?: string }) => (
-  <div className="flex justify-between items-center py-2.5 border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/30 px-3 rounded transition-colors group">
+  <div className="flex justify-between items-center py-2.5 border-b border-zinc-800/80 last:border-0 hover:bg-zinc-800/30 px-3 rounded transition-colors group">
     <span className="text-sm text-zinc-400 group-hover:text-zinc-300">{label}</span>
     <div className="flex items-center gap-2">
-      {status === 'Error' && <AlertTriangle size={14} className="text-amber-500" title="Falha ao ler sensor" />}
+      {status === 'Error' && <span title="Falha ao ler sensor"><AlertTriangle size={14} className="text-amber-500" /></span>}
       {status === 'OK' && <CheckCircle2 size={14} className="text-emerald-500" />}
       <span className="text-sm font-medium text-zinc-200">{value ?? '—'}</span>
     </div>
@@ -468,7 +468,7 @@ const SystemMonitor = () => {
                 const Icon = cat.icon;
                 return (
                   <div key={key} className="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 shadow-lg space-y-4">
-                    <div className="flex items-center gap-2 pb-3 border-b border-zinc-800/60">
+                    <div className="flex items-center gap-2 pb-3 border-b border-zinc-800/80">
                       <Icon size={18} className="text-indigo-400" />
                       <h3 className="font-bold text-zinc-200 text-sm tracking-wide uppercase">{cat.title}</h3>
                     </div>

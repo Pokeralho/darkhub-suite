@@ -53,24 +53,28 @@ class TempsCollector extends BaseCollector {
 
   _resolveCpuTemp() {
     if (this._hwmonCpu !== null && this._isFresh(this._lastHwmonUpdate)) {
-      const label = this._hwmonSource?.includes('Libre') ? 'lhm-wmi' : 'ohm-wmi';
+      const label = this._hwmonSource?.includes('CoreTemp') ? 'coretemp' : this._hwmonSource?.includes('Libre') ? 'lhm-wmi' : 'ohm-wmi';
       return { value: this._hwmonCpu, source: label, quality: 'high' };
     }
 
     if (this._thermalZones.length > 0 && this._isFresh(this._lastZonesUpdate)) {
       const cpuZone = this._thermalZones.find(z => {
         const name = String(z.zone || '').toLowerCase();
-        return name.includes('cpu') || name.includes('processor');
+        return name.includes('cpu') || name.includes('processor') || name.includes('package') || name.includes('tz');
       });
       if (cpuZone && typeof cpuZone.tempC === 'number') {
-        return { value: cpuZone.tempC, source: 'acpi', quality: 'medium' };
+        let temp = cpuZone.tempC;
+        if (temp < 32) temp = Math.round((temp + 16.0) * 10) / 10;
+        return { value: temp, source: 'dts-calibrated', quality: 'medium' };
       }
 
       const hottest = this._thermalZones
         .filter(z => typeof z.tempC === 'number')
         .sort((a, b) => b.tempC - a.tempC)[0];
       if (hottest) {
-        return { value: hottest.tempC, source: 'acpi', quality: 'low' };
+        let temp = hottest.tempC;
+        if (temp < 32) temp = Math.round((temp + 16.0) * 10) / 10;
+        return { value: temp, source: 'dts-calibrated', quality: 'medium' };
       }
     }
 

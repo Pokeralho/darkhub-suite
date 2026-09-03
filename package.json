@@ -1,6 +1,6 @@
 {
   "name": "darkhub-suite",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "description": "High-performance modular Windows utility suite for gamers and power users.",
   "author": "DarkHub Team",
   "license": "MIT",
@@ -11,7 +11,7 @@
     "dev:renderer": "vite",
     "dev:electron": "wait-on http://localhost:5173 && electron .",
     "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\"",
-    "build:native": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.LatencyEngine.exe electron\\services\\DarkHub.LatencyEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.FrameLimiter.exe electron\\services\\DarkHub.FrameLimiter.cs\"",
+    "build:native": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.LatencyEngine.exe electron\\services\\DarkHub.LatencyEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.FrameLimiter.exe electron\\services\\DarkHub.FrameLimiter.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.ClickEngine.exe electron\\services\\DarkHub.ClickEngine.cs\"",
     "build:renderer": "vite build",
     "build": "npm run build:native && npm run build:renderer && electron-builder",
     "build:setup-sfx": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create-sfx-setup.ps1",
@@ -67,7 +67,7 @@
       "onlyLoadAppFromAsar": false
     },
     "directories": {
-      "output": "dist_app"
+      "output": "dist_app_release"
     },
     "files": [
       "dist/**",
