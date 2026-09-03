@@ -1,4 +1,8 @@
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import ElevationHelper from './ElevationHelper.js';
+
+const execAsync = promisify(exec);
 
 class SystemEngine {
 
@@ -205,12 +209,13 @@ class SystemEngine {
 
   async restartExplorer() {
     if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
-    const script = `
-      taskkill /f /im explorer.exe
-      Start-Sleep -Milliseconds 400
-      Start-Process explorer.exe
-    `;
-    await ElevationHelper.runElevatedPowerShell(script);
+    try {
+      await execAsync('powershell -NoProfile -Command "Stop-Process -Name explorer -Force; Start-Sleep -Milliseconds 600; Start-Process explorer.exe"');
+    } catch {
+      try {
+        await execAsync('cmd.exe /c "taskkill /f /im explorer.exe & start explorer.exe"');
+      } catch {}
+    }
     return { ok: true, msg: 'Windows Explorer reiniciado com sucesso.' };
   }
 
