@@ -63,10 +63,15 @@ class UpdateService {
       updater.on('update-available', (info) => {
         Logger.info('UpdateService', `Update available: v${info.version}`);
         this._setState('available');
+        const assetName = info.files?.[0]?.url || `DarkHub-Setup-${info.version}.exe`;
+        const downloadUrl = `https://github.com/${this._repoOwner}/${this._repoName}/releases/download/v${info.version}/${assetName}`;
+
         this._updateInfo = {
           version: info.version,
           releaseDate: info.releaseDate,
           releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : (Array.isArray(info.releaseNotes) ? info.releaseNotes.map(n => n.note).join('\n') : null),
+          downloadUrl: downloadUrl,
+          assetName: assetName,
           githubUrl: `https://github.com/${this._repoOwner}/${this._repoName}/releases/tag/v${info.version}`
         };
         this._emit({
@@ -194,7 +199,7 @@ class UpdateService {
 
     this._setState('downloading');
 
-    if (this._updater && app.isPackaged && !this._updateInfo.downloadUrl) {
+    if (this._updater && app.isPackaged) {
       try {
         await this._updater.downloadUpdate();
         return { ok: true };
@@ -204,9 +209,8 @@ class UpdateService {
     }
 
     if (!this._updateInfo.downloadUrl) {
-      this._setState('error');
-      this._emit({ type: 'error', stage: 'error', message: 'Download URL not found in release.' });
-      return { ok: false, error: 'No asset URL available' };
+      const fileName = this._updateInfo.assetName || `DarkHub-Setup-${this._updateInfo.version}.exe`;
+      this._updateInfo.downloadUrl = `https://github.com/${this._repoOwner}/${this._repoName}/releases/download/v${this._updateInfo.version}/${fileName}`;
     }
 
     return new Promise((resolve) => {
