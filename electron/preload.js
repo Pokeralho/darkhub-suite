@@ -333,7 +333,8 @@ contextBridge.exposeInMainWorld('darkhub', {
     restartSteam: () => ipcRenderer.invoke('steamLua:restartSteam'),
     fetchStoreInfo: (appId) => ipcRenderer.invoke('steamLua:fetchStoreInfo', appId),
     openStPlugInFolder: () => ipcRenderer.invoke('steamLua:openStPlugInFolder'),
-    downloadAndInstallPackage: (params) => ipcRenderer.invoke('steamLua:downloadAndInstallPackage', params)
+    downloadAndInstallPackage: (params) => ipcRenderer.invoke('steamLua:downloadAndInstallPackage', params),
+    configureSpacewarAppIdTxt: (payload) => ipcRenderer.invoke('steamLua:configureSpacewarAppIdTxt', payload)
   },
   steamUnlocker: {
     getStatus: () => ipcRenderer.invoke('steamUnlocker:getStatus'),

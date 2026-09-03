@@ -372,8 +372,14 @@ export class SteamLuaManager {
     const status = this.getSteamStatus();
     if (!status.stPlugInDir) throw new Error('Steam stplug-in directory not found');
     fs.mkdirSync(status.stPlugInDir, { recursive: true });
+
+    const clean = String(rawText || '')
+      .replace(/^\uFEFF/, '')
+      .replace(/\r\n/g, '\n')
+      .trim();
+
     const filePath = path.join(status.stPlugInDir, `${appId}.lua`);
-    fs.writeFileSync(filePath, rawText, 'utf8');
+    fs.writeFileSync(filePath, clean ? clean + '\n' : '', 'utf8');
     return true;
   }
 
@@ -552,6 +558,13 @@ export class SteamLuaManager {
           fs.writeFileSync(path.join(stPlugIn, `${appId}.lua`), starter, 'utf8');
         }
 
+        if (onlineFix) {
+          const p480 = path.join(stPlugIn, '480.lua');
+          if (!fs.existsSync(p480)) {
+            fs.writeFileSync(p480, '-- Spacewar (AppID 480) - Steamworks SDK Test Application\naddappid(480)\n', 'utf8');
+          }
+        }
+
         return { ok: true, appId, packageDownloaded: true, manifestsCount: files.filter(f => f.endsWith('.manifest')).length };
       } else {
         // Fallback starter lua
@@ -559,6 +572,14 @@ export class SteamLuaManager {
         let starter = `addappid(${appId}) -- Added via DarkHub Suite\n`;
         if (onlineFix) starter += 'addappid(480) -- Spacewar Online Fix\n';
         fs.writeFileSync(luaPath, starter, 'utf8');
+
+        if (onlineFix) {
+          const p480 = path.join(stPlugIn, '480.lua');
+          if (!fs.existsSync(p480)) {
+            fs.writeFileSync(p480, '-- Spacewar (AppID 480) - Steamworks SDK Test Application\naddappid(480)\n', 'utf8');
+          }
+        }
+
         return { ok: true, appId, packageDownloaded: false, message: 'Game entitlement added (No remote manifest package found)' };
       }
     } finally {
@@ -607,14 +628,24 @@ export class SteamLuaManager {
   }
 
   toggleOnlineFix(appId, enable) {
+    const status = this.getSteamStatus();
     const details = this.getLuaDetails(appId);
     if (!details) throw new Error('Arquivo Lua não encontrado para o AppID ' + appId);
 
     let raw = details.rawText;
     const has480 = /addappid\s*\(\s*480\s*\)/i.test(raw);
 
-    if (enable && !has480) {
-      raw = raw.trim() + '\n-- Spacewar Online Fix\naddappid(480)\n';
+    if (enable) {
+      if (!has480) {
+        raw = raw.trim() + '\n-- Spacewar Online Fix (Steamworks SDK Test Entitlement)\naddappid(480)\n';
+      }
+      // Ensure 480.lua is registered in stplug-in
+      if (status.stPlugInDir) {
+        const path480 = path.join(status.stPlugInDir, '480.lua');
+        if (!fs.existsSync(path480)) {
+          fs.writeFileSync(path480, '-- Spacewar (AppID 480) - Steamworks SDK Test Application\naddappid(480)\n', 'utf8');
+        }
+      }
     } else if (!enable && has480) {
       raw = raw
         .split(/\r?\n/)
@@ -624,6 +655,26 @@ export class SteamLuaManager {
 
     this.saveLuaText(appId, raw);
     return this.getLuaDetails(appId);
+  }
+
+  configureSpacewarAppIdTxt(targetPath, testAppId = 480) {
+    if (!targetPath || typeof targetPath !== 'string') {
+      throw new Error('Caminho inválido fornecido');
+    }
+    let targetDir = targetPath;
+    try {
+      if (fs.existsSync(targetPath) && fs.statSync(targetPath).isFile()) {
+        targetDir = path.dirname(targetPath);
+      }
+    } catch {}
+
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    const appidFile = path.join(targetDir, 'steam_appid.txt');
+    fs.writeFileSync(appidFile, String(testAppId).trim() + '\n', 'utf8');
+    return { ok: true, path: appidFile, appId: testAppId };
   }
 }
 

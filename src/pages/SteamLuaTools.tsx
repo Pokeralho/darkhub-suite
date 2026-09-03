@@ -236,6 +236,31 @@ export default function SteamLuaTools() {
     await window.darkhub.steamLua.openStPlugInFolder?.();
   };
 
+  const handleGenerateSteamAppIdTxt = async () => {
+    if (!window.darkhub?.steamLua?.configureSpacewarAppIdTxt || !window.darkhub?.dialog) return;
+    try {
+      const folderRes = await window.darkhub.dialog.selectFolder({
+        title: 'Selecionar Pasta do Jogo para steam_appid.txt'
+      });
+      if (!folderRes.canceled && folderRes.folderPath) {
+        const res = await window.darkhub.steamLua.configureSpacewarAppIdTxt({
+          targetPath: folderRes.folderPath,
+          appId: 480
+        });
+        if (res.ok) {
+          setStatusMessage({
+            type: 'success',
+            text: `✓ steam_appid.txt (AppID 480) gerado em: ${res.path}`
+          });
+        } else {
+          setStatusMessage({ type: 'error', text: res.error || 'Falha ao gerar steam_appid.txt' });
+        }
+      }
+    } catch (err: any) {
+      setStatusMessage({ type: 'error', text: err?.message || 'Erro ao gerar steam_appid.txt' });
+    }
+  };
+
   const handleToggleUnlocker = async () => {
     if (!window.darkhub?.steamUnlocker) return;
     setTogglingUnlocker(true);
@@ -432,6 +457,14 @@ export default function SteamLuaTools() {
           >
             <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />
             {t('steamLua.openFolder', 'Abrir Pasta stplug-in')}
+          </button>
+          <button
+            onClick={handleGenerateSteamAppIdTxt}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800/90 hover:bg-zinc-700 text-xs font-medium text-zinc-200 border border-zinc-700/60 transition shadow-sm"
+            title="Criar arquivo steam_appid.txt (480) na pasta de um jogo instalado"
+          >
+            <FileCode className="w-3.5 h-3.5 text-sky-400" />
+            steam_appid.txt (480)
           </button>
           <button
             onClick={handleRestartSteam}

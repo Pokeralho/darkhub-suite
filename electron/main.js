@@ -3058,6 +3058,12 @@ ipcMain.handle('steamLua:toggleOnlineFix', async (_event, payload) => {
   return steamLuaService.toggleOnlineFix(Number(appId), enable)
 })
 
+ipcMain.handle('steamLua:configureSpacewarAppIdTxt', async (_event, payload) => {
+  const targetPath = payload?.targetPath
+  const appId = payload?.appId || 480
+  return steamLuaService.configureSpacewarAppIdTxt(targetPath, appId)
+})
+
 ipcMain.handle('steamLua:deleteLua', async (_event, appId) => {
   return steamLuaService.deleteLua(Number(appId))
 })

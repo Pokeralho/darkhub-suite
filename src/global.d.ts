@@ -400,6 +400,7 @@ export interface DarkHubAPI {
     refreshLibrary: () => Promise<{ ok: boolean }>;
     openStPlugInFolder?: () => Promise<any>;
     toggleOnlineFix?: (payload: { appId: number; enable: boolean }) => Promise<any>;
+    configureSpacewarAppIdTxt?: (payload: { targetPath: string; appId?: number }) => Promise<{ ok: boolean; path?: string; appId?: number; error?: string }>;
     downloadAndInstallPackage: (params: {
       appId: number;
       autoUpdate?: boolean;
