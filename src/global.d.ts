@@ -433,6 +433,44 @@ export interface DarkHubAPI {
       error?: string;
     }>;
   };
+  goldberg: {
+    applyFix: (payload: {
+      gameDir: string;
+      appId: string;
+      options?: {
+        language?: string;
+        accountName?: string;
+        offline?: boolean;
+        disableNetworking?: boolean;
+        disableOverlay?: boolean;
+        localSave?: boolean;
+        generateInterfaces?: boolean;
+      };
+    }) => Promise<{
+      ok: boolean;
+      actions: string[];
+      backupsCreated?: string[];
+      error?: string;
+      message?: string;
+      type: string;
+    }>;
+    removeFix: (gameDir: string) => Promise<{
+      ok: boolean;
+      actions: string[];
+      error?: string;
+      message?: string;
+      type: string;
+    }>;
+    checkStatus: (gameDir: string) => Promise<{
+      applied: boolean;
+      hasBackups: boolean;
+      dllsFound: string[];
+      settingsDir: boolean;
+      appId: string | null;
+      primaryDir: string | null;
+    }>;
+    getSupportedLanguages: () => Promise<string[]>;
+  };
 }
 
 declare module 'crypto-js';

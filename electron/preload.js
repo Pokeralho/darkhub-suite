@@ -340,5 +340,11 @@ contextBridge.exposeInMainWorld('darkhub', {
     getStatus: () => ipcRenderer.invoke('steamUnlocker:getStatus'),
     install: (mode) => ipcRenderer.invoke('steamUnlocker:install', mode),
     uninstall: () => ipcRenderer.invoke('steamUnlocker:uninstall')
+  },
+  goldberg: {
+    applyFix: (payload) => ipcRenderer.invoke('goldberg:applyFix', payload),
+    removeFix: (gameDir) => ipcRenderer.invoke('goldberg:removeFix', gameDir),
+    checkStatus: (gameDir) => ipcRenderer.invoke('goldberg:checkStatus', gameDir),
+    getSupportedLanguages: () => ipcRenderer.invoke('goldberg:getSupportedLanguages')
   }
 })

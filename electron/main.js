@@ -46,6 +46,7 @@ import FramePacerEngine from './services/FramePacerEngine.js'
 import { createFramePacerOverlay, closeFramePacerOverlay, toggleFramePacerOverlay, setOverlayClickThrough, setOverlayConfig, getOverlayStatus } from './services/FramePacerOverlay.js'
 import { steamLuaService, SteamLocator } from './services/SteamLuaService.js'
 import { steamUnlockerService } from './services/SteamUnlockerService.js'
+import { goldbergService } from './services/GoldbergService.js'
 protocol.registerSchemesAsPrivileged([
   { scheme: 'local-resource', privileges: { bypassCSP: true, secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }
 ])
@@ -3120,6 +3121,28 @@ ipcMain.handle('steamUnlocker:install', async (_event, mode) => {
 
 ipcMain.handle('steamUnlocker:uninstall', async () => {
   return steamUnlockerService.uninstallUnlocker()
+})
+
+// === Goldberg Steam Emulator ===
+
+ipcMain.handle('goldberg:applyFix', async (_event, payload) => {
+  const { gameDir, appId, options } = payload || {}
+  if (!gameDir || !appId) throw new Error('gameDir e appId são obrigatórios')
+  return goldbergService.applyFix(String(gameDir), String(appId), options || {})
+})
+
+ipcMain.handle('goldberg:removeFix', async (_event, gameDir) => {
+  if (!gameDir) throw new Error('gameDir é obrigatório')
+  return goldbergService.removeFix(String(gameDir))
+})
+
+ipcMain.handle('goldberg:checkStatus', async (_event, gameDir) => {
+  if (!gameDir) return { applied: false, hasBackups: false, dllsFound: [], settingsDir: false }
+  return goldbergService.checkStatus(String(gameDir))
+})
+
+ipcMain.handle('goldberg:getSupportedLanguages', async () => {
+  return goldbergService.getSupportedLanguages()
 })
 
 ipcMain.handle('ocr:extractText', async (_event, payload) => {

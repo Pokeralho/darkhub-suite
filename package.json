@@ -85,6 +85,7 @@
       "electron/services/*.exe",
       "electron/services/*.dll",
       "electron/services/*.ps1",
+      "electron/services/goldberg/**",
       "node_modules/sharp/**",
       "node_modules/@img/**",
       "node_modules/ffmpeg-static/**"
