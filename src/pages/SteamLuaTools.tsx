@@ -4,7 +4,7 @@ import {
   Save, Check, AlertCircle, FileCode, Layers, HardDrive, Key,
   ExternalLink, Globe, CheckCircle2, XCircle, Settings, DownloadCloud,
   Sparkles, ShieldCheck, ShieldAlert, X, ChevronRight, LayoutGrid, List,
-  Terminal, Sliders, Play, Lock, Unlock
+  Terminal, Sliders, Play, Lock, Unlock, Wrench
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nProvider';
 
@@ -102,18 +102,8 @@ export default function SteamLuaTools() {
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [appMetadataCache, setAppMetadataCache] = useState<Record<number, { name: string; headerImage?: string }>>({});
 
-  // Goldberg Emulator State
-  const [goldbergAppId, setGoldbergAppId] = useState('');
-  const [goldbergGameDir, setGoldbergGameDir] = useState('');
-  const [goldbergStatus, setGoldbergStatus] = useState<{
-    applied: boolean; hasBackups: boolean; dllsFound: string[]; settingsDir: boolean; appId: string | null;
-  } | null>(null);
-  const [goldbergApplying, setGoldbergApplying] = useState(false);
-  const [goldbergRemoving, setGoldbergRemoving] = useState(false);
-  const [goldbergLog, setGoldbergLog] = useState<string[]>([]);
-  const [goldbergLanguage, setGoldbergLanguage] = useState('brazilian');
-  const [goldbergOffline, setGoldbergOffline] = useState(false);
-  const [goldbergDisableOverlay, setGoldbergDisableOverlay] = useState(false);
+  // Goldberg Emulator State (per-game)
+  const [goldbergFixStatus, setGoldbergFixStatus] = useState<Record<number, { applied: boolean; gameDir?: string | null }>>({});
 
   // Helper to extract AppID from string or link
   const parseAppId = (input: string): number | null => {
@@ -274,83 +264,110 @@ export default function SteamLuaTools() {
     }
   };
 
-  // === Goldberg Emulator Handlers ===
-  const handleGoldbergBrowse = async () => {
-    if (!window.darkhub?.dialog) return;
-    try {
-      const res = await window.darkhub.dialog.selectFolder({
-        title: 'Selecionar Diretório do Jogo'
-      });
-      if (!res.canceled && res.folderPath) {
-        setGoldbergGameDir(res.folderPath);
-        setGoldbergLog([]);
-        // Auto-check status
-        if (window.darkhub?.goldberg) {
-          const status = await window.darkhub.goldberg.checkStatus(res.folderPath);
-          setGoldbergStatus(status);
-          if (status.appId && !goldbergAppId) {
-            setGoldbergAppId(status.appId);
+  // === Goldberg Emulator Handlers (Auto-detect per game with dialog fallback) ===
+  const handleGoldbergToggleForGame = async (appId: number, gameName?: string) => {
+    if (!window.darkhub?.goldberg) return;
+    const isApplied = Boolean(goldbergFixStatus[appId]?.applied);
+
+    if (isApplied) {
+      setActionInProgress((prev) => ({ ...prev, [appId]: 'goldbergRemove' }));
+      try {
+        const res = await window.darkhub.goldberg.removeFixAuto({
+          appId,
+          options: { gameName, gameDir: goldbergFixStatus[appId]?.gameDir || undefined }
+        });
+        if (res.ok) {
+          setStatusMessage({
+            type: 'success',
+            text: `✓ Fix removido para ${gameName || `AppID ${appId}`}. Arquivos originais restaurados.`
+          });
+          setGoldbergFixStatus((prev) => ({ ...prev, [appId]: { applied: false, gameDir: res.gameDir } }));
+        } else {
+          setStatusMessage({ type: 'error', text: res.error || 'Falha ao remover fix' });
+        }
+      } catch (err: any) {
+        setStatusMessage({ type: 'error', text: err?.message || 'Erro ao remover fix' });
+      } finally {
+        setActionInProgress((prev) => {
+          const next = { ...prev };
+          delete next[appId];
+          return next;
+        });
+      }
+    } else {
+      setActionInProgress((prev) => ({ ...prev, [appId]: 'goldbergApply' }));
+      try {
+        // 1. Try auto-detect and apply
+        let res = await window.darkhub.goldberg.applyFixAuto({
+          appId,
+          options: {
+            gameName,
+            gameDir: goldbergFixStatus[appId]?.gameDir || undefined,
+            language: 'brazilian',
+            generateInterfaces: true
+          }
+        });
+
+        // 2. If game directory was not found automatically, prompt user to select folder
+        if (!res.ok && res.error && res.error.includes('Não foi possível encontrar o diretório')) {
+          if (window.darkhub?.dialog) {
+            const folderRes = await window.darkhub.dialog.selectFolder({
+              title: `Selecione a pasta do jogo instalado (${gameName || `AppID ${appId}`})`
+            });
+            if (!folderRes.canceled && folderRes.folderPath) {
+              res = await window.darkhub.goldberg.applyFix({
+                gameDir: folderRes.folderPath,
+                appId: String(appId),
+                options: { language: 'brazilian', generateInterfaces: true }
+              });
+              if (res.ok) {
+                res.gameDir = folderRes.folderPath;
+              }
+            } else {
+              setStatusMessage({ type: 'info', text: 'Operação cancelada.' });
+              return;
+            }
           }
         }
-      }
-    } catch (err: any) {
-      setStatusMessage({ type: 'error', text: err?.message || 'Erro ao selecionar pasta' });
-    }
-  };
 
-  const handleGoldbergApply = async () => {
-    if (!window.darkhub?.goldberg || !goldbergGameDir || !goldbergAppId) {
-      setStatusMessage({ type: 'error', text: 'Selecione a pasta do jogo e insira o AppID.' });
-      return;
-    }
-    setGoldbergApplying(true);
-    setGoldbergLog([]);
-    try {
-      const res = await window.darkhub.goldberg.applyFix({
-        gameDir: goldbergGameDir,
-        appId: goldbergAppId,
-        options: {
-          language: goldbergLanguage || undefined,
-          offline: goldbergOffline,
-          disableOverlay: goldbergDisableOverlay,
-          generateInterfaces: true
+        if (res && res.ok) {
+          setStatusMessage({
+            type: 'success',
+            text: `✓ Fix aplicado com sucesso para ${gameName || `AppID ${appId}`}${res.gameDir ? ` (${res.gameDir})` : ''}!`
+          });
+          setGoldbergFixStatus((prev) => ({ ...prev, [appId]: { applied: true, gameDir: res.gameDir } }));
+        } else if (res && !res.ok) {
+          setStatusMessage({ type: 'error', text: res.error || 'Falha ao aplicar fix' });
         }
-      });
-      setGoldbergLog(res.actions || []);
-      if (res.ok) {
-        setStatusMessage({ type: 'success', text: `✓ ${res.message}` });
-        const status = await window.darkhub.goldberg.checkStatus(goldbergGameDir);
-        setGoldbergStatus(status);
-      } else {
-        setStatusMessage({ type: 'error', text: res.error || 'Falha ao aplicar fix' });
+      } catch (err: any) {
+        setStatusMessage({ type: 'error', text: err?.message || 'Erro ao aplicar fix' });
+      } finally {
+        setActionInProgress((prev) => {
+          const next = { ...prev };
+          delete next[appId];
+          return next;
+        });
       }
-    } catch (err: any) {
-      setStatusMessage({ type: 'error', text: err?.message || 'Erro ao aplicar Goldberg Fix' });
-    } finally {
-      setGoldbergApplying(false);
     }
   };
 
-  const handleGoldbergRemove = async () => {
-    if (!window.darkhub?.goldberg || !goldbergGameDir) return;
-    setGoldbergRemoving(true);
-    setGoldbergLog([]);
-    try {
-      const res = await window.darkhub.goldberg.removeFix(goldbergGameDir);
-      setGoldbergLog(res.actions || []);
-      if (res.ok) {
-        setStatusMessage({ type: 'success', text: '✓ Emulação removida e arquivos originais restaurados.' });
-        const status = await window.darkhub.goldberg.checkStatus(goldbergGameDir);
-        setGoldbergStatus(status);
-      } else {
-        setStatusMessage({ type: 'error', text: res.error || 'Falha ao remover fix' });
+  // Auto-check Goldberg status for installed games
+  useEffect(() => {
+    if (!window.darkhub?.goldberg) return;
+    installedLuas.forEach((item) => {
+      if (goldbergFixStatus[item.appId] === undefined) {
+        const meta = appMetadataCache[item.appId];
+        window.darkhub.goldberg.checkStatusAuto({ appId: item.appId, gameName: meta?.name }).then((status) => {
+          if (status) {
+            setGoldbergFixStatus((prev) => ({
+              ...prev,
+              [item.appId]: { applied: status.applied, gameDir: status.gameDir }
+            }));
+          }
+        }).catch(() => {});
       }
-    } catch (err: any) {
-      setStatusMessage({ type: 'error', text: err?.message || 'Erro ao remover Goldberg Fix' });
-    } finally {
-      setGoldbergRemoving(false);
-    }
-  };
+    });
+  }, [installedLuas, appMetadataCache]);
 
   const handleToggleUnlocker = async () => {
     if (!window.darkhub?.steamUnlocker) return;
@@ -763,181 +780,6 @@ export default function SteamLuaTools() {
         )}
       </div>
 
-      {/* GOLDBERG STEAM EMULATOR CARD */}
-      <div className="bg-zinc-900/80 rounded-xl border border-zinc-800/80 p-4 space-y-3.5 shadow-sm">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-bold text-zinc-100 flex items-center gap-2 uppercase tracking-wider">
-            <Settings className="w-3.5 h-3.5 text-amber-500" />
-            Aplicar Fix — Goldberg Steam Emulator
-          </h2>
-          {goldbergStatus?.applied && (
-            <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-500/30">
-              Aplicado
-            </span>
-          )}
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
-          {/* Game Directory */}
-          <div className="flex-1 space-y-1">
-            <label className="text-[11px] text-zinc-400 font-medium">Diretório do Jogo</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={goldbergGameDir}
-                onChange={(e) => setGoldbergGameDir(e.target.value)}
-                placeholder="C:\Games\MeuJogo"
-                className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500/80 transition font-mono"
-              />
-              <button
-                onClick={handleGoldbergBrowse}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-zinc-200 border border-zinc-700/60 transition"
-              >
-                <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />
-                Browse
-              </button>
-            </div>
-          </div>
-
-          {/* App ID */}
-          <div className="w-full sm:w-36 space-y-1">
-            <label className="text-[11px] text-zinc-400 font-medium">Steam AppID</label>
-            <input
-              type="text"
-              value={goldbergAppId}
-              onChange={(e) => setGoldbergAppId(e.target.value.replace(/\D/g, ''))}
-              placeholder="Ex: 1995820"
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500/80 transition font-mono"
-            />
-          </div>
-        </div>
-
-        {/* Options Row */}
-        <div className="flex flex-wrap items-center gap-3 bg-zinc-950/70 px-3 py-2 rounded-lg border border-zinc-800">
-          <label className="flex items-center gap-1.5 cursor-pointer select-none">
-            <select
-              value={goldbergLanguage}
-              onChange={(e) => setGoldbergLanguage(e.target.value)}
-              className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 focus:outline-none focus:border-amber-500/80"
-            >
-              <option value="brazilian">Português (BR)</option>
-              <option value="portuguese">Português (PT)</option>
-              <option value="english">English</option>
-              <option value="spanish">Español</option>
-              <option value="french">Français</option>
-              <option value="german">Deutsch</option>
-              <option value="italian">Italiano</option>
-              <option value="japanese">日本語</option>
-              <option value="koreana">한국어</option>
-              <option value="russian">Русский</option>
-              <option value="schinese">简体中文</option>
-              <option value="tchinese">繁體中文</option>
-            </select>
-            <span className="text-xs text-zinc-400 font-medium">
-              <Globe className="w-3 h-3 inline text-sky-400 mr-0.5" />
-              Idioma
-            </span>
-          </label>
-
-          <label className="flex items-center gap-1.5 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={goldbergOffline}
-              onChange={(e) => setGoldbergOffline(e.target.checked)}
-              className="rounded bg-zinc-900 border-zinc-700 text-amber-500 focus:ring-0 w-3.5 h-3.5"
-            />
-            <span className="text-xs text-zinc-300 font-medium">Modo Offline</span>
-          </label>
-
-          <label className="flex items-center gap-1.5 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={goldbergDisableOverlay}
-              onChange={(e) => setGoldbergDisableOverlay(e.target.checked)}
-              className="rounded bg-zinc-900 border-zinc-700 text-amber-500 focus:ring-0 w-3.5 h-3.5"
-            />
-            <span className="text-xs text-zinc-300 font-medium">Desativar Overlay</span>
-          </label>
-        </div>
-
-        {/* DLL Detection Info */}
-        {goldbergStatus && goldbergGameDir && (
-          <div className="text-[11px] text-zinc-400 bg-zinc-950/60 rounded-lg px-3 py-2 border border-zinc-800/60">
-            {goldbergStatus.dllsFound.length > 0 ? (
-              <span className="text-emerald-400">
-                <CheckCircle2 className="w-3 h-3 inline mr-1" />
-                {goldbergStatus.dllsFound.length} DLL(s) detectada(s): {goldbergStatus.dllsFound.join(', ')}
-              </span>
-            ) : (
-              <span className="text-zinc-500">
-                <AlertCircle className="w-3 h-3 inline mr-1" />
-                Nenhuma steam_api.dll encontrada no diretório selecionado
-              </span>
-            )}
-            {goldbergStatus.applied && goldbergStatus.hasBackups && (
-              <span className="ml-3 text-amber-400">
-                <ShieldCheck className="w-3 h-3 inline mr-1" />
-                Backups dos originais presentes
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={handleGoldbergApply}
-            disabled={goldbergApplying || !goldbergGameDir || !goldbergAppId}
-            className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs transition disabled:opacity-40 shadow-sm"
-          >
-            {goldbergApplying ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                Aplicando...
-              </>
-            ) : (
-              <>
-                <Play className="w-3.5 h-3.5" />
-                Aplicar Fix
-              </>
-            )}
-          </button>
-
-          {goldbergStatus?.applied && (
-            <button
-              onClick={handleGoldbergRemove}
-              disabled={goldbergRemoving}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs transition disabled:opacity-40 border border-zinc-700/60"
-            >
-              {goldbergRemoving ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  Removendo...
-                </>
-              ) : (
-                <>
-                  <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
-                  Reverter Originais
-                </>
-              )}
-            </button>
-          )}
-        </div>
-
-        {/* Action Log */}
-        {goldbergLog.length > 0 && (
-          <div className="bg-zinc-950/80 rounded-lg border border-zinc-800/60 p-3 space-y-1 max-h-40 overflow-y-auto">
-            <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Log de Ações</div>
-            {goldbergLog.map((action, i) => (
-              <div key={i} className="text-[11px] text-zinc-300 flex items-start gap-1.5">
-                <ChevronRight className="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0" />
-                <span>{action}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* GAMES LIBRARY GRID / LIST */}
       <div className="space-y-3">
         {/* Toolbar */}
@@ -1013,6 +855,7 @@ export default function SteamLuaTools() {
               const meta = appMetadataCache[item.appId];
               const isWorking = actionInProgress[item.appId];
               const hasOnline = item.baseAppId === 480 || item.entriesCount > item.depotCount;
+              const isFixApplied = Boolean(goldbergFixStatus[item.appId]?.applied);
 
               return (
                 <div
@@ -1036,6 +879,11 @@ export default function SteamLuaTools() {
                       )}
 
                       <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
+                        {isFixApplied && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-black font-mono shadow">
+                            FIX ATIVO
+                          </span>
+                        )}
                         {hasOnline && (
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-500 text-white font-mono shadow">
                             ONLINE FIX
@@ -1079,6 +927,21 @@ export default function SteamLuaTools() {
                         <Globe className="w-3.5 h-3.5" />
                       </button>
 
+                      {/* Goldberg Offline Fix Button */}
+                      <button
+                        onClick={() => handleGoldbergToggleForGame(item.appId, meta?.name)}
+                        disabled={Boolean(isWorking)}
+                        title={isFixApplied ? 'Fix Ativo (Goldberg) - Clique para remover e restaurar originais' : 'Aplicar Fix (Goldberg Steam Emulator) - Auto-detecta a pasta do jogo'}
+                        className={`px-2 py-1 rounded text-xs font-semibold transition flex items-center gap-1.5 ${
+                          isFixApplied
+                            ? 'bg-amber-950/90 text-amber-300 border border-amber-500/50 hover:bg-amber-900/90 shadow-sm'
+                            : 'bg-zinc-800 hover:bg-amber-600/90 text-zinc-300 hover:text-white border border-zinc-700/60'
+                        }`}
+                      >
+                        <Wrench className={`w-3.5 h-3.5 ${isWorking === 'goldbergApply' || isWorking === 'goldbergRemove' ? 'animate-spin text-amber-400' : isFixApplied ? 'text-amber-400' : 'text-zinc-400'}`} />
+                        <span className="text-[11px]">{isFixApplied ? 'Fix Ativo' : 'Aplicar Fix'}</span>
+                      </button>
+
                       {/* Resync */}
                       <button
                         onClick={() => handleResyncGame(item.appId)}
@@ -1119,6 +982,7 @@ export default function SteamLuaTools() {
               const meta = appMetadataCache[item.appId];
               const isWorking = actionInProgress[item.appId];
               const hasOnline = item.baseAppId === 480 || item.entriesCount > item.depotCount;
+              const isFixApplied = Boolean(goldbergFixStatus[item.appId]?.applied);
 
               return (
                 <div key={item.appId} className="p-3 flex items-center justify-between gap-3 hover:bg-zinc-900/80 transition">
@@ -1145,11 +1009,32 @@ export default function SteamLuaTools() {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {isFixApplied && (
+                      <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-600/30">
+                        Fix Ativo
+                      </span>
+                    )}
+
                     {hasOnline && (
                       <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-sky-950 text-sky-400 border border-sky-600/30">
                         Online Fix
                       </span>
                     )}
+
+                    {/* Goldberg Offline Fix Button */}
+                    <button
+                      onClick={() => handleGoldbergToggleForGame(item.appId, meta?.name)}
+                      disabled={Boolean(isWorking)}
+                      className={`px-2.5 py-1 rounded text-xs font-semibold transition flex items-center gap-1.5 ${
+                        isFixApplied
+                          ? 'bg-amber-950/90 text-amber-300 border border-amber-500/50 hover:bg-amber-900/90 shadow-sm'
+                          : 'bg-zinc-800 hover:bg-amber-600/90 text-zinc-300 hover:text-white border border-zinc-700/60'
+                      }`}
+                      title={isFixApplied ? 'Fix Ativo (Goldberg) - Clique para remover' : 'Aplicar Fix (Goldberg Emulator - Auto-detectar pasta)'}
+                    >
+                      <Wrench className={`w-3.5 h-3.5 ${isWorking === 'goldbergApply' || isWorking === 'goldbergRemove' ? 'animate-spin text-amber-400' : isFixApplied ? 'text-amber-400' : 'text-zinc-400'}`} />
+                      <span className="text-[11px]">{isFixApplied ? 'Fix Ativo' : 'Aplicar Fix'}</span>
+                    </button>
 
                     <button
                       onClick={() => handleToggleOnlineFix(item.appId, hasOnline)}
@@ -1239,6 +1124,34 @@ export default function SteamLuaTools() {
                   <X className="w-4 h-4" />
                 </button>
               </div>
+            </div>
+
+            {/* Goldberg Fix Bar in Modal */}
+            <div className="flex items-center justify-between px-4 py-2 bg-zinc-950/90 border-b border-zinc-800 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <Wrench className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                <span className="text-zinc-300 font-medium">Emulador Offline (Goldberg):</span>
+                {goldbergFixStatus[selectedAppId]?.applied ? (
+                  <span className="text-emerald-400 font-semibold flex items-center gap-1 truncate" title={goldbergFixStatus[selectedAppId]?.gameDir || ''}>
+                    <CheckCircle2 className="w-3 h-3 flex-shrink-0" />
+                    Fix Ativo {goldbergFixStatus[selectedAppId]?.gameDir ? `(${goldbergFixStatus[selectedAppId].gameDir})` : ''}
+                  </span>
+                ) : (
+                  <span className="text-zinc-500">Não instalado</span>
+                )}
+              </div>
+              <button
+                onClick={() => handleGoldbergToggleForGame(selectedAppId, appMetadataCache[selectedAppId]?.name)}
+                disabled={Boolean(actionInProgress[selectedAppId])}
+                className={`px-3 py-1 rounded text-xs font-semibold transition flex items-center gap-1.5 flex-shrink-0 ${
+                  goldbergFixStatus[selectedAppId]?.applied
+                    ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700'
+                    : 'bg-amber-600 hover:bg-amber-500 text-white shadow-sm'
+                }`}
+              >
+                <Wrench className={`w-3 h-3 ${actionInProgress[selectedAppId] === 'goldbergApply' || actionInProgress[selectedAppId] === 'goldbergRemove' ? 'animate-spin' : ''}`} />
+                <span>{goldbergFixStatus[selectedAppId]?.applied ? 'Reverter Originais' : 'Aplicar Fix'}</span>
+              </button>
             </div>
 
             {/* Modal Content */}

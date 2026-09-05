@@ -3145,6 +3145,26 @@ ipcMain.handle('goldberg:getSupportedLanguages', async () => {
   return goldbergService.getSupportedLanguages()
 })
 
+ipcMain.handle('goldberg:applyFixAuto', async (_event, payload) => {
+  const { appId, options } = payload || {}
+  if (!appId) throw new Error('appId é obrigatório')
+  return goldbergService.applyFixAuto(String(appId), options || {})
+})
+
+ipcMain.handle('goldberg:removeFixAuto', async (_event, payload) => {
+  const appId = typeof payload === 'object' ? payload?.appId : payload
+  const options = typeof payload === 'object' ? payload?.options : {}
+  if (!appId) throw new Error('appId é obrigatório')
+  return goldbergService.removeFixAuto(String(appId), options)
+})
+
+ipcMain.handle('goldberg:checkStatusAuto', async (_event, payload) => {
+  const appId = typeof payload === 'object' ? payload?.appId : payload
+  const gameName = typeof payload === 'object' ? payload?.gameName : ''
+  if (!appId) return { applied: false, hasBackups: false, dllsFound: [], settingsDir: false, gameDir: null }
+  return goldbergService.checkStatusAuto(String(appId), gameName)
+})
+
 ipcMain.handle('ocr:extractText', async (_event, payload) => {
   const imagePath = typeof payload === 'string' ? payload : payload?.imagePath
   const base64Data = typeof payload === 'object' && payload?.base64 ? String(payload.base64) : null

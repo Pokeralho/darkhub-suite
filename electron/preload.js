@@ -345,6 +345,9 @@ contextBridge.exposeInMainWorld('darkhub', {
     applyFix: (payload) => ipcRenderer.invoke('goldberg:applyFix', payload),
     removeFix: (gameDir) => ipcRenderer.invoke('goldberg:removeFix', gameDir),
     checkStatus: (gameDir) => ipcRenderer.invoke('goldberg:checkStatus', gameDir),
-    getSupportedLanguages: () => ipcRenderer.invoke('goldberg:getSupportedLanguages')
+    getSupportedLanguages: () => ipcRenderer.invoke('goldberg:getSupportedLanguages'),
+    applyFixAuto: (payload) => ipcRenderer.invoke('goldberg:applyFixAuto', payload),
+    removeFixAuto: (appId) => ipcRenderer.invoke('goldberg:removeFixAuto', appId),
+    checkStatusAuto: (appId) => ipcRenderer.invoke('goldberg:checkStatusAuto', appId)
   }
 })

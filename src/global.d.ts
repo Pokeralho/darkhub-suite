@@ -470,6 +470,44 @@ export interface DarkHubAPI {
       primaryDir: string | null;
     }>;
     getSupportedLanguages: () => Promise<string[]>;
+    applyFixAuto: (payload: {
+      appId: number | string;
+      options?: {
+        gameDir?: string;
+        gameName?: string;
+        language?: string;
+        accountName?: string;
+        offline?: boolean;
+        disableNetworking?: boolean;
+        disableOverlay?: boolean;
+        localSave?: boolean;
+        generateInterfaces?: boolean;
+      };
+    }) => Promise<{
+      ok: boolean;
+      actions: string[];
+      gameDir?: string;
+      error?: string;
+      message?: string;
+      type: string;
+    }>;
+    removeFixAuto: (payload: number | string | { appId: number | string; options?: { gameDir?: string; gameName?: string } }) => Promise<{
+      ok: boolean;
+      actions: string[];
+      gameDir?: string;
+      error?: string;
+      message?: string;
+      type: string;
+    }>;
+    checkStatusAuto: (payload: number | string | { appId: number | string; gameName?: string }) => Promise<{
+      applied: boolean;
+      hasBackups: boolean;
+      dllsFound: string[];
+      settingsDir: boolean;
+      appId: string | null;
+      primaryDir: string | null;
+      gameDir: string | null;
+    }>;
   };
 }
 

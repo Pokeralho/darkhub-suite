@@ -2,12 +2,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import cp from 'node:child_process';
 import { app } from 'electron';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * GoldbergService — manages Goldberg Steam Emulator file operations.
  * 
  * This service handles:
  * - Locating steam_api(64).dll in game directories
+ * - Auto-detecting game install paths from Steam's libraryfolders.vdf
  * - Backing up original DLLs before replacement
  * - Copying emulator DLLs from bundled resources
  * - Creating steam_appid.txt and steam_settings/ config
@@ -49,6 +54,142 @@ class GoldbergService {
   }
 
   /**
+   * Auto-detects the game install directory by AppID using Steam's libraryfolders.vdf
+   * and appmanifest_<appId>.acf files, with fallback to folder name heuristics.
+   *
+   * @param {number|string} appId - Steam AppID
+   * @param {string} [gameName] - Optional game name for heuristics
+   * @returns {string|null} - Path to game install directory, or null if not found
+   */
+  findGameDirByAppId(appId, gameName = '') {
+    const appIdStr = String(appId).trim();
+    const cleanGameName = (gameName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // 1. Find Steam install path
+    const steamPath = this._getSteamPath();
+    if (!steamPath) return null;
+
+    // 2. Parse libraryfolders.vdf to get all library paths
+    const libraryPaths = this._getLibraryPaths(steamPath);
+
+    // 3. For each library path, check appmanifest_<appId>.acf
+    for (const libPath of libraryPaths) {
+      const appsDir = path.join(libPath, 'steamapps');
+      const acfPath = path.join(appsDir, `appmanifest_${appIdStr}.acf`);
+
+      if (fs.existsSync(acfPath)) {
+        try {
+          const acf = fs.readFileSync(acfPath, 'utf8');
+          const dirMatch = acf.match(/"installdir"\s+"([^"]+)"/);
+          if (dirMatch && dirMatch[1]) {
+            const gameDir = path.join(appsDir, 'common', dirMatch[1]);
+            if (fs.existsSync(gameDir)) {
+              return gameDir;
+            }
+          }
+        } catch {}
+      }
+
+      // Check folders in steamapps/common
+      const commonDir = path.join(appsDir, 'common');
+      if (fs.existsSync(commonDir)) {
+        try {
+          const entries = fs.readdirSync(commonDir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (!entry.isDirectory()) continue;
+            const targetPath = path.join(commonDir, entry.name);
+
+            // Check steam_appid.txt
+            const appIdPath = path.join(targetPath, 'steam_appid.txt');
+            if (fs.existsSync(appIdPath)) {
+              try {
+                if (fs.readFileSync(appIdPath, 'utf8').trim() === appIdStr) {
+                  return targetPath;
+                }
+              } catch {}
+            }
+
+            // Check name match if provided
+            if (cleanGameName.length >= 3) {
+              const entryClean = entry.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (entryClean === cleanGameName || entryClean.includes(cleanGameName) || cleanGameName.includes(entryClean)) {
+                const dlls = this.findSteamDlls(targetPath, 2);
+                if (dlls.length > 0) {
+                  return targetPath;
+                }
+              }
+            }
+          }
+        } catch {}
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get Steam installation path from registry
+   */
+  _getSteamPath() {
+    if (process.platform !== 'win32') return null;
+    const queries = [
+      'reg query "HKCU\\Software\\Valve\\Steam" /v SteamPath',
+      'reg query "HKLM\\SOFTWARE\\WOW6432Node\\Valve\\Steam" /v InstallPath',
+      'reg query "HKLM\\SOFTWARE\\Valve\\Steam" /v InstallPath'
+    ];
+
+    for (const q of queries) {
+      try {
+        const out = cp.execSync(q, { windowsHide: true, encoding: 'utf8' });
+        for (const line of out.split(/\r?\n/)) {
+          const match = line.match(/(?:SteamPath|InstallPath)\s+REG_SZ\s+(.+)$/i);
+          if (match && match[1]) {
+            let p = match[1].trim().replace(/\//g, '\\');
+            if (fs.existsSync(path.join(p, 'steam.exe'))) {
+              return p;
+            }
+          }
+        }
+      } catch {}
+    }
+
+    const defaults = [
+      'C:\\Program Files (x86)\\Steam',
+      'C:\\Program Files\\Steam',
+      'D:\\Steam',
+      'E:\\Steam'
+    ];
+    for (const dp of defaults) {
+      if (fs.existsSync(path.join(dp, 'steam.exe'))) return dp;
+    }
+
+    return null;
+  }
+
+  /**
+   * Parse libraryfolders.vdf to get all Steam library paths.
+   */
+  _getLibraryPaths(steamPath) {
+    const paths = [steamPath];
+    const vdfPath = path.join(steamPath, 'steamapps', 'libraryfolders.vdf');
+
+    if (!fs.existsSync(vdfPath)) return paths;
+
+    try {
+      const vdf = fs.readFileSync(vdfPath, 'utf8');
+      const matches = [...vdf.matchAll(/"path"\s+"([^"]+)"/g)];
+      for (const m of matches) {
+        const libPath = path.normalize(m[1].replace(/\\\\/g, '\\'));
+        if (!paths.includes(libPath) && fs.existsSync(libPath)) {
+          paths.push(libPath);
+        }
+      }
+    } catch {}
+
+    return paths;
+  }
+
+  /**
    * Scans a game directory tree (up to 3 levels deep) for steam_api.dll / steam_api64.dll.
    * Returns an array of { dll, fullPath, dir } objects.
    */
@@ -79,19 +220,77 @@ class GoldbergService {
   }
 
   /**
+   * High-level auto-apply: given AppID and optional gameName/gameDir, auto-detects game directory and applies fix.
+   *
+   * @param {number|string} appId - Steam AppID
+   * @param {object} options - Same options as applyFix
+   * @returns {{ ok: boolean, actions: string[], gameDir?: string, error?: string }}
+   */
+  applyFixAuto(appId, options = {}) {
+    let gameDir = options.gameDir;
+    if (!gameDir) {
+      gameDir = this.findGameDirByAppId(appId, options.gameName);
+    }
+    if (!gameDir) {
+      return {
+        ok: false,
+        actions: [],
+        error: `Não foi possível encontrar o diretório de instalação para AppID ${appId}. Verifique se o jogo está instalado via Steam ou selecione a pasta manualmente.`,
+        type: 'Configuração de Emulação'
+      };
+    }
+
+    const result = this.applyFix(gameDir, appId, options);
+    result.gameDir = gameDir;
+    return result;
+  }
+
+  /**
+   * High-level auto-remove: given AppID, auto-detects game directory and removes fix.
+   */
+  removeFixAuto(appId, options = {}) {
+    let gameDir = options?.gameDir;
+    if (!gameDir) {
+      gameDir = this.findGameDirByAppId(appId, options?.gameName);
+    }
+    if (!gameDir) {
+      return {
+        ok: false,
+        actions: [],
+        error: `Não foi possível encontrar o diretório de instalação para AppID ${appId}.`,
+        type: 'Remoção de Emulação'
+      };
+    }
+
+    const result = this.removeFix(gameDir);
+    result.gameDir = gameDir;
+    return result;
+  }
+
+  /**
+   * High-level auto-status: given AppID, auto-detects game directory and checks status.
+   */
+  checkStatusAuto(appId, gameName = '') {
+    const gameDir = this.findGameDirByAppId(appId, gameName);
+    const base = {
+      applied: false,
+      hasBackups: false,
+      dllsFound: [],
+      settingsDir: false,
+      appId: String(appId),
+      primaryDir: null,
+      gameDir: null
+    };
+
+    if (!gameDir) return base;
+
+    const status = this.checkStatus(gameDir);
+    status.gameDir = gameDir;
+    return status;
+  }
+
+  /**
    * Applies the Goldberg emulator configuration to a game directory.
-   * 
-   * @param {string} gameDir - Path to the game's root directory
-   * @param {string} appId - Steam AppID for the game
-   * @param {object} options - Configuration options
-   * @param {string} [options.language] - Force language (e.g. 'brazilian', 'english')
-   * @param {string} [options.accountName] - Force account name
-   * @param {boolean} [options.offline] - Enable offline mode
-   * @param {boolean} [options.disableNetworking] - Disable networking
-   * @param {boolean} [options.disableOverlay] - Disable overlay
-   * @param {boolean} [options.localSave] - Enable local save in game directory
-   * @param {boolean} [options.generateInterfaces] - Auto-generate steam_interfaces.txt
-   * @returns {{ ok: boolean, actions: string[], error?: string }}
    */
   applyFix(gameDir, appId, options = {}) {
     const result = { ok: false, actions: [], backupsCreated: [], type: 'Configuração de Emulação' };
@@ -111,7 +310,6 @@ class GoldbergService {
       const dllLocations = this.findSteamDlls(gameDir);
 
       if (dllLocations.length === 0) {
-        // No DLLs found — just create config at root level
         result.actions.push('Nenhum steam_api.dll encontrado. Configuração criada na raiz do jogo.');
       }
 
@@ -172,7 +370,6 @@ class GoldbergService {
         fs.mkdirSync(settingsDir, { recursive: true });
       }
 
-      // steam_appid.txt inside steam_settings (preferred location per readme)
       fs.writeFileSync(path.join(settingsDir, 'steam_appid.txt'), appIdStr + '\n', 'utf8');
       result.actions.push('steam_settings/steam_appid.txt criado');
 
@@ -270,9 +467,6 @@ class GoldbergService {
 
   /**
    * Removes the Goldberg emulator and restores original DLLs from backups.
-   * 
-   * @param {string} gameDir - Path to the game's root directory
-   * @returns {{ ok: boolean, actions: string[], error?: string }}
    */
   removeFix(gameDir) {
     const result = { ok: false, actions: [], type: 'Remoção de Emulação' };
@@ -282,11 +476,8 @@ class GoldbergService {
         throw new Error(`Diretório do jogo não encontrado: ${gameDir}`);
       }
 
-      // Find all locations where we applied the fix
       const dllLocations = this.findSteamDlls(gameDir);
       const processedDirs = new Set();
-
-      // Also check root directory
       const allDirs = [gameDir, ...dllLocations.map(l => l.dir)];
 
       for (const dir of allDirs) {
@@ -306,13 +497,7 @@ class GoldbergService {
         }
 
         // Remove generated files
-        const filesToRemove = [
-          'steam_appid.txt',
-          'steam_interfaces.txt',
-          'local_save.txt'
-        ];
-
-        for (const file of filesToRemove) {
+        for (const file of ['steam_appid.txt', 'steam_interfaces.txt', 'local_save.txt']) {
           const filePath = path.join(dir, file);
           if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
@@ -341,9 +526,6 @@ class GoldbergService {
 
   /**
    * Checks if a game directory already has Goldberg emulator applied.
-   * 
-   * @param {string} gameDir - Path to the game directory
-   * @returns {{ applied: boolean, hasBackups: boolean, dllsFound: string[], settingsDir: boolean }}
    */
   checkStatus(gameDir) {
     const status = {
@@ -352,7 +534,8 @@ class GoldbergService {
       dllsFound: [],
       settingsDir: false,
       appId: null,
-      primaryDir: null
+      primaryDir: null,
+      gameDir: gameDir || null
     };
 
     try {
@@ -364,7 +547,6 @@ class GoldbergService {
       if (dllLocations.length > 0) {
         status.primaryDir = dllLocations[0].dir;
 
-        // Check if any backup exists (indicates emulator was applied)
         for (const loc of dllLocations) {
           for (const dllName of ['steam_api.dll.original', 'steam_api64.dll.original']) {
             if (fs.existsSync(path.join(loc.dir, dllName))) {
@@ -376,13 +558,11 @@ class GoldbergService {
           if (status.applied) break;
         }
 
-        // Check for steam_settings directory
         const settingsDir = path.join(dllLocations[0].dir, 'steam_settings');
         status.settingsDir = fs.existsSync(settingsDir);
         if (status.settingsDir) status.applied = true;
       }
 
-      // Check for steam_appid.txt at root or primary dir
       for (const dir of [gameDir, status.primaryDir].filter(Boolean)) {
         const appIdFile = path.join(dir, 'steam_appid.txt');
         if (fs.existsSync(appIdFile)) {
