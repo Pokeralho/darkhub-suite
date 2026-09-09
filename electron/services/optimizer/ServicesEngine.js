@@ -23,9 +23,6 @@ class ServicesEngine {
       # Busca do Windows (Indexação)
       sc stop WSearch
       sc config WSearch start= disabled
-      # Superfetch (SysMain)
-      sc stop SysMain
-      sc config SysMain start= disabled
       # Telemetria Fixa e Connected User Experiences (CDPSvc)
       sc stop DiagTrack
       sc config DiagTrack start= disabled
@@ -43,7 +40,6 @@ class ServicesEngine {
 
     const expectations = [
       { name: 'WSearch', expected: 'DISABLED' },
-      { name: 'SysMain', expected: 'DISABLED' },
       { name: 'DiagTrack', expected: 'DISABLED' },
       { name: 'CDPSvc', expected: 'DISABLED' },
       { name: 'lfsvc', expected: 'DISABLED' },
@@ -58,12 +54,12 @@ class ServicesEngine {
     if (mismatches.length > 0) {
       return {
         ok: true,
-        msg: `Busca do Windows, SysMain e Serviços Inúteis foram desligados, mas a verificação pós-aplicação encontrou ${mismatches.length} serviço(s) com estado divergente.`,
+        msg: `Busca do Windows e Serviços Redundantes foram desligados (SysMain preservado para jogos), mas a verificação pós-aplicação encontrou ${mismatches.length} serviço(s) com estado divergente.`,
         verified: false,
         verifyMismatches: mismatches
       };
     }
-    return { ok: true, msg: 'Busca do Windows, SysMain e Serviços Inúteis foram desligados (verificado).', verified: true };
+    return { ok: true, msg: 'Busca do Windows e Serviços Redundantes foram desligados (SysMain preservado para streaming de jogos).', verified: true };
   }
 
   async revertServicesTweak() {

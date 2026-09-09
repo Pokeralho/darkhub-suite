@@ -76,6 +76,7 @@ export interface DarkHubAPI {
     getGpuInfo: () => Promise<{ ok: boolean; controllers?: Array<{ model: string; vendor: string; vram: number; bus: string; isDedicated: boolean }>; error?: string }>;
     getHagsStatus: () => Promise<{ ok: boolean; enabled: boolean; value: string; error?: string }>;
     setHagsStatus: (payload: { enabled: boolean }) => Promise<{ ok: boolean; msg?: string; error?: string }>;
+    revertHags: () => Promise<{ ok: boolean; msg?: string; error?: string }>;
     deepTweaksList: () => Promise<any>;
     deepTweaksStatus: () => Promise<{ ok: boolean; status: Record<string, boolean> }>;
     deepTweaksAnalyze: (payload: { tweakIds: string[] }) => Promise<any>;
@@ -98,6 +99,8 @@ export interface DarkHubAPI {
     openTamperSettings: () => Promise<any>;
     applyMsiMode: () => Promise<any>;
     applyExtremeKernelMod: () => Promise<any>;
+    revertExtremeKernelMod: () => Promise<any>;
+    revertServicesTweak: () => Promise<any>;
     applyExtremeNetworkMod: () => Promise<any>;
     applyCpuUnpark: () => Promise<any>;
   };
@@ -276,6 +279,100 @@ export interface DarkHubAPI {
     createManualBackup: (payload: any) => Promise<any>;
     checkUpdate: () => Promise<any>;
     downloadUpdate: (payload: string | { url: string; version?: string }) => Promise<any>;
+  };
+  dlss5: {
+    detectGpu: () => Promise<{ ok: boolean; vendor: 'nvidia' | 'amd' | 'intel' | 'other'; model: string; driverVersion: string; isRtx: boolean; isAmd: boolean; isIntel: boolean; defaultProfile: 'nvidia' | 'amd' }>;
+    scanGame: (payload: string | { path: string }) => Promise<{
+      ok: boolean;
+      gameName?: string;
+      exePath?: string | null;
+      targetDir?: string;
+      searchBaseDir?: string;
+      engine?: string;
+      graphicsApi?: {
+        primaryApi: string;
+        apiName: string;
+        apiBadge: string;
+        hasD3D12: boolean;
+        hasAgilitySdk: boolean;
+        hasD3D11: boolean;
+        hasVulkan: boolean;
+        hasOpenGL: boolean;
+        hasD3D9: boolean;
+        isRemix?: boolean;
+        is64?: boolean;
+        bitness?: string;
+        detectedApis: string[];
+        importedDlls: string[];
+        recommendedLoader: string;
+        loaderReason: string;
+        compatibilityNote: string;
+      };
+      routeInfo?: {
+        recommendedRoute: string;
+        routeName: string;
+        routeBadge: string;
+        routeDescription: string;
+        allowedRoutes: Array<{ id: string; name: string; description: string }>;
+        isRemix: boolean;
+        is64: boolean;
+        neuralUpstreamRecommended: boolean;
+      };
+      dlssDetected?: boolean;
+      existingDlls?: string[];
+      installed?: boolean;
+      installedProfile?: string | null;
+      installedLoader?: string | null;
+      manifest?: any;
+      error?: string;
+    }>;
+    apply: (payload: {
+      gamePath?: string;
+      targetDir?: string;
+      profile: 'nvidia' | 'amd' | 'intel';
+      loader?: string;
+      route?: string;
+      neuralUpstream?: boolean;
+      enableFrameGen?: boolean;
+      upscaleQuality?: string;
+      enableOverlay?: boolean;
+      upscaler?: string;
+      signatureBypass?: boolean;
+    }) => Promise<{
+      ok: boolean;
+      msg?: string;
+      error?: string;
+      targetDir?: string;
+      profile?: string;
+      loader?: string;
+      route?: string;
+      neuralUpstream?: boolean;
+      injectedFiles?: Array<{ file: string; sha256?: string }>;
+    }>;
+    revert: (payload: string | { gamePath?: string; targetDir?: string }) => Promise<{ ok: boolean; msg?: string; error?: string; restoredCount?: number }>;
+    getSteamGames: () => Promise<Array<{
+      appId: string;
+      name: string;
+      installDir: string;
+      headerUrl: string;
+      isApplied: boolean;
+    }>>;
+    getRecentGames: () => Promise<Array<{ gameName: string; targetDir: string; exePath?: string | null; profile: string; loader: string; route?: string; neuralUpstream?: boolean; engine?: string; graphicsApi?: any; lastAppliedAt?: number }>>;
+    getProvenance: () => Promise<{
+      ok: boolean;
+      title: string;
+      version: string;
+      architecture: string;
+      hasBinaries: boolean;
+      sourceDir: string;
+      filesCount: number;
+      files: Array<{ name: string; size: number; sha256?: string; isBinary: boolean }>;
+      upstreamRepositories: Array<{ name: string; url: string; role: string }>;
+      guarantee: string;
+    }>;
+    downloadBinaries: () => Promise<any>;
+    openFolder: (targetPath: string) => Promise<{ ok: boolean; error?: string }>;
+    onLog: (callback: (message: string) => void) => () => void;
   };
   metadata: {
     read: (path: string) => Promise<any>;
@@ -508,6 +605,30 @@ export interface DarkHubAPI {
       primaryDir: string | null;
       gameDir: string | null;
     }>;
+  };
+  dlss5: {
+    detectGpu: () => Promise<any>;
+    scanGame: (payload: any) => Promise<any>;
+    apply: (payload: {
+      targetDir?: string;
+      gamePath?: string;
+      profile?: 'nvidia' | 'amd' | 'intel';
+      amdEngine?: 'zluda' | 'fsr';
+      zludaCache?: boolean;
+      upscaler?: string;
+      route?: string;
+      neuralUpstream?: boolean;
+      enableFrameGen?: boolean;
+      enableOverlay?: boolean;
+      loader?: string;
+      signatureBypass?: boolean;
+    }) => Promise<any>;
+    revert: (payload: any) => Promise<any>;
+    getRecentGames: () => Promise<any>;
+    getProvenance: () => Promise<any>;
+    downloadBinaries: () => Promise<any>;
+    openFolder: (targetPath: string) => Promise<any>;
+    onLog: (callback: (entry: string) => void) => () => void;
   };
 }
 

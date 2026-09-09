@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Pokeralho/darkhub-suite/releases"><img src="https://img.shields.io/badge/Release-v0.4.6-blue?style=flat-square" alt="Release Version" /></a>
+  <a href="https://github.com/Pokeralho/darkhub-suite/releases"><img src="https://img.shields.io/badge/Release-v0.4.7-blue?style=flat-square" alt="Release Version" /></a>
   <a href="https://github.com/Pokeralho/darkhub-suite/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" /></a>
   <img src="https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011%20(x64)-zinc?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/badge/PRs-Welcome-green?style=flat-square" alt="PRs Welcome" />

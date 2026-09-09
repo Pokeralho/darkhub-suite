@@ -42,10 +42,15 @@ export default function Optimizer() {
   const [loadingPrograms, setLoadingPrograms] = useState(false);
   const [uninstallingProgram, setUninstallingProgram] = useState<string | null>(null);
 
-  // GPU Preferences State
+  // GPU Preferences & HAGS State
   const [gpuPreferences, setGpuPreferences] = useState<any[]>([]);
   const [selectedGpuAppPath, setSelectedGpuAppPath] = useState('');
   const [selectedGpuPref, setSelectedGpuPref] = useState<'high_performance' | 'power_saving' | 'default'>('high_performance');
+  const [hagsStatus, setHagsStatus] = useState<{ loading: boolean; enabled: boolean; value: string; error?: string }>({
+    loading: false,
+    enabled: false,
+    value: 'unknown'
+  });
 
   // Process Priority State
   const [processList, setProcessList] = useState<any[]>([]);
@@ -107,6 +112,7 @@ export default function Optimizer() {
     loadDefenderStatus();
     refreshDnsState();
     loadGpuData();
+    loadHagsStatus();
 
     if (window.darkhub?.optimizer?.onRunEvent) {
       const unsub = window.darkhub.optimizer.onRunEvent((ev: any) => {
@@ -431,8 +437,12 @@ export default function Optimizer() {
       } else if (presetId === 'revert_all') {
         const allIds = deepTweaks.map(t => t.id);
         await window.darkhub.optimizer.deepTweaksRevert({ tweakIds: allIds });
-        await handleRevertAdvancedNetwork();
-        addLog('[SUCESSO] Todos os ajustes foram revertidos para o padrão original do Windows!');
+        await Promise.all([
+          window.darkhub.optimizer.revertExtremeKernelMod?.().catch(() => {}),
+          window.darkhub.optimizer.revertServicesTweak?.().catch(() => {}),
+          handleRevertAdvancedNetwork()
+        ]);
+        addLog('[SUCESSO] Todos os ajustes de Kernel, Serviços e Registro foram revertidos para o padrão original do Windows!');
       }
       await refreshStatus();
       await loadInitialData();
@@ -443,12 +453,89 @@ export default function Optimizer() {
     }
   };
 
-  // --- GPU Preferences ---
+  const handleRestoreStreamingDefaults = async () => {
+    setIsOptimizing(true);
+    setShowConsole(true);
+    addLog('[STREAMING] Restaurando padrões de streaming e agendador de GPU/Kernel para jogos...');
+    try {
+      await Promise.all([
+        window.darkhub.optimizer.revertExtremeKernelMod?.().catch(() => {}),
+        window.darkhub.optimizer.revertServicesTweak?.().catch(() => {}),
+        window.darkhub.optimizer.revertHags?.().catch(() => {})
+      ]);
+      addLog('[SUCESSO] SysMain preservado, agendamento de GPU/HAGS e prioridades restauradas para os padrões do Windows. Se estiver jogando Overwatch 2, entre no Campo de Treinamento por 1 minuto para compilar shaders.');
+      await loadHagsStatus();
+      await refreshStatus();
+      await loadInitialData();
+    } catch (e: any) {
+      addLog(`[ERRO] ${e.message}`);
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
+  // --- GPU Preferences & HAGS ---
+  const loadHagsStatus = async () => {
+    if (!window.darkhub?.optimizer?.getHagsStatus) return;
+    setHagsStatus(prev => ({ ...prev, loading: true }));
+    try {
+      const res = await window.darkhub.optimizer.getHagsStatus();
+      if (res?.ok) {
+        setHagsStatus({ loading: false, enabled: Boolean(res.enabled), value: res.value ?? (res.enabled ? '2' : '1') });
+      } else {
+        setHagsStatus(prev => ({ ...prev, loading: false, error: res?.error }));
+      }
+    } catch (e: any) {
+      setHagsStatus(prev => ({ ...prev, loading: false, error: e?.message || String(e) }));
+    }
+  };
+
+  const handleToggleHags = async (enable: boolean) => {
+    if (!window.darkhub?.optimizer?.setHagsStatus) return;
+    setIsOptimizing(true);
+    setShowConsole(true);
+    addLog(`[HAGS] ${enable ? 'Ativando' : 'Desativando'} Agendamento de GPU Acelerado por Hardware (HwSchMode = ${enable ? '2' : '1'})...`);
+    try {
+      const res = await window.darkhub.optimizer.setHagsStatus({ enabled: enable });
+      if (res?.ok) {
+        addLog(`[SUCESSO] ${res.msg || (enable ? 'HAGS ativado com sucesso!' : 'HAGS desativado com sucesso!')}`);
+      } else {
+        addLog(`[ERRO] ${res?.error || 'Falha ao ajustar HAGS'}`);
+      }
+      await loadHagsStatus();
+    } catch (e: any) {
+      addLog(`[ERRO] ${e.message || String(e)}`);
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
+  const handleRevertHags = async () => {
+    if (!window.darkhub?.optimizer?.revertHags) return;
+    setIsOptimizing(true);
+    setShowConsole(true);
+    addLog('[HAGS] Revertendo configuração do HAGS para o padrão limpo do Windows (Removendo chave de registro HwSchMode)...');
+    try {
+      const res = await window.darkhub.optimizer.revertHags();
+      if (res?.ok) {
+        addLog(`[SUCESSO] ${res.msg || 'HAGS revertido ao padrão original do Windows!'}`);
+      } else {
+        addLog(`[ERRO] ${res?.error || 'Falha ao reverter HAGS'}`);
+      }
+      await loadHagsStatus();
+    } catch (e: any) {
+      addLog(`[ERRO] ${e.message || String(e)}`);
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
   const loadGpuData = async () => {
     if (!window.darkhub?.optimizer) return;
     try {
       const res = await window.darkhub.optimizer.getGpuPreferences();
       if (res?.ok) setGpuPreferences(res.preferences || []);
+      await loadHagsStatus();
     } catch {}
   };
 
@@ -800,6 +887,84 @@ export default function Optimizer() {
         </button>
       </div>
 
+      {/* TEXTURE STREAMING NOTICE / HAGS CONTROL CARD */}
+      <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <div className="font-semibold text-amber-200 text-sm">
+                {t('optimizer.streamingNotice.title', 'Aviso de Texturas em Jogos (Overwatch 2, Warzone, etc.) & Controle HAGS')}
+              </div>
+              <p className="text-zinc-400 text-[11px] mt-0.5 leading-relaxed">
+                {t('optimizer.streamingNotice.desc', 'Se você notar modelos invisíveis ou texturas lentas, isso ocorre quando o agendador HAGS entra em conflito com o driver da GPU ou se o cache foi limpo. Utilize os botões abaixo para Ativar, Desativar ou Reverter o HAGS ao padrão do Windows.')}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[10px] text-zinc-400 font-mono">
+              Status HAGS:
+            </span>
+            <span className={`px-2 py-0.5 rounded text-[11px] font-mono font-semibold border ${
+              hagsStatus.value === '2' || (hagsStatus.enabled && hagsStatus.value !== '1')
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                : hagsStatus.value === '1'
+                ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                : 'bg-zinc-800 text-zinc-300 border-zinc-700'
+            }`}>
+              {hagsStatus.loading
+                ? 'Verificando...'
+                : hagsStatus.value === '2' || (hagsStatus.enabled && hagsStatus.value !== '1')
+                ? 'Ativado (HwSchMode=2)'
+                : hagsStatus.value === '1'
+                ? 'Desativado (HwSchMode=1)'
+                : 'Padrão Windows'}
+            </span>
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-amber-500/20">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => handleToggleHags(true)}
+              disabled={isOptimizing || (hagsStatus.enabled && hagsStatus.value === '2')}
+              className="px-2.5 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 font-semibold text-xs transition disabled:opacity-50 flex items-center gap-1.5"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{t('optimizer.hags.enableBtn', 'Ativar HAGS')}</span>
+            </button>
+
+            <button
+              onClick={() => handleToggleHags(false)}
+              disabled={isOptimizing || (!hagsStatus.enabled && hagsStatus.value === '1')}
+              className="px-2.5 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 font-semibold text-xs transition disabled:opacity-50 flex items-center gap-1.5"
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+              <span>{t('optimizer.hags.disableBtn', 'Desativar HAGS (Fix Texturas)')}</span>
+            </button>
+
+            <button
+              onClick={handleRevertHags}
+              disabled={isOptimizing}
+              className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border border-zinc-700 font-semibold text-xs transition disabled:opacity-50 flex items-center gap-1.5"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
+              <span>{t('optimizer.hags.revertBtn', 'Reverter HAGS (Padrão Windows)')}</span>
+            </button>
+          </div>
+
+          <button
+            onClick={handleRestoreStreamingDefaults}
+            disabled={isOptimizing}
+            className="shrink-0 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/30 font-semibold text-xs transition disabled:opacity-50 whitespace-nowrap"
+          >
+            {t('optimizer.streamingNotice.revertBtn', 'Restaurar Padrões de Streaming & Kernel')}
+          </button>
+        </div>
+      </div>
+
       {/* NAVIGATION TABS */}
       <div className="flex items-center gap-1.5 overflow-x-auto p-1.5 bg-zinc-900/60 border border-zinc-800/80 rounded-xl">
         <button
@@ -1117,6 +1282,76 @@ export default function Optimizer() {
       {/* TAB 3: GPU GAME PRIORITY */}
       {activeTab === 'gpu' && (
         <div className="space-y-4">
+          {/* Dedicated HAGS Control Card */}
+          <div className="bg-zinc-900/80 rounded-xl border border-zinc-800/80 p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800">
+              <div>
+                <h3 className="text-xs font-bold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-emerald-400" />
+                  {t('optimizer.hags.title', 'Agendamento de GPU Acelerado por Hardware (HAGS / HwSchMode)')}
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5 max-w-2xl leading-relaxed">
+                  {t('optimizer.hags.desc', 'O HAGS transfere a alocação de memória de vídeo para a GPU dedicada. Em placas modernas reduz latência e permite DLSS Frame Gen, mas pode atrasar o carregamento de texturas em jogos como Overwatch 2 e Warzone se a VRAM oscilar.')}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[11px] text-zinc-400 font-mono">Status:</span>
+                <span className={`px-2.5 py-1 rounded text-xs font-mono font-semibold border ${
+                  hagsStatus.value === '2' || (hagsStatus.enabled && hagsStatus.value !== '1')
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                    : hagsStatus.value === '1'
+                    ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                    : 'bg-zinc-800 text-zinc-300 border-zinc-700'
+                }`}>
+                  {hagsStatus.loading
+                    ? 'Verificando...'
+                    : hagsStatus.value === '2' || (hagsStatus.enabled && hagsStatus.value !== '1')
+                    ? t('optimizer.hags.enabled', 'HAGS Ativado (HwSchMode = 2)')
+                    : hagsStatus.value === '1'
+                    ? t('optimizer.hags.disabled', 'HAGS Desativado (HwSchMode = 1)')
+                    : t('optimizer.hags.default', 'Padrão Windows (Sem override)')}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => handleToggleHags(true)}
+                  disabled={isOptimizing || (hagsStatus.enabled && hagsStatus.value === '2')}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{t('optimizer.hags.enableBtn', 'Ativar HAGS')}</span>
+                </button>
+
+                <button
+                  onClick={() => handleToggleHags(false)}
+                  disabled={isOptimizing || (!hagsStatus.enabled && hagsStatus.value === '1')}
+                  className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  <span>{t('optimizer.hags.disableBtn', 'Desativar HAGS (Fix Texturas OW2/Warzone)')}</span>
+                </button>
+
+                <button
+                  onClick={handleRevertHags}
+                  disabled={isOptimizing}
+                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border border-zinc-700 font-semibold text-xs transition disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>{t('optimizer.hags.revertBtn', 'Reverter HAGS (Padrão Windows)')}</span>
+                </button>
+              </div>
+
+              <div className="text-[11px] text-zinc-500 font-mono flex items-center gap-1">
+                <Info className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                <span>{t('optimizer.hags.restartNote', 'Requer reiniciar o Windows para surtir efeito completo.')}</span>
+              </div>
+            </div>
+          </div>
+
           <div className="bg-zinc-900/80 rounded-xl border border-zinc-800/80 p-4 space-y-4">
             <div>
               <h3 className="text-xs font-bold text-zinc-100 uppercase tracking-wider flex items-center gap-2">

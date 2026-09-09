@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld('darkhub', {
     getGpuInfo: () => ipcRenderer.invoke('optimizer:getGpuInfo'),
     getHagsStatus: () => ipcRenderer.invoke('optimizer:getHagsStatus'),
     setHagsStatus: (payload) => ipcRenderer.invoke('optimizer:setHagsStatus', payload),
+    revertHags: () => ipcRenderer.invoke('optimizer:revertHags'),
     deepTweaksList: () => ipcRenderer.invoke('optimizer:deepTweaksList'),
     deepTweaksStatus: () => ipcRenderer.invoke('optimizer:deepTweaksStatus'),
     deepTweaksAnalyze: (payload) => ipcRenderer.invoke('optimizer:deepTweaksAnalyze', payload),
@@ -96,6 +97,8 @@ contextBridge.exposeInMainWorld('darkhub', {
     openTamperSettings: () => ipcRenderer.invoke('optimizer:openTamperSettings'),
     applyMsiMode: () => ipcRenderer.invoke('optimizer:applyMsiMode'),
     applyExtremeKernelMod: () => ipcRenderer.invoke('optimizer:applyExtremeKernelMod'),
+    revertExtremeKernelMod: () => ipcRenderer.invoke('optimizer:revertExtremeKernelMod'),
+    revertServicesTweak: () => ipcRenderer.invoke('optimizer:revertServicesTweak'),
     applyExtremeNetworkMod: () => ipcRenderer.invoke('optimizer:applyExtremeNetworkMod'),
     applyCpuUnpark: () => ipcRenderer.invoke('optimizer:applyCpuUnpark')
   },
@@ -251,6 +254,22 @@ contextBridge.exposeInMainWorld('darkhub', {
     createManualBackup: (payload) => ipcRenderer.invoke('optiscaler:createManualBackup', payload),
     checkUpdate: () => ipcRenderer.invoke('optiscaler:checkUpdate'),
     downloadUpdate: (url) => ipcRenderer.invoke('optiscaler:downloadUpdate', url)
+  },
+  dlss5: {
+    getSteamGames: () => ipcRenderer.invoke('dlss5:getSteamGames'),
+    detectGpu: () => ipcRenderer.invoke('dlss5:detectGpu'),
+    scanGame: (payload) => ipcRenderer.invoke('dlss5:scanGame', payload),
+    apply: (payload) => ipcRenderer.invoke('dlss5:apply', payload),
+    revert: (payload) => ipcRenderer.invoke('dlss5:revert', payload),
+    getRecentGames: () => ipcRenderer.invoke('dlss5:getRecentGames'),
+    getProvenance: () => ipcRenderer.invoke('dlss5:getProvenance'),
+    downloadBinaries: () => ipcRenderer.invoke('dlss5:downloadBinaries'),
+    openFolder: (targetPath) => ipcRenderer.invoke('dlss5:openFolder', targetPath),
+    onLog: (callback) => {
+      const listener = (_event, msg) => callback(msg);
+      ipcRenderer.on('dlss5:log', listener);
+      return () => ipcRenderer.removeListener('dlss5:log', listener);
+    }
   },
   injector: {
     inject: (payload) => ipcRenderer.invoke('injector:inject', payload)

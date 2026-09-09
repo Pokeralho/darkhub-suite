@@ -62,12 +62,13 @@ class MemoryEngine {
     if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
     const script = `
       $ErrorActionPreference = 'SilentlyContinue'
-      bcdedit /set useplatformclock true
+      bcdedit /deletevalue useplatformclock
+      bcdedit /deletevalue useplatformtick
       bcdedit /set disabledynamictick yes
     `;
     const { code, stderr } = await ElevationHelper.runElevatedPowerShell(script);
     if (code !== 0) return { ok: false, error: stderr };
-    return { ok: true, msg: 'Timer resolution adjusted (useplatformclock/disabledynamictick)' };
+    return { ok: true, msg: 'Resolução do timer ajustada com segurança (disabledynamictick sem forçar HPET)' };
   }
 
   async optimizeAudioLatency() {

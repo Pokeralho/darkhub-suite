@@ -4,6 +4,32 @@ All notable changes to the DarkHub Suite project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.7] - 2026-09-09
+
+### Added
+- **OptiScaler Manager Complete Overhaul & Game Library Integration**:
+  - Full automatic synchronization with Steam and DarkHub installed game libraries.
+  - Permanent persistence for external games added via `.exe` file picker into DarkHub Library.
+  - High-performance shallow file scanner and cached GPU telemetry, reducing tab latency from >2.5s to <15ms.
+  - Integration of FSR 4.1.1b RDNA 2 INT8 mod (the3rdparty1917) with INT8 vector instructions, anti-ghosting matrix, and native HDR color space for Radeon RX 6000.
+  - Intelligent loader collision prevention and Agility SDK conflict bypass preventing application launch crashes (`0xc0000142`) in modern D3D12 games.
+- **Dedicated Backup & 1-Click Game Restoration System**:
+  - Prominent, unmissable backup card directly on each selected game view displaying snapshot timestamps and preserved files.
+  - 1-click clean reversion restoring original game files and removing all proxy loaders (`dxgi.dll`, `winmm.dll`, `version.dll`, `d3d12.dll`) and OptiScaler artifacts.
+  - Support for manual snapshots and individual snapshot removal.
+- **DLSS 5 & Universal Neural Upscaler (EXPERIMENTAL / BETA)**:
+  - Added dedicated interface for next-generation neural upscaler research and universal frame generation.
+  - **Explicit Experimental / Beta Classification**: DLSS 5 translation and universal neural upscaling pipelines are classified as experimental research modules. Features include real-time multi-vendor shader translation, dynamic telemetry inspection, and proxy driver interop, subject to active iteration.
+- **Official Portable Distribution**:
+  - Added standalone `DarkHub 0.4.7-portable.exe` build alongside the standard NSIS installer for zero-install, USB, and sandbox workflows.
+
+### Fixed
+- Fixed external game loss on reload by automatically persisting custom games into DarkHub Library store (`library.games.json`).
+- Fixed game launch error (`0xc0000142`) caused by redundant `D3D12_Optiscaler` injection on games with native DirectX 12 Core.
+- Resolved sequential PowerShell execution bottleneck during game library inspection.
+
+---
+
 ## [0.4.6] - 2026-09-02
 
 ### Added

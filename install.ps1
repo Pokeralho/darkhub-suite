@@ -4,7 +4,7 @@ function Start-DarkHubInstall {
     } catch {}
 
     $repo = "Pokeralho/darkhub-suite"
-    $Version = "0.4.6"
+    $Version = "0.4.7"
     try {
         $latestReleaseJson = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest" -Headers @{"User-Agent"="DarkHub-Installer"} -TimeoutSec 5 -ErrorAction Stop
         if ($latestReleaseJson.tag_name) {

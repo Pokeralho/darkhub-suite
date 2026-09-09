@@ -17,6 +17,7 @@ const __dirname = path.dirname(__filename);
  * - Copying emulator DLLs from bundled resources
  * - Creating steam_appid.txt and steam_settings/ config
  * - Generating steam_interfaces.txt for older games
+ * - Detecting and removing SteamStub PE wrapper from executables
  * - Reverting all changes by restoring backups
  */
 class GoldbergService {
@@ -51,6 +52,24 @@ class GoldbergService {
     // Last resort: use the first candidate
     this._sdkDir = candidates[0];
     return this._sdkDir;
+  }
+
+  /**
+   * Resolves the bundled Steamless CLI directory.
+   */
+  get steamlessDir() {
+    const candidates = [
+      path.join(path.dirname(app.getAppPath()), 'app.asar.unpacked', 'electron', 'services', 'goldberg', 'steamless'),
+      path.join(app.getAppPath(), 'electron', 'services', 'goldberg', 'steamless'),
+      path.join(__dirname, 'goldberg', 'steamless')
+    ];
+
+    for (const dir of candidates) {
+      if (fs.existsSync(path.join(dir, 'Steamless.CLI.exe'))) {
+        return dir;
+      }
+    }
+    return null;
   }
 
   /**
@@ -220,6 +239,191 @@ class GoldbergService {
   }
 
   /**
+   * Finds all .exe files in a game directory (non-recursive, root level only).
+   * Returns array of full paths.
+   */
+  findGameExecutables(gameDir) {
+    const results = [];
+    try {
+      const entries = fs.readdirSync(gameDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isFile() && entry.name.toLowerCase().endsWith('.exe')) {
+          // Skip known non-game executables
+          const lower = entry.name.toLowerCase();
+          if (lower.startsWith('unins') || lower.includes('setup') || lower.includes('redist') ||
+              lower.includes('vcredist') || lower.includes('dxsetup') || lower.includes('dotnet') ||
+              lower === 'steamless.cli.exe' || lower === 'generate_interfaces_file.exe') {
+            continue;
+          }
+          results.push(path.join(gameDir, entry.name));
+        }
+      }
+    } catch {}
+    return results;
+  }
+
+  /**
+   * Detects if a PE executable has a SteamStub wrapper by checking for a .bind section
+   * with the entry point residing within it.
+   * 
+   * @param {string} exePath - Path to the executable
+   * @returns {{ hasSteamStub: boolean, bindSection?: object, entryPoint?: number, arch?: string }}
+   */
+  detectSteamStub(exePath) {
+    const result = { hasSteamStub: false };
+
+    try {
+      const fd = fs.openSync(exePath, 'r');
+      const headerBuf = Buffer.alloc(4096);
+      fs.readSync(fd, headerBuf, 0, 4096, 0);
+
+      // Check DOS signature
+      if (headerBuf.readUInt16LE(0) !== 0x5A4D) {
+        fs.closeSync(fd);
+        return result;
+      }
+
+      // PE offset
+      const peOffset = headerBuf.readUInt32LE(60);
+      if (peOffset + 24 >= 4096) {
+        fs.closeSync(fd);
+        return result;
+      }
+
+      // Check PE signature
+      if (headerBuf.readUInt32LE(peOffset) !== 0x00004550) {
+        fs.closeSync(fd);
+        return result;
+      }
+
+      // COFF header
+      const machine = headerBuf.readUInt16LE(peOffset + 4);
+      const numberOfSections = headerBuf.readUInt16LE(peOffset + 6);
+      const sizeOfOptionalHeader = headerBuf.readUInt16LE(peOffset + 20);
+
+      result.arch = machine === 0x8664 ? 'x64' : machine === 0x14C ? 'x86' : 'unknown';
+
+      // Entry point
+      const addressOfEntryPoint = headerBuf.readUInt32LE(peOffset + 24 + 16);
+      result.entryPoint = addressOfEntryPoint;
+
+      // Section headers
+      const sectionStart = peOffset + 24 + sizeOfOptionalHeader;
+      
+      // We may need more data for section headers
+      const sectionBufSize = numberOfSections * 40;
+      const sectionBuf = Buffer.alloc(sectionBufSize);
+      fs.readSync(fd, sectionBuf, 0, sectionBufSize, sectionStart);
+
+      for (let i = 0; i < numberOfSections; i++) {
+        const off = i * 40;
+        const name = sectionBuf.toString('ascii', off, off + 8).replace(/\0/g, '');
+        
+        if (name === '.bind') {
+          const virtualSize = sectionBuf.readUInt32LE(off + 8);
+          const virtualAddress = sectionBuf.readUInt32LE(off + 12);
+          const sizeOfRawData = sectionBuf.readUInt32LE(off + 16);
+          const pointerToRawData = sectionBuf.readUInt32LE(off + 20);
+
+          result.bindSection = {
+            index: i,
+            name,
+            virtualSize,
+            virtualAddress,
+            sizeOfRawData,
+            pointerToRawData,
+            isLastSection: (i === numberOfSections - 1)
+          };
+
+          // Check if EP is within .bind section
+          if (addressOfEntryPoint >= virtualAddress &&
+              addressOfEntryPoint < virtualAddress + virtualSize) {
+            result.hasSteamStub = true;
+          }
+          break;
+        }
+      }
+
+      fs.closeSync(fd);
+    } catch {}
+
+    return result;
+  }
+
+  /**
+   * Removes SteamStub PE wrapper from an executable using bundled Steamless CLI.
+   * Creates a backup of the original exe first.
+   * 
+   * @param {string} exePath - Path to the executable to unpack
+   * @param {object} result - Result object to append actions to
+   * @returns {boolean} - True if successfully unpacked
+   */
+  removeSteamStub(exePath, result) {
+    const steamlessDir = this.steamlessDir;
+    if (!steamlessDir) {
+      result.actions.push('⚠ Steamless CLI não encontrado — passo de remoção do wrapper pulado');
+      return false;
+    }
+
+    const steamlessCli = path.join(steamlessDir, 'Steamless.CLI.exe');
+    const exeName = path.basename(exePath);
+    const exeDir = path.dirname(exePath);
+
+    try {
+      // Create backup of original exe
+      const backupPath = exePath + '.steamstub.original';
+      if (!fs.existsSync(backupPath)) {
+        fs.copyFileSync(exePath, backupPath);
+        result.actions.push(`Backup do executável criado: ${exeName}.steamstub.original`);
+        result.backupsCreated.push(backupPath);
+      }
+
+      // Run Steamless CLI to unpack
+      // Steamless outputs to <filename>.unpacked.exe in the same directory
+      const unpackedPath = exePath.replace(/\.exe$/i, '.unpacked.exe');
+
+      // Clean up any previous unpacked file
+      if (fs.existsSync(unpackedPath)) {
+        try { fs.unlinkSync(unpackedPath); } catch {}
+      }
+
+      cp.execSync(
+        `"${steamlessCli}" --quiet "${exePath}"`,
+        {
+          cwd: exeDir,
+          windowsHide: true,
+          timeout: 120000, // 2 minutes timeout for large executables
+          stdio: 'pipe'
+        }
+      );
+
+      // Check if unpacked file was created
+      if (fs.existsSync(unpackedPath)) {
+        // Replace original with unpacked version
+        fs.unlinkSync(exePath);
+        fs.renameSync(unpackedPath, exePath);
+        result.actions.push(`✓ SteamStub removido: ${exeName} (wrapper PE desempacotado)`);
+        return true;
+      } else {
+        result.actions.push(`⚠ Steamless não conseguiu desempacotar ${exeName}`);
+        return false;
+      }
+    } catch (err) {
+      result.actions.push(`⚠ Erro ao remover wrapper de ${exeName}: ${err.message || String(err)}`);
+      
+      // If something went wrong, try to restore backup
+      const backupPath = exePath + '.steamstub.original';
+      if (fs.existsSync(backupPath) && !fs.existsSync(exePath)) {
+        try {
+          fs.copyFileSync(backupPath, exePath);
+          result.actions.push('Executável restaurado do backup após falha');
+        } catch {}
+      }
+      return false;
+    }
+  }
+
+  /**
    * High-level auto-apply: given AppID and optional gameName/gameDir, auto-detects game directory and applies fix.
    *
    * @param {number|string} appId - Steam AppID
@@ -291,6 +495,10 @@ class GoldbergService {
 
   /**
    * Applies the Goldberg emulator configuration to a game directory.
+   * This includes:
+   *  1. Detecting and removing SteamStub wrapper from game executables
+   *  2. Replacing steam_api(64).dll with Goldberg emulator DLLs
+   *  3. Creating steam_appid.txt, steam_settings/, and steam_interfaces.txt
    */
   applyFix(gameDir, appId, options = {}) {
     const result = { ok: false, actions: [], backupsCreated: [], type: 'Configuração de Emulação' };
@@ -316,7 +524,32 @@ class GoldbergService {
       // Determine the primary directory (where the first DLL was found, or game root)
       const primaryDir = dllLocations.length > 0 ? dllLocations[0].dir : gameDir;
 
-      // 2. For each DLL location, backup original and copy emulator DLL
+      // 2. Detect and remove SteamStub from game executables BEFORE DLL replacement
+      const gameExes = this.findGameExecutables(gameDir);
+      for (const exePath of gameExes) {
+        const stubInfo = this.detectSteamStub(exePath);
+        if (stubInfo.hasSteamStub) {
+          result.actions.push(`SteamStub detectado em ${path.basename(exePath)} (${stubInfo.arch}, seção .bind)`);
+          this.removeSteamStub(exePath, result);
+        }
+      }
+
+      // Also check subdirs where DLLs were found (sometimes exe is in a subfolder)
+      const checkedDirs = new Set([gameDir]);
+      for (const loc of dllLocations) {
+        if (checkedDirs.has(loc.dir)) continue;
+        checkedDirs.add(loc.dir);
+        const subExes = this.findGameExecutables(loc.dir);
+        for (const exePath of subExes) {
+          const stubInfo = this.detectSteamStub(exePath);
+          if (stubInfo.hasSteamStub) {
+            result.actions.push(`SteamStub detectado em ${path.basename(exePath)} (${stubInfo.arch}, seção .bind)`);
+            this.removeSteamStub(exePath, result);
+          }
+        }
+      }
+
+      // 3. For each DLL location, backup original and copy emulator DLL
       const processedDirs = new Set();
       for (const loc of dllLocations) {
         if (processedDirs.has(loc.dir)) continue;
@@ -327,44 +560,55 @@ class GoldbergService {
           const targetDll = path.join(loc.dir, dllName);
           const sourceDll = path.join(this.sdkDir, dllName);
 
+          // Only process if the source (Goldberg) DLL exists
           if (!fs.existsSync(sourceDll)) continue;
+          
+          // Only process if the target DLL exists in the game dir
+          // (don't create new DLLs that the game doesn't use)
+          if (!fs.existsSync(targetDll)) continue;
 
-          if (fs.existsSync(targetDll)) {
-            // Check if it's already a Goldberg DLL (same size as ours)
-            const targetSize = fs.statSync(targetDll).size;
-            const sourceSize = fs.statSync(sourceDll).size;
+          // Check if it's already a Goldberg DLL (same size as ours)
+          const targetSize = fs.statSync(targetDll).size;
+          const sourceSize = fs.statSync(sourceDll).size;
 
-            if (targetSize === sourceSize) {
-              result.actions.push(`${dllName} já é a versão do emulador em ${path.relative(gameDir, loc.dir) || '.'}`);
-              continue;
-            }
-
-            // Backup original
-            const backupPath = targetDll + '.original';
-            if (!fs.existsSync(backupPath)) {
-              fs.copyFileSync(targetDll, backupPath);
-              result.backupsCreated.push(backupPath);
-              result.actions.push(`Backup criado: ${dllName}.original`);
-            }
+          if (targetSize === sourceSize) {
+            result.actions.push(`${dllName} já é a versão do emulador em ${path.relative(gameDir, loc.dir) || '.'}`);
+            continue;
           }
 
-          // Copy emulator DLL
-          fs.copyFileSync(sourceDll, targetDll);
-          result.actions.push(`DLL do emulador instalada: ${dllName} em ${path.relative(gameDir, loc.dir) || '.'}`);
+          // Backup original
+          const backupPath = targetDll + '.original';
+          if (!fs.existsSync(backupPath)) {
+            fs.copyFileSync(targetDll, backupPath);
+            result.backupsCreated.push(backupPath);
+            result.actions.push(`Backup criado: ${dllName}.original`);
+          }
+
+          // Copy emulator DLL — use writeFileSync with the buffer to ensure full replacement
+          const sourceBuffer = fs.readFileSync(sourceDll);
+          fs.writeFileSync(targetDll, sourceBuffer);
+          
+          // Verify the copy was successful
+          const newSize = fs.statSync(targetDll).size;
+          if (newSize === sourceSize) {
+            result.actions.push(`✓ DLL do emulador instalada: ${dllName} (${newSize} bytes) em ${path.relative(gameDir, loc.dir) || '.'}`);
+          } else {
+            result.actions.push(`⚠ DLL copiada mas tamanho diferente do esperado: ${dllName} (${newSize} vs ${sourceSize})`);
+          }
         }
 
-        // 3. Generate steam_interfaces.txt if requested or if original DLL is old
+        // 4. Generate steam_interfaces.txt if requested or if original DLL is old
         if (options.generateInterfaces !== false) {
           this._generateInterfaces(loc.dir, result);
         }
       }
 
-      // 4. Create steam_appid.txt in primary directory
+      // 5. Create steam_appid.txt in primary directory
       const appIdFile = path.join(primaryDir, 'steam_appid.txt');
       fs.writeFileSync(appIdFile, appIdStr + '\n', 'utf8');
       result.actions.push(`steam_appid.txt criado com AppID: ${appIdStr}`);
 
-      // 5. Create steam_settings directory and config files
+      // 6. Create steam_settings directory and config files
       const settingsDir = path.join(primaryDir, 'steam_settings');
       if (!fs.existsSync(settingsDir)) {
         fs.mkdirSync(settingsDir, { recursive: true });
@@ -372,6 +616,10 @@ class GoldbergService {
 
       fs.writeFileSync(path.join(settingsDir, 'steam_appid.txt'), appIdStr + '\n', 'utf8');
       result.actions.push('steam_settings/steam_appid.txt criado');
+
+      // Force offline mode for all games by default
+      fs.writeFileSync(path.join(settingsDir, 'offline.txt'), 'Offline mode enabled\n', 'utf8');
+      result.actions.push('Modo offline ativado');
 
       // Force language if specified
       if (options.language) {
@@ -383,12 +631,6 @@ class GoldbergService {
       if (options.accountName) {
         fs.writeFileSync(path.join(settingsDir, 'force_account_name.txt'), options.accountName.trim() + '\n', 'utf8');
         result.actions.push(`Nome de conta forçado: ${options.accountName}`);
-      }
-
-      // Offline mode
-      if (options.offline) {
-        fs.writeFileSync(path.join(settingsDir, 'offline.txt'), 'Offline mode enabled\n', 'utf8');
-        result.actions.push('Modo offline ativado');
       }
 
       // Disable networking
@@ -466,7 +708,7 @@ class GoldbergService {
   }
 
   /**
-   * Removes the Goldberg emulator and restores original DLLs from backups.
+   * Removes the Goldberg emulator and restores original DLLs and executables from backups.
    */
   removeFix(gameDir) {
     const result = { ok: false, actions: [], type: 'Remoção de Emulação' };
@@ -495,6 +737,22 @@ class GoldbergService {
             result.actions.push(`DLL original restaurada: ${dllName}`);
           }
         }
+
+        // Restore backed up executables (SteamStub originals)
+        try {
+          const entries = fs.readdirSync(dir);
+          for (const entry of entries) {
+            if (entry.endsWith('.steamstub.original')) {
+              const originalExeName = entry.replace('.steamstub.original', '');
+              const backupPath = path.join(dir, entry);
+              const targetPath = path.join(dir, originalExeName);
+
+              fs.copyFileSync(backupPath, targetPath);
+              fs.unlinkSync(backupPath);
+              result.actions.push(`Executável original restaurado: ${originalExeName}`);
+            }
+          }
+        } catch {}
 
         // Remove generated files
         for (const file of ['steam_appid.txt', 'steam_interfaces.txt', 'local_save.txt']) {
@@ -535,7 +793,8 @@ class GoldbergService {
       settingsDir: false,
       appId: null,
       primaryDir: null,
-      gameDir: gameDir || null
+      gameDir: gameDir || null,
+      steamStubRemoved: false
     };
 
     try {
@@ -562,6 +821,18 @@ class GoldbergService {
         status.settingsDir = fs.existsSync(settingsDir);
         if (status.settingsDir) status.applied = true;
       }
+
+      // Check for SteamStub backups
+      try {
+        const entries = fs.readdirSync(gameDir);
+        for (const entry of entries) {
+          if (entry.endsWith('.steamstub.original')) {
+            status.steamStubRemoved = true;
+            status.applied = true;
+            break;
+          }
+        }
+      } catch {}
 
       for (const dir of [gameDir, status.primaryDir].filter(Boolean)) {
         const appIdFile = path.join(dir, 'steam_appid.txt');

@@ -61,7 +61,8 @@ export class GamingBooster extends EventEmitter {
                 // PriorityClass) sem coordenação.
                 if (ManagedProcessRegistry.isManaged(pid)) continue
                 try {
-                  os.setPriority(pid, os.constants.priority.PRIORITY_HIGH)
+                  const prio = os.constants.priority.PRIORITY_ABOVE_NORMAL ?? -5
+                  os.setPriority(pid, prio)
                 } catch (e) {}
               }
             }

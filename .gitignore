@@ -13,6 +13,7 @@ dist/
 dist-ssr/
 dist_app/
 dist_app_release/
+dist_release/
 release/
 out/
 target/

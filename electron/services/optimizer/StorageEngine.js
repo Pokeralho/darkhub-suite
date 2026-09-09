@@ -26,12 +26,33 @@ class StorageEngine {
     return Array.from(dirs);
   }
 
+  _isProtectedPath(name) {
+    if (!name || typeof name !== 'string') return false;
+    const lower = name.toLowerCase();
+    const protectedPatterns = [
+      'd3dscache',
+      'directxshadercache',
+      'nv_shader_cache',
+      'nvcache',
+      'dxcache',
+      'glcache',
+      'vkcache',
+      'nvidia',
+      'amd',
+      'overwatch',
+      'blizzard',
+      'battle.net'
+    ];
+    return protectedPatterns.some(pattern => lower.includes(pattern));
+  }
+
   async _scanDir(dirPath) {
     let files = 0;
     let bytes = 0;
     try {
       const entries = await fs.readdir(dirPath, { withFileTypes: true });
       for (const entry of entries) {
+        if (this._isProtectedPath(entry.name)) continue;
         const fullPath = path.join(dirPath, entry.name);
         try {
           const stats = await fs.stat(fullPath);
@@ -50,6 +71,7 @@ class StorageEngine {
     try {
       const entries = await fs.readdir(dirPath, { withFileTypes: true });
       for (const entry of entries) {
+        if (this._isProtectedPath(entry.name)) continue;
         const fullPath = path.join(dirPath, entry.name);
         try {
           const stats = await fs.stat(fullPath);

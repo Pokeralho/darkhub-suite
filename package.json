@@ -1,6 +1,6 @@
 {
   "name": "darkhub-suite",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "High-performance modular Windows utility suite for gamers and power users.",
   "author": "DarkHub Team",
   "license": "MIT",
@@ -17,7 +17,7 @@
     "build:setup-sfx": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create-sfx-setup.ps1",
     "build:setup-nsis": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$nsis=Join-Path $env:LOCALAPPDATA 'electron-builder\\Cache\\nsis\\nsis-3.0.4.1-nsis-3.0.4.1\\Bin\\makensis.exe'; & $nsis installer\\darkhub.nsi\"",
     "build:setup-inno": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-inno-setup.ps1",
-    "build:portable": "npm run build:renderer && electron-builder --dir && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create-portable.ps1",
+    "build:portable": "npm run build:renderer && electron-builder --win portable",
     "test:unit": "vitest run"
   },
   "dependencies": {
@@ -67,7 +67,7 @@
       "onlyLoadAppFromAsar": false
     },
     "directories": {
-      "output": "dist_app_release"
+      "output": "dist_release"
     },
     "files": [
       "dist/**",
@@ -86,6 +86,7 @@
       "electron/services/*.dll",
       "electron/services/*.ps1",
       "electron/services/goldberg/**",
+      "electron/services/fsr4_rdna2/**",
       "node_modules/sharp/**",
       "node_modules/@img/**",
       "node_modules/ffmpeg-static/**"
@@ -106,6 +107,7 @@
       "requestedExecutionLevel": "requireAdministrator",
       "target": [
         "nsis",
+        "portable",
         "dir"
       ]
     },
@@ -120,6 +122,10 @@
       "uninstallDisplayName": "DarkHub Suite",
       "include": "build/installer.nsh",
       "differentialPackage": false
+    },
+    "portable": {
+      "artifactName": "${productName} ${version}-portable.${ext}",
+      "requestExecutionLevel": "admin"
     },
     "publish": [
       {

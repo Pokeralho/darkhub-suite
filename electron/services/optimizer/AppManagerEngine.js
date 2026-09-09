@@ -451,6 +451,14 @@ class AppManagerEngine {
     return { ok: true, msg: `HAGS ${enabled ? 'ativado' : 'desativado'}. Reinicie o Windows para surtir efeito completo.` };
   }
 
+  async revertHags() {
+    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    const script = `Remove-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' -Name 'HwSchMode' -Force -ErrorAction SilentlyContinue`;
+    const { code, stderr } = await ElevationHelper.runElevatedPowerShell(script);
+    if (code !== 0) return { ok: false, error: stderr || 'Falha ao reverter HAGS' };
+    return { ok: true, msg: 'HAGS restaurado para o padrão original do Windows. Reinicie o computador.' };
+  }
+
   async getInstalledPrograms() {
     if (process.platform !== 'win32') return { ok: false, error: 'Only Windows', programs: [] };
     const script = `

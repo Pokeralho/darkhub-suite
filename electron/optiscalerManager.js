@@ -113,7 +113,9 @@ async function getFileVersionInfo(filePath) {
   return runPowerShellJson(script, [filePath])
 }
 
+let cachedGpuInfo = null
 async function getGpuInfo() {
+  if (cachedGpuInfo) return cachedGpuInfo
   const script = `
     $ErrorActionPreference = 'Stop'
     Get-CimInstance Win32_VideoController |
@@ -139,7 +141,8 @@ async function getGpuInfo() {
           ? 'rdna2'
           : 'unknown'
     : null
-  return { vendor, amdArchitecture, controllers: list }
+  cachedGpuInfo = { vendor, amdArchitecture, controllers: list }
+  return cachedGpuInfo
 }
 
 function getWindowsBuild() {
@@ -151,10 +154,10 @@ function isWindows11OrNewer() {
   return getWindowsBuild() >= 22000
 }
 
-async function walkFiles(root, { maxDepth = 4, maxFiles = 5000 } = {}) {
+async function walkFiles(root, { maxDepth = 2, maxFiles = 300 } = {}) {
   const out = []
   const rootPath = normalizeWinPath(root)
-  const skipDirs = new Set(['.git', 'node_modules', 'content', 'movies', 'sound', 'audio', 'localization'])
+  const skipDirs = new Set(['.git', 'node_modules', 'content', 'movies', 'sound', 'audio', 'localization', 'datas', 'levels', 'videos'])
 
   async function walk(dir, depth) {
     if (out.length >= maxFiles || depth > maxDepth) return
@@ -219,24 +222,52 @@ function detectUpscaleFiles(files) {
   }
 }
 
-async function detectInstalledLoaders(targetDir) {
+async function isOptiScalerLoader(filePath, sourcePath = null) {
+  if (!(await exists(filePath))) return false
+  try {
+    const stat = await fs.lstat(filePath)
+    if (sourcePath) {
+      const optiDll = path.join(sourcePath, 'OptiScaler.dll')
+      if (await exists(optiDll)) {
+        const optiStat = await fs.lstat(optiDll)
+        if (stat.size === optiStat.size) return true
+      }
+    }
+    if (stat.size === 25379632 || (stat.size >= 24000000 && stat.size <= 27000000)) {
+      return true
+    }
+    // Fast non-blocking header check for OptiScaler strings in first 2MB
+    const fd = await fs.open(filePath, 'r')
+    try {
+      const readLen = Math.min(stat.size, 1024 * 1024 * 2)
+      const buf = Buffer.alloc(readLen)
+      await fd.read(buf, 0, readLen, 0)
+      const str = buf.toString('latin1')
+      if (str.includes('OptiScaler') || str.includes('optiscaler.dll')) {
+        return true
+      }
+    } finally {
+      await fd.close()
+    }
+  } catch {}
+  return false
+}
+
+async function detectInstalledLoaders(targetDir, sourcePath = null) {
   const loaders = []
   const conflicts = []
 
   for (const loader of SUPPORTED_LOADERS) {
     const filePath = path.join(targetDir, loader)
     if (!(await exists(filePath))) continue
-    const versionInfo = await getFileVersionInfo(filePath)
-    const original = String(versionInfo?.originalFilename ?? '').toLowerCase()
-    const product = String(versionInfo?.productName ?? '').toLowerCase()
-    const isOptiScaler = original === 'optiscaler.dll' || product.includes('optiscaler')
+    const isOptiScaler = await isOptiScalerLoader(filePath, sourcePath)
     const entry = {
       file: loader,
       path: filePath,
       isOptiScaler,
-      originalFilename: versionInfo?.originalFilename || '',
-      fileVersion: versionInfo?.fileVersion || '',
-      productVersion: versionInfo?.productVersion || ''
+      originalFilename: isOptiScaler ? 'OptiScaler.dll' : loader,
+      fileVersion: '',
+      productVersion: ''
     }
     loaders.push(entry)
     if (!isOptiScaler) conflicts.push(entry)
@@ -276,15 +307,33 @@ function normalizeChoice(value, allowed, fallback) {
 
 function buildIniPatch({ upscaler, inputApi, gpu, includeAgilitySdk }) {
   const patch = []
-  const isFsr4Mode = upscaler === 'fsr4' || upscaler === 'fsr4_rdna3'
+  const isFsr4Mode = upscaler === 'fsr4' || upscaler === 'fsr4_rdna3' || upscaler === 'fsr4_rdna2'
 
   if (upscaler === 'fsr22') {
     patch.push(['Upscalers', 'Dx11Upscaler', 'fsr22'], ['Upscalers', 'Dx12Upscaler', 'fsr22'], ['Upscalers', 'VulkanUpscaler', 'fsr22'], ['FSR', 'UpscalerIndex', '2'], ['FSR', 'Fsr4Update', 'false'])
   } else if (upscaler === 'fsr31') {
     patch.push(['Upscalers', 'Dx11Upscaler', 'fsr31'], ['Upscalers', 'Dx12Upscaler', 'fsr31'], ['Upscalers', 'VulkanUpscaler', 'fsr31'], ['FSR', 'UpscalerIndex', '1'], ['FSR', 'Fsr4Update', 'false'])
+  } else if (upscaler === 'fsr4_rdna2') {
+    patch.push(
+      ['Upscalers', 'Dx11Upscaler', 'fsr31_12'],
+      ['Upscalers', 'Dx12Upscaler', 'fsr31'],
+      ['Upscalers', 'VulkanUpscaler', 'fsr31_12'],
+      ['FSR', 'UpscalerIndex', '0'],
+      ['FSR', 'Fsr4Update', 'true'],
+      ['FSR', 'Fsr4ForceEnableInt8', 'true'],
+      ['FSR', 'Fsr4DoNotLoadAmdxc64', 'false'],
+      ['FSR', 'FsrNonLinearColorSpace', 'true'],
+      ['FSR', 'FsrAgilitySDKUpgrade', includeAgilitySdk ? 'true' : 'false']
+    )
   } else if (isFsr4Mode) {
-    patch.push(['Upscalers', 'Dx11Upscaler', 'fsr31_12'], ['Upscalers', 'Dx12Upscaler', 'fsr31'], ['Upscalers', 'VulkanUpscaler', 'fsr31_12'], ['FSR', 'UpscalerIndex', '0'], ['FSR', 'Fsr4Update', 'true'])
-    if (includeAgilitySdk) patch.push(['FSR', 'FsrAgilitySDKUpgrade', 'true'])
+    patch.push(
+      ['Upscalers', 'Dx11Upscaler', 'fsr31_12'],
+      ['Upscalers', 'Dx12Upscaler', 'fsr31'],
+      ['Upscalers', 'VulkanUpscaler', 'fsr31_12'],
+      ['FSR', 'UpscalerIndex', '0'],
+      ['FSR', 'Fsr4Update', 'true'],
+      ['FSR', 'FsrAgilitySDKUpgrade', includeAgilitySdk ? 'true' : 'false']
+    )
   } else if (upscaler === 'xess') {
     patch.push(['Upscalers', 'Dx11Upscaler', gpu.vendor === 'intel' ? 'xess' : 'xess_12'], ['Upscalers', 'Dx12Upscaler', 'xess'], ['Upscalers', 'VulkanUpscaler', 'xess'])
   } else if (upscaler === 'dlss') {
@@ -389,11 +438,19 @@ async function buildAnalysis(app, payload = {}) {
   const requestedLoader = preferredLoader === 'auto'
     ? autoLoader.loader
     : SUPPORTED_LOADERS.find((x) => x.toLowerCase() === preferredLoader) || autoLoader.loader
-  const upscaler = normalizeChoice(payload?.upscaler ?? game?.optiscaler?.upscaler, ['auto', 'fsr22', 'fsr31', 'fsr4', 'fsr4_rdna3', 'xess', 'dlss'], 'auto')
+  const upscaler = normalizeChoice(payload?.upscaler ?? game?.optiscaler?.upscaler, ['auto', 'fsr22', 'fsr31', 'fsr4', 'fsr4_rdna3', 'fsr4_rdna2', 'xess', 'dlss'], 'auto')
   const inputApi = normalizeChoice(payload?.inputApi ?? game?.optiscaler?.inputApi, ['auto', 'dlss', 'xess', 'fsr'], 'auto')
   const resolvedInputApi = inputApi === 'auto' ? chooseInputApi(detected) : inputApi
-  const isFsr4Mode = upscaler === 'fsr4' || upscaler === 'fsr4_rdna3'
-  const includeAgilitySdk = Boolean(payload?.includeAgilitySdk ?? game?.optiscaler?.includeAgilitySdk ?? (isFsr4Mode && !isWindows11OrNewer()))
+  const isFsr4Mode = upscaler === 'fsr4' || upscaler === 'fsr4_rdna3' || upscaler === 'fsr4_rdna2'
+  const hasNativeAgility = (await exists(path.join(targetDir, 'D3D12'))) ||
+                           (await exists(path.join(targetDir, 'D3D12Core.dll')))
+  let includeAgilitySdk = Boolean(payload?.includeAgilitySdk ?? game?.optiscaler?.includeAgilitySdk ?? false)
+  if (hasNativeAgility) {
+    includeAgilitySdk = false
+    notes.push('Agility SDK nativo detectado no jogo: D3D12_Optiscaler desativado para evitar conflito (0xc0000142).')
+  } else if (includeAgilitySdk) {
+    notes.push('D3D12_Optiscaler sera instalado para o modo Agility SDK.')
+  }
   const manifest = await readJsonIfExists(path.join(targetDir, MANIFEST_FILE))
   const selectedLoaderConflict = installed.conflicts.find((x) => x.file.toLowerCase() === requestedLoader.toLowerCase()) || null
   const legacyConflicts = []
@@ -406,11 +463,11 @@ async function buildAnalysis(app, payload = {}) {
   const versionFiles = detected.files
     .filter((x) => ['DLSS', 'DLSS-G', 'XeSS', 'XeFG', 'FidelityFX'].includes(x.kind))
     .slice(0, 8)
-  const versions = []
-  for (const item of versionFiles) {
-    const info = await getFileVersionInfo(item.path)
-    versions.push({ ...item, fileVersion: info?.fileVersion || '', productVersion: info?.productVersion || '' })
-  }
+  const versions = versionFiles.map((item) => ({
+    ...item,
+    fileVersion: '',
+    productVersion: ''
+  }))
 
   if (!detected.hasDlss && !detected.hasFsr && !detected.hasXess) {
     notes.push('Nenhum arquivo DLSS/XeSS/FSR foi encontrado nesta pasta. O jogo ainda pode funcionar, mas talvez a pasta alvo esteja errada.')
@@ -418,7 +475,7 @@ async function buildAnalysis(app, payload = {}) {
   if (isFsr4Mode && gpu.vendor !== 'amd') {
     notes.push('FSR4 foi selecionado, mas a GPU AMD nao foi detectada. O suporte real depende do driver/jogo.')
   }
-  if (isFsr4Mode && gpu.vendor === 'amd' && gpu.amdArchitecture !== 'rdna4') {
+  if (isFsr4Mode && gpu.vendor === 'amd' && gpu.amdArchitecture !== 'rdna4' && upscaler !== 'fsr4_rdna2' && upscaler !== 'fsr4_rdna3') {
     notes.push('FSR4 e oficialmente suportado em Radeon RX 9000/RDNA4. Este perfil fora de RDNA4 e experimental.')
   }
   if (upscaler === 'fsr4_rdna3') {
@@ -426,6 +483,13 @@ async function buildAnalysis(app, payload = {}) {
       notes.push('Perfil RDNA3 detectado: DarkHub vai forcar Fsr4Update=true e UpscalerIndex=0 para testar FSR4.')
     } else {
       notes.push('Perfil FSR4 RDNA3 selecionado, mas a deteccao nao confirmou RDNA3.')
+    }
+  }
+  if (upscaler === 'fsr4_rdna2') {
+    if (gpu.amdArchitecture === 'rdna2') {
+      notes.push('Perfil RDNA2 detectado: DarkHub vai implantar o FSR 4.1.1b INT8 (the3rdparty1917) com Fsr4ForceEnableInt8=true e mitigacao de ghosting ativa.')
+    } else {
+      notes.push('Perfil FSR 4.1.1b RDNA2 selecionado: DarkHub vai forcar o bypass INT8 para GPUs AMD Radeon sem FP8 nativo.')
     }
   }
   if (selectedLoaderConflict) notes.push(`${requestedLoader} ja existe e nao parece ser OptiScaler. A aplicacao fara backup antes de sobrescrever.`)
@@ -531,6 +595,56 @@ function isSameInstall(analysis, payload) {
   )
 }
 
+async function resolveFsr4Rdna2Path(app) {
+  const candidates = [
+    path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'services', 'fsr4_rdna2', 'amd_fidelityfx_upscaler_dx12.dll'),
+    path.resolve(process.cwd(), 'electron', 'services', 'fsr4_rdna2', 'amd_fidelityfx_upscaler_dx12.dll')
+  ]
+  try {
+    const userData = app?.getPath ? app.getPath('userData') : (process.env.APPDATA || path.join(process.cwd(), '.data'))
+    candidates.push(path.join(userData, 'OptiScaler', 'FSR4_RDNA2', 'amd_fidelityfx_upscaler_dx12.dll'))
+    candidates.push(path.join(process.env.APPDATA || '', 'darkhub-electron', 'OptiScaler', 'FSR4_RDNA2', 'amd_fidelityfx_upscaler_dx12.dll'))
+    candidates.push(path.join(process.env.APPDATA || '', 'DarkHub', 'OptiScaler', 'FSR4_RDNA2', 'amd_fidelityfx_upscaler_dx12.dll'))
+  } catch {}
+
+  for (const c of candidates) {
+    if (fsRaw.existsSync(c)) return c
+  }
+
+  try {
+    const https = await import('https')
+    const targetDir = path.join(process.env.APPDATA || '', 'darkhub-electron', 'OptiScaler', 'FSR4_RDNA2')
+    await fs.mkdir(targetDir, { recursive: true })
+    const targetFile = path.join(targetDir, 'amd_fidelityfx_upscaler_dx12.dll')
+    const archivePath = path.join(targetDir, 'FSR_4.1.1b_INT8_with_RDNA2_fix.7z')
+    const downloadUrl = 'https://github.com/the3rdparty1917/fsr4xyz/releases/download/4.1.1b/FSR_4.1.1b_INT8_with_RDNA2_fix.7z'
+
+    const downloadWithRedirect = (url, dest) => new Promise((resolve, reject) => {
+      https.get(url, { headers: { 'User-Agent': 'DarkHubSuite-OptiScaler' } }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          return downloadWithRedirect(res.headers.location, dest).then(resolve).catch(reject)
+        }
+        if (res.statusCode !== 200) return reject(new Error(`Download status: ${res.statusCode}`))
+        const out = fsRaw.createWriteStream(dest)
+        res.pipe(out)
+        out.on('finish', () => out.close(resolve))
+        out.on('error', reject)
+      }).on('error', reject)
+    })
+
+    await downloadWithRedirect(downloadUrl, archivePath)
+    await execFileAsync('tar.exe', ['-xf', archivePath, '-C', targetDir], { windowsHide: true })
+    const subDll = path.join(targetDir, '4.1.1b', 'amd_fidelityfx_upscaler_dx12.dll')
+    if (fsRaw.existsSync(subDll)) {
+      await fs.copyFile(subDll, targetFile)
+    }
+    if (fsRaw.existsSync(targetFile)) return targetFile
+  } catch (e) {
+    console.error('[OptiScaler] Falha ao resolver FSR 4.1.1b RDNA 2:', e)
+  }
+  return null
+}
+
 async function applyOptiScaler(app, getLibraryStore, payload = {}) {
   const analysis = await buildAnalysis(app, payload)
   if (!analysis.ok) return analysis
@@ -564,6 +678,34 @@ async function applyOptiScaler(app, getLibraryStore, payload = {}) {
   }
 
   try {
+    // 1. Remove any other OptiScaler proxy loaders from targetDir to prevent conflicting hooks (0xc0000142)
+    for (const loader of SUPPORTED_LOADERS) {
+      if (loader.toLowerCase() === analysis.choices.loader.toLowerCase()) continue
+      const oldLoaderPath = path.join(targetDir, loader)
+      if (await exists(oldLoaderPath)) {
+        const isOpti = await isOptiScalerLoader(oldLoaderPath, analysis.source.path)
+        if (isOpti) {
+          try {
+            await fs.unlink(oldLoaderPath)
+          } catch {}
+        }
+      }
+    }
+
+    // 2. Remove loose OptiScaler.dll in game root if present
+    const looseOpti = path.join(targetDir, 'OptiScaler.dll')
+    if (await exists(looseOpti)) {
+      try { await fs.unlink(looseOpti) } catch {}
+    }
+
+    // 3. Remove D3D12_Optiscaler if includeAgilitySdk is false
+    if (!analysis.choices.includeAgilitySdk) {
+      const d3d12Opti = path.join(targetDir, 'D3D12_Optiscaler')
+      if (await exists(d3d12Opti)) {
+        try { await fs.rm(d3d12Opti, { recursive: true, force: true }) } catch {}
+      }
+    }
+
     const copiedRoot = await copySourceRootFiles(analysis.source.path, targetDir, backupDir, manifest)
     manifest.copied.push(...copiedRoot)
 
@@ -578,6 +720,16 @@ async function applyOptiScaler(app, getLibraryStore, payload = {}) {
     if (analysis.choices.includeAgilitySdk) {
       const agility = await copySourceDirectory(analysis.source.path, targetDir, 'D3D12_Optiscaler', backupDir, manifest)
       if (agility) manifest.copied.push(agility)
+    }
+
+    if (analysis.choices.upscaler === 'fsr4_rdna2') {
+      const fsr4Rdna2Src = await resolveFsr4Rdna2Path(app)
+      if (fsr4Rdna2Src && fsRaw.existsSync(fsr4Rdna2Src)) {
+        const dest = path.join(targetDir, 'amd_fidelityfx_upscaler_dx12.dll')
+        await backupPathIfExists(dest, backupDir, manifest)
+        await fs.copyFile(fsr4Rdna2Src, dest)
+        manifest.copied.push({ source: fsr4Rdna2Src, path: dest, note: 'FSR 4.1.1b INT8 (the3rdparty1917)' })
+      }
     }
 
     const iniPath = path.join(targetDir, 'OptiScaler.ini')
@@ -597,25 +749,31 @@ async function applyOptiScaler(app, getLibraryStore, payload = {}) {
     if (gameId && getLibraryStore) {
       const { loadLibrary, upsertGame } = await getLibraryStore()
       const lib = await loadLibrary(app)
-      const game = lib.games.find((g) => g.id === gameId)
-      if (game) {
-        await upsertGame(app, {
-          ...game,
-          workingDir: game.workingDir || path.dirname(game.exePath),
-          optiscaler: {
-            ...(game.optiscaler ?? {}),
-            enabled: true,
-            applyOnLaunch,
-            targetDir,
-            loader: analysis.choices.loader,
-            upscaler: analysis.choices.upscaler,
-            inputApi: analysis.choices.resolvedInputApi,
-            includeAgilitySdk: analysis.choices.includeAgilitySdk,
-            sourceVersion: analysis.source.version,
-            lastInstalledAt: Date.now()
-          }
-        })
+      let game = lib.games.find((g) => g.id === gameId || normalizeWinPath(g.exePath || '').toLowerCase() === normalizeWinPath(analysis.game.targetExePath || '').toLowerCase())
+      if (!game) {
+        game = {
+          id: gameId || `game-${Date.now()}`,
+          name: analysis.game.name || path.basename(analysis.game.targetExePath, '.exe'),
+          exePath: analysis.game.targetExePath,
+          workingDir: analysis.game.workingDir || targetDir
+        }
       }
+      await upsertGame(app, {
+        ...game,
+        workingDir: game.workingDir || path.dirname(game.exePath || analysis.game.targetExePath),
+        optiscaler: {
+          ...(game.optiscaler ?? {}),
+          enabled: true,
+          applyOnLaunch,
+          targetDir,
+          loader: analysis.choices.loader,
+          upscaler: analysis.choices.upscaler,
+          inputApi: analysis.choices.resolvedInputApi,
+          includeAgilitySdk: analysis.choices.includeAgilitySdk,
+          sourceVersion: analysis.source.version,
+          lastInstalledAt: Date.now()
+        }
+      })
     }
 
     return { ok: true, analysis, backupDir, manifest }
@@ -628,78 +786,129 @@ async function applyOptiScaler(app, getLibraryStore, payload = {}) {
   }
 }
 
+async function listBackups(payload = {}) {
+  const targetDir = normalizeWinPath(payload?.targetDir || path.dirname(String(payload?.exePath ?? '')))
+  if (!targetDir || !(await exists(targetDir))) {
+    return { ok: true, backups: [] }
+  }
+
+  const backupRoot = path.join(targetDir, 'OptiScaler_Backups')
+  if (!(await exists(backupRoot))) {
+    return { ok: true, backups: [] }
+  }
+
+  try {
+    const entries = await fs.readdir(backupRoot, { withFileTypes: true })
+    const backups = []
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+      const bDir = path.join(backupRoot, entry.name)
+      const manifest = (await readJsonIfExists(path.join(bDir, 'manifest.json'))) ||
+                       (await readJsonIfExists(path.join(bDir, 'manifest.failed.json')))
+      backups.push({
+        id: entry.name,
+        path: bDir,
+        createdAt: manifest?.createdAt || entry.name,
+        isManual: Boolean(manifest?.isManual),
+        filesCount: Array.isArray(manifest?.backedUp) ? manifest.backedUp.length : 0,
+        manifest: manifest || {}
+      })
+    }
+    // Sort descending by id (timestamp)
+    backups.sort((a, b) => b.id.localeCompare(a.id))
+    return { ok: true, backups }
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err), backups: [] }
+  }
+}
+
 async function restoreBackup(app, getLibraryStore, payload = {}) {
   const targetDir = normalizeWinPath(payload?.targetDir || path.dirname(String(payload?.exePath ?? '')))
-  if (!targetDir || !(await exists(targetDir))) return { ok: false, error: 'Pasta alvo do jogo nao encontrada.' }
+  if (!targetDir || !(await exists(targetDir))) return { ok: false, error: 'Pasta alvo do jogo não encontrada.' }
 
-  const backupId = payload?.backupId || payload?.id
   const backupRoot = path.join(targetDir, 'OptiScaler_Backups')
+  const backupId = payload?.backupId || payload?.id
   let backupDir = payload?.backupPath ? normalizeWinPath(payload.backupPath) : null
   if (!backupDir && backupId) {
     backupDir = path.join(backupRoot, backupId)
   }
 
+  const listRes = await listBackups(payload)
+  const allBackups = listRes.ok ? listRes.backups : []
+
+  // If no explicit backup specified, use earliest backup with backedUp items (cleanest baseline), or latest
   if (!backupDir || !(await exists(backupDir))) {
-    const listRes = await listBackups(payload)
-    if (listRes.ok && listRes.backups.length > 0) {
-      backupDir = listRes.backups[0].path
+    if (allBackups.length > 0) {
+      const earliestWithBackups = [...allBackups].reverse().find(b => Array.isArray(b.manifest?.backedUp) && b.manifest.backedUp.length > 0)
+      backupDir = earliestWithBackups ? earliestWithBackups.path : allBackups[0].path
     }
   }
-
-  if (!backupDir || !(await exists(backupDir))) {
-    return { ok: false, error: 'Nenhum backup valido encontrado para restaurar.' }
-  }
-
-  const manifest = (await readJsonIfExists(path.join(backupDir, 'manifest.json'))) ||
-                   (await readJsonIfExists(path.join(backupDir, 'manifest.failed.json')))
 
   const restored = []
   const removed = []
 
   try {
+    // 1. Restore backed up files if backup directory exists
+    if (backupDir && (await exists(backupDir))) {
+      const manifest = (await readJsonIfExists(path.join(backupDir, 'manifest.json'))) ||
+                       (await readJsonIfExists(path.join(backupDir, 'manifest.failed.json')))
 
-    if (manifest && Array.isArray(manifest.backedUp)) {
-      for (const item of manifest.backedUp) {
-        if (await exists(item.backupPath)) {
-          const stat = await fs.lstat(item.backupPath)
-          if (stat.isDirectory()) {
-            await fs.cp(item.backupPath, item.path, { recursive: true, force: true })
-          } else {
-            await fs.copyFile(item.backupPath, item.path)
+      if (manifest && Array.isArray(manifest.backedUp)) {
+        for (const item of manifest.backedUp) {
+          if (await exists(item.backupPath)) {
+            const stat = await fs.lstat(item.backupPath)
+            if (stat.isDirectory()) {
+              await fs.cp(item.backupPath, item.path, { recursive: true, force: true })
+            } else {
+              await fs.copyFile(item.backupPath, item.path)
+            }
+            restored.push(item.path)
           }
-          restored.push(item.path)
+        }
+      } else {
+        const backupEntries = await fs.readdir(backupDir, { withFileTypes: true })
+        for (const entry of backupEntries) {
+          if (entry.name === 'manifest.json' || entry.name === 'manifest.failed.json') continue
+          const src = path.join(backupDir, entry.name)
+          const dst = path.join(targetDir, entry.name)
+          if (entry.isDirectory()) {
+            await fs.cp(src, dst, { recursive: true, force: true })
+          } else {
+            await fs.copyFile(src, dst)
+          }
+          restored.push(dst)
         }
       }
     }
 
+    // 2. Comprehensive cleanup: Purge ALL OptiScaler proxy loaders from targetDir
+    const releaseDir = resolveReleaseDir(app)
+    for (const loader of SUPPORTED_LOADERS) {
+      const p = path.join(targetDir, loader)
+      if (await exists(p)) {
+        const wasRestored = restored.some(r => normalizeWinPath(r).toLowerCase() === normalizeWinPath(p).toLowerCase())
+        if (!wasRestored) {
+          const isOpti = await isOptiScalerLoader(p, releaseDir)
+          if (isOpti) {
+            try {
+              await fs.unlink(p)
+              removed.push(p)
+            } catch {}
+          }
+        }
+      }
+    }
+
+    // 3. Purge all known OptiScaler files
     const filesToClean = [
       'OptiScaler.dll', 'OptiScaler.ini', 'OptiScaler.log', 'OptiScaler.asi',
       'DarkHubOptiScaler.json', 'fakenvapi.ini', 'nvngx.ini'
     ]
-    for (const loader of SUPPORTED_LOADERS) {
-      filesToClean.push(loader)
-    }
-
-    if (manifest && Array.isArray(manifest.copied)) {
-      for (const item of manifest.copied) {
-        const dest = item.path || item.dest
-        if (dest && typeof dest === 'string') {
-          const wasBackedUp = manifest.backedUp?.some((b) => normalizeWinPath(b.path) === normalizeWinPath(dest))
-          if (!wasBackedUp && (await exists(dest))) {
-            const stat = await fs.lstat(dest)
-            if (stat.isDirectory()) {
-              await fs.rm(dest, { recursive: true, force: true })
-            } else {
-              await fs.unlink(dest)
-            }
-            removed.push(dest)
-          }
-        }
-      }
-    } else {
-      for (const f of filesToClean) {
-        const p = path.join(targetDir, f)
-        if (await exists(p)) {
+    for (const f of filesToClean) {
+      const p = path.join(targetDir, f)
+      if (await exists(p)) {
+        const wasRestored = restored.some(r => normalizeWinPath(r).toLowerCase() === normalizeWinPath(p).toLowerCase())
+        if (!wasRestored) {
           try {
             await fs.unlink(p)
             removed.push(p)
@@ -708,6 +917,7 @@ async function restoreBackup(app, getLibraryStore, payload = {}) {
       }
     }
 
+    // Purge D3D12_Optiscaler & Licenses
     for (const dirName of ['D3D12_Optiscaler', 'Licenses']) {
       const p = path.join(targetDir, dirName)
       if (await exists(p)) {
@@ -718,31 +928,35 @@ async function restoreBackup(app, getLibraryStore, payload = {}) {
       }
     }
 
-    const localManifest = path.join(targetDir, MANIFEST_FILE)
-    if (await exists(localManifest)) {
-      try { await fs.unlink(localManifest) } catch {}
-    }
-
+    // 4. Update Library store
     const gameId = payload?.gameId || payload?.game?.id
-    if (gameId && getLibraryStore) {
-      const { loadLibrary, upsertGame } = await getLibraryStore()
-      const lib = await loadLibrary(app)
-      const game = lib.games.find((g) => g.id === gameId)
-      if (game) {
-        await upsertGame(app, {
-          ...game,
-          optiscaler: {
-            ...(game.optiscaler ?? {}),
-            enabled: false,
-            lastRestoredAt: Date.now()
-          }
-        })
-      }
+    if (getLibraryStore) {
+      try {
+        const { loadLibrary, upsertGame } = await getLibraryStore()
+        const lib = await loadLibrary(app)
+        const game = lib.games.find((g) => (gameId && g.id === gameId) || normalizeWinPath(path.dirname(g.exePath)).toLowerCase() === normalizeWinPath(targetDir).toLowerCase())
+        if (game) {
+          await upsertGame(app, {
+            ...game,
+            optiscaler: {
+              ...(game.optiscaler ?? {}),
+              enabled: false,
+              lastRestoredAt: Date.now()
+            }
+          })
+        }
+      } catch {}
     }
 
-    return { ok: true, message: 'Backup restaurado com sucesso.', restored, removed, backupDir }
+    return {
+      ok: true,
+      message: `Jogo revertido com sucesso! ${restored.length} arquivo(s) restaurado(s), ${removed.length} arquivo(s) do OptiScaler removido(s).`,
+      restored,
+      removed,
+      backupDir
+    }
   } catch (err) {
-    return { ok: false, error: `Falha na restauracao: ${err?.message ?? String(err)}` }
+    return { ok: false, error: `Falha na restauração: ${err?.message ?? String(err)}` }
   }
 }
 

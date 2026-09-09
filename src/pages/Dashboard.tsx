@@ -554,6 +554,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           <span>{t('dashboard.quickMaintenance', 'Quick Maintenance Actions:')}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('dlss5')}
+              className="px-2.5 py-1.5 rounded bg-purple-950/70 hover:bg-purple-900/80 text-purple-200 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-purple-700/60 shadow-sm"
+            >
+              <Sparkles size={13} className="text-purple-400" />
+              <span>DLSS 5 Manager</span>
+            </button>
+          )}
           <button
             onClick={handleOptimizeRam}
             disabled={isOptimizingRam}

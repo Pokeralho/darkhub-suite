@@ -551,7 +551,7 @@ export default function SteamLuaTools() {
         <div>
           <h1 className="text-lg font-bold text-zinc-100 tracking-tight flex items-center gap-2">
             {t('steamLua.title', 'Steam Lua & Depot Tools')}
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono font-normal">v0.4.6</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono font-normal">v0.4.7</span>
           </h1>
           <p className="text-xs text-zinc-400 mt-0.5">
             {t('steamLua.subtitle', 'Gerenciamento nativo de AppIDs, Depots, DLCs e scripts stplug-in para o cliente Steam.')}

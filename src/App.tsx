@@ -25,6 +25,7 @@ const Decryption = lazy(() => import('./pages/Decryption'));
 const NetworkTools = lazy(() => import('./pages/NetworkTools'));
 const DevTools = lazy(() => import('./pages/DevTools'));
 const OptiScalerManager = lazy(() => import('./pages/OptiScalerManager'));
+const Dlss5Manager = lazy(() => import('./pages/Dlss5Manager'));
 const SetupHub = lazy(() => import('./pages/SetupHub'));
 const DllInjector = lazy(() => import('./pages/DllInjector'));
 const FramePacer = lazy(() => import('./pages/FramePacer'));
@@ -109,7 +110,9 @@ const App = () => {
       case 'framepacer':
         return <FramePacer />;
       case 'optiscaler':
-        return <OptiScalerManager />;
+        return <OptiScalerManager onNavigate={(p: string) => setCurrentPage(p)} />;
+      case 'dlss5':
+        return <Dlss5Manager />;
       case 'luluflix':
         return <LuluFlix />;
       case 'juuzou':

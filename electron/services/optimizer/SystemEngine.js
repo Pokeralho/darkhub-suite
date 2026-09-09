@@ -32,10 +32,9 @@ class SystemEngine {
       # 2. IconCache para reparar problemas graficos
       Remove-Item "$env:LOCALAPPDATA\\IconCache.db" -Force
 
-      # 3. Limpeza severa de pastas locais
-      Remove-Item -Path "$env:TEMP\\*" -Recurse -Force
+      # 3. Limpeza segura de pastas locais (preserva prefetch e caches de shaders)
+      Get-ChildItem -Path "$env:TEMP\\*" -Exclude "*shader*","*d3ds*","*dxcache*","*nvidia*","*amd*","*overwatch*","*blizzard*" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
       Remove-Item -Path "$env:WINDIR\\Temp\\*" -Recurse -Force
-      Remove-Item -Path "$env:WINDIR\\Prefetch\\*" -Recurse -Force
       Remove-Item -Path "$env:WINDIR\\SoftwareDistribution\\Download\\*" -Recurse -Force
     `;
     const { code, stderr } = await ElevationHelper.runElevatedPowerShell(script);
@@ -253,16 +252,49 @@ class SystemEngine {
       reg add "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games" /v "Priority" /t REG_DWORD /d 6 /f
       reg add "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games" /v "Scheduling Category" /t REG_SZ /d "High" /f
       reg add "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games" /v "SFIO Priority" /t REG_SZ /d "High" /f
-      reg add "HKLM\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers" /v HwSchMode /t REG_DWORD /d 2 /f
       fsutil behavior set disablelastaccess 1
       fsutil behavior set disable8dot3 1
       fsutil behavior set memoryusage 2
       bcdedit /set disabledynamictick yes
-      bcdedit /set useplatformtick yes
+      bcdedit /deletevalue useplatformtick
+      bcdedit /deletevalue useplatformclock
     `;
     const { code, stderr } = await ElevationHelper.runElevatedPowerShell(script);
     if (code !== 0) return { ok: false, error: stderr };
-    return { ok: true, msg: 'Mod Extremo de Kernel e Latência aplicado com sucesso (Win32PrioritySeparation 0x26, MMCSS, HAGS, NTFS).' };
+    return { ok: true, msg: 'Mod Extremo de Kernel e Latência aplicado com sucesso (Win32PrioritySeparation 0x26, MMCSS, NTFS).' };
+  }
+
+  async revertExtremeKernelMod() {
+    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    const script = `
+      $ErrorActionPreference = 'SilentlyContinue'
+      # Restaura prioridade do Windows (2 = valor padrão cliente)
+      reg add "HKLM\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl" /v Win32PrioritySeparation /t REG_DWORD /d 2 /f
+      reg add "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management" /v DisablePagingExecutive /t REG_DWORD /d 0 /f
+      reg add "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management" /v LargeSystemCache /t REG_DWORD /d 0 /f
+
+      # Restaura agendador multimídia e rede (padrão Windows: NetworkThrottlingIndex = 10, SystemResponsiveness = 20)
+      reg add "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile" /v NetworkThrottlingIndex /t REG_DWORD /d 10 /f
+      reg add "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile" /v SystemResponsiveness /t REG_DWORD /d 20 /f
+      reg add "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games" /v "GPU Priority" /t REG_DWORD /d 8 /f
+      reg add "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games" /v "Priority" /t REG_DWORD /d 2 /f
+      reg add "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games" /v "Scheduling Category" /t REG_SZ /d "Medium" /f
+      reg add "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games" /v "SFIO Priority" /t REG_SZ /d "Normal" /f
+
+      # Restaura HAGS (remove override caso tenha sido aplicado anteriormente)
+      reg delete "HKLM\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers" /v HwSchMode /f
+
+      # Restaura comportamento de sistema de arquivos e timers
+      fsutil behavior set disablelastaccess 0
+      fsutil behavior set disable8dot3 0
+      fsutil behavior set memoryusage 0
+      bcdedit /deletevalue disabledynamictick
+      bcdedit /deletevalue useplatformtick
+      bcdedit /deletevalue useplatformclock
+    `;
+    const { code, stderr } = await ElevationHelper.runElevatedPowerShell(script);
+    if (code !== 0) return { ok: false, error: stderr };
+    return { ok: true, msg: 'Modificações de Kernel e Agendamento restauradas para o padrão do Windows.' };
   }
 
   async applyExtremeNetworkMod() {

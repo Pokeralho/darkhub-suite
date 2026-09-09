@@ -302,8 +302,8 @@ class SystemOptimizerService {
     this.operations.set('optimizer:disableServices', {
       id: 'optimizer:disableServices',
       name: 'Desativar Serviços Redundantes',
-      description: 'Desativa o Windows Search (Indexador), SysMain (Superfetch) e Connected User Experiences.',
-      technicalDescription: 'Executa comandos SC para desativar e parar WSearch, SysMain, DiagTrack e CDPSvc.',
+      description: 'Desativa o Windows Search (Indexador), DiagTrack e Connected User Experiences (preserva o SysMain para jogos).',
+      technicalDescription: 'Executa comandos SC para desativar e parar WSearch, DiagTrack, CDPSvc e lfsvc sem afetar o cache do SysMain.',
       category: 'services',
       risk: 'advanced',
       requiresAdmin: true,
@@ -316,7 +316,7 @@ class SystemOptimizerService {
         return {
           status: res.ok ? 'Success' : 'Error',
           message: res.ok ? res.msg : res.error,
-          affectedResources: ['Windows Services (SysMain, WSearch, DiagTrack, CDPSvc)'],
+          affectedResources: ['Windows Services (WSearch, DiagTrack, CDPSvc, lfsvc)'],
           processedItems: 4
         };
       }

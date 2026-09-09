@@ -25,6 +25,7 @@ import {
 } from './vaultCrypto.js'
 import { registerNetworkIPC } from './networkIPC.js'
 import { registerOptiScalerIPC } from './optiscalerManager.js'
+import { registerDlss5IPC } from './services/dlss5/Dlss5Service.js'
 import Logger from './services/LoggerService.js'
 import { runCommand, runPowerShell, runPowerShellJson, stripBom, encodePowerShellScript, powerShellArgsForEncodedScript } from './services/PowerShellRunner.js'
 import HardwareService from './services/HardwareService.js'
@@ -165,6 +166,7 @@ async function getLibraryStore() {
 }
 
 registerOptiScalerIPC({ app, ipcMain, getLibraryStore })
+registerDlss5IPC({ app, ipcMain, shell })
 
 async function getYtDlpTools() {
   ytdlpToolsPromise ||= import('./ytdlp.js')
@@ -2048,6 +2050,7 @@ ipcMain.handle('optimizer:removeGpuPreference', async (_event, payload) => AppMa
 ipcMain.handle('optimizer:getGpuInfo', async () => AppManagerEngine.getGpuInfo());
 ipcMain.handle('optimizer:getHagsStatus', async () => AppManagerEngine.getHagsStatus());
 ipcMain.handle('optimizer:setHagsStatus', async (_event, payload) => AppManagerEngine.setHagsStatus(payload));
+ipcMain.handle('optimizer:revertHags', async () => AppManagerEngine.revertHags());
 
 ipcMain.handle('optimizer:uninstallProgramWithLeftovers', async (_event, payload) => AppManagerEngine.uninstallProgramWithLeftovers(payload));
 ipcMain.handle('optimizer:advancedNetworkApply', async () => NetworkEngine.advancedNetworkApply());
@@ -2461,6 +2464,12 @@ ipcMain.handle('optimizer:applyMsiMode', async () => {
 });
 ipcMain.handle('optimizer:applyExtremeKernelMod', async () => {
   return await SystemEngine.applyExtremeKernelMod();
+});
+ipcMain.handle('optimizer:revertExtremeKernelMod', async () => {
+  return await SystemEngine.revertExtremeKernelMod();
+});
+ipcMain.handle('optimizer:revertServicesTweak', async () => {
+  return await ServicesEngine.revertServicesTweak();
 });
 ipcMain.handle('optimizer:applyExtremeNetworkMod', async () => {
   return await SystemEngine.applyExtremeNetworkMod();

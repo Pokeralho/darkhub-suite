@@ -3,7 +3,7 @@ import {
   Zap, Activity, Gamepad2, Cpu, ShieldCheck,
   ArrowRight, CheckCircle2, Monitor,
   Layers, Terminal, Flame, RefreshCw, Play,
-  Network, Wrench, ShieldAlert, FileText, Lock, ChevronRight
+  Network, Wrench, ShieldAlert, FileText, Lock, ChevronRight, Sparkles
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nProvider';
 
@@ -77,7 +77,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
         <div>
           <h1 className="text-lg font-bold text-zinc-100 tracking-tight flex items-center gap-2">
             {t('home.title', 'Home Dashboard')}
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono font-normal">v0.4.6</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono font-normal">v0.4.7</span>
           </h1>
           <p className="text-xs text-zinc-400">{t('home.subtitle', 'Control Center, Kernel Optimization & Frame Pacing')}</p>
         </div>
@@ -99,8 +99,9 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
       </div>
 
       {}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        {}
+      {/* MAIN NAVIGATION CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+        {/* DarkPacer */}
         <div
           onClick={() => onNavigate('darkpacer')}
           className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850 rounded-lg p-3.5 cursor-pointer transition-colors flex flex-col justify-between group"
@@ -123,11 +124,38 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
           </div>
           <div className="flex items-center text-xs font-medium text-emerald-400 pt-1">
             <span>{t('home.configPacing', 'Configure Pacing')}</span>
-            <ChevronRight size={13} className="ml-1 group-hover:tranzinc-x-0.5 transition-transform" />
+            <ChevronRight size={13} className="ml-1 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
 
-        {}
+        {/* DLSS 5 & Universal Upscaler */}
+        <div
+          onClick={() => onNavigate('dlss5')}
+          className="bg-zinc-900 border border-zinc-800 hover:border-purple-500/50 hover:bg-zinc-850 rounded-lg p-3.5 cursor-pointer transition-colors flex flex-col justify-between group"
+        >
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="p-1.5 bg-purple-500/10 border border-purple-500/20 rounded text-purple-400 shrink-0">
+                <Sparkles size={16} />
+              </div>
+              <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-purple-950/60 text-purple-300 border border-purple-800/60">
+                AI FRAME GEN
+              </span>
+            </div>
+            <h2 className="text-sm font-semibold text-zinc-100 group-hover:text-purple-400 transition-colors mb-1">
+              {t('home.dlss5Title', 'DLSS 5 & Universal Upscaler')}
+            </h2>
+            <p className="text-xs text-zinc-400 leading-relaxed mb-3">
+              {t('home.dlss5Desc', 'Upscaling neural com IA, Frame Generation universal para NVIDIA e AMD, ZLUDA HIP e rotas automáticas.')}
+            </p>
+          </div>
+          <div className="flex items-center text-xs font-medium text-purple-400 pt-1">
+            <span>{t('home.openDlss5', 'Gerenciar DLSS 5')}</span>
+            <ChevronRight size={13} className="ml-1 group-hover:translate-x-0.5 transition-transform" />
+          </div>
+        </div>
+
+        {/* OptiScaler Manager */}
         <div
           onClick={() => onNavigate('optiscaler')}
           className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850 rounded-lg p-3.5 cursor-pointer transition-colors flex flex-col justify-between group"
@@ -150,11 +178,11 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
           </div>
           <div className="flex items-center text-xs font-medium text-blue-400 pt-1">
             <span>{t('home.manageGames', 'Manage Games')}</span>
-            <ChevronRight size={13} className="ml-1 group-hover:tranzinc-x-0.5 transition-transform" />
+            <ChevronRight size={13} className="ml-1 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
 
-        {}
+        {/* System Optimizer */}
         <div
           onClick={() => onNavigate('optimizer')}
           className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850 rounded-lg p-3.5 cursor-pointer transition-colors flex flex-col justify-between group"
@@ -177,11 +205,11 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
           </div>
           <div className="flex items-center text-xs font-medium text-amber-400 pt-1">
             <span>{t('home.openTweaks', 'Open Tweaks')}</span>
-            <ChevronRight size={13} className="ml-1 group-hover:tranzinc-x-0.5 transition-transform" />
+            <ChevronRight size={13} className="ml-1 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
 
-        {}
+        {/* Post-Install Hub */}
         <div
           onClick={() => onNavigate('setuphub')}
           className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850 rounded-lg p-3.5 cursor-pointer transition-colors flex flex-col justify-between group"
@@ -204,12 +232,12 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
           </div>
           <div className="flex items-center text-xs font-medium text-violet-400 pt-1">
             <span>{t('home.accessCatalog', 'Access Catalog')}</span>
-            <ChevronRight size={13} className="ml-1 group-hover:tranzinc-x-0.5 transition-transform" />
+            <ChevronRight size={13} className="ml-1 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
       </div>
 
-      {}
+      {/* QUICK ACCESS UTILITIES */}
       <div className="space-y-2 pt-1">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -217,8 +245,27 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
-          {}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
+          {/* DLSS 5 Manager Quick */}
+          <div
+            onClick={() => onNavigate('dlss5')}
+            className="p-3 bg-zinc-900 border border-zinc-800 hover:border-purple-500/40 hover:bg-zinc-850 rounded-lg cursor-pointer transition-colors group flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-1.5 bg-purple-500/10 text-purple-400 rounded shrink-0">
+                <Sparkles size={16} />
+              </div>
+              <div className="min-w-0">
+                <h4 className="text-xs font-semibold text-zinc-200 group-hover:text-purple-400 transition-colors truncate">
+                  DLSS 5 Manager
+                </h4>
+                <p className="text-[10px] text-zinc-500 truncate">AI Frame Gen & Upscaling</p>
+              </div>
+            </div>
+            <ChevronRight size={14} className="text-zinc-600 group-hover:text-zinc-300 transition-colors shrink-0" />
+          </div>
+
+          {/* PGE Portable */}
           <div
             onClick={handleLaunchPGE}
             className="p-3 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850 rounded-lg cursor-pointer transition-colors group flex items-center justify-between"
