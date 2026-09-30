@@ -4071,19 +4071,29 @@ function registerAutoClickerHotkey() {
 }
 
 function getClickEnginePath() {
-  const candidate1 = path.join(__dirname, 'services', 'DarkHub.ClickEngine.exe')
-  if (fsRaw.existsSync(candidate1)) return candidate1
-  const candidate2 = path.join(process.resourcesPath, 'app.asar.unpacked', 'electron', 'services', 'DarkHub.ClickEngine.exe')
-  if (fsRaw.existsSync(candidate2)) return candidate2
-  const candidate3 = path.join(app.getAppPath(), 'electron', 'services', 'DarkHub.ClickEngine.exe')
-  if (fsRaw.existsSync(candidate3)) return candidate3
+  const unpackedFromDir = __dirname.includes('app.asar')
+    ? path.join(__dirname.replace('app.asar', 'app.asar.unpacked'), 'services', 'DarkHub.ClickEngine.exe')
+    : null
+  if (unpackedFromDir && fsRaw.existsSync(unpackedFromDir)) return unpackedFromDir
+
+  if (process.resourcesPath) {
+    const fromResources = path.join(process.resourcesPath, 'app.asar.unpacked', 'electron', 'services', 'DarkHub.ClickEngine.exe')
+    if (fsRaw.existsSync(fromResources)) return fromResources
+  }
+
+  const devPath = path.join(__dirname, 'services', 'DarkHub.ClickEngine.exe')
+  if (!devPath.includes('app.asar') && fsRaw.existsSync(devPath)) return devPath
+
+  const appPath = path.join(app.getAppPath().replace('app.asar', 'app.asar.unpacked'), 'electron', 'services', 'DarkHub.ClickEngine.exe')
+  if (fsRaw.existsSync(appPath)) return appPath
+
   return null
 }
 
 async function startAutoClicker(payload) {
   const button = payload?.button === 'right' || payload?.button === 'middle' || payload?.button === 'double' ? payload.button : 'left'
   const intervalMsRaw = Number(payload?.intervalMs)
-  const intervalMs = Number.isFinite(intervalMsRaw) ? Math.max(1, Math.min(10000, Math.trunc(intervalMsRaw))) : 100
+  const intervalMs = Number.isFinite(intervalMsRaw) ? Math.max(1, Math.min(10000, Math.trunc(intervalMsRaw))) : 50
 
   if (autoClickerProc) {
     try {
@@ -4097,23 +4107,67 @@ async function startAutoClicker(payload) {
 
   const nativeExe = getClickEnginePath()
   if (nativeExe && fsRaw.existsSync(nativeExe)) {
-    const p = spawn(nativeExe, [], {
-      windowsHide: true,
-      stdio: ['pipe', 'pipe', 'pipe']
-    })
+    try {
+      const p = spawn(nativeExe, [], {
+        windowsHide: true,
+        stdio: ['pipe', 'pipe', 'pipe']
+      })
 
-    autoClickerProc = p
-    autoClickerState = { button, intervalMs, startedAt: Date.now(), isNative: true }
+      p.on('error', (err) => {
+        log.warn('[AutoClicker] native engine process error:', err)
+        autoClickerProc = null
+        autoClickerState = null
+      })
 
-    p.stdin?.write(`START ${button} ${intervalMs}\n`)
+      p.on('exit', () => {
+        autoClickerProc = null
+        autoClickerState = null
+        try {
+          mainWindow?.webContents?.send('autoclicker:changed', { running: false, state: null })
+        } catch {}
+      })
 
-    p.on('exit', () => {
+      p.stdout?.on('data', (data) => {
+        const text = data.toString()
+        const lines = text.split('\n')
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed) continue
+          try {
+            const parsed = JSON.parse(trimmed)
+            if (parsed.event === 'toggle') {
+              if (parsed.status === 'running') {
+                autoClickerState = {
+                  button: parsed.button || button,
+                  intervalMs: parsed.intervalMs || intervalMs,
+                  startedAt: Date.now(),
+                  isNative: true
+                }
+                mainWindow?.webContents?.send('autoclicker:changed', { running: true, state: autoClickerState })
+              } else {
+                autoClickerState = null
+                mainWindow?.webContents?.send('autoclicker:changed', { running: false, state: null })
+              }
+            }
+          } catch {}
+        }
+      })
+
+      autoClickerProc = p
+      autoClickerState = { button, intervalMs, startedAt: Date.now(), isNative: true }
+
+      if (autoClickerHotkey) {
+        p.stdin?.write(`HOTKEY ${autoClickerHotkey}\n`)
+      }
+      p.stdin?.write(`START ${button} ${intervalMs}\n`)
+
+      await saveAutoClickerConfig().catch(() => {})
+      return { ok: true, msg: 'AutoClicker iniciado com Engine Nativa C# (Baixo Nível)', state: autoClickerState }
+    } catch (err) {
+      log.warn('[AutoClicker] native spawn failed, falling back to powershell:', err)
       autoClickerProc = null
       autoClickerState = null
-    })
-
-    await saveAutoClickerConfig().catch(() => {})
-    return { ok: true, msg: 'AutoClicker iniciado com Engine Nativa C# (Baixo Nível)', state: autoClickerState }
+    }
   }
 
   const ps = [
@@ -4129,23 +4183,37 @@ async function startAutoClicker(payload) {
     `    public Int32 dx; public Int32 dy; public UInt32 mouseData; public UInt32 dwFlags; public UInt32 time; public IntPtr dwExtraInfo;`,
     `  }`,
     `  [DllImport("user32.dll", SetLastError=true)] public static extern UInt32 SendInput(UInt32 nInputs, INPUT[] pInputs, Int32 cbSize);`,
+    `  [DllImport("user32.dll", SetLastError=true)] public static extern void mouse_event(UInt32 dwFlags, UInt32 dx, UInt32 dy, UInt32 dwData, Int32 dwExtraInfo);`,
     `  public const UInt32 INPUT_MOUSE = 0;`,
     `  public const UInt32 MOUSEEVENTF_LEFTDOWN = 0x0002;`,
     `  public const UInt32 MOUSEEVENTF_LEFTUP = 0x0004;`,
     `  public const UInt32 MOUSEEVENTF_RIGHTDOWN = 0x0008;`,
     `  public const UInt32 MOUSEEVENTF_RIGHTUP = 0x0010;`,
-    `  public static void Click(bool right){`,
-    `    var down = new INPUT { type = INPUT_MOUSE, mi = new MOUSEINPUT { dwFlags = right ? MOUSEEVENTF_RIGHTDOWN : MOUSEEVENTF_LEFTDOWN } };`,
-    `    var up   = new INPUT { type = INPUT_MOUSE, mi = new MOUSEINPUT { dwFlags = right ? MOUSEEVENTF_RIGHTUP   : MOUSEEVENTF_LEFTUP   } };`,
-    `    var arr = new INPUT[] { down, up };`,
-    `    SendInput((UInt32)arr.Length, arr, Marshal.SizeOf(typeof(INPUT)));`,
+    `  public const UInt32 MOUSEEVENTF_MIDDLEDOWN = 0x0020;`,
+    `  public const UInt32 MOUSEEVENTF_MIDDLEUP = 0x0040;`,
+    `  public static void Click(string btn, int holdMs){`,
+    `    UInt32 down = MOUSEEVENTF_LEFTDOWN; UInt32 up = MOUSEEVENTF_LEFTUP;`,
+    `    if (btn == "right") { down = MOUSEEVENTF_RIGHTDOWN; up = MOUSEEVENTF_RIGHTUP; }`,
+    `    else if (btn == "middle") { down = MOUSEEVENTF_MIDDLEDOWN; up = MOUSEEVENTF_MIDDLEUP; }`,
+    `    var downIn = new INPUT { type = INPUT_MOUSE, mi = new MOUSEINPUT { dwFlags = down } };`,
+    `    var upIn   = new INPUT { type = INPUT_MOUSE, mi = new MOUSEINPUT { dwFlags = up   } };`,
+    `    UInt32 s1 = SendInput(1, new INPUT[] { downIn }, Marshal.SizeOf(typeof(INPUT)));`,
+    `    if (s1 == 0) mouse_event(down, 0, 0, 0, 0);`,
+    `    System.Threading.Thread.Sleep(holdMs);`,
+    `    UInt32 s2 = SendInput(1, new INPUT[] { upIn }, Marshal.SizeOf(typeof(INPUT)));`,
+    `    if (s2 == 0) mouse_event(up, 0, 0, 0, 0);`,
     `  }`,
     `}`,
     `"@`,
-    `$right = ${button === 'right' ? '$true' : '$false'}`,
+    `$btn = '${button}'`,
     `$interval = ${intervalMs}`,
-    `Start-Sleep -Milliseconds 250`,
-    `while($true){ [Clicker]::Click($right); Start-Sleep -Milliseconds $interval }`
+    `$hold = [Math]::Max(1, [Math]::Min(12, [int]($interval / 3)))`,
+    `Start-Sleep -Milliseconds 200`,
+    `while($true){`,
+    `  if ($btn -eq 'double') { [Clicker]::Click('left', $hold); Start-Sleep -Milliseconds 20; [Clicker]::Click('left', $hold) }`,
+    `  else { [Clicker]::Click($btn, $hold) }`,
+    `  Start-Sleep -Milliseconds $interval`,
+    `}`
   ].join('\n')
 
   const p = spawn('powershell.exe', powerShellArgsForEncodedScript(encodePowerShellScript(ps)), {
@@ -4158,6 +4226,9 @@ async function startAutoClicker(payload) {
   p.on('exit', () => {
     autoClickerProc = null
     autoClickerState = null
+    try {
+      mainWindow?.webContents?.send('autoclicker:changed', { running: false, state: null })
+    } catch {}
   })
 
   await saveAutoClickerConfig().catch(() => {})
@@ -4170,7 +4241,9 @@ async function stopAutoClicker() {
       if (autoClickerProc.stdin?.writable) {
         autoClickerProc.stdin.write('STOP\nEXIT\n')
       }
-      autoClickerProc.kill()
+      setTimeout(() => {
+        try { autoClickerProc?.kill() } catch {}
+      }, 100)
     } catch {}
     autoClickerProc = null
     autoClickerState = null
@@ -4206,7 +4279,7 @@ ipcMain.handle('autoclicker:toggle', async (_event, payload) => {
   try {
     if (autoClickerProc) return await stopAutoClicker()
     const next = payload && typeof payload === 'object' ? payload : autoClickerState
-    return await startAutoClicker(next ?? { intervalMs: 100, button: 'left' })
+    return await startAutoClicker(next ?? { intervalMs: 50, button: 'left' })
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) }
   }
@@ -4222,12 +4295,17 @@ ipcMain.handle('autoclicker:setHotkey', async (_event, payload) => {
     if (hotkey.length === 0) {
       unregisterAutoClickerHotkey()
       autoClickerHotkey = null
+      if (autoClickerProc?.stdin?.writable) {
+        autoClickerProc.stdin.write('HOTKEY NONE\n')
+      }
       await saveAutoClickerConfig().catch(() => {})
       return { ok: true, enabled: false }
     }
     autoClickerHotkey = hotkey
     const reg = registerAutoClickerHotkey()
-    if (!reg.ok) return reg
+    if (autoClickerProc?.stdin?.writable) {
+      autoClickerProc.stdin.write(`HOTKEY ${autoClickerHotkey}\n`)
+    }
     await saveAutoClickerConfig().catch(() => {})
     return { ok: true, enabled: true, hotkey: autoClickerHotkey }
   } catch (err) {

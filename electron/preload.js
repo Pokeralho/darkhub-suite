@@ -179,7 +179,12 @@ contextBridge.exposeInMainWorld('darkhub', {
     toggle: (payload) => ipcRenderer.invoke('autoclicker:toggle', payload),
     getHotkey: () => ipcRenderer.invoke('autoclicker:getHotkey'),
     setHotkey: (payload) => ipcRenderer.invoke('autoclicker:setHotkey', payload),
-    setTabActive: (active) => ipcRenderer.invoke('autoclicker:setTabActive', active)
+    setTabActive: (active) => ipcRenderer.invoke('autoclicker:setTabActive', active),
+    onChanged: (cb) => {
+      const handler = (_event, data) => cb(data)
+      ipcRenderer.on('autoclicker:changed', handler)
+      return () => ipcRenderer.removeListener('autoclicker:changed', handler)
+    }
   },
   latency: {
     getConfig: () => ipcRenderer.invoke('latency:getConfig'),
