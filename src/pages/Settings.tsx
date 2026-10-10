@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react'
+import { APP_VERSION_LABEL } from '../appVersion';
+import { visibleInterval } from '../utils/visibleInterval';
 import { Bug, Loader2, ShieldCheck, Activity, Save, AppWindow, RefreshCw, Power, Globe, Download, Upload, CheckCircle2, AlertTriangle, FileCode } from 'lucide-react'
 import { useI18n } from '../i18n/I18nProvider'
 import type { SupportedLang } from '../i18n/messages'
@@ -251,7 +253,7 @@ export default function SettingsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-[11px] font-semibold text-zinc-400 block mb-1">Código do Idioma (ex: es-MX, it-IT, pl-PL):</label>
+                <label className="text-[11px] font-semibold text-zinc-400 block mb-1">{t('settings.langCodeLabel', 'Código do Idioma (ex: es-MX, it-IT, pl-PL):')}</label>
                 <input
                   type="text"
                   value={customLangCode}
@@ -262,7 +264,7 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-zinc-400 block mb-1">Nome de Exibição (ex: Español Mexicano):</label>
+                <label className="text-[11px] font-semibold text-zinc-400 block mb-1">{t('settings.langNameLabel', 'Nome de Exibição (ex: Español Mexicano):')}</label>
                 <input
                   type="text"
                   value={customLangLabel}
@@ -274,7 +276,7 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label className="text-[11px] font-semibold text-zinc-400 block mb-1">Dicionário JSON de Tradução:</label>
+              <label className="text-[11px] font-semibold text-zinc-400 block mb-1">{t('settings.langDictLabel', 'Dicionário JSON de Tradução:')}</label>
               <textarea
                 value={customLangJson}
                 onChange={(e) => setCustomLangJson(e.target.value)}
@@ -325,7 +327,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">Telemetria de Erros & Bugs</h2>
-              <p className="text-xs text-zinc-500">Envia logs anônimos de crashes e exceções para o canal de suporte.</p>
+              <p className="text-xs text-zinc-500">{t('settings.crashLogsDesc', 'Envia logs anônimos de crashes e exceções para o canal de suporte.')}</p>
             </div>
           </div>
 
@@ -341,7 +343,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="flex items-center justify-between pt-1 border-t border-zinc-800/80">
-          <span className="text-[11px] text-zinc-500">Dados sensíveis e caminhos de usuário são redigidos automaticamente.</span>
+          <span className="text-[11px] text-zinc-500">{t('settings.redactionNote', 'Dados sensíveis e caminhos de usuário são redigidos automaticamente.')}</span>
           <button
             onClick={saveTelemetry}
             disabled={telemetryBusy}
@@ -371,8 +373,8 @@ export default function SettingsPage() {
               <Activity size={16} />
             </div>
             <div>
-              <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">Serviços em Segundo Plano</h2>
-              <p className="text-xs text-zinc-500">Controle a execução de módulos residentes para economizar recursos.</p>
+              <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">{t('settings.bgServices', 'Serviços em Segundo Plano')}</h2>
+              <p className="text-xs text-zinc-500">{t('settings.bgServicesDesc', 'Controle a execução de módulos residentes para economizar recursos.')}</p>
             </div>
           </div>
         </div>
@@ -414,7 +416,7 @@ export default function SettingsPage() {
             className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-200 text-xs font-medium rounded-md transition-colors disabled:opacity-50 flex items-center gap-1.5 border border-zinc-700/60"
           >
             {liveServicesBusy ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-            <span>Salvar Serviços</span>
+            <span>{t('settings.saveServices', 'Salvar Serviços')}</span>
           </button>
         </div>
 
@@ -437,7 +439,7 @@ export default function SettingsPage() {
               <Power size={16} />
             </div>
             <div>
-              <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">Inicialização com o Windows</h2>
+              <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">{t('settings.windowsStartup', 'Inicialização com o Windows')}</h2>
               <p className="text-xs text-zinc-500">Inicie o DarkHub Suite automaticamente ao ligar o computador (inicia na bandeja).</p>
             </div>
           </div>
@@ -475,7 +477,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">Comportamento da Janela</h2>
-              <p className="text-xs text-zinc-500">Defina a ação ao fechar a janela do DarkHub.</p>
+              <p className="text-xs text-zinc-500">{t('settings.closeActionDesc', 'Defina a ação ao fechar a janela do DarkHub.')}</p>
             </div>
           </div>
 
@@ -533,11 +535,47 @@ export default function SettingsPage() {
 
       {}
       <UpdateManagerSection />
+      <ResourceUsageSection />
+    </div>
+  )
+}
+
+function ResourceUsageSection() {
+  const { t } = useI18n()
+  const [usage, setUsage] = useState<{ totalCpuPercent: number; totalWorkingSetMb: number; processes: Array<{ pid: number; type: string; name?: string; cpuPercent: number; workingSetMb: number }> } | null>(null)
+
+  useEffect(() => {
+    return visibleInterval(async () => {
+      const res = await window.darkhub?.app?.getResourceUsage?.()
+      if (res?.ok) setUsage({ totalCpuPercent: res.totalCpuPercent ?? 0, totalWorkingSetMb: res.totalWorkingSetMb ?? 0, processes: res.processes ?? [] })
+    }, 2000)
+  }, [])
+
+  return (
+    <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">{t('settings.resourceUsage', 'Consumo de recursos do DarkHub')}</h2>
+        <span className="text-xs font-mono text-zinc-400">
+          {usage ? `${usage.totalCpuPercent}% CPU · ${usage.totalWorkingSetMb} MB` : '—'}
+        </span>
+      </div>
+      <p className="text-xs text-zinc-500">{t('settings.resourceUsageDesc', 'Medido em tempo real pelo Electron (todos os processos do app). Use para comparar o consumo antes e depois de abrir as janelas de monitoramento.')}</p>
+      {usage && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] font-mono text-zinc-400">
+          {usage.processes.map((p) => (
+            <div key={p.pid} className="flex justify-between border-b border-zinc-800/60 py-0.5">
+              <span>{p.type}{p.name ? ` · ${p.name}` : ''}</span>
+              <span>{p.cpuPercent}% · {p.workingSetMb} MB</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
 function UpdateManagerSection() {
+  const { t } = useI18n()
   const [checking, setChecking] = useState(false)
   const [status, setStatus] = useState<{
     currentVersion?: string
@@ -566,7 +604,7 @@ function UpdateManagerSection() {
           loadStatus()
         } else if (evt.type === 'not-available') {
           setChecking(false)
-          setFeedback({ ok: true, msg: `Você está na versão mais recente (${evt.currentVersion || status?.currentVersion || 'v0.4.5'}).` })
+          setFeedback({ ok: true, msg: `Você está na versão mais recente (${evt.currentVersion || status?.currentVersion || APP_VERSION_LABEL}).` })
           loadStatus()
         } else if (evt.type === 'error') {
           setChecking(false)
@@ -604,9 +642,9 @@ function UpdateManagerSection() {
             <RefreshCw size={16} className={checking ? 'animate-spin' : ''} />
           </div>
           <div>
-            <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">Atualizações do DarkHub</h2>
+            <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">{t('settings.updates', 'Atualizações do DarkHub')}</h2>
             <p className="text-xs text-zinc-500">
-              Versão em execução: <span className="font-mono text-blue-400 font-semibold">{status?.currentVersion || 'v0.4.5'}</span>
+              Versão em execução: <span className="font-mono text-blue-400 font-semibold">{status?.currentVersion || APP_VERSION_LABEL}</span>
             </p>
           </div>
         </div>
@@ -617,7 +655,7 @@ function UpdateManagerSection() {
           className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-200 text-xs font-medium rounded-md transition-colors disabled:opacity-50 flex items-center gap-1.5 border border-zinc-700/60"
         >
           {checking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-          <span>Verificar Atualizações</span>
+          <span>{t('settings.checkUpdates', 'Verificar Atualizações')}</span>
         </button>
       </div>
 

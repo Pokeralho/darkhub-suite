@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { visibleInterval } from '../utils/visibleInterval'
 import { useI18n } from '../i18n/I18nProvider'
 import { Zap, Loader2 } from 'lucide-react'
 import { HelpTip } from '../components/HelpTip'
@@ -132,8 +133,7 @@ export default function UltraLowLatency() {
 
   useEffect(() => {
     refresh()
-    const id = setInterval(refresh, 1200)
-    return () => clearInterval(id)
+    return visibleInterval(refresh, 1500)
   }, [])
 
   const pickExe = async () => {

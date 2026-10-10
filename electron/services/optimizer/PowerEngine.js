@@ -1,90 +1,138 @@
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
-const execAsync = promisify(exec);
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { runCommand } from '../PowerShellRunner.js';
+import { POWER_GUIDS, parsePowercfgList } from './OptimizerUtils.js';
+
+// loaded lazily so the module also works outside Electron (unit tests, tooling)
+let electron = null;
+try { electron = createRequire(import.meta.url)('electron'); } catch { electron = null; }
+
+const app = electron?.app || null;
 
 class PowerEngine {
   constructor() {
     this.powerPlans = null;
   }
 
-  async _fetchPowerPlans() {
+  _statePath() {
+    const base = app?.getPath ? app.getPath('userData') : (process.env.APPDATA || process.cwd());
+    return path.join(base, 'optimizer_power_previous.json');
+  }
+
+  async _powercfg(args) {
     try {
-      const { stdout } = await execAsync('powercfg /L');
-      const lines = stdout.split(/\r?\n/);
-      const plans = [];
-      for (const line of lines) {
-        const match = line.match(/GUID:\s*([a-z0-9-]+)\s+\((.*?)\)/i);
-        if (match) {
-          plans.push({ guid: match[1], name: match[2].trim(), isActive: line.includes('*') });
-        }
-      }
-      this.powerPlans = plans;
-      return plans;
+      const r = await runCommand('powercfg.exe', args, { timeoutMs: 15000 });
+      return { code: r.code ?? 1, stdout: r.stdout || '', stderr: r.stderr || '' };
     } catch (e) {
-      return [];
+      return { code: 1, stdout: '', stderr: e?.message ?? String(e) };
     }
+  }
+
+  async _fetchPowerPlans() {
+    const r = await this._powercfg(['/L']);
+    this.powerPlans = r.code === 0 ? parsePowercfgList(r.stdout) : [];
+    return this.powerPlans;
   }
 
   async analyzeHighPerformance() {
     await this._fetchPowerPlans();
-    return { ok: true, summary: { command: 'powercfg /setactive [HighPerformance GUID]' } };
+    return { ok: true, summary: { command: `powercfg /setactive ${POWER_GUIDS.high}` } };
   }
 
   async analyzeBalanced() {
     await this._fetchPowerPlans();
-    return { ok: true, summary: { command: 'powercfg /setactive [Balanced GUID]' } };
+    return { ok: true, summary: { command: `powercfg /setactive ${POWER_GUIDS.balanced}` } };
   }
 
   async _getActiveSchemeGuid() {
+    const r = await this._powercfg(['/getactivescheme']);
+    const m = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i.exec(r.stdout);
+    return m ? m[1].toLowerCase() : null;
+  }
+
+  /** Plans are matched by GUID (names are localized, and High Performance is hidden on many PCs). */
+  async _ensurePlan(guid) {
+    const plans = this.powerPlans || await this._fetchPowerPlans();
+    if (plans.some((p) => p.guid === guid)) return { ok: true, created: false };
+    // The built-in scheme exists in the system even when not listed: duplicate it under the same GUID.
+    const dup = await this._powercfg(['/duplicatescheme', guid, guid]);
+    if (dup.code !== 0) return { ok: false, error: dup.stderr || dup.stdout || 'Plano de energia indisponível neste PC' };
+    await this._fetchPowerPlans();
+    return { ok: true, created: true };
+  }
+
+  _rememberPrevious(guid) {
     try {
-      const { stdout } = await execAsync('powercfg /getactivescheme');
-      const match = stdout.match(/GUID:\s*([a-z0-9-]+)/i);
-      return match ? match[1].toLowerCase() : null;
+      fs.writeFileSync(this._statePath(), JSON.stringify({ guid, savedAt: Date.now() }), 'utf8');
+    } catch { /* best effort */ }
+  }
+
+  _readPrevious() {
+    try {
+      return JSON.parse(fs.readFileSync(this._statePath(), 'utf8'))?.guid || null;
     } catch {
       return null;
     }
   }
 
-  async _setPlanByKeywords(keywords, defaultScheme) {
-    if (!this.powerPlans) await this._fetchPowerPlans();
-
-    let target = this.powerPlans.find(p => keywords.some(k => p.name.toLowerCase().includes(k)));
-    let guidToUse = target ? target.guid : defaultScheme;
-
-    try {
-      await execAsync(`powercfg /setactive ${guidToUse}`);
-
-      const activeGuid = await this._getActiveSchemeGuid();
-      const verified = activeGuid != null && activeGuid === guidToUse.toLowerCase();
-
-      return {
-        status: verified ? 'Success' : 'Warning',
-        durationMs: 0,
-        affectedResources: ['Powercfg'],
-        processedItems: 1,
-        savingsBytes: 0,
-        message: verified
-          ? `Plano alterado para: ${target ? target.name : defaultScheme}`
-          : `Comando executado, mas a verificação pós-aplicação não confirmou a troca do plano de energia (esquema ativo: ${activeGuid ?? 'desconhecido'}).`
-      };
-    } catch (e) {
-      return {
-        status: 'Error',
-        durationMs: 0,
-        affectedResources: ['Powercfg'],
-        processedItems: 0,
-        savingsBytes: 0,
-        message: `Falha ao alterar plano de energia: ${e.message}`
-      };
-    }
+  _result(status, message, extra = {}) {
+    return {
+      ok: status !== 'Error',
+      status,
+      durationMs: 0,
+      affectedResources: ['Powercfg'],
+      processedItems: status === 'Error' ? 0 : 1,
+      savingsBytes: 0,
+      message,
+      msg: message,
+      ...(status === 'Error' ? { error: message } : {}),
+      ...extra
+    };
   }
 
+  async _activate(guid, label) {
+    const ensured = await this._ensurePlan(guid);
+    if (!ensured.ok) return this._result('Error', `Plano "${label}" indisponível: ${ensured.error}`);
+    const set = await this._powercfg(['/setactive', guid]);
+    if (set.code !== 0) return this._result('Error', `Falha ao ativar o plano "${label}": ${set.stderr || set.stdout}`);
+    const active = await this._getActiveSchemeGuid();
+    if (active !== guid) {
+      return this._result('Error', `O comando foi aceito, mas o plano ativo continua sendo ${active ?? 'desconhecido'} (política de TI ou Modo de Energia do Windows 11 pode estar sobrescrevendo).`);
+    }
+    return this._result('Success', `Plano de energia ativo (verificado): ${label}.`);
+  }
+
+  /**
+   * High Performance plan: keeps the CPU at higher clocks. Real on desktops; on laptops it costs battery
+   * and heat, and it does not by itself raise FPS. The previously active plan is remembered.
+   */
   async setHighPerformance() {
-    return this._setPlanByKeywords(['ultimate', 'desempenho máximo', 'alto desempenho', 'high performance'], 'SCHEME_MIN');
+    const before = await this._getActiveSchemeGuid();
+    if (before && before !== POWER_GUIDS.high && before !== POWER_GUIDS.ultimate) this._rememberPrevious(before);
+    return this._activate(POWER_GUIDS.high, 'Alto Desempenho');
+  }
+
+  /** Ultimate Performance (hidden plan, created on demand). Desktop-oriented: no power-saving at all. */
+  async setUltimate() {
+    const before = await this._getActiveSchemeGuid();
+    if (before && before !== POWER_GUIDS.high && before !== POWER_GUIDS.ultimate) this._rememberPrevious(before);
+    return this._activate(POWER_GUIDS.ultimate, 'Desempenho Máximo');
   }
 
   async setBalanced() {
-    return this._setPlanByKeywords(['equilibrado', 'balanced'], 'SCHEME_BALANCED');
+    return this._activate(POWER_GUIDS.balanced, 'Equilibrado');
+  }
+
+  /** Back to whatever was active before the app switched to High Performance (or Balanced when unknown). */
+  async restorePrevious() {
+    const prev = this._readPrevious();
+    if (!prev) return this.setBalanced();
+    const plans = await this._fetchPowerPlans();
+    if (!plans.some((p) => p.guid === prev)) return this.setBalanced();
+    const set = await this._powercfg(['/setactive', prev]);
+    if (set.code !== 0) return this._result('Error', `Falha ao restaurar o plano anterior: ${set.stderr || set.stdout}`);
+    return this._result('Success', 'Plano de energia anterior restaurado.');
   }
 }
 

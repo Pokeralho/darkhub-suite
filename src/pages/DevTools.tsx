@@ -1,4 +1,3 @@
-import { useI18n } from '../i18n/I18nProvider';
 import React, { useState } from 'react';
 import { Code, ArrowRightLeft, Hash, Brackets, Scale, FileDiff, Calculator } from 'lucide-react';
 import CryptoJS from 'crypto-js';

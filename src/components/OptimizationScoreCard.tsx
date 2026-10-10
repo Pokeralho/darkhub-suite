@@ -1,4 +1,3 @@
-import { useI18n } from '../i18n/I18nProvider';
 import React from 'react';
 import { HelpTip } from './HelpTip';
 
@@ -11,7 +10,6 @@ export const OptimizationScoreCard: React.FC<OptimizationScoreCardProps> = ({
   score,
   onClick
 }) => {
-  const { t } = useI18n();
   return (
     <div
       onClick={onClick}

@@ -25,7 +25,8 @@ class FramePacerEngine extends EventEmitter {
       currentFps: 0,
       avgFps: 0,
       low1Percent: 0,
-      low01Percent: 0,
+      low01Percent: null,
+      hasLiveTelemetry: false,
       currentFrametimeMs: 0,
       frametimeJitterMs: 0,
       stutterCount: 0,
@@ -134,17 +135,18 @@ class FramePacerEngine extends EventEmitter {
       const exePath = this._getExePath()
       Logger.info('FramePacerEngine', `Executável nativo: ${exePath}`)
 
-      this._nativeProcess = spawn(exePath, [
+      const proc = spawn(exePath, [
         String(this.targetFps),
         String(this.pacingMode)
       ], {
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe']
       })
+      this._nativeProcess = proc
 
       let buffer = ''
 
-      this._nativeProcess.stdout.on('data', (data) => {
+      proc.stdout.on('data', (data) => {
         buffer += data.toString()
         const lines = buffer.split('\n')
         buffer = lines.pop()
@@ -154,7 +156,7 @@ class FramePacerEngine extends EventEmitter {
           if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) continue
           try {
             const parsed = JSON.parse(trimmed)
-            if (parsed && typeof parsed.currentFps === 'number') {
+            if (parsed && typeof parsed.isRunning === 'boolean') {
               this._latestMetrics = {
                 ...parsed,
                 isRunning: this.isRunning
@@ -165,21 +167,22 @@ class FramePacerEngine extends EventEmitter {
         }
       })
 
-      this._nativeProcess.stderr.on('data', (err) => {
+      proc.stderr.on('data', (err) => {
         Logger.warn('FramePacerEngine', `Native stderr: ${err.toString().trim()}`)
       })
 
-      this._nativeProcess.on('exit', (code) => {
+      proc.on('exit', (code) => {
         Logger.info('FramePacerEngine', `Processo nativo encerrado (code ${code})`)
+        if (this._nativeProcess === proc) this._nativeProcess = null
+        if (proc._intentionalStop) return
         if (this.isRunning) {
-
           setTimeout(() => {
-            if (this.isRunning) this._spawnNativeProcess()
+            if (this.isRunning && !this._nativeProcess) this._spawnNativeProcess()
           }, 2000)
         }
       })
 
-      this._nativeProcess.on('error', (err) => {
+      proc.on('error', (err) => {
         Logger.error('FramePacerEngine', `Falha ao iniciar processo nativo: ${err.message}`)
       })
     } catch (err) {
@@ -188,21 +191,19 @@ class FramePacerEngine extends EventEmitter {
   }
 
   _killNativeProcess() {
-    if (this._nativeProcess) {
-      try {
-
-        if (this._nativeProcess.stdin && !this._nativeProcess.stdin.destroyed) {
-          this._nativeProcess.stdin.write('STOP\n')
-        }
-
-        setTimeout(() => {
-          try {
-            if (this._nativeProcess) this._nativeProcess.kill('SIGTERM')
-          } catch {}
-        }, 500)
-      } catch {}
-      this._nativeProcess = null
-    }
+    const proc = this._nativeProcess
+    this._nativeProcess = null
+    if (!proc) return
+    proc._intentionalStop = true
+    try {
+      if (proc.stdin && !proc.stdin.destroyed) {
+        proc.stdin.write('STOP\n')
+      }
+    } catch {}
+    const timer = setTimeout(() => {
+      try { proc.kill('SIGTERM') } catch {}
+    }, 500)
+    proc.once?.('exit', () => clearTimeout(timer))
   }
 }
 

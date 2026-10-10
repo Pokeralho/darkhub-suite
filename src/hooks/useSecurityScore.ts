@@ -1,8 +1,7 @@
-import { useI18n } from '../i18n/I18nProvider';
 import { useState, useEffect } from 'react';
+import { visibleInterval } from '../utils/visibleInterval'
 
 export const useSecurityScore = () => {
-  const { t } = useI18n();
   const [securityScore, setSecurityScore] = useState<number | null>(() => {
     try {
       const raw = localStorage.getItem('darkhub.dashboard.securityScore');
@@ -53,15 +52,15 @@ export const useSecurityScore = () => {
     };
 
     const start = window.setTimeout(fetchSecurity, 900);
-    const interval = window.setInterval(() => {
+    const stopPolling = visibleInterval(() => {
       if (disabled) return;
-      fetchSecurity();
+      return fetchSecurity();
     }, 60_000);
 
     return () => {
       alive = false;
       window.clearTimeout(start);
-      window.clearInterval(interval);
+      stopPolling();
     };
   }, []);
 

@@ -38,8 +38,8 @@ export function createFramePacerOverlay() {
     hasShadow: false,
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: false,
-      sandbox: false
+      contextIsolation: true,
+      sandbox: true
     }
   })
 
@@ -67,7 +67,7 @@ export function createFramePacerOverlay() {
   <style>
     * { box-sizing: border-box; user-select: none; margin: 0; padding: 0; }
     body {
-      background: rgba(6, 9, 15, ${overlayConfig.opacity});
+      background: rgba(6, 9, 15, ${Math.min(1, Math.max(0.2, Number(overlayConfig.opacity) || 0.94))});
       color: #f1f5f9;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       border: 1px solid rgba(56, 189, 248, 0.25);

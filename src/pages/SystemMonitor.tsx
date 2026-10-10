@@ -90,9 +90,9 @@ const SystemMonitor = () => {
       setIsBenchmarking(true);
       setBenchmarkResult(null);
       try {
-        const res = await window.darkhub.system.runBenchmark();
-        if (res.ok) setBenchmarkResult({ mops: res.mops, time: res.time });
-        else alert('Falha no benchmark: ' + res.error);
+        const res = await window.darkhub?.system?.runBenchmark?.();
+        if (res?.ok) setBenchmarkResult({ mops: res.mops, time: res.time });
+        else alert(t('monitor.benchmarkFailed', 'Falha no benchmark: ') + (res?.error ?? ''));
       } catch (e) {
         console.error('Benchmark error', e);
       } finally {
@@ -111,7 +111,7 @@ const SystemMonitor = () => {
     report += `Total: ${formatBytes(metrics?.ram?.values?.total?.value)}\n`;
     report += `Used: ${metrics?.ram?.values?.percent?.value}%\n\n`;
     navigator.clipboard.writeText(report);
-    alert('Relatório copiado para a área de transferência!');
+    alert(t('monitor.reportCopied', 'Relatório copiado para a área de transferência!'));
   };
 
   const renderTabs = () => {

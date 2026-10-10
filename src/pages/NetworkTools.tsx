@@ -127,9 +127,9 @@ const NetworkTools = () => {
     },
     {
       id: 'dns',
-      label: 'Informações de DNS / Adaptadores',
+      label: t('network.dnsInfo', 'Informações de DNS / Adaptadores'),
       icon: Info,
-      desc: 'ipconfig /all completo',
+      desc: t('network.dnsInfoDesc', 'ipconfig /all completo'),
       color: 'purple',
       fn: () => window.darkhub?.network?.dnsInfo?.()
     },

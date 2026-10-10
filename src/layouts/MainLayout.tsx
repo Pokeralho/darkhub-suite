@@ -1,4 +1,5 @@
 import React from 'react';
+import { APP_VERSION_LABEL } from '../appVersion';
 import {
   Home as HomeIcon, LayoutGrid, Zap, Monitor, FileText, Settings,
   PlaySquare, ScanText, ShieldAlert, Lock, Image as ImageIcon,
@@ -87,6 +88,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
         { id: 'passwords', label: t('nav.passwords', 'Password Vault'), icon: Lock },
         { id: 'decryption', label: t('nav.decryption', 'Decryption'), icon: Fingerprint },
         { id: 'converter', label: t('nav.converter', 'File Converter'), icon: FileText },
+        { id: 'downloads', label: t('nav.downloads', 'Download Manager'), icon: Download },
         { id: 'youtube', label: t('nav.youtube', 'Video Downloader'), icon: PlaySquare },
         { id: 'ocr', label: t('nav.ocr', 'Image OCR'), icon: ScanText },
         { id: 'metadata', label: t('nav.metadata', 'EXIF Editor'), icon: ImageIcon },
@@ -131,7 +133,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
             DarkHub Suite
           </span>
-          <span className="text-[10px] text-zinc-500 font-mono">v0.4.7</span>
+          <span className="text-[10px] text-zinc-500 font-mono">{APP_VERSION_LABEL}</span>
         </div>
 
         <div className="flex-1 h-full drag-region" />
@@ -202,7 +204,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
                           )}
                         </div>
                         {!collapsed && item.badge && (
-                          <span className="text-[9px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-400 font-mono uppercase shrink-0">
+                          <span className="text-[9px] px-1 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono uppercase shrink-0">
                             {item.badge}
                           </span>
                         )}
@@ -228,7 +230,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
           <div className="p-2 border-t border-zinc-800/80 shrink-0 bg-zinc-950/60 flex items-center gap-1">
             <button
               onClick={() => setCurrentPage('settings')}
-              title="Configurações"
+              title={t('nav.settings', 'Configurações')}
               className={`flex-1 min-w-0 flex items-center ${collapsed ? 'justify-center' : 'space-x-2'} px-2 py-1.5 rounded-md text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 border border-transparent hover:border-zinc-800 transition-colors duration-100`}
             >
               <Settings size={15} className="shrink-0 text-zinc-400" />

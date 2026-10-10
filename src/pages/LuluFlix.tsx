@@ -1,19 +1,5 @@
-import { useI18n } from '../i18n/I18nProvider';
 import React, { useEffect, useRef, useState } from 'react';
 import { PlaySquare, RefreshCw } from 'lucide-react';
-
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      webview: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement> & {
-        src?: string;
-        allowpopups?: string;
-        partition?: string;
-        ref?: React.Ref<any>;
-      }, HTMLElement>;
-    }
-  }
-}
 
 const LuluFlix = () => {
   const [loading, setLoading] = useState(true);

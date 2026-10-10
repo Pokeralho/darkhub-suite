@@ -3,12 +3,10 @@ import {
   DownloadCloud, CheckCircle2, Loader2, AlertCircle, X, ShieldCheck,
   Sparkles, ArrowRight, RefreshCw, Server, Zap, FileCode, Check
 } from 'lucide-react';
-import { useI18n } from '../i18n/I18nProvider';
 
 type UpdateStage = 'idle' | 'checking' | 'available' | 'downloading' | 'verifying' | 'downloaded' | 'error';
 
 export default function UpdaterOverlay() {
-  const { t } = useI18n();
   const [stage, setStage] = useState<UpdateStage>('idle');
   const [updateInfo, setUpdateInfo] = useState<any>(null);
   const [progress, setProgress] = useState(0);

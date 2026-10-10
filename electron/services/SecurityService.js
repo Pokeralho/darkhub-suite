@@ -1,9 +1,12 @@
+import os from 'node:os';
 import { ipcMain } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import Logger from './LoggerService.js';
 import { runPowerShell as runPowerShellShared } from './PowerShellRunner.js';
 import ElevationHelper from './optimizer/ElevationHelper.js';
+
+const HOSTNAME_RE = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 
 class SecurityService {
   constructor() {
@@ -378,13 +381,13 @@ class SecurityService {
       const newBlock = `\n\n# DarkHub Anti-Phishing Shield - BEGIN\n${blockRules}\n# DarkHub Anti-Phishing Shield - END\n`;
 
       const finalContent = cleanHosts + newBlock;
-      const tmpFile = path.join(process.env.TEMP || 'C:\\Temp', 'hosts_shield.tmp');
+      const tmpFile = path.join(os.tmpdir(), `hosts_shield_${process.pid}_${Date.now()}.tmp`);
       fs.writeFileSync(tmpFile, finalContent, 'utf8');
 
       const script = `
         $ErrorActionPreference = 'Stop'
-        Copy-Item -Path "${tmpFile}" -Destination "${hostsPath}" -Force
-        Remove-Item -Path "${tmpFile}" -Force -ErrorAction SilentlyContinue
+        Copy-Item -LiteralPath '${tmpFile.replace(/'/g, "''")}' -Destination '${hostsPath.replace(/'/g, "''")}' -Force
+        Remove-Item -LiteralPath '${tmpFile.replace(/'/g, "''")}' -Force -ErrorAction SilentlyContinue
         ipconfig /flushdns
       `;
       const { code, stderr } = await ElevationHelper.runElevatedPowerShell(script);
@@ -408,13 +411,13 @@ class SecurityService {
       const currentHosts = fs.readFileSync(hostsPath, 'utf8');
       const cleanHosts = currentHosts.replace(/# DarkHub Anti-Phishing Shield - BEGIN[\s\S]*?# DarkHub Anti-Phishing Shield - END/g, '').trim();
 
-      const tmpFile = path.join(process.env.TEMP || 'C:\\Temp', 'hosts_shield_clean.tmp');
+      const tmpFile = path.join(os.tmpdir(), `hosts_shield_clean_${process.pid}_${Date.now()}.tmp`);
       fs.writeFileSync(tmpFile, cleanHosts + '\n', 'utf8');
 
       const script = `
         $ErrorActionPreference = 'Stop'
-        Copy-Item -Path "${tmpFile}" -Destination "${hostsPath}" -Force
-        Remove-Item -Path "${tmpFile}" -Force -ErrorAction SilentlyContinue
+        Copy-Item -LiteralPath '${tmpFile.replace(/'/g, "''")}' -Destination '${hostsPath.replace(/'/g, "''")}' -Force
+        Remove-Item -LiteralPath '${tmpFile.replace(/'/g, "''")}' -Force -ErrorAction SilentlyContinue
         ipconfig /flushdns
       `;
       const { code, stderr } = await ElevationHelper.runElevatedPowerShell(script);
@@ -568,7 +571,7 @@ class SecurityService {
       if (Array.isArray(phishingDomains)) {
         this.customPhishingDomains = Array.from(new Set([
           ...this.customPhishingDomains,
-          ...phishingDomains.map(d => String(d).trim().toLowerCase()).filter(Boolean)
+          ...phishingDomains.map(d => String(d).trim().toLowerCase()).filter((d) => HOSTNAME_RE.test(d))
         ]));
       }
       if (Array.isArray(keywords)) {

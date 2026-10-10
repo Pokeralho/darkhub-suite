@@ -1,5 +1,37 @@
 /// <reference types="vite/client" />
 
+export interface DownloadItem {
+  id: string;
+  url: string;
+  fileName: string;
+  dir: string | null;
+  filePath: string | null;
+  size: number;
+  downloaded: number;
+  status: 'queued' | 'downloading' | 'paused' | 'completed' | 'error' | 'canceled';
+  error: string | null;
+  resumable: boolean;
+  connections: number;
+  speedLimitKBps: number;
+  speedBps: number;
+  etaSeconds: number | null;
+  created: number;
+  completedAt: number | null;
+  segments: number[];
+  hasSha256: boolean;
+}
+
+export interface DownloadSettings {
+  downloadDir: string;
+  maxConcurrent: number;
+  defaultConnections: number;
+  maxConnections: number;
+  globalSpeedLimitKBps: number;
+  retries: number;
+  organizeByCategory: boolean;
+  schedule: { enabled: boolean; start: string; stop: string };
+}
+
 export interface DarkHubAPI {
   hardware: {
     onUpdate: (callback: (data: any) => void) => () => void;
@@ -23,6 +55,23 @@ export interface DarkHubAPI {
   };
   app: {
     getAbout: () => Promise<any>;
+    getResourceUsage: () => Promise<{ ok: boolean; totalCpuPercent?: number; totalWorkingSetMb?: number; processes?: Array<{ pid: number; type: string; name?: string; cpuPercent: number; workingSetMb: number }>; error?: string }>;
+  };
+  downloads: {
+    list: () => Promise<{ ok: boolean; items?: DownloadItem[]; settings?: DownloadSettings; error?: string }>;
+    add: (payload: { url: string; fileName?: string; dir?: string; connections?: number; speedLimitKBps?: number; sha256?: string; referer?: string; startNow?: boolean }) => Promise<{ ok: boolean; id?: string; error?: string }>;
+    pause: (id: string) => Promise<{ ok: boolean; error?: string }>;
+    resume: (id: string) => Promise<{ ok: boolean; error?: string }>;
+    pauseAll: () => Promise<{ ok: boolean }>;
+    resumeAll: () => Promise<{ ok: boolean }>;
+    cancel: (id: string, deleteFiles?: boolean) => Promise<{ ok: boolean; error?: string }>;
+    remove: (id: string, deleteFile?: boolean) => Promise<{ ok: boolean; error?: string }>;
+    clearFinished: () => Promise<{ ok: boolean }>;
+    getSettings: () => Promise<{ ok: boolean; settings?: DownloadSettings }>;
+    setSettings: (patch: Partial<DownloadSettings>) => Promise<{ ok: boolean; settings?: DownloadSettings; error?: string }>;
+    showInFolder: (id: string) => Promise<{ ok: boolean; error?: string }>;
+    chooseDir: () => Promise<{ ok: boolean; dir?: string; canceled?: boolean }>;
+    onUpdate: (cb: (items: DownloadItem[]) => void) => () => void;
   };
   pge: {
     openPortable: () => Promise<any>;
@@ -46,7 +95,7 @@ export interface DarkHubAPI {
     }) => Promise<any>;
   };
   injector: {
-    inject: (payload: any) => Promise<any>;
+    inject: (payload: { processName: string; dllPath: string }) => Promise<{ ok: boolean; message?: string; error?: string }>;
   };
   telemetry: {
     testBugReport: () => Promise<any>;
@@ -67,7 +116,7 @@ export interface DarkHubAPI {
     onRunEvent: (callback: (payload: any) => void) => () => void;
     listBloatware: () => Promise<any>;
     removeSelectedBloatware: (payload: { appIds: string[] } | string[]) => Promise<any>;
-    applyTweak?: (id: string, options?: any) => Promise<any>;
+    applyTweak: (id: 'optimize-ram' | 'clean-temp' | 'repair-windows') => Promise<any>;
     getRunningProcesses: () => Promise<any>;
     setProcessPriority: (payload: {pid: number, priority: string}) => Promise<any>;
     getGpuPreferences: () => Promise<{ ok: boolean; preferences?: Array<{ appPath: string; appName: string; preference: string; rawValue: string }>; error?: string }>;
@@ -139,7 +188,7 @@ export interface DarkHubAPI {
     remove: (payload: { id: string }) => Promise<any>;
     reveal: (payload: { id: string }) => Promise<any>;
     copyPassword: (payload: { id: string }) => Promise<any>;
-    changeMasterPassword: (payload: { newMasterPassword: string }) => Promise<any>;
+    changeMasterPassword: (payload: { currentMasterPassword: string; newMasterPassword: string }) => Promise<any>;
     regenerateRecoveryWords: () => Promise<any>;
     export: (payload: { targetPath: string }) => Promise<any>;
     import: (payload: { sourcePath: string }) => Promise<any>;
@@ -178,8 +227,11 @@ export interface DarkHubAPI {
     getHotkey: () => Promise<any>;
     setHotkey: (payload: any) => Promise<any>;
     setTabActive: (active: boolean) => Promise<any>;
+    onChanged: (callback: (payload: { running: boolean; state: any }) => void) => () => void;
   };
   latency: {
+    queryTimer: () => Promise<any>;
+    getCpuTopology: () => Promise<any>;
     getConfig: () => Promise<any>;
     setConfig: (payload: any) => Promise<any>;
     enableUltra: () => Promise<any>;
@@ -212,9 +264,6 @@ export interface DarkHubAPI {
     download: () => Promise<any>;
     install: () => Promise<any>;
     onEvent: (callback: (payload: any) => void) => () => void;
-  };
-  injector: {
-    inject: (payload: { processName: string; dllPath: string }) => Promise<{ ok: boolean; message?: string; error?: string }>;
   };
   darkpacer: {
     start: (payload?: { targetFps?: number; pacingMode?: string }) => Promise<{ ok: boolean; isRunning: boolean; targetFps?: number; pacingMode?: string }>;
@@ -338,6 +387,9 @@ export interface DarkHubAPI {
       enableOverlay?: boolean;
       upscaler?: string;
       signatureBypass?: boolean;
+      amdEngine?: 'neural' | 'zluda' | 'fsr';
+      zludaCache?: boolean;
+      neuralPasses?: 1 | 2 | 3;
     }) => Promise<{
       ok: boolean;
       msg?: string;
@@ -387,10 +439,10 @@ export interface DarkHubAPI {
     reportError: (payload: any) => Promise<any>;
   };
   window: {
-    minimize: () => void;
-    maximize: () => void;
+    minimize: () => Promise<void>;
+    maximize: () => Promise<void>;
     isMaximized: () => Promise<boolean>;
-    close: () => void;
+    close: () => Promise<void>;
   };
   network: {
     ping: (host: string) => Promise<any>;
@@ -605,30 +657,6 @@ export interface DarkHubAPI {
       primaryDir: string | null;
       gameDir: string | null;
     }>;
-  };
-  dlss5: {
-    detectGpu: () => Promise<any>;
-    scanGame: (payload: any) => Promise<any>;
-    apply: (payload: {
-      targetDir?: string;
-      gamePath?: string;
-      profile?: 'nvidia' | 'amd' | 'intel';
-      amdEngine?: 'zluda' | 'fsr';
-      zludaCache?: boolean;
-      upscaler?: string;
-      route?: string;
-      neuralUpstream?: boolean;
-      enableFrameGen?: boolean;
-      enableOverlay?: boolean;
-      loader?: string;
-      signatureBypass?: boolean;
-    }) => Promise<any>;
-    revert: (payload: any) => Promise<any>;
-    getRecentGames: () => Promise<any>;
-    getProvenance: () => Promise<any>;
-    downloadBinaries: () => Promise<any>;
-    openFolder: (targetPath: string) => Promise<any>;
-    onLog: (callback: (entry: string) => void) => () => void;
   };
 }
 

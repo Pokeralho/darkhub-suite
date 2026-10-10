@@ -1237,14 +1237,15 @@ public static class Psapi {
         if (g?.gameId && typeof getLibraryStore === 'function') {
           try {
             const durationSeconds = Math.floor((now() - g.startedAt) / 1000)
-            const { loadLibrary, saveLibrary } = await getLibraryStore()
-            const lib = await loadLibrary(app)
-            const game = Array.isArray(lib?.games) ? lib.games.find(x => x.id === g.gameId) : null
+            const { updateGame } = await getLibraryStore()
+            const game = await updateGame(app, g.gameId, (entry) => {
+              entry.playtimeSeconds = (entry.playtimeSeconds || 0) + Math.max(0, durationSeconds)
+              entry.playCount = (entry.playCount || 0) + 1
+              entry.lastPlayedAt = Date.now()
+            }).catch(() => null)
             if (game) {
-              game.playtimeSeconds = (game.playtimeSeconds || 0) + Math.max(0, durationSeconds)
-              game.playCount = (game.playCount || 0) + 1
-              game.lastPlayedAt = Date.now()
-              await saveLibrary(app, lib.games).catch(() => {})
+              const { loadLibrary } = await getLibraryStore()
+              const lib = await loadLibrary(app)
 
               broadcastEvent('library:gameStopped', {
                 gameId: g.gameId,

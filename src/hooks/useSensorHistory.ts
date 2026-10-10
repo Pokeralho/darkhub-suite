@@ -1,4 +1,3 @@
-import { useI18n } from '../i18n/I18nProvider';
 import { useState, useEffect, useRef } from 'react';
 
 export function useSensorHistory(value: number | null | undefined, limit: number = 60) {

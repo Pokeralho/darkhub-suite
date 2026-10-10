@@ -62,7 +62,8 @@ class NativeLatencyClient extends EventEmitter {
               this.emit('ready', msg)
             } else if (this.pendingCallbacks.length > 0) {
               const cb = this.pendingCallbacks.shift()
-              cb.resolve(msg)
+              clearTimeout(cb.timer)
+              if (!cb.abandoned) cb.resolve(msg)
             }
           } catch (e) {
 
@@ -77,7 +78,8 @@ class NativeLatencyClient extends EventEmitter {
         this.isReady = false
         while (this.pendingCallbacks.length > 0) {
           const cb = this.pendingCallbacks.shift()
-          cb.reject(new Error('LatencyEngine process exited'))
+          clearTimeout(cb.timer)
+          if (!cb.abandoned) cb.reject(new Error('LatencyEngine process exited'))
         }
       })
 
@@ -94,19 +96,27 @@ class NativeLatencyClient extends EventEmitter {
         return reject(new Error('DarkHub.LatencyEngine.exe not available'))
       }
 
-      const timer = setTimeout(() => {
-        const idx = this.pendingCallbacks.findIndex((c) => c.timer === timer)
-        if (idx !== -1) {
-          this.pendingCallbacks.splice(idx, 1)
+      const entry = { resolve, reject, timer: null, abandoned: false }
+      entry.timer = setTimeout(() => {
+        // Keep the slot in the FIFO so a late reply is discarded instead of
+        // being delivered to the next caller.
+        if (!entry.abandoned) {
+          entry.abandoned = true
           reject(new Error('LatencyEngine command timed out'))
+        }
+        const abandoned = this.pendingCallbacks.filter((c) => c.abandoned).length
+        if (abandoned > 16 && this.process) {
+          try { this.process.kill() } catch {}
         }
       }, timeoutMs)
 
-      this.pendingCallbacks.push({ resolve, reject, timer })
+      this.pendingCallbacks.push(entry)
       try {
         this.process.stdin.write(JSON.stringify(payload) + '\n')
       } catch (err) {
-        clearTimeout(timer)
+        clearTimeout(entry.timer)
+        const idx = this.pendingCallbacks.indexOf(entry)
+        if (idx !== -1) this.pendingCallbacks.splice(idx, 1)
         reject(err)
       }
     })

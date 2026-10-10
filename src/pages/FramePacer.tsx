@@ -31,7 +31,8 @@ export default function FramePacerPage() {
     currentFps: number
     avgFps: number
     low1Percent: number
-    low01Percent: number
+    low01Percent: number | null
+    hasLiveTelemetry?: boolean
     currentFrametimeMs: number
     frametimeJitterMs: number
     stutterCount: number
@@ -41,7 +42,8 @@ export default function FramePacerPage() {
     currentFps: 0,
     avgFps: 0,
     low1Percent: 0,
-    low01Percent: 0,
+    low01Percent: null,
+    hasLiveTelemetry: false,
     currentFrametimeMs: 0,
     frametimeJitterMs: 0,
     stutterCount: 0,
@@ -49,6 +51,7 @@ export default function FramePacerPage() {
     history: []
   })
 
+  const live = isRunning && metrics.hasLiveTelemetry === true
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   useEffect(() => {
@@ -274,18 +277,18 @@ export default function FramePacerPage() {
               <span className="text-[11px] text-zinc-500 font-semibold uppercase">{t('framepacer.framerate', 'Taxa de Quadros')}</span>
               <div className="mt-2 flex items-baseline gap-1">
                 <span className="text-3xl font-black font-mono text-white tracking-tight">
-                  {isRunning ? metrics.currentFps : '--'}
+                  {live ? metrics.currentFps : '--'}
                 </span>
                 <span className="text-xs font-bold text-zinc-500">FPS</span>
               </div>
-              <span className="text-[10px] text-zinc-500 mt-1">{t('framepacer.average', 'Média:')} {isRunning ? metrics.avgFps : '--'}</span>
+              <span className="text-[10px] text-zinc-500 mt-1">{t('framepacer.average', 'Média:')} {live ? metrics.avgFps : '--'}</span>
             </div>
 
             <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800/80 flex flex-col justify-between">
               <span className="text-[11px] text-zinc-500 font-semibold uppercase">{t('framepacer.currentFrametime', 'Frametime Atual')}</span>
               <div className="mt-2 flex items-baseline gap-1">
                 <span className="text-3xl font-black font-mono text-sky-400 tracking-tight">
-                  {isRunning ? metrics.currentFrametimeMs : '--'}
+                  {live ? metrics.currentFrametimeMs : '--'}
                 </span>
                 <span className="text-xs font-bold text-zinc-500">ms</span>
               </div>
@@ -298,21 +301,22 @@ export default function FramePacerPage() {
             <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800/80">
               <div className="text-[10px] font-bold text-amber-400 uppercase">1% Low</div>
               <div className="text-base font-black font-mono text-zinc-100 mt-0.5">
-                {isRunning ? Math.round(metrics.low1Percent) : '--'} <span className="text-[9px] text-zinc-500">FPS</span>
+                {live ? Math.round(metrics.low1Percent) : '--'} <span className="text-[9px] text-zinc-500">FPS</span>
+                <div className="text-[9px] text-zinc-500 font-normal">0.1%: {live && metrics.low01Percent != null ? Math.round(metrics.low01Percent) : '--'}</div>
               </div>
             </div>
 
             <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800/80">
               <div className="text-[10px] font-bold text-purple-400 uppercase">Jitter</div>
               <div className="text-base font-black font-mono text-zinc-100 mt-0.5">
-                ±{isRunning ? metrics.frametimeJitterMs : '0.0'}<span className="text-[9px] text-zinc-500">ms</span>
+                {live ? <>±{metrics.frametimeJitterMs}</> : '--'}<span className="text-[9px] text-zinc-500">ms</span>
               </div>
             </div>
 
             <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800/80">
               <div className="text-[10px] font-bold text-rose-400 uppercase">Stutters</div>
               <div className="text-base font-black font-mono text-zinc-100 mt-0.5">
-                {isRunning ? metrics.stutterCount : '0'}
+                {live ? metrics.stutterCount : '--'}
               </div>
             </div>
           </div>
@@ -458,7 +462,7 @@ export default function FramePacerPage() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className={`text-sm font-bold ${active ? 'text-sky-300' : 'text-white'}`}>{m.title}</span>
-                      <span className="px-2 py-0.2 text-[9px] font-bold uppercase rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+                      <span className="px-2 py-0.5 text-[9px] font-bold uppercase rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
                         {m.badge}
                       </span>
                     </div>

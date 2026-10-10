@@ -6,9 +6,13 @@ class CpuCollector {
   constructor() {
     this.lastCpu = null;
     this.lastCores = null;
+    this.lastResult = null;
+    this.lastPollAt = 0;
   }
 
   poll() {
+    // Several consumers poll this collector; deltas are only meaningful over a real interval.
+    if (this.lastResult && Date.now() - this.lastPollAt < 400) return this.lastResult;
     try {
       const cpus = os.cpus();
       if (!cpus || cpus.length === 0) throw new Error('No CPUs found');
@@ -51,7 +55,8 @@ class CpuCollector {
       this.lastCpu = { idle, total };
       this.lastCores = coresData;
 
-      return {
+      this.lastPollAt = Date.now();
+      this.lastResult = {
         status: 'OK',
         timestamp: Date.now(),
         values: {
@@ -59,6 +64,7 @@ class CpuCollector {
           coresLoad: coresLoad.map(l => createSensor(Math.max(0, Math.min(100, l)), '%', 'node-os'))
         }
       };
+      return this.lastResult;
     } catch (err) {
       Logger.warn('CpuCollector', 'Erro ao processar V8 CPU', err);
       return { status: 'Error', timestamp: Date.now(), values: null, error: err.message };

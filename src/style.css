@@ -6,6 +6,8 @@
   --color-dark-card: #18181b;
   --color-dark-border: #27272a;
   --color-primary: #3b82f6;
+  --color-zinc-750: #323238;
+  --color-zinc-850: #1f1f23;
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -18,7 +20,7 @@ html, body, #app {
   overflow: hidden;
   background-color: #09090b;
   color: #f4f4f5;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", Helvetica, Arial, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   user-select: none;
   -webkit-font-smoothing: antialiased;
 }
@@ -63,3 +65,13 @@ button:active:not(:disabled),
   background: #3f3f46;
 }
 
+
+/* Entrance animations used across pages (no tailwindcss-animate dependency) */
+@keyframes dh-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dh-slide-up { from { opacity: 0; transform: translateY(0.5rem); } to { opacity: 1; transform: translateY(0); } }
+.animate-fadeIn,
+.animate-in { animation: dh-fade-in 0.25s ease-out both; }
+.animate-in.slide-in-from-bottom-2 { animation: dh-slide-up 0.25s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-fadeIn, .animate-in { animation: none; }
+}

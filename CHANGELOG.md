@@ -4,6 +4,49 @@ All notable changes to the DarkHub Suite project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.8] - 2026-10-10
+
+### Added
+- **Frame Pacer Native Metrics (Real-Time Precision)**:
+  - Replaced synthetic frame timing with actual Present() timings from DXGI hook via shared memory telemetry.
+  - Rust cdylib `DarkHub_PacerHook.dll` with seqlock-protected 1040-byte telemetry ring buffer.
+  - Real 1% low metric (mean of worst 1%) and conditional 0.1% low (≥1000 samples required).
+  - Stutter detection (frame > 2× rolling median + >20ms) and stale telemetry safeguard (>1.5s timeout).
+  - Unit tests for hook injection, seqlock readers, and ring buffer semantics (Linux stubs for Win32 APIs).
+- **Downloads Manager (Active Downloads)**:
+  - Full-featured HTTP downloader with manual URL input, automatic piece-chunking (Range probe, ≤96 pieces, 512 KB min).
+  - Positional writes to `.dhpart` with persistent queue/settings (`userData/downloads/`).
+  - Per-download and global token-bucket throttling, exponential backoff retries with SHA-256 verification.
+  - Schedule window support (including midnight boundary), pause/resume, concurrent connection limit (user-configurable).
+  - Dedicated Downloads tab in navigation and 13 comprehensive test cases.
+- **Optimizer Audit & Corrections**:
+  - Comprehensive audit of System Optimization page engines (`SystemOptimizerService` and 13 sub-engines).
+  - Real registry/PowerShell operations verified and traced; no functions removed or hidden, all fixed to deliver promised results.
+  - Audit report published to `docs/OPTIMIZER_AUDIT.md` with function-by-function verification matrix.
+  - New `DnsEngine` with DNS over HTTPS (DoH) support and integrated DNS operations into main optimization flow.
+- **Monitoring Optimizations**:
+  - Polling pause when windows are hidden/minimized (single `visibleInterval` helper across 6 pages).
+  - Unified HAL telemetry stream with persistent daemon (no duplicate hardware queries).
+  - Resource Usage card in Settings showing DarkHub's own memory, CPU, and disk footprint.
+
+### Fixed
+- Fixed `lib.rs` telemetry struct alignment and seqlock writer state machine (odd sequence = writing).
+- Fixed `FrameLimiter.cs` to read real frame metrics from hook instead of placeholder values.
+- Resolved optimizer engines publishing fake improvements; all now execute real Win32/PowerShell operations.
+- Fixed monitoring page polling overlap and resource waste (now pauses when hidden).
+
+### Changed
+- Migrated frame pacing metrics from synthetic math to hardware-backed Present timing collection.
+- Refactored `DarkHub.FramePacer.ps1` removal (no longer needed; injection via C# FrameLimiter.exe).
+
+### Notes
+- Pre-existing test failure: `tests/dlss5Lifecycle.test.ts` requires `fsr4_rdna2/amd_fidelityfx_upscaler_dx12.dll` (not in repo).
+- `SystemEngine.activateWindows` left as original implementation (executes remote PowerShell script with admin elevation).
+- Steam/Goldberg unlock modules untouched per user boundary.
+- Browser extension for downloads deferred to future release.
+
+---
+
 ## [0.4.7] - 2026-09-09
 
 ### Added

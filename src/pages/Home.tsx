@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { visibleInterval } from '../utils/visibleInterval';
+import { APP_VERSION_LABEL } from '../appVersion';
 import {
   Zap, Activity, Gamepad2, Cpu, ShieldCheck,
   ArrowRight, CheckCircle2, Monitor,
@@ -30,25 +32,24 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
         try {
           const info = await window.darkhub.system.getInfo();
           if (info) {
-            const totalGb = info.memory?.totalGb || (info.memory?.total ? (info.memory.total / (1024 ** 3)).toFixed(1) : '32.0');
-            const freeGb = info.memory?.freeGb || (info.memory?.free ? (info.memory.free / (1024 ** 3)).toFixed(1) : '16.0');
-            const cpuName = (info.cpu?.name || info.cpu?.brand || info.cpu?.model || 'AMD Ryzen Processor').trim();
+            const totalGb = info.memory?.totalGb || (info.memory?.total ? (info.memory.total / (1024 ** 3)).toFixed(1) : '—');
+            const freeGb = info.memory?.freeGb || (info.memory?.free ? (info.memory.free / (1024 ** 3)).toFixed(1) : '—');
+            const cpuName = (info.cpu?.name || info.cpu?.brand || info.cpu?.model || '—').trim();
             const osName = info.os?.platform === 'win32' ? `Windows ${info.os.release?.startsWith('10.0.22') || info.os.release?.startsWith('10.0.26') ? '11' : '10'} x64` : info.os?.platform || 'Windows';
             setSysSummary({
               cpu: cpuName,
-              ram: `${freeGb} GB livre de ${totalGb} GB`,
+              ram: t('home.ramFree', '{free} GB livre de {total} GB').replace('{free}', String(freeGb)).replace('{total}', String(totalGb)),
               totalGb,
               freeGb,
               os: osName,
-              cores: info.cpu?.cores || 6
+              cores: info.cpu?.cores || 0
             });
           }
         } catch {}
       }
     };
     fetchInfo();
-    const interval = setInterval(fetchInfo, 10000);
-    return () => clearInterval(interval);
+    return visibleInterval(fetchInfo, 10000);
   }, []);
 
   const handleLaunchPGE = async (e: React.MouseEvent) => {
@@ -77,7 +78,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
         <div>
           <h1 className="text-lg font-bold text-zinc-100 tracking-tight flex items-center gap-2">
             {t('home.title', 'Home Dashboard')}
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono font-normal">v0.4.7</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono font-normal">{APP_VERSION_LABEL}</span>
           </h1>
           <p className="text-xs text-zinc-400">{t('home.subtitle', 'Control Center, Kernel Optimization & Frame Pacing')}</p>
         </div>

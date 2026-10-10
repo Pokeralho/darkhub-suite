@@ -159,7 +159,18 @@ export async function saveLibrary(app, games) {
   await fs.rename(tmp, target)
 }
 
-export async function upsertGame(app, input) {
+let writeChain = Promise.resolve()
+function serialized(task) {
+  const run = writeChain.then(task, task)
+  writeChain = run.catch(() => {})
+  return run
+}
+
+export function upsertGame(app, input) {
+  return serialized(() => upsertGameUnsafe(app, input))
+}
+
+async function upsertGameUnsafe(app, input) {
   const lib = await loadLibrary(app)
   const next = sanitizeGame(input)
   const games = Array.isArray(lib.games) ? lib.games.slice() : []
@@ -170,7 +181,11 @@ export async function upsertGame(app, input) {
   return { ok: true, game: games.find((g) => g.id === next.id), games }
 }
 
-export async function upsertGamesBulk(app, inputsArray) {
+export function upsertGamesBulk(app, inputsArray) {
+  return serialized(() => upsertGamesBulkUnsafe(app, inputsArray))
+}
+
+async function upsertGamesBulkUnsafe(app, inputsArray) {
   const lib = await loadLibrary(app)
   const games = Array.isArray(lib.games) ? lib.games.slice() : []
   for (const input of inputsArray) {
@@ -183,7 +198,11 @@ export async function upsertGamesBulk(app, inputsArray) {
   return { ok: true, count: inputsArray.length, games }
 }
 
-export async function removeGame(app, id) {
+export function removeGame(app, id) {
+  return serialized(() => removeGameUnsafe(app, id))
+}
+
+async function removeGameUnsafe(app, id) {
   const lib = await loadLibrary(app)
   const games = Array.isArray(lib.games) ? lib.games.slice() : []
   const next = games.filter((g) => g.id !== id)
@@ -191,137 +210,14 @@ export async function removeGame(app, id) {
   return { ok: true, removed: games.length - next.length, games: next }
 }
 
-export async function discoverGames() {
-  const fsRaw = await import('node:fs');
-  const path = await import('node:path');
-  const cp = await import('node:child_process');
-
-  function getSteamPath() {
-    try {
-      const out = cp.execSync('reg query "HKCU\\\\Software\\\\Valve\\\\Steam" /v SteamPath', {encoding: 'utf8'});
-      const line = out.split('\\n').find(l => l.includes('SteamPath'));
-      if (line) return line.trim().split(/\\s{2,}/)[2];
-    } catch (e) {}
-    return null;
-  }
-
-  function getEpicPath() {
-    return path.join(process.env.ProgramData || 'C:\\\\ProgramData', 'Epic', 'EpicGamesLauncher', 'Data', 'Manifests');
-  }
-
-  function scoreExecutable(exePath) {
-    let score = 50;
-    const name = path.basename(exePath).toLowerCase();
-
-    if (/setup|install|update|uninst|crash|reporter|helper|bootstrapper|launcher/i.test(name)) {
-      score -= 100;
-    }
-
-    try {
-      const stat = fsRaw.statSync(exePath);
-      if (stat.size < 1024 * 1024 * 2) score -= 20;
-      else if (stat.size > 1024 * 1024 * 10) score += 20;
-    } catch (e) {}
-
-    const dir = path.dirname(exePath);
-    try {
-      const files = fsRaw.readdirSync(dir);
-      const hasUnity = files.some(f => f.toLowerCase().includes('unityplayer.dll') || f.toLowerCase().endsWith('_data'));
-      const hasUnreal = files.some(f => f.toLowerCase() === 'engine' || f.toLowerCase().includes('win64-shipping'));
-      const hasCry = files.some(f => f.toLowerCase() === 'crysystem.dll');
-
-      if (hasUnity) score += 50;
-      if (hasUnreal) score += 50;
-      if (hasCry) score += 50;
-
-      if (files.some(f => f.toLowerCase().includes('dxgi') || f.toLowerCase().includes('d3d'))) score += 10;
-      if (files.some(f => f.toLowerCase().includes('vulkan'))) score += 10;
-    } catch (e) {}
-
-    return score;
-  }
-
-  function scanDirectoryForBestExe(dir) {
-    let bestExe = '';
-    let bestScore = -999;
-
-    function walk(currentDir, depth) {
-      if (depth > 3) return;
-      try {
-        const files = fsRaw.readdirSync(currentDir, { withFileTypes: true });
-        for (const file of files) {
-          const fullPath = path.join(currentDir, file.name);
-          if (file.isDirectory()) {
-            walk(fullPath, depth + 1);
-          } else if (file.name.toLowerCase().endsWith('.exe')) {
-            const score = scoreExecutable(fullPath);
-            if (score > bestScore && score > 0) {
-              bestScore = score;
-              bestExe = fullPath;
-            }
-          }
-        }
-      } catch(e) {}
-    }
-
-    walk(dir, 0);
-    return bestExe;
-  }
-
-  return new Promise((resolve) => {
-    try {
-      const games = [];
-      const steamPath = getSteamPath();
-      if (steamPath) {
-        const vdfPath = path.join(steamPath, 'steamapps', 'libraryfolders.vdf');
-        if (fsRaw.existsSync(vdfPath)) {
-          const vdf = fsRaw.readFileSync(vdfPath, 'utf8');
-          const matches = [...vdf.matchAll(/"path"\\s+"([^"]+)"/g)];
-          for (const match of matches) {
-            const libPath = match[1].replace(/\\\\\\\\/g, '\\\\');
-            const appsDir = path.join(libPath, 'steamapps');
-            if (fsRaw.existsSync(appsDir)) {
-              const acfs = fsRaw.readdirSync(appsDir).filter(f => f.startsWith('appmanifest_') && f.endsWith('.acf'));
-              for (const acf of acfs) {
-                const acfContent = fsRaw.readFileSync(path.join(appsDir, acf), 'utf8');
-                const nameMatch = acfContent.match(/"name"\\s+"([^"]+)"/);
-                const dirMatch = acfContent.match(/"installdir"\\s+"([^"]+)"/);
-                if (nameMatch && dirMatch) {
-                  const gameDir = path.join(appsDir, 'common', dirMatch[1]);
-                  const exePath = fsRaw.existsSync(gameDir) ? scanDirectoryForBestExe(gameDir) : '';
-                  games.push({ name: nameMatch[1], platform: 'Steam', exePath });
-                }
-              }
-            }
-          }
-        }
-      }
-
-      const epicPath = getEpicPath();
-      if (fsRaw.existsSync(epicPath)) {
-        const items = fsRaw.readdirSync(epicPath).filter(f => f.endsWith('.item'));
-        for (const item of items) {
-          try {
-            const json = JSON.parse(fsRaw.readFileSync(path.join(epicPath, item), 'utf8'));
-            if (json.DisplayName) {
-              games.push({
-                name: json.DisplayName,
-                platform: 'Epic Games',
-                exePath: path.join(json.InstallLocation, json.LaunchExecutable)
-              });
-            }
-          } catch (e) {}
-        }
-      }
-
-      const result = games.filter(x => x && x.name).map(g => ({
-        name: g.name,
-        platform: g.platform,
-        exePath: g.exePath || ''
-      }));
-      resolve({ ok: true, discovered: result });
-    } catch(err) {
-      resolve({ ok: false, error: 'Falha ao processar heurística: ' + String(err) });
-    }
-  });
+export function updateGame(app, id, mutator) {
+  return serialized(async () => {
+    const lib = await loadLibrary(app)
+    const games = Array.isArray(lib.games) ? lib.games.slice() : []
+    const game = games.find((g) => g.id === id)
+    if (!game) return null
+    mutator(game)
+    await saveLibrary(app, games)
+    return game
+  })
 }

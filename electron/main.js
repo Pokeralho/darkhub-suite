@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell, protocol, clipboard, globalShortcut, Menu, Tray, screen } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell, protocol, clipboard, globalShortcut, Menu, Tray, screen, session } from 'electron'
 import log from 'electron-log'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -26,6 +26,7 @@ import {
 import { registerNetworkIPC } from './networkIPC.js'
 import { registerOptiScalerIPC } from './optiscalerManager.js'
 import { registerDlss5IPC } from './services/dlss5/Dlss5Service.js'
+import { registerDownloadsIPC } from './services/downloads/registerDownloadsIPC.js'
 import Logger from './services/LoggerService.js'
 import { runCommand, runPowerShell, runPowerShellJson, stripBom, encodePowerShellScript, powerShellArgsForEncodedScript } from './services/PowerShellRunner.js'
 import HardwareService from './services/HardwareService.js'
@@ -41,8 +42,11 @@ import VisualsEngine from './services/optimizer/VisualsEngine.js'
 import ToolboxEngine from './services/optimizer/ToolboxEngine.js'
 import AppManagerEngine from './services/optimizer/AppManagerEngine.js'
 import DeepTweaksEngine from './services/optimizer/DeepTweaksEngine.js'
+import DefenderControlEngine from './services/optimizer/DefenderControlEngine.js'
+import { Worker } from 'node:worker_threads'
 import ServicesEngine from './services/optimizer/ServicesEngine.js'
-import { registerLatencyGuardian } from './latencyGuardian.js'
+import DnsEngine from './services/optimizer/DnsEngine.js'
+import StorageEngine from './services/optimizer/StorageEngine.js'
 import FramePacerEngine from './services/FramePacerEngine.js'
 import { createFramePacerOverlay, closeFramePacerOverlay, toggleFramePacerOverlay, setOverlayClickThrough, setOverlayConfig, getOverlayStatus } from './services/FramePacerOverlay.js'
 import { steamLuaService, SteamLocator } from './services/SteamLuaService.js'
@@ -167,6 +171,7 @@ async function getLibraryStore() {
 
 registerOptiScalerIPC({ app, ipcMain, getLibraryStore })
 registerDlss5IPC({ app, ipcMain, shell })
+const downloadsService = registerDownloadsIPC({ app, ipcMain, dialog, shell, BrowserWindow, logger: Logger })
 
 async function getYtDlpTools() {
   ytdlpToolsPromise ||= import('./ytdlp.js')
@@ -195,6 +200,18 @@ let tray = null
 let appIsQuitting = false
 let closeToTrayEnabled = true
 let latencyGuardianHandle = null
+let latencyServiceState = 'starting'
+const LATENCY_CHANNELS = [
+  'latency:getConfig', 'latency:queryTimer', 'latency:getCpuTopology', 'latency:setConfig',
+  'latency:enableUltra', 'latency:enableUltraStable', 'latency:disableUltra', 'latency:toggleUltra',
+  'latency:boostNow', 'latency:launchGameWithProfile'
+]
+for (const ch of LATENCY_CHANNELS) {
+  ipcMain.handle(ch, async () => ({
+    ok: false,
+    error: latencyServiceState === 'disabled' ? 'latency-service-disabled' : 'latency-service-starting'
+  }))
+}
 
 function normalizeAccessPath(input) {
   if (typeof input !== 'string' || !input.trim()) return null
@@ -255,13 +272,7 @@ function normalizeRegistryPath(value) {
   return String(value ?? '').trim().replace(/\//g, '\\').toUpperCase()
 }
 
-const allowedStartupRegistryPaths = new Set([
-  'HKCU:\\SOFTWARE\\MICROSOFT\\WINDOWS\\CURRENTVERSION\\RUN',
-  'HKLM:\\SOFTWARE\\MICROSOFT\\WINDOWS\\CURRENTVERSION\\RUN',
-  'HKCU:\\SOFTWARE\\MICROSOFT\\WINDOWS\\CURRENTVERSION\\RUNONCE',
-  'HKLM:\\SOFTWARE\\MICROSOFT\\WINDOWS\\CURRENTVERSION\\RUNONCE',
-  'HKLM:\\SOFTWARE\\WOW6432NODE\\MICROSOFT\\WINDOWS\\CURRENTVERSION\\RUN'
-])
+
 
 function normalizeWebhookUrl(value) {
   if (typeof value !== 'string') return null
@@ -535,16 +546,6 @@ function getStartupFolderRoots() {
   return roots.map(normalizeAccessPath).filter(Boolean)
 }
 
-function isStartupShortcutPath(filePath) {
-  const normalized = normalizeAccessPath(filePath)
-  if (!normalized || path.extname(normalized).toLowerCase() !== '.lnk') return false
-  return getStartupFolderRoots().some((root) => isPathInside(normalized, root))
-}
-
-function isValidServiceName(name) {
-  return typeof name === 'string' && /^[A-Za-z0-9_.-]{1,128}$/.test(name)
-}
-
 async function estimateDirectoryBytes(root, opts, state, depth) {
   if (!root) return
   if (state.truncated) return
@@ -668,78 +669,6 @@ async function computeJunkEstimate(payload) {
   } finally {
     if (junkEstimateCache?.inFlight === work) junkEstimateCache.inFlight = null
   }
-}
-
-async function walkDirStats(rootDir, { maxEntries = 8000, maxDepth = 12 } = {}) {
-  let files = 0
-  let dirs = 0
-  let bytes = 0
-  let skipped = 0
-
-  async function walk(current, depth) {
-    if (files + dirs >= maxEntries) {
-      skipped += 1
-      return
-    }
-    if (depth > maxDepth) {
-      skipped += 1
-      return
-    }
-
-    let entries
-    try {
-      entries = await fs.readdir(current, { withFileTypes: true })
-    } catch {
-      skipped += 1
-      return
-    }
-
-    for (const entry of entries) {
-      if (files + dirs >= maxEntries) {
-        skipped += 1
-        return
-      }
-
-      const full = path.join(current, entry.name)
-      if (entry.isDirectory()) {
-        dirs += 1
-        await walk(full, depth + 1)
-        continue
-      }
-
-      if (entry.isFile()) {
-        files += 1
-        try {
-          const st = await fs.stat(full)
-          bytes += st.size
-        } catch {
-          skipped += 1
-        }
-        continue
-      }
-    }
-  }
-
-  await walk(rootDir, 0)
-  return { rootDir, files, dirs, bytes, skipped }
-}
-
-async function clearDirectoryContents(rootDir) {
-  const entries = await fs.readdir(rootDir, { withFileTypes: true })
-
-  const results = await Promise.all(
-    entries.map(async (entry) => {
-      const full = path.join(rootDir, entry.name)
-      try {
-        await fs.rm(full, { recursive: true, force: true })
-        return { path: full, ok: true }
-      } catch (err) {
-        return { path: full, ok: false, error: err?.message ?? String(err) }
-      }
-    })
-  )
-
-  return results
 }
 
 function createMainWindow() {
@@ -908,14 +837,17 @@ function createMainWindow() {
     win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
   }
 
-  win.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-    const newHeaders = { ...details.responseHeaders };
-    Object.keys(newHeaders).forEach(k => {
-      const lk = k.toLowerCase();
-      if (lk === 'x-frame-options') delete newHeaders[k];
+  try {
+    session.fromPartition('persist:darkhub_media').webRequest.onHeadersReceived((details, callback) => {
+      const newHeaders = { ...details.responseHeaders };
+      Object.keys(newHeaders).forEach(k => {
+        if (k.toLowerCase() === 'x-frame-options') delete newHeaders[k];
+      });
+      callback({ responseHeaders: newHeaders });
     });
-    callback({ responseHeaders: newHeaders });
-  });
+  } catch (err) {
+    log.warn('[session] failed to configure media partition headers', err?.message ?? String(err))
+  }
 
   win.webContents.on('render-process-gone', async (_event, details) => {
     try {
@@ -1129,12 +1061,13 @@ async function dnsBenchmark(servers, { timeoutMs = 1500, attempts = 2, concurren
 }
 
 let cachedSysInfo = null;
-let metricsDiskIoLast = null
+
 let metricsNetLastByIface = new Map()
 let snapshotDiskIoLast = null
 let snapshotNetLastByIface = new Map()
 
 let cachedHardwareSnapshot = null;
+let cachedPhysicalCores = null;
 ipcMain.handle('system:getInfo', async () => {
   const total = os.totalmem()
   const free = os.freemem()
@@ -1156,6 +1089,13 @@ ipcMain.handle('system:getInfo', async () => {
     } catch {}
   }
 
+  if (cachedPhysicalCores === null) {
+    try {
+      const cpuInfo = await si.cpu()
+      if (Number.isFinite(cpuInfo?.physicalCores) && cpuInfo.physicalCores > 0) cachedPhysicalCores = cpuInfo.physicalCores
+    } catch {}
+  }
+
   const manufacturer = cpuModel.includes('Intel') ? 'Intel' : (cpuModel.includes('AMD') || cpuModel.includes('Ryzen')) ? 'AMD' : 'Generic'
 
   return {
@@ -1172,7 +1112,7 @@ ipcMain.handle('system:getInfo', async () => {
       model: cpuModel,
       name: cpuModel,
       cores: cpus.length,
-      physicalCores: Math.max(1, Math.floor(cpus.length / 2)),
+      physicalCores: cachedPhysicalCores ?? Math.max(1, Math.floor(cpus.length / 2)),
       speed: cpuSpeed
     },
     memory: {
@@ -1290,8 +1230,6 @@ ipcMain.handle('system:getLatency', async (_event, payload) => {
 
 ipcMain.handle('system:runBenchmark', async () => {
   return new Promise((resolve) => {
-    const { Worker } = require('node:worker_threads');
-
     const workerCode = `
       const { parentPort } = require('node:worker_threads');
       const start = process.hrtime.bigint();
@@ -1314,7 +1252,7 @@ ipcMain.handle('system:runBenchmark', async () => {
       if (!finished) {
         finished = true;
         worker.terminate();
-        resolve({ ok: false, error: 'Timeout atingido' });
+        resolve({ ok: false, error: 'Benchmark timed out' });
       }
     }, 15000);
 
@@ -1703,8 +1641,7 @@ function findPgeBat() {
     path.join(process.cwd(), 'PGE Portable', 'Pokeralho Games Launcher.bat'),
     path.resolve(__dirname, '..', 'PGE Portable', 'Pokeralho Games Launcher.bat'),
     path.resolve(__dirname, '..', '..', 'PGE Portable', 'Pokeralho Games Launcher.bat'),
-    path.join(process.env.APPDATA || '', 'darkhub-suite', 'PGE Portable', 'Pokeralho Games Launcher.bat'),
-    'C:\\Workspace\\DarkHub Suite\\PGE Portable\\Pokeralho Games Launcher.bat'
+    path.join(process.env.APPDATA || '', 'darkhub-suite', 'PGE Portable', 'Pokeralho Games Launcher.bat')
   ]
 
   for (const c of candidates) {
@@ -1752,6 +1689,27 @@ ipcMain.handle('pge:openPortable', async () => {
   return launchPgeBat(batPath)
 })
 
+ipcMain.handle('app:getResourceUsage', async () => {
+  try {
+    const metrics = app.getAppMetrics()
+    const processes = metrics.map((m) => ({
+      pid: m.pid,
+      type: m.type,
+      name: m.name || m.serviceName || '',
+      cpuPercent: Math.round((m.cpu?.percentCPUUsage ?? 0) * 10) / 10,
+      workingSetMb: Math.round(((m.memory?.workingSetSize ?? 0) / 1024) * 10) / 10
+    }))
+    return {
+      ok: true,
+      totalCpuPercent: Math.round(processes.reduce((a, p) => a + p.cpuPercent, 0) * 10) / 10,
+      totalWorkingSetMb: Math.round(processes.reduce((a, p) => a + p.workingSetMb, 0)),
+      processes
+    }
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err) }
+  }
+})
+
 ipcMain.handle('app:getAbout', async () => {
   return {
     name: app.getName(),
@@ -1770,17 +1728,45 @@ ipcMain.handle('app:getAbout', async () => {
   }
 })
 
+const STARTUP_TASK_NAME = 'DarkHub Suite Autostart'
+
+async function isStartupTaskEnabled() {
+  if (process.platform !== 'win32') return false
+  try {
+    const r = await runCommand('schtasks.exe', ['/Query', '/TN', STARTUP_TASK_NAME], { timeoutMs: 8000 })
+    return r.code === 0
+  } catch {
+    return false
+  }
+}
+
+async function setStartupTask(enabled, hidden) {
+  if (process.platform !== 'win32') return false
+  if (!enabled) {
+    await runCommand('schtasks.exe', ['/Delete', '/TN', STARTUP_TASK_NAME, '/F'], { timeoutMs: 8000 }).catch(() => {})
+    return true
+  }
+  const exe = process.execPath
+  const command = `"${exe}"${hidden ? ' --hidden' : ''}`
+  const r = await runCommand('schtasks.exe', [
+    '/Create', '/TN', STARTUP_TASK_NAME, '/TR', command,
+    '/SC', 'ONLOGON', '/RL', 'HIGHEST', '/F'
+  ], { timeoutMs: 15000 })
+  if (r.code !== 0) throw new Error(r.stderr || 'Falha ao criar a tarefa de inicialização')
+  return true
+}
+
 ipcMain.handle('settings:getConfig', async () => {
   try {
     const { loadConfig: loadPersistedConfig } = await import('./configManager.js')
     const config = await loadPersistedConfig()
-    const loginSettings = app.getLoginItemSettings()
+    const startupEnabled = await isStartupTaskEnabled()
     return {
       ok: true,
       config: {
         app: {
           ...(config.app ?? {}),
-          openAtLogin: Boolean(loginSettings?.openAtLogin)
+          openAtLogin: startupEnabled
         },
         telemetry: {
           bugReportsEnabled: config.telemetry?.bugReportsEnabled !== false,
@@ -1869,11 +1855,7 @@ ipcMain.handle('settings:updateStartupBehavior', async (_event, payload) => {
   try {
     const openAtLogin = Boolean(payload?.openAtLogin)
     const openAsHidden = Boolean(payload?.openAsHidden ?? true)
-    app.setLoginItemSettings({
-      openAtLogin,
-      openAsHidden,
-      args: openAsHidden ? ['--hidden'] : []
-    })
+    await setStartupTask(openAtLogin, openAsHidden)
     const { loadConfig: loadPersistedConfig, saveConfig } = await import('./configManager.js')
     const current = await loadPersistedConfig()
     const next = await saveConfig({
@@ -1883,8 +1865,7 @@ ipcMain.handle('settings:updateStartupBehavior', async (_event, payload) => {
         openAtLogin
       }
     })
-    const updatedLogin = app.getLoginItemSettings()
-    return { ok: true, openAtLogin: Boolean(updatedLogin?.openAtLogin) }
+    return { ok: true, openAtLogin: await isStartupTaskEnabled() }
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) }
   }
@@ -1995,11 +1976,13 @@ ipcMain.handle('framepacer:getOverlayStatus', async () => {
 ipcMain.handle('dialog:grantDroppedFiles', async (_event, filePaths) => {
   if (!Array.isArray(filePaths)) return { ok: false, error: 'Invalid file list' }
   const granted = []
-  for (const p of filePaths) {
-    if (typeof p === 'string' && p.trim()) {
-      grantFilePath(p)
-      granted.push(p)
-    }
+  for (const p of filePaths.slice(0, 200)) {
+    if (typeof p !== 'string' || !p.trim() || !path.isAbsolute(p)) continue
+    try {
+      if (!fsRaw.statSync(p).isFile()) continue
+    } catch { continue }
+    grantFilePath(p)
+    granted.push(p)
   }
   return { ok: true, granted }
 })
@@ -2057,6 +2040,18 @@ ipcMain.handle('optimizer:advancedNetworkApply', async () => NetworkEngine.advan
 ipcMain.handle('optimizer:advancedNetworkRevert', async () => NetworkEngine.advancedNetworkRevert());
 
 ipcMain.handle('optimizer:deepTweaksList', async () => DeepTweaksEngine.listTweaks());
+ipcMain.handle('optimizer:applyTweak', async (_event, id) => {
+  try {
+    switch (id) {
+      case 'optimize-ram': return await MemoryEngine.optimizeRAM()
+      case 'clean-temp': return await StorageEngine.cleanTempFiles()
+      case 'repair-windows': return await SystemEngine.repairWindows()
+      default: return { ok: false, error: `Unknown tweak: ${String(id)}` }
+    }
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err) }
+  }
+})
 ipcMain.handle('optimizer:deepTweaksStatus', async () => DeepTweaksEngine.checkTweaksStatus());
 ipcMain.handle('optimizer:deepTweaksAnalyze', async (_event, payload) => {
   const ids = payload?.tweakIds || [];
@@ -2066,8 +2061,15 @@ ipcMain.handle('optimizer:deepTweaksAnalyze', async (_event, payload) => {
 });
 ipcMain.handle('optimizer:deepTweaksApply', async (event, payload) => DeepTweaksEngine.applyTweaks(payload?.tweakIds || [], (channel, msg) => event.sender.send(channel, msg)));
 ipcMain.handle('optimizer:deepTweaksRevert', async (event, payload) => DeepTweaksEngine.revertTweaks(payload?.tweakIds || [], (channel, msg) => event.sender.send(channel, msg)));
-ipcMain.handle('optimizer:deepTweaksUndo', async (_event, payload) => DeepTweaksEngine.undoTweaks(payload?.undoToken));
-ipcMain.handle('optimizer:globalRecommendedTweaks', async (event) => DeepTweaksEngine.applyTweaks(DeepTweaksEngine.listTweaks().map(t => t.id), (channel, msg) => event.sender.send(channel, msg)));
+ipcMain.handle('optimizer:deepTweaksUndo', async (_event, payload) => DeepTweaksEngine.undoTweaks(payload?.tweakIds ?? payload?.undoToken ?? []));
+ipcMain.handle('optimizer:globalRecommendedTweaks', async (event) => {
+  try {
+    // only low-risk, reversible, non-security tweaks (see pickRecommendedTweaks)
+    return await DeepTweaksEngine.applyRecommended((channel, msg) => event.sender.send(channel, msg));
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err) };
+  }
+});
 
 function isValidIpv4(value) {
   if (typeof value !== 'string') return false
@@ -2078,164 +2080,37 @@ function isValidIpv4(value) {
   return true
 }
 
-ipcMain.handle('optimizer:setDnsServers', async (_event, payload) => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
-  const primary = payload?.primary
-  const secondary = payload?.secondary
-  if (!isValidIpv4(primary) || !isValidIpv4(secondary)) return { ok: false, error: 'Invalid DNS server IP' }
-
-  const ps = [
-    `$servers = @(${psSingleQuote(primary.trim())},${psSingleQuote(secondary.trim())})`,
-    `Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | ForEach-Object {`,
-    `  Set-DnsClientServerAddress -InterfaceIndex $_.InterfaceIndex -ServerAddresses $servers`,
-    `}`
-  ].join('; ')
-
-  try {
-    const { code, stderr } = await runPowerShell(ps, { timeoutMs: 60000 })
-    if (code !== 0) return { ok: false, error: stderr || 'Failed to set DNS servers' }
-    return { ok: true, msg: `DNS applied: ${primary} / ${secondary}` }
-  } catch (err) {
-    return { ok: false, error: err?.message ?? String(err) }
-  }
-})
+ipcMain.handle('optimizer:dnsPresets', async () => ({ ok: true, presets: DnsEngine.getPresets() }));
 
 ipcMain.handle('optimizer:getDnsState', async () => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
-  try {
-    const adapter = await getActiveAdapterName()
-    if (!adapter) return { ok: false, error: 'Active network adapter not found' }
-    const ps = `
-      $ErrorActionPreference='Stop'
-      $a=${psSingleQuote(adapter)}
-      $s = Get-DnsClientServerAddress -InterfaceAlias $a -AddressFamily IPv4
-      [PSCustomObject]@{
-        adapter = $a
-        servers = @($s.ServerAddresses)
-      } | ConvertTo-Json -Compress
-    `
-    const { code, stderr, data } = await runPowerShellJson(ps, { timeoutMs: 20000 })
-    if (code !== 0) return { ok: false, error: stderr || 'Failed to read DNS state' }
-    return { ok: true, adapter: data.adapter, servers: Array.isArray(data.servers) ? data.servers : [] }
-  } catch (err) {
-    return { ok: false, error: err?.message ?? String(err) }
-  }
-})
+  try { return await DnsEngine.getState(); } catch (err) { return { ok: false, error: err?.message ?? String(err) }; }
+});
 
+// setDnsServers and applyDns share one path: UAC, read-back verification, persistent undo token
+ipcMain.handle('optimizer:setDnsServers', async (_event, payload) => {
+  try { return await DnsEngine.apply({ primary: payload?.primary, secondary: payload?.secondary }); }
+  catch (err) { return { ok: false, error: err?.message ?? String(err) }; }
+});
 ipcMain.handle('optimizer:applyDns', async (_event, payload) => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
-  const primary = payload?.primary
-  const secondary = payload?.secondary
-  if (!isValidIpv4(primary) || !isValidIpv4(secondary)) return { ok: false, error: 'Invalid DNS server IP' }
-  try {
-    const adapter = await getActiveAdapterName()
-    if (!adapter) return { ok: false, error: 'Active network adapter not found' }
-
-    const psRead = `
-      $ErrorActionPreference='Stop'
-      $a=${psSingleQuote(adapter)}
-      $s = Get-DnsClientServerAddress -InterfaceAlias $a -AddressFamily IPv4
-      [PSCustomObject]@{
-        adapter = $a
-        servers = @($s.ServerAddresses)
-      } | ConvertTo-Json -Compress
-    `
-    const { code: codeRead, data: before, stderr: errRead } = await runPowerShellJson(psRead, { timeoutMs: 20000 })
-    if (codeRead !== 0) return { ok: false, error: errRead || 'Failed to read DNS servers' }
-    const prevServers = Array.isArray(before?.servers) ? before.servers : []
-
-    const psApply = `
-      $ErrorActionPreference='Stop'
-      $a=${psSingleQuote(adapter)}
-      Set-DnsClientServerAddress -InterfaceAlias $a -ServerAddresses @(${psSingleQuote(String(primary).trim())},${psSingleQuote(String(secondary).trim())})
-    `
-    const { code, stderr } = await runPowerShell(psApply, { timeoutMs: 30000 })
-    if (code !== 0) return { ok: false, error: stderr || 'Failed to apply DNS servers' }
-
-    const undoToken = `dns_${Date.now()}_${Math.random().toString(16).slice(2)}`
-    dnsUndoStore.set(undoToken, { adapter, servers: prevServers })
-
-    return {
-      ok: true,
-      msg: `DNS aplicado no adaptador ${adapter}: ${primary} / ${secondary}`,
-      adapter,
-      before: prevServers,
-      after: [String(primary).trim(), String(secondary).trim()],
-      undoToken
-    }
-  } catch (err) {
-    return { ok: false, error: err?.message ?? String(err) }
-  }
-})
+  try { return await DnsEngine.apply({ primary: payload?.primary, secondary: payload?.secondary }); }
+  catch (err) { return { ok: false, error: err?.message ?? String(err) }; }
+});
 
 ipcMain.handle('optimizer:undoDns', async (_event, payload) => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
-  const undoToken = payload?.undoToken
-  if (typeof undoToken !== 'string' || !undoToken) return { ok: false, error: 'No undoToken' }
-  const entry = dnsUndoStore.get(undoToken)
-  if (!entry) return { ok: false, error: 'Undo token inválido ou expirado' }
-  try {
-    const adapter = entry.adapter
-    const prev = Array.isArray(entry.servers) ? entry.servers : []
-    if (prev.length === 0) {
-      const ps = `
-        $ErrorActionPreference='Stop'
-        $a=${psSingleQuote(adapter)}
-        Set-DnsClientServerAddress -InterfaceAlias $a -ResetServerAddresses
-      `
-      const { code, stderr } = await runPowerShell(ps, { timeoutMs: 30000 })
-      if (code !== 0) return { ok: false, error: stderr || 'Failed to reset DNS servers' }
-    } else {
-      const safeServers = prev.map(psSingleQuote).join(',')
-      const ps = `
-        $ErrorActionPreference='Stop'
-        $a=${psSingleQuote(adapter)}
-        Set-DnsClientServerAddress -InterfaceAlias $a -ServerAddresses @(${safeServers})
-      `
-      const { code, stderr } = await runPowerShell(ps, { timeoutMs: 30000 })
-      if (code !== 0) return { ok: false, error: stderr || 'Failed to restore DNS servers' }
-    }
-    dnsUndoStore.delete(undoToken)
-    return { ok: true, msg: `DNS restaurado no adaptador ${adapter}`, adapter, servers: prev }
-  } catch (err) {
-    return { ok: false, error: err?.message ?? String(err) }
-  }
-})
+  try { return await DnsEngine.undo({ undoToken: typeof payload?.undoToken === 'string' ? payload.undoToken : undefined }); }
+  catch (err) { return { ok: false, error: err?.message ?? String(err) }; }
+});
 
 ipcMain.handle('optimizer:dnsBenchmark', async (_event, payload) => {
   try {
-    const timeoutMs = clampInt(payload?.timeoutMs, 300, 5000, 1500)
-    const attempts = clampInt(payload?.attempts, 1, 5, 2)
-    const concurrency = clampInt(payload?.concurrency, 1, 16, 8)
-    const bench = await dnsBenchmark(dnsPresets, { timeoutMs, attempts, concurrency })
-    return { ok: true, ...bench }
+    return await DnsEngine.benchmark({ timeoutMs: payload?.timeoutMs, attempts: payload?.attempts, concurrency: payload?.concurrency });
   } catch (err) {
-    return { ok: false, error: err?.message ?? String(err) }
+    return { ok: false, error: err?.message ?? String(err) };
   }
-})
+});
 // ============================================================
 // HELPER: Criar Ponto de Restauração do Sistema
 // ============================================================
-async function createSystemRestorePoint(description) {
-  if (process.platform !== 'win32') return false;
-
-  try {
-    const script = `
-      $ErrorActionPreference = 'Stop'
-      try {
-        Checkpoint-Computer -Description ${psSingleQuote(description)} -RestorePointType "MODIFY_SETTINGS" -ErrorAction Stop
-        Write-Output "SUCCESS"
-      } catch {
-        Write-Output "FAILED"
-      }
-    `;
-    const { stdout } = await runPowerShell(script, { timeoutMs: 60000 });
-    return stdout.includes('SUCCESS');
-  } catch {
-    return false;
-  }
-}
-
 function sendRoutineEvent(event, routineId, type, message, extra = {}) {
   try {
     event.sender.send('optimizer:runEvent', {
@@ -2251,73 +2126,6 @@ function sendRoutineEvent(event, routineId, type, message, extra = {}) {
 function sendRoutineProgress(event, routineId, progress, message, extra = {}) {
   const safeProgress = Math.max(0, Math.min(100, Math.round(Number(progress) || 0)))
   sendRoutineEvent(event, routineId, 'progress', message, { progress: safeProgress, ...extra })
-}
-
-function extractProgressPercent(text) {
-  const input = String(text ?? '')
-  const match =
-    input.match(/(?:verification|verifica(?:c|ç)(?:a|ã)o).*?(\d{1,3})\s*%/i) ||
-    input.match(/(\d{1,3}(?:[.,]\d+)?)\s*%/)
-
-  if (!match) return null
-  const value = Number(String(match[1]).replace(',', '.'))
-  if (!Number.isFinite(value)) return null
-  return Math.max(0, Math.min(100, value))
-}
-
-const routineNameById = {
-  'msi-mode': 'Ativar MSI Mode em adaptadores PCI',
-  'kernel-extreme': 'Mod Extremo de Kernel e Latência',
-  'network-extreme': 'Mod Extremo de Rede TCP/IP',
-  'cpu-unpark': 'Desestacionar Núcleos de CPU',
-  'defender-disable': 'Desativar Windows Defender (TrustedInstaller)',
-  'defender-enable': 'Ativar Windows Defender',
-  'open-tamper-settings': 'Abrir Proteção contra Adulteração',
-  'disable-services': 'Desabilitar servicos desnecessarios',
-  'disable-visual-effects': 'Desativar belezas visuais',
-  'revert-visual-effects': 'Reverter efeitos visuais',
-  'create-restore-point': 'Criar ponto de restauracao',
-  'repair-windows': 'Reparar Windows',
-  'high-performance': 'Modo de alto desempenho',
-  'ultimate-performance': 'Modo Ultimate Performance',
-  'timer-resolution': 'Ajustar temporizador',
-  'clean-registry': 'Limpeza de registro',
-  'clean-network': 'Limpar dados de rede',
-  'dns-benchmark': 'DNS Benchmark',
-  'game-route': 'Otimizar rota para jogos',
-  'latency-optimizer': 'Otimizar latencia',
-  'system-info': 'Informacoes do sistema',
-  'activate-windows': 'Ativar Windows/Office',
-  'clean-temp': 'Limpar arquivos temporarios',
-  'startup-optimizer': 'Otimizador de inicializacao',
-  'remove-bloatware': 'Remover bloatware',
-  'optimize-ram': 'Otimizar memoria RAM',
-  'advanced-network': 'Otimizacao avancada de rede',
-  'advanced-network-revert': 'Reverter otimizacao de rede',
-  'change-priority': 'Prioridade de aplicacao',
-  'uninstall-program': 'Desinstalar programa',
-  'open-antivirus': 'Antivirus MRT',
-  'space-sniffer': 'SpaceSniffer',
-  'disable-telemetry': 'Desativar telemetria do Windows',
-  'revert-telemetry': 'Reverter telemetria do Windows',
-  'disable-gamebar': 'Desativar Game Bar/Xbox',
-  'optimize-memory': 'Otimizacoes de memoria',
-  'optimize-network': 'Otimizacoes de rede'
-}
-
-function startRoutineHeartbeat(event, routineId) {
-  let ticks = 0
-  let progress = 3
-  return setInterval(() => {
-    ticks += 1
-    progress = Math.min(92, progress + (ticks < 5 ? 3 : 1))
-    sendRoutineProgress(
-      event,
-      routineId,
-      progress,
-      `Ainda executando. Tempo decorrido: ${ticks * 12}s.`
-    )
-  }, 12000)
 }
 
 function emitCommandOutput(event, routineId, prefix = '') {
@@ -2346,24 +2154,6 @@ async function runRoutineCommand(event, routineId, command, args = [], {
     throw new Error(result.stderr || `${command} exited with code ${result.code}`)
   }
   return result
-}
-
-async function runRoutinePowerShell(event, routineId, script, options = {}) {
-  const { label = null, allowCodes = [0], ...powerShellOptions } = options
-  if (label) sendRoutineEvent(event, routineId, 'log', label)
-  const result = await runPowerShell(script, {
-    ...powerShellOptions,
-    onStdout: emitCommandOutput(event, routineId),
-    onStderr: emitCommandOutput(event, routineId, '[ERRO] ')
-  })
-  if (!allowCodes.includes(result.code)) {
-    throw new Error(result.stderr || `PowerShell exited with code ${result.code}`)
-  }
-  return result
-}
-
-async function runRoutineCmdLine(event, routineId, commandLine, options = {}) {
-  return runRoutineCommand(event, routineId, 'cmd', ['/d', '/s', '/c', String(commandLine)], options)
 }
 
 // ============================================================
@@ -2417,9 +2207,9 @@ ipcMain.handle('optimizer:runRoutine', async (_event, routineId) => {
         case 'space-sniffer': res = await ToolboxEngine.openSpaceSniffer(); break;
         case 'change-priority': res = await ToolboxEngine.openTaskManager(); break;
         case 'disable-telemetry': res = await DeepTweaksEngine.applyTweaks(['tweak:disableTelemetry'], () => {}); break;
-        case 'revert-telemetry': res = await DeepTweaksEngine.undoTweaks('tweak:disableTelemetry'); break;
+        case 'revert-telemetry': res = await DeepTweaksEngine.undoTweaks(['tweak:disableTelemetry']); break;
         case 'disable-ai': res = await DeepTweaksEngine.applyTweaks(['tweak:disableAiAndAds'], () => {}); break;
-        case 'revert-ai': res = await DeepTweaksEngine.undoTweaks('tweak:disableAiAndAds'); break;
+        case 'revert-ai': res = await DeepTweaksEngine.undoTweaks(['tweak:disableAiAndAds']); break;
         case 'disable-gamebar': res = await DeepTweaksEngine.applyTweaks(['tweak:disableGameDvr'], () => {}); break;
         case 'startup-optimizer': res = { ok: true, msg: 'Use a aba Gerenciador de Inicialização interativa' }; break;
         case 'uninstall-program': res = { ok: true, msg: 'Use a aba Desinstalar Programas interativa' }; break;
@@ -2433,6 +2223,15 @@ ipcMain.handle('optimizer:runRoutine', async (_event, routineId) => {
         case 'kernel-extreme': res = await SystemEngine.applyExtremeKernelMod(); break;
         case 'network-extreme': res = await SystemEngine.applyExtremeNetworkMod(); break;
         case 'cpu-unpark': res = await SystemEngine.applyCpuUnpark(); break;
+        case 'timer-tuning': res = await SystemEngine.applyTimerTuning(); break;
+        case 'revert-timer-tuning': res = await SystemEngine.revertTimerTuning(); break;
+        case 'revert-kernel-extreme': res = await SystemEngine.revertExtremeKernelMod(); break;
+        case 'revert-network-extreme': res = await SystemEngine.revertExtremeNetworkMod(); break;
+        case 'revert-cpu-unpark': res = await SystemEngine.revertCpuUnpark(); break;
+        case 'revert-msi-mode': res = await SystemEngine.revertMsiMode(); break;
+        case 'revert-pagefile': res = await SystemEngine.revertPagefile(); break;
+        case 'restore-capabilities': res = await SystemEngine.restoreCapabilities(); break;
+        case 'revert-gaming-mode': res = await SystemEngine.revertHardcoreGamerMode(); break;
         case 'defender-disable': res = await DefenderControlEngine.runNativeDefenderControl('disable'); break;
         case 'defender-enable': res = await DefenderControlEngine.runNativeDefenderControl('enable'); break;
         case 'open-tamper-settings': res = DefenderControlEngine.openTamperSettings(); break;
@@ -2788,7 +2587,7 @@ ipcMain.handle('youtube:getVideoInfo', async (_event, payload) => {
         }
         const client = clientType || (typeof clientRaw === 'string' && clientRaw.trim().length ? clientRaw.trim() : 'android,web')
         args.push('--extractor-args', `youtube:player_client=${client}`)
-        args.push(String(url))
+        args.push('--', String(url))
         return args
       }
 
@@ -2991,7 +2790,7 @@ ipcMain.handle('youtube:download', async (event, payload) => {
       args.push('-f', 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bestvideo+bestaudio/best', '--merge-output-format', 'mp4')
     }
 
-    args.push(String(url))
+    args.push('--', String(url))
 
     const { code, stderr } = await runYtDlp(ytdlpPath, args, {
       timeoutMs: 60 * 60 * 1000,
@@ -3270,7 +3069,10 @@ async function readVaultFile() {
 
 async function writeVaultFile(obj) {
   const content = JSON.stringify(obj)
-  await fs.writeFile(vaultFilePath(), content, 'utf8')
+  const target = vaultFilePath()
+  const tmp = `${target}.${process.pid}.tmp`
+  await fs.writeFile(tmp, content, 'utf8')
+  await fs.rename(tmp, target)
 }
 
 function lockVault() {
@@ -3472,16 +3274,27 @@ ipcMain.handle('vault:copyPassword', async (_event, payload) => {
   const id = String(payload?.id ?? '')
   const entry = (vaultData.entries ?? []).find((e) => e.id === id)
   if (!entry) return { ok: false, error: 'Not found' }
-  clipboard.writeText(String(entry.password ?? ''))
+  const copied = String(entry.password ?? '')
+  clipboard.writeText(copied)
+  setTimeout(() => {
+    try { if (clipboard.readText() === copied) clipboard.clear() } catch {}
+  }, 20000).unref?.()
   return { ok: true }
 })
 
 ipcMain.handle('vault:changeMasterPassword', async (_event, payload) => {
   await ensureUnlocked()
   const newPassword = payload?.newMasterPassword
+  const currentPassword = payload?.currentMasterPassword
   if (typeof newPassword !== 'string' || newPassword.length < 8) return { ok: false, error: 'Invalid master password' }
+  if (typeof currentPassword !== 'string' || !currentPassword) return { ok: false, error: 'Current master password required' }
 
   const file = await readVaultFile()
+  try {
+    await unwrapVaultKeyWithPassword(file?.wrappers?.master, currentPassword)
+  } catch {
+    return { ok: false, error: 'Current master password is incorrect' }
+  }
   const masterWrapper = await wrapVaultKeyWithPassword(vaultKey, newPassword, buildKdf())
   const next = {
     ...file,
@@ -3517,6 +3330,7 @@ ipcMain.handle('vault:export', async (_event, payload) => {
   const targetPath = payload?.targetPath
   if (typeof targetPath !== 'string' || !targetPath) return { ok: false, error: 'Invalid targetPath' }
   if (!(await vaultFileExists())) return { ok: false, error: 'Vault not initialized' }
+  if (!hasFileAccessGrant(targetPath)) return { ok: false, error: 'Destination was not chosen through the save dialog' }
   await fs.copyFile(vaultFilePath(), targetPath)
   return { ok: true }
 })
@@ -3524,6 +3338,15 @@ ipcMain.handle('vault:export', async (_event, payload) => {
 ipcMain.handle('vault:import', async (_event, payload) => {
   const sourcePath = payload?.sourcePath
   if (typeof sourcePath !== 'string' || !sourcePath) return { ok: false, error: 'Invalid sourcePath' }
+  if (!hasFileAccessGrant(sourcePath)) return { ok: false, error: 'Source was not chosen through the file dialog' }
+  try {
+    const candidate = JSON.parse(await fs.readFile(sourcePath, 'utf8'))
+    if (candidate?.version !== VAULT_VERSION || !candidate?.wrappers?.master || !candidate?.data) {
+      return { ok: false, error: 'Invalid vault file' }
+    }
+  } catch {
+    return { ok: false, error: 'Invalid vault file' }
+  }
   await fs.copyFile(sourcePath, vaultFilePath())
   lockVault()
   return { ok: true }
@@ -3659,95 +3482,6 @@ async function getSecurityScoreV2() {
 
 ipcMain.handle('security:getSecurityScore', async () => {
   return getSecurityScoreV2()
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
-  const checks = []
-  let score = 0
-
-  const add = (id, title, ok, weight, details) => {
-    const passed = Boolean(ok)
-    checks.push({ id, title, ok: passed, weight, details: details ?? null })
-    if (passed) score += weight
-  }
-
-  try {
-    try {
-      const ps = `
-        $ErrorActionPreference = 'Stop'
-        $profiles = Get-NetFirewallProfile | Select-Object Name, Enabled
-        $enabled = @($profiles | Where-Object { $_.Enabled -eq $true }).Count
-        $total = @($profiles).Count
-        [PSCustomObject]@{ total=$total; enabled=$enabled; allEnabled=($enabled -eq $total) } | ConvertTo-Json -Compress
-      `
-      const { code, data, stderr } = await runPowerShellJson(ps, { timeoutMs: 15000 })
-      if (code === 0) {
-        add('firewall', 'Firewall (todos os perfis)', Boolean(data?.allEnabled), 30, data)
-      } else {
-        add('firewall', 'Firewall (todos os perfis)', false, 30, stderr || `powershell exited ${code}`)
-      }
-    } catch (err) {
-      add('firewall', 'Firewall (todos os perfis)', false, 30, err?.message ?? String(err))
-    }
-
-    try {
-      const ps = `
-        $ErrorActionPreference = 'Stop'
-        $s = Get-MpComputerStatus
-        $obj = [PSCustomObject]@{
-          AMServiceEnabled = $s.AMServiceEnabled
-          AntivirusEnabled = $s.AntivirusEnabled
-          RealTimeProtectionEnabled = $s.RealTimeProtectionEnabled
-          NISEnabled = $s.NISEnabled
-          AntispywareEnabled = $s.AntispywareEnabled
-        }
-        $obj | ConvertTo-Json -Compress
-      `
-      const { code, data, stderr } = await runPowerShellJson(ps, { timeoutMs: 15000 })
-      if (code === 0) {
-        add('defenderRealtime', 'Microsoft Defender (tempo real)', Boolean(data?.RealTimeProtectionEnabled), 30, data)
-        add('defenderAV', 'Microsoft Defender (antivírus)', Boolean(data?.AntivirusEnabled), 15, data)
-        add('defenderAM', 'Microsoft Defender (serviço)', Boolean(data?.AMServiceEnabled), 5, data)
-      } else {
-        add('defenderRealtime', 'Microsoft Defender (tempo real)', false, 30, stderr || `powershell exited ${code}`)
-        add('defenderAV', 'Microsoft Defender (antivírus)', false, 15, stderr || `powershell exited ${code}`)
-        add('defenderAM', 'Microsoft Defender (serviço)', false, 5, stderr || `powershell exited ${code}`)
-      }
-    } catch (err) {
-      add('defenderRealtime', 'Microsoft Defender (tempo real)', false, 30, err?.message ?? String(err))
-      add('defenderAV', 'Microsoft Defender (antivírus)', false, 15, err?.message ?? String(err))
-      add('defenderAM', 'Microsoft Defender (serviço)', false, 5, err?.message ?? String(err))
-    }
-
-    try {
-      const ps = `
-        $ErrorActionPreference = 'Stop'
-        $v = (Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System' -Name 'EnableLUA' -ErrorAction Stop).EnableLUA
-        [PSCustomObject]@{ EnableLUA = $v; enabled = ($v -eq 1) } | ConvertTo-Json -Compress
-      `
-      const { code, data, stderr } = await runPowerShellJson(ps, { timeoutMs: 15000 })
-      if (code === 0) {
-        add('uac', 'UAC (EnableLUA)', Boolean(data?.enabled), 10, data)
-      } else {
-        add('uac', 'UAC (EnableLUA)', false, 10, stderr || `powershell exited ${code}`)
-      }
-    } catch (err) {
-      add('uac', 'UAC (EnableLUA)', false, 10, err?.message ?? String(err))
-    }
-
-    try {
-      const hostsPath = path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
-      const content = await fs.readFile(hostsPath, 'utf8')
-      const hasSection = content.includes('DarkHub Tracking Blocker - BEGIN') && content.includes('DarkHub Tracking Blocker - END')
-      add('trackingBlocker', 'Tracking Blocker (hosts)', hasSection, 10, { hostsPath, hasSection })
-    } catch (err) {
-      add('trackingBlocker', 'Tracking Blocker (hosts)', false, 10, err?.message ?? String(err))
-    }
-
-    if (score > 100) score = 100
-    if (score < 0) score = 0
-    return { ok: true, score, ts: Date.now(), checks }
-  } catch (err) {
-    return { ok: false, error: err?.message ?? String(err), ts: Date.now(), checks }
-  }
 })
 
 ipcMain.handle('security:auditTracking', async () => {
@@ -3833,7 +3567,12 @@ ipcMain.handle('security:getTrackingDomains', async () => {
     if (Array.isArray(parsed?.custom)) custom = parsed.custom.map((d) => String(d).trim()).filter(Boolean)
   } catch {}
 
-  const defaults = [
+  const defaults = DEFAULT_TRACKING_DOMAINS
+
+  return { ok: true, defaults, custom }
+})
+
+const DEFAULT_TRACKING_DOMAINS = Object.freeze([
     'doubleclick.net',
     'google-analytics.com',
     'analytics.google.com',
@@ -3856,17 +3595,19 @@ ipcMain.handle('security:getTrackingDomains', async () => {
     'adroll.com',
     'taboola.com',
     'outbrain.com'
-  ]
+  ])
 
-  return { ok: true, defaults, custom }
-})
+const HOSTNAME_RE = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/
+function isValidHostname(value) {
+  return typeof value === 'string' && HOSTNAME_RE.test(value)
+}
 
 ipcMain.handle('security:setCustomTrackingDomains', async (_event, payload) => {
   const domains = payload?.domains
   if (!Array.isArray(domains)) return { ok: false, error: 'Invalid domains' }
   const cleaned = domains
     .map((d) => String(d).trim().toLowerCase())
-    .filter((d) => d && !d.includes(' ') && !d.startsWith('#'))
+    .filter((d) => isValidHostname(d))
     .slice(0, 500)
   const unique = Array.from(new Set(cleaned))
   const domainsFile = path.join(app.getPath('userData'), 'tracking.domains.json')
@@ -3877,37 +3618,14 @@ ipcMain.handle('security:setCustomTrackingDomains', async (_event, payload) => {
 ipcMain.handle('security:blockTracking', async () => {
   if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
   try {
-    const defaults = [
-      'doubleclick.net',
-      'google-analytics.com',
-      'analytics.google.com',
-      'googletagmanager.com',
-      'facebook.com',
-      'connect.facebook.net',
-      'ads.twitter.com',
-      'scorecardresearch.com',
-      'quantserve.com',
-      'adnxs.com',
-      'mathtag.com',
-      'bluekai.com',
-      'krxd.net',
-      'demdex.net',
-      'omtrdc.net',
-      'everesttech.net',
-      'pixel.rubiconproject.com',
-      'pubmatic.com',
-      'openx.net',
-      'adroll.com',
-      'taboola.com',
-      'outbrain.com'
-    ]
+    const defaults = DEFAULT_TRACKING_DOMAINS
 
     const domainsFile = path.join(app.getPath('userData'), 'tracking.domains.json')
     let customDomains = []
     try {
       const raw = await fs.readFile(domainsFile, 'utf8')
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed?.custom)) customDomains = parsed.custom.map((d) => String(d).trim()).filter(Boolean)
+      if (Array.isArray(parsed?.custom)) customDomains = parsed.custom.map((d) => String(d).trim()).filter((d) => isValidHostname(d.toLowerCase()))
     } catch {}
 
     const trackingDomains = Array.from(new Set([...defaults, ...customDomains]))
@@ -3953,10 +3671,13 @@ ipcMain.handle('security:unblockTracking', async () => {
   if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
   try {
     const hostsPath = path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
-    const backupPath = path.join(app.getPath('userData'), 'hosts.backup')
-    const backup = await fs.readFile(backupPath, 'utf8')
-    await fs.writeFile(hostsPath, backup, 'utf8')
-    return { ok: true, msg: 'Hosts restored from backup', backupPath }
+    const content = await fs.readFile(hostsPath, 'utf8')
+    const stripped = content
+      .replace(/# DarkHub Tracking Blocker - BEGIN[\s\S]*?# DarkHub Tracking Blocker - END\r?\n?/g, '')
+      .replace(/(\r?\n){3,}/g, os.EOL + os.EOL)
+      .trimEnd() + os.EOL
+    await fs.writeFile(hostsPath, stripped, 'utf8')
+    return { ok: true, msg: 'Tracking blocker section removed from hosts' }
   } catch (err) {
     return { ok: false, error: `Administrative privileges required to restore hosts file: ${err?.message ?? String(err)}` }
   }
@@ -3975,7 +3696,11 @@ ipcMain.handle('security:optimizeLatency', async () => {
 
 ipcMain.handle('security:killProcess', async (_event, pid) => {
   try {
-    process.kill(pid)
+    const target = Number(pid)
+    if (!Number.isInteger(target) || target <= 4 || target === process.pid) {
+      return { ok: false, error: 'Invalid or protected process id' }
+    }
+    process.kill(target)
     return { ok: true }
   } catch (err) {
     return { ok: false, error: err.message }
@@ -4115,11 +3840,14 @@ async function startAutoClicker(payload) {
 
       p.on('error', (err) => {
         log.warn('[AutoClicker] native engine process error:', err)
-        autoClickerProc = null
-        autoClickerState = null
+        if (autoClickerProc === p) {
+          autoClickerProc = null
+          autoClickerState = null
+        }
       })
 
       p.on('exit', () => {
+        if (autoClickerProc !== p) return
         autoClickerProc = null
         autoClickerState = null
         try {
@@ -4224,6 +3952,7 @@ async function startAutoClicker(payload) {
   autoClickerState = { button, intervalMs, startedAt: Date.now(), isNative: false }
 
   p.on('exit', () => {
+    if (autoClickerProc !== p) return
     autoClickerProc = null
     autoClickerState = null
     try {
@@ -4531,10 +4260,12 @@ app.whenReady().then(async () => {
       log.warn('[startup-bg] machine marker failed:', err?.message ?? String(err))
     }
 
+    if (liveServices.latencyGuardian === false) latencyServiceState = 'disabled'
     if (liveServices.latencyGuardian !== false) {
       try {
         log.info('[startup-bg] registering latency guardian')
         const { registerLatencyGuardian } = await import('./latencyGuardian.js')
+        for (const ch of LATENCY_CHANNELS) ipcMain.removeHandler(ch)
         latencyGuardianHandle = registerLatencyGuardian({
           app,
           ipcMain,
@@ -4546,10 +4277,19 @@ app.whenReady().then(async () => {
           getLibraryStore,
           BrowserWindow
         })
+        latencyServiceState = 'ready'
         log.info('[startup-bg] latency guardian ready')
       } catch (err) {
         log.warn('[startup-bg] latency guardian failed:', err?.message ?? String(err))
+        latencyServiceState = 'failed'
+        for (const ch of LATENCY_CHANNELS) {
+          try { ipcMain.removeHandler(ch) } catch {}
+          ipcMain.handle(ch, async () => ({ ok: false, error: 'latency-service-failed' }))
+        }
       }
+    }
+
+    if (liveServices.overlay !== false) {
 
       try {
         globalShortcut.register('CommandOrControl+Shift+F', () => {
@@ -4566,12 +4306,6 @@ app.whenReady().then(async () => {
       })
     }
 
-    try {
-      const steamStatus = steamLuaService.getSteamStatus()
-      if (steamStatus.isValid && steamStatus.steamPath && steamStoreInjector.isCdpJunctionInstalled(steamStatus.steamPath)) {
-        steamStoreInjector.startDaemon(steamStatus.steamPath)
-      }
-    } catch {}
   }
 
   protocol.registerFileProtocol('local-resource', (request, callback) => {
@@ -4583,9 +4317,11 @@ app.whenReady().then(async () => {
       url = url.slice(1)
     }
     try {
-      return callback(decodeURIComponent(url))
+      const resolved = decodeURIComponent(url)
+      if (!path.isAbsolute(resolved) || !hasFileAccessGrant(resolved)) return callback(403)
+      return callback(resolved)
     } catch (error) {
-      console.error(error)
+      log.warn('[local-resource] request failed:', error?.message ?? String(error))
       return callback(404)
     }
   })
@@ -4638,6 +4374,7 @@ let latencyGuardianStopHandled = false
 
 app.on('before-quit', (event) => {
   appIsQuitting = true
+  try { void downloadsService.shutdown() } catch {}
   try {
     UpdateService.destroy()
   } catch {}

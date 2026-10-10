@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { visibleInterval } from '../utils/visibleInterval';
+import { APP_VERSION_LABEL } from '../appVersion';
 import { 
   Gamepad2, RefreshCw, RotateCcw, FolderOpen, Search, Plus, Trash2, 
   Save, Check, AlertCircle, FileCode, Layers, HardDrive, Key,
@@ -159,8 +161,8 @@ export default function SteamLuaTools() {
 
   useEffect(() => {
     loadStatusAndList();
-    const interval = setInterval(loadStatusAndList, 10000);
-    return () => clearInterval(interval);
+    const stopPolling = visibleInterval(loadStatusAndList, 10000);
+    return stopPolling;
   }, [loadStatusAndList]);
 
   // Debounced preview lookup on quick add input
@@ -551,7 +553,7 @@ export default function SteamLuaTools() {
         <div>
           <h1 className="text-lg font-bold text-zinc-100 tracking-tight flex items-center gap-2">
             {t('steamLua.title', 'Steam Lua & Depot Tools')}
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono font-normal">v0.4.7</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono font-normal">{APP_VERSION_LABEL}</span>
           </h1>
           <p className="text-xs text-zinc-400 mt-0.5">
             {t('steamLua.subtitle', 'Gerenciamento nativo de AppIDs, Depots, DLCs e scripts stplug-in para o cliente Steam.')}

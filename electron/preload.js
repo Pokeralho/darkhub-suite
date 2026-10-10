@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
-contextBridge.exposeInMainWorld('darkhub', {
+const darkhubApi = {
   hardware: { 
     onUpdate: (callback) => {
       const handler = (_, data) => callback(data);
@@ -27,7 +27,28 @@ contextBridge.exposeInMainWorld('darkhub', {
     runBenchmark: () => ipcRenderer.invoke('system:runBenchmark')
   },
   app: {
-    getAbout: () => ipcRenderer.invoke('app:getAbout')
+    getAbout: () => ipcRenderer.invoke('app:getAbout'),
+    getResourceUsage: () => ipcRenderer.invoke('app:getResourceUsage')
+  },
+  downloads: {
+    list: () => ipcRenderer.invoke('downloads:list'),
+    add: (payload) => ipcRenderer.invoke('downloads:add', payload),
+    pause: (id) => ipcRenderer.invoke('downloads:pause', { id }),
+    resume: (id) => ipcRenderer.invoke('downloads:resume', { id }),
+    pauseAll: () => ipcRenderer.invoke('downloads:pauseAll'),
+    resumeAll: () => ipcRenderer.invoke('downloads:resumeAll'),
+    cancel: (id, deleteFiles = true) => ipcRenderer.invoke('downloads:cancel', { id, deleteFiles }),
+    remove: (id, deleteFile = false) => ipcRenderer.invoke('downloads:remove', { id, deleteFile }),
+    clearFinished: () => ipcRenderer.invoke('downloads:clearFinished'),
+    getSettings: () => ipcRenderer.invoke('downloads:getSettings'),
+    setSettings: (patch) => ipcRenderer.invoke('downloads:setSettings', patch),
+    showInFolder: (id) => ipcRenderer.invoke('downloads:showInFolder', { id }),
+    chooseDir: () => ipcRenderer.invoke('downloads:chooseDir'),
+    onUpdate: (cb) => {
+      const handler = (_event, list) => cb(list)
+      ipcRenderer.on('downloads:update', handler)
+      return () => ipcRenderer.removeListener('downloads:update', handler)
+    }
   },
   pge: {
     openPortable: () => ipcRenderer.invoke('pge:openPortable')
@@ -47,6 +68,7 @@ contextBridge.exposeInMainWorld('darkhub', {
   },
   
   optimizer: {
+    applyTweak: (id) => ipcRenderer.invoke('optimizer:applyTweak', id),
     listOperations: () => ipcRenderer.invoke('optimizer:listOperations'),
     listProfiles: () => ipcRenderer.invoke('optimizer:listProfiles'),
     checkIsAdmin: () => ipcRenderer.invoke('optimizer:checkIsAdmin'),
@@ -276,30 +298,7 @@ contextBridge.exposeInMainWorld('darkhub', {
       return () => ipcRenderer.removeListener('dlss5:log', listener);
     }
   },
-  injector: {
-    inject: (payload) => ipcRenderer.invoke('injector:inject', payload)
-  },
-  pge: {
-    openPortable: () => ipcRenderer.invoke('pge:openPortable')
-  },
   darkpacer: {
-    start: (payload) => ipcRenderer.invoke('framepacer:start', payload),
-    stop: () => ipcRenderer.invoke('framepacer:stop'),
-    updateConfig: (payload) => ipcRenderer.invoke('framepacer:updateConfig', payload),
-    getMetrics: () => ipcRenderer.invoke('framepacer:getMetrics'),
-    createOverlay: () => ipcRenderer.invoke('framepacer:createOverlay'),
-    closeOverlay: () => ipcRenderer.invoke('framepacer:closeOverlay'),
-    toggleOverlay: () => ipcRenderer.invoke('framepacer:toggleOverlay'),
-    setOverlayClickThrough: (enabled) => ipcRenderer.invoke('framepacer:setOverlayClickThrough', enabled),
-    setOverlayConfig: (config) => ipcRenderer.invoke('framepacer:setOverlayConfig', config),
-    getOverlayStatus: () => ipcRenderer.invoke('framepacer:getOverlayStatus'),
-    onMetrics: (callback) => {
-      const listener = (_event, metrics) => callback(metrics);
-      ipcRenderer.on('framepacer:metrics', listener);
-      return () => ipcRenderer.removeListener('framepacer:metrics', listener);
-    }
-  },
-  framepacer: {
     start: (payload) => ipcRenderer.invoke('framepacer:start', payload),
     stop: () => ipcRenderer.invoke('framepacer:stop'),
     updateConfig: (payload) => ipcRenderer.invoke('framepacer:updateConfig', payload),
@@ -374,4 +373,8 @@ contextBridge.exposeInMainWorld('darkhub', {
     removeFixAuto: (appId) => ipcRenderer.invoke('goldberg:removeFixAuto', appId),
     checkStatusAuto: (appId) => ipcRenderer.invoke('goldberg:checkStatusAuto', appId)
   }
-})
+}
+
+darkhubApi.framepacer = darkhubApi.darkpacer
+
+contextBridge.exposeInMainWorld('darkhub', darkhubApi)

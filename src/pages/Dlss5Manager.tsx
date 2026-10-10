@@ -123,10 +123,11 @@ export default function Dlss5Manager() {
   const [frameGen, setFrameGen] = useState<boolean>(true);
   const [overlayMenu, setOverlayMenu] = useState<boolean>(true);
   const [loaderDll, setLoaderDll] = useState<string>('dxgi.dll');
-  const [signatureBypass, setSignatureBypass] = useState<boolean>(true);
+  const [signatureBypass, setSignatureBypass] = useState<boolean>(false);
   const [selectedRoute, setSelectedRoute] = useState<string>('optiscaler');
   const [neuralUpstream, setNeuralUpstream] = useState<boolean>(true);
-  const [amdEngine, setAmdEngine] = useState<'zluda' | 'fsr'>('zluda');
+  const [amdEngine, setAmdEngine] = useState<'neural' | 'zluda' | 'fsr'>('fsr');
+  const [neuralPasses, setNeuralPasses] = useState<1 | 2 | 3>(3);
   const [zludaCache, setZludaCache] = useState<boolean>(true);
 
   // Action / State
@@ -361,14 +362,15 @@ export default function Dlss5Manager() {
         gamePath: scannedGame.exePath || undefined,
         profile: selectedProfile,
         amdEngine: selectedProfile === 'amd' ? amdEngine : undefined,
-        zludaCache: selectedProfile === 'amd' ? zludaCache : undefined,
+        zludaCache: selectedProfile === 'amd' && amdEngine === 'zluda' ? zludaCache : undefined,
+        neuralPasses: selectedProfile === 'amd' && amdEngine === 'neural' ? neuralPasses : undefined,
         upscaler,
         route: selectedRoute,
         neuralUpstream,
         enableFrameGen: frameGen,
         enableOverlay: overlayMenu,
         loader: loaderDll,
-        signatureBypass
+        signatureBypass: selectedProfile === 'nvidia' ? signatureBypass : false
       };
 
       const res = await window.darkhub.dlss5.apply(options);
@@ -590,12 +592,56 @@ export default function Dlss5Manager() {
                   {t('dlss5.amdEngineLabel', 'Motor de Execução AMD')}
                 </span>
                 <p className="text-[11px] text-zinc-400">
-                  Selecione entre aceleração neural direta ZLUDA (RDNA 3/4) ou modo de compatibilidade universal FSR (RDNA 1/2).
+                  {t('dlss5.amdEngineHelp', 'Escolha entre AMD Neural (AMD-NR), ZLUDA (RDNA 3/4) ou o modo de compatibilidade FSR (RDNA 1/2).')}
                 </p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* AMD-NR Neural Option */}
+              <div
+                onClick={() => setAmdEngine('neural')}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-2 md:col-span-2 ${
+                  amdEngine === 'neural'
+                    ? 'bg-emerald-500/10 border-emerald-500/60 shadow-sm'
+                    : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-zinc-100 flex items-center gap-1.5">
+                      <Zap size={14} className={amdEngine === 'neural' ? 'text-emerald-400' : 'text-zinc-500'} />
+                      {t('dlss5.amdEngineNeural', 'AMD Neural (AMD-NR / OptiScaler)')}
+                    </span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">
+                      DX12
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-1.5 leading-relaxed">
+                    {t('dlss5.amdEngineNeuralDesc', 'Reconstrução neural DLSS-NR rodando em GPUs AMD via OptiScaler. Exige jogo DirectX 12, driver AMD atual e ~2 GB de VRAM livre. Ajuste fino no jogo: tecla INSERT, aba Neural.')}
+                  </p>
+                </div>
+                {amdEngine === 'neural' && (
+                  <div className="space-y-2 pt-2 border-t border-zinc-800/60" onClick={(e) => e.stopPropagation()}>
+                    <label className="flex items-center justify-between text-[11px] text-zinc-300">
+                      <span>{t('dlss5.neuralPasses', 'Passes neurais implantados')}</span>
+                      <select
+                        value={neuralPasses}
+                        onChange={(e) => setNeuralPasses(Number(e.target.value) as 1 | 2 | 3)}
+                        className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200"
+                      >
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                      </select>
+                    </label>
+                    <p className="text-[10px] text-zinc-500">
+                      {t('dlss5.amdNrPackageHint', 'O pacote AMD-NR (github.com/3zwr1/AMD-NR---OptiScaler) deve ser extraído em %APPDATA%/DarkHub Suite/OptiScaler/AMD_NR antes de aplicar.')}
+                    </p>
+                  </div>
+                )}
+              </div>
+
               {/* ZLUDA HIP Option */}
               <div
                 onClick={() => setAmdEngine('zluda')}
@@ -669,7 +715,7 @@ export default function Dlss5Manager() {
                   <div className="pr-3">
                     <div className="text-xs font-medium text-zinc-200 flex items-center gap-1.5">
                       <span>{t('dlss5.zludaCache', 'Cache de Tradução AOT (Anti-Stutter)')}</span>
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">RedDukeDev</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">RedDukeDev</span>
                     </div>
                     <div className="text-[10px] text-zinc-500 mt-0.5">
                       {t('dlss5.zludaCacheDesc', 'Precompila módulos neurais do container DLSS para eliminar micro-travamentos (stutter) em tempo de execução.')}
@@ -1177,7 +1223,7 @@ export default function Dlss5Manager() {
               <div className="pr-2">
                 <div className="text-xs font-medium text-zinc-200 flex items-center gap-1.5">
                   <span>{t('dlss5.neuralUpstream', 'Neural Upstream Routing')}</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">4K FPS+</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">4K FPS+</span>
                 </div>
                 <div className="text-[10px] text-zinc-500">Reconstrução pré-upscale na resolução nativa interna</div>
               </div>
@@ -1199,7 +1245,8 @@ export default function Dlss5Manager() {
             </div>
           </div>
 
-          {/* Signature Bypass Setting */}
+          {/* Signature Bypass Setting (NVIDIA only, opt-in) */}
+          {selectedProfile === 'nvidia' && (
           <div className="p-3 bg-zinc-950/40 rounded-lg border border-zinc-800/80 flex items-center justify-between">
             <div className="space-y-0.5">
               <span className="text-xs font-medium text-zinc-200">
@@ -1219,6 +1266,7 @@ export default function Dlss5Manager() {
               className="w-4 h-4 rounded text-blue-600 bg-zinc-900 border-zinc-700 focus:ring-0 cursor-pointer"
             />
           </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-2">

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { visibleInterval } from '../utils/visibleInterval'
 import { 
   MousePointerClick, Pause, Play, Zap, Cpu, Settings2, 
   Keyboard, Clock, Activity, CheckCircle2, AlertCircle, Sparkles, X, RotateCcw, ShieldCheck
@@ -47,7 +48,7 @@ export default function AutoClicker() {
 
   useEffect(() => {
     refresh();
-    const id = setInterval(refresh, 1000);
+    const stopPolling = visibleInterval(refresh, 1000);
 
     let unsub: (() => void) | undefined;
     if (window.darkhub?.autoclicker?.onChanged) {
@@ -71,7 +72,7 @@ export default function AutoClicker() {
     }, 200);
 
     return () => {
-      clearInterval(id);
+      stopPolling();
       clearInterval(cpsInterval);
       unsub?.();
       if (window.darkhub?.autoclicker?.setTabActive) {

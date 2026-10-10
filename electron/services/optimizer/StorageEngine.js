@@ -1,29 +1,34 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import { formatBytes } from './OptimizerUtils.js';
+
 class StorageEngine {
   constructor() {
     this.tempDirs = this._getStandardizedTempDirs();
   }
 
   _getStandardizedTempDirs() {
-    const dirs = new Set();
+    const dirs = new Map();
+    const add = (p) => {
+      if (!p) return;
+      const norm = path.normalize(p);
+      const key = process.platform === 'win32' ? norm.toLowerCase() : norm;
+      if (!dirs.has(key)) dirs.set(key, norm);
+    };
     if (process.platform === 'win32') {
       const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
       const winDir = process.env.WINDIR || 'C:\\Windows';
-
-      if (process.env.TEMP) dirs.add(path.normalize(process.env.TEMP));
-      if (process.env.TMP) dirs.add(path.normalize(process.env.TMP));
-
-      dirs.add(path.join(winDir, 'Temp'));
-      dirs.add(path.join(winDir, 'SoftwareDistribution', 'Download'));
-      dirs.add(path.join(winDir, 'Minidump'));
-      dirs.add(path.join(localAppData, 'CrashDumps'));
-
+      add(process.env.TEMP);
+      add(process.env.TMP);
+      add(path.join(winDir, 'Temp'));
+      add(path.join(winDir, 'SoftwareDistribution', 'Download'));
+      add(path.join(winDir, 'Minidump'));
+      add(path.join(localAppData, 'CrashDumps'));
     } else {
-      dirs.add('/tmp');
+      add('/tmp');
     }
-    return Array.from(dirs);
+    return Array.from(dirs.values());
   }
 
   _isProtectedPath(name) {
@@ -43,52 +48,67 @@ class StorageEngine {
       'blizzard',
       'battle.net'
     ];
-    return protectedPatterns.some(pattern => lower.includes(pattern));
+    return protectedPatterns.some((pattern) => lower.includes(pattern));
+  }
+
+  /**
+   * Walks a directory recursively. With dryRun=false it deletes files and then the empty folders.
+   * Sizes are REAL file sizes (the old code used the size of the directory entry, i.e. ~0, for folders).
+   */
+  async _walk(dir, { dryRun, state, depth = 0 }) {
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (this._isProtectedPath(entry.name)) { state.protectedSkipped += 1; continue; }
+      const full = path.join(dir, entry.name);
+      try {
+        if (entry.isSymbolicLink()) {
+          // never follow links (junctions can point outside the temp folder)
+          if (!dryRun) await fs.unlink(full);
+          continue;
+        }
+        if (entry.isDirectory()) {
+          if (depth > 64) { state.skippedDeep += 1; continue; }
+          await this._walk(full, { dryRun, state, depth: depth + 1 });
+          if (!dryRun) {
+            try { await fs.rmdir(full); } catch { /* not empty or in use: leave it */ }
+          }
+          continue;
+        }
+        const st = await fs.lstat(full);
+        if (dryRun) {
+          state.files += 1;
+          state.bytes += st.size;
+        } else {
+          await fs.unlink(full);
+          state.files += 1;
+          state.bytes += st.size;
+        }
+      } catch (e) {
+        if (e && (e.code === 'EPERM' || e.code === 'EACCES')) state.denied += 1;
+        else state.locked += 1;
+      }
+    }
+  }
+
+  _newState() {
+    return { files: 0, bytes: 0, locked: 0, denied: 0, protectedSkipped: 0, skippedDeep: 0 };
   }
 
   async _scanDir(dirPath) {
-    let files = 0;
-    let bytes = 0;
-    try {
-      const entries = await fs.readdir(dirPath, { withFileTypes: true });
-      for (const entry of entries) {
-        if (this._isProtectedPath(entry.name)) continue;
-        const fullPath = path.join(dirPath, entry.name);
-        try {
-          const stats = await fs.stat(fullPath);
-          bytes += stats.size;
-          files++;
-        } catch (e) {  }
-      }
-    } catch (e) {  }
-    return { files, bytes };
+    const state = this._newState();
+    await this._walk(dirPath, { dryRun: true, state });
+    return { files: state.files, bytes: state.bytes };
   }
 
   async _deleteDirContents(dirPath) {
-    let deletedFiles = 0;
-    let freedBytes = 0;
-    let lockedFiles = 0;
-    try {
-      const entries = await fs.readdir(dirPath, { withFileTypes: true });
-      for (const entry of entries) {
-        if (this._isProtectedPath(entry.name)) continue;
-        const fullPath = path.join(dirPath, entry.name);
-        try {
-          const stats = await fs.stat(fullPath);
-          if (entry.isDirectory()) {
-            await fs.rm(fullPath, { recursive: true, force: true });
-          } else {
-            await fs.unlink(fullPath);
-          }
-          freedBytes += stats.size;
-          deletedFiles++;
-        } catch (e) {
-
-          lockedFiles++;
-        }
-      }
-    } catch (e) {  }
-    return { deletedFiles, freedBytes, lockedFiles };
+    const state = this._newState();
+    await this._walk(dirPath, { dryRun: false, state });
+    return { deletedFiles: state.files, freedBytes: state.bytes, lockedFiles: state.locked + state.denied, deniedFiles: state.denied };
   }
 
   async analyzeTempFiles() {
@@ -103,28 +123,37 @@ class StorageEngine {
   }
 
   async cleanTempFiles() {
+    const started = Date.now();
     let totalDeleted = 0;
     let totalFreed = 0;
     let totalLocked = 0;
+    let totalDenied = 0;
 
     for (const dir of this.tempDirs) {
       const result = await this._deleteDirContents(dir);
       totalDeleted += result.deletedFiles;
       totalFreed += result.freedBytes;
       totalLocked += result.lockedFiles;
+      totalDenied += result.deniedFiles;
     }
 
     const status = totalLocked > 0 ? 'Warning' : 'Success';
-    const mbFreed = (totalFreed / (1024 * 1024)).toFixed(2);
-    let msg = `Lixo residual limpo (${mbFreed} MB).`;
-    if (totalLocked > 0) msg += ` Ignorados ${totalLocked} arquivos em uso pelo sistema (segurança).`;
+    let msg = `${totalDeleted} arquivo(s) removido(s), ${formatBytes(totalFreed)} liberados (medido).`;
+    if (totalLocked > 0) {
+      msg += ` ${totalLocked} item(ns) ignorado(s) por estarem em uso${totalDenied ? ` ou exigirem administrador (${totalDenied})` : ''}.`;
+    }
 
     return {
+      ok: true,
       status,
-      durationMs: 0,
+      durationMs: Date.now() - started,
       affectedResources: this.tempDirs,
       processedItems: totalDeleted,
       savings: totalFreed,
+      savingsBytes: totalFreed,
+      freedBytes: totalFreed,
+      lockedFiles: totalLocked,
+      msg,
       message: msg
     };
   }

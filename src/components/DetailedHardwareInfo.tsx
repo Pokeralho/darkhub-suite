@@ -1,5 +1,5 @@
-import { useI18n } from '../i18n/I18nProvider';
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSystemMetrics } from '../hooks/useSystemMetrics';
 
 interface HardwareInfo {
   cpu: any;
@@ -31,16 +31,9 @@ const tempEntries = (value: any): Array<[string, number]> => {
 };
 
 export const DetailedHardwareInfo: React.FC = () => {
-  const { t } = useI18n();
   const [info, setInfo] = useState<HardwareInfo | null>(null);
   const [activeTab, setActiveTab] = useState<'cpu' | 'gpu' | 'ram' | 'storage' | 'sensors'>('cpu');
   const [loading, setLoading] = useState(true);
-  const [realtime, setRealtime] = useState({
-    cpuUsage: 0,
-    ramUsage: 0,
-    temperatures: {} as any
-  });
-
   useEffect(() => {
     let cancelled = false;
 
@@ -78,33 +71,24 @@ export const DetailedHardwareInfo: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-    const update = async () => {
-      try {
-        const [metrics, temp] = await Promise.all([
-          window.darkhub?.system?.getMetrics?.() ?? {},
-          window.darkhub?.system?.getTemperatures?.() ?? {}
-        ]);
-        if (!mounted) return;
-
-        const used = Number(metrics?.memory?.used ?? 0);
-        const total = Number(metrics?.memory?.total ?? 0);
-        setRealtime({
-          cpuUsage: Math.round(Number(metrics?.cpu?.currentLoad ?? 0)),
-          ramUsage: total > 0 ? Math.round((used / total) * 100) : 0,
-          temperatures: temp
-        });
-      } catch {}
+  // Live values come from the shared hardware stream (one daemon for the whole app), not from
+  // per-component polling with PowerShell-backed IPC calls.
+  const live = useSystemMetrics();
+  const realtime = useMemo(() => {
+    const probes: any[] = live?.temps?.values?.probes ?? [];
+    const temperatures: Record<string, number> = {};
+    for (const p of probes) {
+      const v = p?.temperature?.value;
+      if (typeof v === 'number') temperatures[p?.name || `Sensor ${Object.keys(temperatures).length + 1}`] = v;
+    }
+    const main = live?.temps?.values?.main?.value;
+    if (typeof main === 'number' && Object.keys(temperatures).length === 0) temperatures['CPU'] = main;
+    return {
+      cpuUsage: Math.round(Number(live?.cpu?.values?.currentLoad?.value ?? 0)),
+      ramUsage: Math.round(Number(live?.ram?.values?.percent?.value ?? 0)),
+      temperatures
     };
-
-    update();
-    const interval = window.setInterval(update, 1200);
-    return () => {
-      mounted = false;
-      window.clearInterval(interval);
-    };
-  }, []);
+  }, [live?.temps, live?.cpu, live?.ram]);
 
   const sensors = useMemo(
     () => tempEntries(realtime.temperatures).length ? tempEntries(realtime.temperatures) : tempEntries(info?.temperatures),

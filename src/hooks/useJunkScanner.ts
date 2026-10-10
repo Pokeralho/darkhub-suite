@@ -1,5 +1,5 @@
-import { useI18n } from '../i18n/I18nProvider';
 import { useState, useEffect } from 'react'
+import { visibleInterval } from '../utils/visibleInterval'
 
 const STORAGE_KEY = 'darkhub.dashboard.junkEstimate'
 const TTL_MS = 30 * 60 * 1000
@@ -31,7 +31,6 @@ function saveCache(data: Omit<CachedJunk, 'cachedAt'>) {
 }
 
 export const useJunkScanner = () => {
-  const { t } = useI18n();
   const [junk, setJunk] = useState<any>(() => loadCached())
   const [loading, setLoading] = useState(() => loadCached() === null)
 
@@ -72,12 +71,12 @@ export const useJunkScanner = () => {
 
     const start = window.setTimeout(() => fetchJunk(false), 900)
 
-    const interval = window.setInterval(() => fetchJunk(true), 45_000)
+    const stopPolling = visibleInterval(() => fetchJunk(true), 45_000)
 
     return () => {
       alive = false
       window.clearTimeout(start)
-      window.clearInterval(interval)
+      stopPolling()
     }
   }, [])
 

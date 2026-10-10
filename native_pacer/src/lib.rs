@@ -1,5 +1,5 @@
-﻿// native_pacer/src/lib.rs - v4 (Ultra-Precision DXGI Present & Present1 VMT Hook & Frame Pacer)
-// Sub-microsecond QPC Hardware Pacing + True 1% / 0.1% Low Mathematics + timeBeginPeriod(1)
+// native_pacer/src/lib.rs - v5 (DXGI Present / Present1 hook: frame limiter + measured telemetry)
+// All published metrics come from real Present() timings. See PacerTelemetryV2 for the layout.
 
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
@@ -61,21 +61,7 @@ pub struct PacerConfig {
     pub enabled: u32,
 }
 
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct PacerTelemetry {
-    pub magic: u32,        // 0x54454C45 'TELE'
-    pub frame_count: u64,
-    pub current_fps: f32,
-    pub current_frametime_ms: f32,
-    pub avg_fps: f32,
-    pub low1_percent: f32,
-    pub jitter_ms: f32,
-    pub target_fps: u32,
-    pub game_pid: u32,
-}
-
-#[link(name = "user32")]
+#[cfg_attr(windows, link(name = "user32"))]
 extern "system" {
     fn CreateWindowExA(
         dwExStyle: DWORD,
@@ -94,7 +80,7 @@ extern "system" {
     fn DestroyWindow(hWnd: HWND) -> BOOL;
 }
 
-#[link(name = "winmm")]
+#[cfg_attr(windows, link(name = "winmm"))]
 extern "system" {
     fn timeBeginPeriod(uPeriod: u32) -> u32;
     fn timeEndPeriod(uPeriod: u32) -> u32;
@@ -133,20 +119,89 @@ type FnD3D11CreateDeviceAndSwapChain = unsafe extern "system" fn(
     pp_immediate_context: *mut *mut c_void,
 ) -> HRESULT;
 
+// ---------------------------------------------------------------------------------------------
+// Telemetry v2 (shared memory "DarkHub_Pacer_Telemetry2")
+//
+// Every number published here is measured from real Present() calls. Nothing is estimated or
+// back-filled: until enough frames exist, the corresponding field is published as 0 and the
+// reader must treat 0 as "not available".
+//
+// Consistency: single writer / many readers "seqlock". `seq` is odd while the writer is updating.
+// A reader copies the block, and accepts it only if `seq` was even and unchanged afterwards.
+// ---------------------------------------------------------------------------------------------
+pub const TEL_MAGIC: u32 = 0x324D_4C54; // 'TLM2'
+pub const TEL_RING: usize = 240;
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct PacerTelemetryV2 {
+    pub magic: u32,                // 0
+    pub seq: u32,                  // 4
+    pub frame_count: u64,          // 8
+    pub last_present_qpc: i64,     // 16  raw QueryPerformanceCounter value of the last measured Present
+    pub qpc_freq: i64,             // 24
+    pub game_pid: u32,             // 32
+    pub target_fps: u32,           // 36
+    pub current_fps: f32,          // 40
+    pub current_frametime_ms: f32, // 44
+    pub avg_fps: f32,              // 48  frames in the last ~1s window
+    pub low1_fps: f32,             // 52  1% low  = fps of the mean of the worst 1% frame times
+    pub low01_fps: f32,            // 56  0.1% low (0 until >= 1000 frames were captured)
+    pub jitter_ms: f32,            // 60  std-dev of frame time in the last ~1s window
+    pub stutter_count: u32,        // 64  cumulative frames slower than 2x the rolling median
+    pub sample_count: u32,         // 68  frames currently held in the statistics window
+    pub ring_len: u32,             // 72  valid entries in `ring`
+    pub reserved: u32,             // 76
+    pub ring: [f32; TEL_RING],     // 80  most recent frame times (ms), oldest first
+}
+
 static mut ORIGINAL_PRESENT: Option<FnPresent> = None;
 static mut ORIGINAL_PRESENT1: Option<FnPresent1> = None;
+static mut PRESENT_SLOT: usize = 0;
+static mut PRESENT1_SLOT: usize = 0;
+static mut PRESENT_ORIG_ADDR: usize = 0;
+static mut PRESENT1_ORIG_ADDR: usize = 0;
 
 static mut QPC_FREQ: i64 = 0;
 static mut LAST_PRESENT_QPC: i64 = 0;
-static mut TELEMETRY_PTR: *mut PacerTelemetry = ptr::null_mut();
+static mut TELEMETRY_PTR: *mut PacerTelemetryV2 = ptr::null_mut();
 static mut CONFIG_PTR: *mut PacerConfig = ptr::null_mut();
 
 static FRAME_COUNT: AtomicU64 = AtomicU64::new(0);
 static HOOK_INSTALLED: AtomicBool = AtomicBool::new(false);
-const HISTORY_CAP: usize = 120;
-static mut FRAMETIME_HISTORY: [f32; HISTORY_CAP] = [16.6; HISTORY_CAP];
-static mut HISTORY_IDX: usize = 0;
-static mut HISTORY_LEN: usize = 0;
+static BUSY: AtomicBool = AtomicBool::new(false);
+
+const HIST_CAP: usize = 2048;
+static mut HIST: [f32; HIST_CAP] = [0.0; HIST_CAP];
+static mut HIST_HEAD: usize = 0; // next write position
+static mut HIST_LEN: usize = 0;
+static mut SCRATCH: [f32; HIST_CAP] = [0.0; HIST_CAP];
+
+static mut CUR_STATS: Stats = Stats::ZERO;
+static mut MEDIAN_MS: f32 = 0.0;
+static mut STUTTERS: u32 = 0;
+static mut LAST_PUBLISH_MS: f64 = 0.0;
+
+// Swap chains seen presenting. Only the busiest one (the game's own) is paced and measured, so
+// that overlay / capture swap chains do not pollute the numbers.
+const SC_SLOTS: usize = 8;
+static mut SC_PTRS: [usize; SC_SLOTS] = [0; SC_SLOTS];
+static mut SC_COUNTS: [u32; SC_SLOTS] = [0; SC_SLOTS];
+static mut MAIN_SC: usize = 0;
+static mut SC_WINDOW_START_MS: f64 = 0.0;
+
+#[derive(Clone, Copy)]
+struct Stats {
+    avg_fps: f32,
+    low1_fps: f32,
+    low01_fps: f32,
+    jitter_ms: f32,
+    samples: u32,
+}
+
+impl Stats {
+    const ZERO: Stats = Stats { avg_fps: 0.0, low1_fps: 0.0, low01_fps: 0.0, jitter_ms: 0.0, samples: 0 };
+}
 
 #[inline]
 unsafe fn get_qpc_ms() -> f64 {
@@ -166,113 +221,243 @@ unsafe fn precision_wait(target_ms: f64, start_ms: f64) {
         if remaining <= 0.0 {
             break;
         }
-        // Sub-millisecond hybrid sleep: if remaining > 1.2ms, yield with OS timer
-        if remaining > 1.2 {
-            Sleep((remaining - 0.8) as u32);
+        // Coarse OS sleep while far from the deadline, short spin for the last stretch.
+        if remaining > 1.5 {
+            Sleep((remaining - 1.0) as u32);
         } else {
-            // Ultra-precise CPU microsecond spinlock
             std::hint::spin_loop();
         }
     }
 }
 
-// Common Pacing and Telemetry Calculation for both Present & Present1
-unsafe fn perform_pacing() {
-    let now = get_qpc_ms();
-    let mut frametime_ms = 16.666;
+/// k = 0 is the most recent sample.
+#[inline]
+unsafe fn hist_recent(k: usize) -> f32 {
+    HIST[(HIST_HEAD + HIST_CAP - 1 - k) % HIST_CAP]
+}
 
-    if LAST_PRESENT_QPC > 0 && QPC_FREQ > 0 {
-        let last_ms = (LAST_PRESENT_QPC as f64 / QPC_FREQ as f64) * 1000.0;
-        let diff = now - last_ms;
-        if diff > 0.1 && diff < 2000.0 {
-            frametime_ms = diff;
-        }
+unsafe fn push_sample(ft: f32) {
+    HIST[HIST_HEAD] = ft;
+    HIST_HEAD = (HIST_HEAD + 1) % HIST_CAP;
+    if HIST_LEN < HIST_CAP {
+        HIST_LEN += 1;
+    }
+}
+
+/// Recomputes statistics from the real frame-time history. Called a few times per second.
+unsafe fn compute_stats() -> Stats {
+    let len = HIST_LEN;
+    if len < 2 {
+        return Stats::ZERO;
     }
 
-    // Read config from Shared Memory
+    // ~1 second window: average fps and jitter.
+    let mut acc = 0.0f64;
+    let mut n1 = 0usize;
+    while n1 < len && acc < 1000.0 {
+        acc += hist_recent(n1) as f64;
+        n1 += 1;
+    }
+    let avg_fps = if acc > 0.0 { (n1 as f64 * 1000.0 / acc) as f32 } else { 0.0 };
+    let mean = (acc / n1 as f64) as f32;
+    let mut var = 0.0f32;
+    for k in 0..n1 {
+        let d = hist_recent(k) - mean;
+        var += d * d;
+    }
+    let jitter = (var / n1 as f32).sqrt();
+
+    // Percentile lows over the whole retained history, from a sorted copy.
+    for i in 0..len {
+        SCRATCH[i] = hist_recent(i);
+    }
+    SCRATCH[..len].sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    MEDIAN_MS = SCRATCH[len / 2];
+
+    let mean_worst = |count: usize| -> f32 {
+        let c = count.max(1).min(len);
+        let mut s = 0.0f32;
+        for i in (len - c)..len {
+            s += SCRATCH[i];
+        }
+        s / c as f32
+    };
+
+    let worst1 = mean_worst(len / 100);
+    let low1 = if worst1 > 0.0 { 1000.0 / worst1 } else { 0.0 };
+    let low01 = if len >= 1000 {
+        let w = mean_worst(len / 1000);
+        if w > 0.0 { 1000.0 / w } else { 0.0 }
+    } else {
+        0.0
+    };
+
+    Stats { avg_fps, low1_fps: low1, low01_fps: low01, jitter_ms: jitter, samples: len as u32 }
+}
+
+unsafe fn publish(target_fps: u32, cur_ft: f32, qpc_now: i64) {
+    if TELEMETRY_PTR.is_null() {
+        return;
+    }
+    let tel = TELEMETRY_PTR;
+    let seq_ptr = ptr::addr_of_mut!((*tel).seq);
+
+    // seq -> odd: writing
+    let s0 = ptr::read_volatile(seq_ptr);
+    ptr::write_volatile(seq_ptr, s0.wrapping_add(1));
+    std::sync::atomic::fence(Ordering::SeqCst);
+
+    (*tel).magic = TEL_MAGIC;
+    (*tel).frame_count = FRAME_COUNT.load(Ordering::Relaxed);
+    (*tel).last_present_qpc = qpc_now;
+    (*tel).qpc_freq = QPC_FREQ;
+    (*tel).game_pid = GetCurrentProcessId();
+    (*tel).target_fps = target_fps;
+    (*tel).current_frametime_ms = cur_ft;
+    (*tel).current_fps = if cur_ft > 0.0 { 1000.0 / cur_ft } else { 0.0 };
+    (*tel).avg_fps = CUR_STATS.avg_fps;
+    (*tel).low1_fps = CUR_STATS.low1_fps;
+    (*tel).low01_fps = CUR_STATS.low01_fps;
+    (*tel).jitter_ms = CUR_STATS.jitter_ms;
+    (*tel).stutter_count = STUTTERS;
+    (*tel).sample_count = CUR_STATS.samples;
+
+    let n = HIST_LEN.min(TEL_RING);
+    for i in 0..n {
+        // oldest first
+        (*tel).ring[i] = hist_recent(n - 1 - i);
+    }
+    (*tel).ring_len = n as u32;
+
+    std::sync::atomic::fence(Ordering::SeqCst);
+    ptr::write_volatile(seq_ptr, s0.wrapping_add(2)); // even: stable
+}
+
+/// Returns true when this swap chain is the one that should be paced and measured.
+unsafe fn is_main_swapchain(sc: usize, now_ms: f64) -> bool {
+    let mut slot = SC_SLOTS;
+    for i in 0..SC_SLOTS {
+        if SC_PTRS[i] == sc {
+            slot = i;
+            break;
+        }
+    }
+    if slot == SC_SLOTS {
+        for i in 0..SC_SLOTS {
+            if SC_PTRS[i] == 0 {
+                SC_PTRS[i] = sc;
+                SC_COUNTS[i] = 0;
+                slot = i;
+                break;
+            }
+        }
+    }
+    if slot < SC_SLOTS {
+        SC_COUNTS[slot] = SC_COUNTS[slot].saturating_add(1);
+    }
+    if MAIN_SC == 0 {
+        MAIN_SC = sc;
+        SC_WINDOW_START_MS = now_ms;
+    }
+
+    // Re-elect the busiest swap chain every 2 seconds.
+    if now_ms - SC_WINDOW_START_MS > 2000.0 {
+        let mut best = MAIN_SC;
+        let mut best_count = 0u32;
+        for i in 0..SC_SLOTS {
+            if SC_PTRS[i] != 0 && SC_COUNTS[i] > best_count {
+                best_count = SC_COUNTS[i];
+                best = SC_PTRS[i];
+            }
+            if SC_COUNTS[i] == 0 {
+                SC_PTRS[i] = 0; // inactive, free the slot
+            }
+            SC_COUNTS[i] = 0;
+        }
+        if best != MAIN_SC {
+            MAIN_SC = best;
+            LAST_PRESENT_QPC = 0;
+        }
+        SC_WINDOW_START_MS = now_ms;
+    }
+
+    sc == MAIN_SC
+}
+
+// Shared pacing + measurement for Present and Present1.
+unsafe fn perform_pacing(sc: usize) {
+    if BUSY.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_err() {
+        return; // another thread is already measuring; never block the game
+    }
+
+    let now = get_qpc_ms();
+    if !is_main_swapchain(sc, now) {
+        BUSY.store(false, Ordering::Release);
+        return;
+    }
+
+    // Config: pacing_mode 2 = uncapped.
     let mut target_fps = 0u32;
     if !CONFIG_PTR.is_null() {
         let cfg = &*CONFIG_PTR;
-        if cfg.magic == 0x4441524B && cfg.enabled == 1 {
+        if cfg.magic == 0x4441524B && cfg.enabled == 1 && cfg.pacing_mode != 2 {
             target_fps = cfg.target_fps;
         }
     }
 
-    // Physical Hardware-Level Frame Limit (Sub-microsecond accuracy)
-    if target_fps > 0 {
+    let last_ms = if LAST_PRESENT_QPC > 0 && QPC_FREQ > 0 {
+        (LAST_PRESENT_QPC as f64 / QPC_FREQ as f64) * 1000.0
+    } else {
+        0.0
+    };
+
+    // Frame limiter: hold the Present until the target frame time has elapsed.
+    if target_fps > 0 && last_ms > 0.0 {
         let target_ms = 1000.0 / target_fps as f64;
-        if frametime_ms < target_ms {
-            precision_wait(target_ms, now - frametime_ms);
-            let delayed_now = get_qpc_ms();
-            if LAST_PRESENT_QPC > 0 && QPC_FREQ > 0 {
-                frametime_ms = delayed_now - (LAST_PRESENT_QPC as f64 / QPC_FREQ as f64 * 1000.0);
-            }
+        if now - last_ms < target_ms {
+            precision_wait(target_ms, last_ms);
         }
     }
 
     let mut qpc_now = 0i64;
     QueryPerformanceCounter(&mut qpc_now);
+    let after_ms = if QPC_FREQ > 0 { (qpc_now as f64 / QPC_FREQ as f64) * 1000.0 } else { 0.0 };
+
+    // The very first Present after (re)start has no predecessor: record nothing instead of
+    // inventing a frame time. Gaps >= 2s (loading screen, alt-tab) are not frames either.
+    let mut measured = false;
+    let mut ft = 0.0f32;
+    if last_ms > 0.0 {
+        let diff = after_ms - last_ms;
+        if diff > 0.05 && diff < 2000.0 {
+            ft = diff as f32;
+            measured = true;
+        }
+    }
     LAST_PRESENT_QPC = qpc_now;
 
-    let cur_fps = if frametime_ms > 0.1 { (1000.0 / frametime_ms) as f32 } else { 0.0 };
-    let ft_f32 = frametime_ms as f32;
+    if measured {
+        // Stutter = frame slower than 2x the rolling median (needs a warm-up of 30 frames).
+        if HIST_LEN >= 30 && MEDIAN_MS > 0.0 && ft > MEDIAN_MS * 2.0 && ft > 20.0 {
+            STUTTERS = STUTTERS.wrapping_add(1);
+        }
+        push_sample(ft);
+        FRAME_COUNT.fetch_add(1, Ordering::Relaxed);
 
-    FRAMETIME_HISTORY[HISTORY_IDX] = ft_f32;
-    HISTORY_IDX = (HISTORY_IDX + 1) % HISTORY_CAP;
-    if HISTORY_LEN < HISTORY_CAP {
-        HISTORY_LEN += 1;
-    }
-
-    let mut sum = 0.0f32;
-    for i in 0..HISTORY_LEN {
-        sum += FRAMETIME_HISTORY[i];
-    }
-    let avg_ft = if HISTORY_LEN > 0 { sum / HISTORY_LEN as f32 } else { ft_f32 };
-    let avg_fps = if avg_ft > 0.1 { 1000.0 / avg_ft } else { cur_fps };
-
-    let mut var_sum = 0.0f32;
-    for i in 0..HISTORY_LEN {
-        let diff = FRAMETIME_HISTORY[i] - avg_ft;
-        var_sum += diff * diff;
-    }
-    let jitter = (var_sum / (HISTORY_LEN.max(1) as f32)).sqrt();
-
-    // Exact Mathematical 1% Low percentile from sorted frametime window
-    let mut sorted_ft = [0.0f32; HISTORY_CAP];
-    let len = HISTORY_LEN;
-    let mut low1 = avg_fps * 0.92;
-    if len > 5 {
-        sorted_ft[..len].copy_from_slice(&FRAMETIME_HISTORY[..len]);
-        sorted_ft[..len].sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        // 99th percentile slowest frame (1% worst frametime)
-        let idx_1pct = ((len as f32) * 0.99) as usize;
-        let worst_ft = sorted_ft[idx_1pct.min(len - 1)];
-        if worst_ft > 0.1 {
-            low1 = 1000.0 / worst_ft;
+        // Heavy statistics + publishing at ~20 Hz are plenty for a UI.
+        if after_ms - LAST_PUBLISH_MS >= 50.0 {
+            CUR_STATS = compute_stats();
+            publish(target_fps, ft, qpc_now);
+            LAST_PUBLISH_MS = after_ms;
         }
     }
 
-    let fcount = FRAME_COUNT.fetch_add(1, Ordering::Relaxed);
-
-    // Update Telemetry Shared Memory
-    if !TELEMETRY_PTR.is_null() {
-        let tel = &mut *TELEMETRY_PTR;
-        tel.magic = 0x54454C45;
-        tel.frame_count = fcount;
-        tel.current_fps = cur_fps;
-        tel.current_frametime_ms = ft_f32;
-        tel.avg_fps = avg_fps;
-        tel.low1_percent = low1;
-        tel.jitter_ms = jitter;
-        tel.target_fps = target_fps;
-        tel.game_pid = GetCurrentProcessId();
-    }
+    BUSY.store(false, Ordering::Release);
 }
 
-// Hooked IDXGISwapChain::Present (Index 8)
+// Hooked IDXGISwapChain::Present (vtable index 8)
 unsafe extern "system" fn hooked_present(p_swap_chain: *mut c_void, sync_interval: u32, flags: u32) -> HRESULT {
-    perform_pacing();
-
+    perform_pacing(p_swap_chain as usize);
     if let Some(orig) = ORIGINAL_PRESENT {
         orig(p_swap_chain, sync_interval, flags)
     } else {
@@ -280,15 +465,14 @@ unsafe extern "system" fn hooked_present(p_swap_chain: *mut c_void, sync_interva
     }
 }
 
-// Hooked IDXGISwapChain1::Present1 (Index 22 - used by Unreal Engine 5 / DX12 / The Sinking City 2)
+// Hooked IDXGISwapChain1::Present1 (vtable index 22)
 unsafe extern "system" fn hooked_present1(
     p_swap_chain: *mut c_void,
     sync_interval: u32,
     present_flags: u32,
     p_present_parameters: *const c_void,
 ) -> HRESULT {
-    perform_pacing();
-
+    perform_pacing(p_swap_chain as usize);
     if let Some(orig) = ORIGINAL_PRESENT1 {
         orig(p_swap_chain, sync_interval, present_flags, p_present_parameters)
     } else {
@@ -296,69 +480,57 @@ unsafe extern "system" fn hooked_present1(
     }
 }
 
-// Setup Shared Memory
+unsafe fn map_named(names: &[&str], size: usize) -> *mut c_void {
+    for name in names {
+        let name_u16: Vec<u16> = name.encode_utf16().collect();
+        let h = CreateFileMappingW(ptr::null_mut(), ptr::null_mut(), 0x04, 0, size as u32, name_u16.as_ptr());
+        if !h.is_null() {
+            let p = MapViewOfFile(h, 0x0006, 0, 0, size);
+            if !p.is_null() {
+                return p;
+            }
+        }
+    }
+    ptr::null_mut()
+}
+
 unsafe fn setup_shared_memory() {
     let mut freq = 0i64;
     QueryPerformanceFrequency(&mut freq);
     QPC_FREQ = freq;
 
-    let names = [
-        "DarkHub_Pacer_Config\0",
-        "Local\\DarkHub_Pacer_Config\0",
-        "Global\\DarkHub_Pacer_Config\0",
-    ];
-
-    for name in &names {
-        let name_u16: Vec<u16> = name.encode_utf16().collect();
-        let h_cfg = CreateFileMappingW(
-            ptr::null_mut(),
-            ptr::null_mut(),
-            0x04, // PAGE_READWRITE
-            0,
-            std::mem::size_of::<PacerConfig>() as u32,
-            name_u16.as_ptr(),
-        );
-        if !h_cfg.is_null() {
-            let p = MapViewOfFile(h_cfg, 0x0006, 0, 0, std::mem::size_of::<PacerConfig>()) as *mut PacerConfig;
-            if !p.is_null() {
-                CONFIG_PTR = p;
-                (*CONFIG_PTR).magic = 0x4441524B;
-                (*CONFIG_PTR).enabled = 1;
-                (*CONFIG_PTR).target_fps = 0;
-                break;
-            }
-        }
+    let cfg = map_named(
+        &["DarkHub_Pacer_Config\0", "Local\\DarkHub_Pacer_Config\0", "Global\\DarkHub_Pacer_Config\0"],
+        std::mem::size_of::<PacerConfig>(),
+    ) as *mut PacerConfig;
+    if !cfg.is_null() {
+        CONFIG_PTR = cfg;
+        (*cfg).magic = 0x4441524B;
+        (*cfg).enabled = 1;
+        (*cfg).target_fps = 0;
     }
 
-    let tel_names = [
-        "DarkHub_Pacer_Telemetry\0",
-        "Local\\DarkHub_Pacer_Telemetry\0",
-        "Global\\DarkHub_Pacer_Telemetry\0",
-    ];
-
-    for name in &tel_names {
-        let name_u16: Vec<u16> = name.encode_utf16().collect();
-        let h_tel = CreateFileMappingW(
-            ptr::null_mut(),
-            ptr::null_mut(),
-            0x04,
-            0,
-            std::mem::size_of::<PacerTelemetry>() as u32,
-            name_u16.as_ptr(),
-        );
-        if !h_tel.is_null() {
-            let p = MapViewOfFile(h_tel, 0x0006, 0, 0, std::mem::size_of::<PacerTelemetry>()) as *mut PacerTelemetry;
-            if !p.is_null() {
-                TELEMETRY_PTR = p;
-                (*TELEMETRY_PTR).magic = 0x54454C45;
-                (*TELEMETRY_PTR).game_pid = GetCurrentProcessId();
-                break;
-            }
-        }
+    let tel = map_named(
+        &["DarkHub_Pacer_Telemetry2\0", "Local\\DarkHub_Pacer_Telemetry2\0", "Global\\DarkHub_Pacer_Telemetry2\0"],
+        std::mem::size_of::<PacerTelemetryV2>(),
+    ) as *mut PacerTelemetryV2;
+    if !tel.is_null() {
+        TELEMETRY_PTR = tel;
+        (*tel).magic = TEL_MAGIC;
+        (*tel).game_pid = GetCurrentProcessId();
+        (*tel).qpc_freq = freq;
     }
 }
 
-// Install VTable Hook on IDXGISwapChain (Index 8: Present, Index 22: Present1)
+unsafe fn patch_slot(slot: usize, new_value: usize) {
+    let mut old_protect = 0u32;
+    VirtualProtect(slot as LPVOID, std::mem::size_of::<usize>(), 0x04, &mut old_protect); // PAGE_READWRITE
+    *(slot as *mut usize) = new_value;
+    VirtualProtect(slot as LPVOID, std::mem::size_of::<usize>(), old_protect, &mut old_protect);
+}
+
+// Hook IDXGISwapChain::Present (index 8) and Present1 (index 22) through a throw-away swap chain.
+// All swap chains created by the same dxgi.dll implementation share this vtable.
 unsafe fn install_vtable_hooks() -> bool {
     if HOOK_INSTALLED.load(Ordering::Relaxed) {
         return true;
@@ -412,26 +584,22 @@ unsafe fn install_vtable_hooks() -> bool {
 
     if hr >= 0 && !p_swap_chain.is_null() {
         let vtable = *p_swap_chain;
-        
-        // 1. Hook Present (Index 8)
-        let present_ptr_addr = vtable.add(8) as *mut usize;
-        let orig_present_addr = *present_ptr_addr;
-        ORIGINAL_PRESENT = Some(std::mem::transmute(orig_present_addr));
 
-        let mut old_protect = 0u32;
-        VirtualProtect(present_ptr_addr as LPVOID, std::mem::size_of::<usize>(), 0x04, &mut old_protect); // PAGE_READWRITE
-        *present_ptr_addr = hooked_present as *const () as usize;
-        VirtualProtect(present_ptr_addr as LPVOID, std::mem::size_of::<usize>(), old_protect, &mut old_protect);
+        // Present (index 8)
+        let present_slot = vtable.add(8) as usize;
+        PRESENT_SLOT = present_slot;
+        PRESENT_ORIG_ADDR = *(present_slot as *const usize);
+        ORIGINAL_PRESENT = Some(std::mem::transmute(PRESENT_ORIG_ADDR));
+        patch_slot(present_slot, hooked_present as *const () as usize);
 
-        // 2. Hook Present1 (Index 22) if available on IDXGISwapChain1..4
-        let present1_ptr_addr = vtable.add(22) as *mut usize;
-        let orig_present1_addr = *present1_ptr_addr;
-        if orig_present1_addr != 0 {
-            ORIGINAL_PRESENT1 = Some(std::mem::transmute(orig_present1_addr));
-
-            VirtualProtect(present1_ptr_addr as LPVOID, std::mem::size_of::<usize>(), 0x04, &mut old_protect);
-            *present1_ptr_addr = hooked_present1 as *const () as usize;
-            VirtualProtect(present1_ptr_addr as LPVOID, std::mem::size_of::<usize>(), old_protect, &mut old_protect);
+        // Present1 (index 22), only when the implementation exposes it
+        let present1_slot = vtable.add(22) as usize;
+        let orig1 = *(present1_slot as *const usize);
+        if orig1 != 0 {
+            PRESENT1_SLOT = present1_slot;
+            PRESENT1_ORIG_ADDR = orig1;
+            ORIGINAL_PRESENT1 = Some(std::mem::transmute(orig1));
+            patch_slot(present1_slot, hooked_present1 as *const () as usize);
         }
 
         HOOK_INSTALLED.store(true, Ordering::Relaxed);
@@ -441,12 +609,24 @@ unsafe fn install_vtable_hooks() -> bool {
     HOOK_INSTALLED.load(Ordering::Relaxed)
 }
 
+/// Restores the original vtable entries (DLL unloaded through FreeLibrary).
+unsafe fn remove_vtable_hooks() {
+    if !HOOK_INSTALLED.swap(false, Ordering::Relaxed) {
+        return;
+    }
+    if PRESENT_SLOT != 0 && PRESENT_ORIG_ADDR != 0 {
+        patch_slot(PRESENT_SLOT, PRESENT_ORIG_ADDR);
+    }
+    if PRESENT1_SLOT != 0 && PRESENT1_ORIG_ADDR != 0 {
+        patch_slot(PRESENT1_SLOT, PRESENT1_ORIG_ADDR);
+    }
+}
+
 extern "system" fn init_thread(_param: *mut c_void) -> u32 {
     unsafe {
-        // Enforce 1ms high-precision Windows kernel timer resolution
-        timeBeginPeriod(1);
+        timeBeginPeriod(1); // 1 ms kernel timer resolution for the limiter's coarse sleep
         setup_shared_memory();
-        // Give game time to initialize graphic drivers and DX12 pipelines
+        // Give the game time to create its graphics device before hooking.
         Sleep(500);
         install_vtable_hooks();
     }
@@ -457,7 +637,7 @@ extern "system" fn init_thread(_param: *mut c_void) -> u32 {
 pub extern "system" fn DllMain(
     _hinst: *const c_void,
     reason: u32,
-    _reserved: *const c_void,
+    reserved: *const c_void,
 ) -> BOOL {
     match reason {
         1 => { // DLL_PROCESS_ATTACH
@@ -467,10 +647,83 @@ pub extern "system" fn DllMain(
         }
         0 => { // DLL_PROCESS_DETACH
             unsafe {
+                // `reserved` is non-null when the process is terminating: nothing to restore then.
+                if reserved.is_null() {
+                    remove_vtable_hooks();
+                }
                 timeEndPeriod(1);
             }
         }
         _ => {}
     }
     1
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    unsafe fn reset() {
+        HIST_HEAD = 0;
+        HIST_LEN = 0;
+    }
+
+    #[test]
+    fn stats_come_only_from_real_samples() {
+        unsafe {
+            reset();
+            assert_eq!(compute_stats().samples, 0, "no samples must mean no stats");
+
+            // 1000 frames of 10 ms plus 10 frames of 50 ms.
+            for _ in 0..1000 { push_sample(10.0); }
+            for _ in 0..10 { push_sample(50.0); }
+            let s = compute_stats();
+            assert_eq!(s.samples, 1010);
+            // 1% low = mean of worst 10 frames = 50 ms -> 20 fps
+            assert!((s.low1_fps - 20.0).abs() < 0.01, "low1 was {}", s.low1_fps);
+            // 0.1% low = worst 1 frame = 50 ms -> 20 fps (only valid with >= 1000 samples)
+            assert!((s.low01_fps - 20.0).abs() < 0.01, "low01 was {}", s.low01_fps);
+            assert!(MEDIAN_MS > 9.9 && MEDIAN_MS < 10.1);
+        }
+    }
+
+    #[test]
+    fn low01_unavailable_with_few_samples() {
+        unsafe {
+            reset();
+            for _ in 0..200 { push_sample(16.0); }
+            let s = compute_stats();
+            assert_eq!(s.low01_fps, 0.0);
+            assert!((s.avg_fps - 62.5).abs() < 0.5, "avg was {}", s.avg_fps);
+            assert!(s.jitter_ms < 0.001);
+        }
+    }
+
+    #[test]
+    fn telemetry_layout_matches_reader() {
+        assert_eq!(std::mem::size_of::<PacerTelemetryV2>(), 80 + TEL_RING * 4);
+        assert_eq!(std::mem::align_of::<PacerTelemetryV2>(), 8);
+    }
+}
+
+// Linux-only link stubs so the pure statistics code can be unit-tested off Windows.
+#[cfg(all(test, not(windows)))]
+mod win_stubs {
+    use super::*;
+    #[no_mangle] pub extern "system" fn CreateWindowExA(_: DWORD, _: *const i8, _: *const i8, _: DWORD, _: i32, _: i32, _: i32, _: i32, _: HWND, _: *mut c_void, _: *mut c_void, _: *mut c_void) -> HWND { ptr::null_mut() }
+    #[no_mangle] pub extern "system" fn DestroyWindow(_: HWND) -> BOOL { 0 }
+    #[no_mangle] pub extern "system" fn timeBeginPeriod(_: u32) -> u32 { 0 }
+    #[no_mangle] pub extern "system" fn timeEndPeriod(_: u32) -> u32 { 0 }
+    #[no_mangle] pub extern "system" fn QueryPerformanceCounter(_: *mut i64) -> BOOL { 0 }
+    #[no_mangle] pub extern "system" fn QueryPerformanceFrequency(_: *mut i64) -> BOOL { 0 }
+    #[no_mangle] pub extern "system" fn VirtualProtect(_: LPVOID, _: SIZE_T, _: DWORD, _: *mut DWORD) -> BOOL { 0 }
+    #[no_mangle] pub extern "system" fn CreateFileMappingW(_: HANDLE, _: *mut c_void, _: DWORD, _: DWORD, _: DWORD, _: *const u16) -> HANDLE { ptr::null_mut() }
+    #[no_mangle] pub extern "system" fn OpenFileMappingW(_: DWORD, _: BOOL, _: *const u16) -> HANDLE { ptr::null_mut() }
+    #[no_mangle] pub extern "system" fn MapViewOfFile(_: HANDLE, _: DWORD, _: DWORD, _: DWORD, _: SIZE_T) -> LPVOID { ptr::null_mut() }
+    #[no_mangle] pub extern "system" fn CloseHandle(_: HANDLE) -> BOOL { 0 }
+    #[no_mangle] pub extern "system" fn GetCurrentProcessId() -> DWORD { 1 }
+    #[no_mangle] pub extern "system" fn Sleep(_: DWORD) {}
+    #[no_mangle] pub extern "system" fn LoadLibraryA(_: *const i8) -> *mut c_void { ptr::null_mut() }
+    #[no_mangle] pub extern "system" fn GetProcAddress(_: *mut c_void, _: *const i8) -> *mut c_void { ptr::null_mut() }
+    #[no_mangle] pub extern "system" fn CreateThread(_: *mut c_void, _: SIZE_T, _: extern "system" fn(*mut c_void) -> u32, _: *mut c_void, _: DWORD, _: *mut DWORD) -> HANDLE { ptr::null_mut() }
 }

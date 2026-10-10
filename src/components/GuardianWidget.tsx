@@ -1,9 +1,8 @@
-import { useI18n } from '../i18n/I18nProvider';
 import React, { useEffect, useRef, useState } from 'react'
+import { visibleInterval } from '../utils/visibleInterval'
 import { Zap, X } from 'lucide-react'
 
 export default function GuardianWidget() {
-  const { t } = useI18n();
   const [enabled, setEnabled] = useState(false)
   const [ultraOn, setUltraOn] = useState(false)
   const [ping, setPing] = useState<number | null>(null)
@@ -97,9 +96,9 @@ export default function GuardianWidget() {
 
   useEffect(() => {
     refresh()
-    const id = setInterval(refresh, 1000)
+    const stopPolling = visibleInterval(refresh, 1500)
     return () => {
-      clearInterval(id)
+      stopPolling()
       if (alertTimerRef.current) window.clearTimeout(alertTimerRef.current)
     }
   }, [])

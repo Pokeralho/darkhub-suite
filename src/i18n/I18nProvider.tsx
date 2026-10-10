@@ -84,7 +84,8 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     lang,
     setLang,
     t,
-    languages: availableLanguages,
+    // Only offer languages that actually ship a dictionary (others fall back silently to English)
+    languages: availableLanguages.filter((l) => Boolean((messages as any)[l.code])),
     importCustomTranslation,
     customLanguages
   }), [lang, setLang, t, importCustomTranslation, customLanguages])

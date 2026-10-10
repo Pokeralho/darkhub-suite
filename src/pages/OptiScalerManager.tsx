@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useI18n } from '../i18n/I18nProvider';
 import {
   AlertTriangle,
   Archive,
@@ -121,7 +120,6 @@ interface OptiScalerManagerProps {
 }
 
 export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps = {}) {
-  const { t } = useI18n();
 
   // Games & Selection
   const [games, setGames] = useState<GameItem[]>([]);
@@ -519,7 +517,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
             >
               <Sparkles size={15} className="text-purple-400" />
               <span>DLSS 5 Manager</span>
-              <span className="px-1.5 py-0.2 text-[9px] font-bold rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
                 EXP
               </span>
             </button>

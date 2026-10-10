@@ -11,7 +11,10 @@ import {
   parseJsonOutput
 } from './services/PowerShellRunner.js'
 
+import { downloadToFile, fetchJson, assetSha256 } from './services/SecureDownload.js'
+
 const fs = fsRaw.promises
+const log = { info: (...a) => console.log(...a) }
 const execFileAsync = promisify(execFile)
 
 const RELEASE_FOLDER_NAME = 'Optiscaler_0.9.1-final.20260427._DSB'
@@ -114,6 +117,25 @@ async function getFileVersionInfo(filePath) {
 }
 
 let cachedGpuInfo = null
+function classifyAmdArchitecture(name) {
+  const text = String(name || '').toLowerCase()
+  const rx = text.match(/\brx\s*(\d{4})/)
+  if (rx) {
+    const family = rx[1][0]
+    if (family === '9') return 'rdna4'
+    if (family === '7') return 'rdna3'
+    if (family === '6') return 'rdna2'
+    return 'unknown'
+  }
+  const igpu = text.match(/radeon(?:\s+graphics)?\s+(\d{3})m\b/)
+  if (igpu) {
+    const n = Number(igpu[1])
+    if ([610, 660, 680].includes(n)) return 'rdna2'
+    if ([740, 760, 780, 840, 860, 880, 890].includes(n)) return 'rdna3'
+  }
+  return 'unknown'
+}
+
 async function getGpuInfo() {
   if (cachedGpuInfo) return cachedGpuInfo
   const script = `
@@ -124,23 +146,20 @@ async function getGpuInfo() {
   `
   const parsed = await runPowerShellJson(script)
   const list = Array.isArray(parsed) ? parsed : parsed ? [parsed] : []
-  const text = list.map((x) => `${x.Name ?? ''} ${x.AdapterCompatibility ?? ''} ${x.PNPDeviceID ?? ''}`).join(' ').toLowerCase()
-  const vendor = text.includes('nvidia')
-    ? 'nvidia'
-    : text.includes('intel')
-      ? 'intel'
-      : text.includes('amd') || text.includes('advanced micro devices') || text.includes('radeon')
-        ? 'amd'
-        : 'unknown'
-  const amdArchitecture = vendor === 'amd'
-    ? /(?:rx\s*)?9\d{3}|radeon.*(?:9060|9070|9080|9090)/i.test(text)
-      ? 'rdna4'
-      : /(?:rx\s*)?7\d{3}|radeon.*(?:7400|7600|7700|7800|7900|740m|760m|780m|880m|890m)/i.test(text)
-        ? 'rdna3'
-        : /(?:rx\s*)?6\d{3}|radeon.*(?:6400|6500|6600|6700|6800|6900)/i.test(text)
-          ? 'rdna2'
-          : 'unknown'
-    : null
+  const classified = list.map((x) => {
+    const name = String(x.Name ?? '')
+    const maker = `${name} ${x.AdapterCompatibility ?? ''}`.toLowerCase()
+    const vendorId = String(x.PNPDeviceID ?? '').toUpperCase().match(/VEN_([0-9A-F]{4})/)?.[1]
+    let controllerVendor = 'unknown'
+    if (vendorId === '10DE' || maker.includes('nvidia')) controllerVendor = 'nvidia'
+    else if (vendorId === '1002' || maker.includes('advanced micro devices') || maker.includes('amd') || maker.includes('radeon')) controllerVendor = 'amd'
+    else if (vendorId === '8086' || maker.includes('intel')) controllerVendor = 'intel'
+    return { name, vendor: controllerVendor }
+  })
+  const priority = ['nvidia', 'amd', 'intel']
+  const primary = priority.map((v) => classified.find((c) => c.vendor === v)).find(Boolean)
+  const vendor = primary?.vendor ?? 'unknown'
+  const amdArchitecture = vendor === 'amd' ? classifyAmdArchitecture(primary.name) : null
   cachedGpuInfo = { vendor, amdArchitecture, controllers: list }
   return cachedGpuInfo
 }
@@ -222,33 +241,46 @@ function detectUpscaleFiles(files) {
   }
 }
 
+const OPTISCALER_SIGNATURES = [Buffer.from('OptiScaler', 'latin1'), Buffer.from('OptiScaler', 'utf16le')]
+
+async function fileContainsOptiScalerSignature(filePath, size) {
+  const MAX_SCAN = 96 * 1024 * 1024
+  const CHUNK = 4 * 1024 * 1024
+  const overlap = 32
+  const fd = await fs.open(filePath, 'r')
+  try {
+    const limit = Math.min(size, MAX_SCAN)
+    const buf = Buffer.alloc(CHUNK + overlap)
+    let position = 0
+    let carry = 0
+    while (position < limit) {
+      const { bytesRead } = await fd.read(buf, carry, Math.min(CHUNK, limit - position), position)
+      if (bytesRead <= 0) break
+      const view = buf.subarray(0, carry + bytesRead)
+      if (OPTISCALER_SIGNATURES.some((sig) => view.includes(sig))) return true
+      carry = Math.min(overlap, view.length)
+      view.copy(buf, 0, view.length - carry)
+      position += bytesRead
+    }
+  } finally {
+    await fd.close()
+  }
+  return false
+}
+
 async function isOptiScalerLoader(filePath, sourcePath = null) {
   if (!(await exists(filePath))) return false
   try {
     const stat = await fs.lstat(filePath)
+    if (!stat.isFile()) return false
     if (sourcePath) {
       const optiDll = path.join(sourcePath, 'OptiScaler.dll')
       if (await exists(optiDll)) {
         const optiStat = await fs.lstat(optiDll)
-        if (stat.size === optiStat.size) return true
+        if (stat.size === optiStat.size && (await fileContainsOptiScalerSignature(filePath, stat.size))) return true
       }
     }
-    if (stat.size === 25379632 || (stat.size >= 24000000 && stat.size <= 27000000)) {
-      return true
-    }
-    // Fast non-blocking header check for OptiScaler strings in first 2MB
-    const fd = await fs.open(filePath, 'r')
-    try {
-      const readLen = Math.min(stat.size, 1024 * 1024 * 2)
-      const buf = Buffer.alloc(readLen)
-      await fd.read(buf, 0, readLen, 0)
-      const str = buf.toString('latin1')
-      if (str.includes('OptiScaler') || str.includes('optiscaler.dll')) {
-        return true
-      }
-    } finally {
-      await fd.close()
-    }
+    return await fileContainsOptiScalerSignature(filePath, stat.size)
   } catch {}
   return false
 }
@@ -431,7 +463,7 @@ async function buildAnalysis(app, payload = {}) {
 
   const files = await walkFiles(targetDir, { maxDepth: 4, maxFiles: 6000 })
   const detected = detectUpscaleFiles(files)
-  const installed = await detectInstalledLoaders(targetDir)
+  const installed = await detectInstalledLoaders(targetDir, releaseDir)
   const gpu = await getGpuInfo()
   const autoLoader = chooseLoader({ targetDir, installed, detected, exePath: targetExePath })
   const preferredLoader = normalizeChoice(payload?.loader, ['auto', ...SUPPORTED_LOADERS.map((x) => x.toLowerCase())], 'auto')
@@ -493,7 +525,6 @@ async function buildAnalysis(app, payload = {}) {
     }
   }
   if (selectedLoaderConflict) notes.push(`${requestedLoader} ja existe e nao parece ser OptiScaler. A aplicacao fara backup antes de sobrescrever.`)
-  if (includeAgilitySdk) notes.push('D3D12_Optiscaler sera instalado para o modo FSR4/Agility SDK.')
 
   const iniPatch = buildIniPatch({ upscaler, inputApi: resolvedInputApi, gpu, includeAgilitySdk })
 
@@ -590,6 +621,7 @@ function isSameInstall(analysis, payload) {
     opti.loader === analysis.choices.loader &&
     opti.upscaler === analysis.choices.upscaler &&
     opti.inputApi === analysis.choices.resolvedInputApi &&
+    Boolean(opti.includeAgilitySdk) === Boolean(analysis.choices.includeAgilitySdk) &&
     fsRaw.existsSync(loaderPath) &&
     fsRaw.existsSync(path.join(analysis.game.targetDir, 'OptiScaler.ini'))
   )
@@ -603,7 +635,6 @@ async function resolveFsr4Rdna2Path(app) {
   try {
     const userData = app?.getPath ? app.getPath('userData') : (process.env.APPDATA || path.join(process.cwd(), '.data'))
     candidates.push(path.join(userData, 'OptiScaler', 'FSR4_RDNA2', 'amd_fidelityfx_upscaler_dx12.dll'))
-    candidates.push(path.join(process.env.APPDATA || '', 'darkhub-electron', 'OptiScaler', 'FSR4_RDNA2', 'amd_fidelityfx_upscaler_dx12.dll'))
     candidates.push(path.join(process.env.APPDATA || '', 'DarkHub', 'OptiScaler', 'FSR4_RDNA2', 'amd_fidelityfx_upscaler_dx12.dll'))
   } catch {}
 
@@ -612,32 +643,28 @@ async function resolveFsr4Rdna2Path(app) {
   }
 
   try {
-    const https = await import('https')
-    const targetDir = path.join(process.env.APPDATA || '', 'darkhub-electron', 'OptiScaler', 'FSR4_RDNA2')
+    const userData = app?.getPath ? app.getPath('userData') : path.join(process.env.APPDATA || '', 'DarkHub')
+    const targetDir = path.join(userData, 'OptiScaler', 'FSR4_RDNA2')
     await fs.mkdir(targetDir, { recursive: true })
     const targetFile = path.join(targetDir, 'amd_fidelityfx_upscaler_dx12.dll')
     const archivePath = path.join(targetDir, 'FSR_4.1.1b_INT8_with_RDNA2_fix.7z')
-    const downloadUrl = 'https://github.com/the3rdparty1917/fsr4xyz/releases/download/4.1.1b/FSR_4.1.1b_INT8_with_RDNA2_fix.7z'
 
-    const downloadWithRedirect = (url, dest) => new Promise((resolve, reject) => {
-      https.get(url, { headers: { 'User-Agent': 'DarkHubSuite-OptiScaler' } }, (res) => {
-        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          return downloadWithRedirect(res.headers.location, dest).then(resolve).catch(reject)
-        }
-        if (res.statusCode !== 200) return reject(new Error(`Download status: ${res.statusCode}`))
-        const out = fsRaw.createWriteStream(dest)
-        res.pipe(out)
-        out.on('finish', () => out.close(resolve))
-        out.on('error', reject)
-      }).on('error', reject)
+    const release = await fetchJson('https://api.github.com/repos/the3rdparty1917/fsr4xyz/releases/tags/4.1.1b')
+    const asset = release?.assets?.find((a) => a.name === 'FSR_4.1.1b_INT8_with_RDNA2_fix.7z')
+    if (!asset?.browser_download_url) throw new Error('Asset FSR 4.1.1b nao encontrado no release.')
+
+    const { sha256 } = await downloadToFile(asset.browser_download_url, archivePath, {
+      expectedSha256: assetSha256(asset),
+      maxBytes: 200 * 1024 * 1024
     })
+    log.info?.(`[OptiScaler] FSR4 RDNA2 baixado (sha256=${sha256}, verificado=${Boolean(assetSha256(asset))})`)
 
-    await downloadWithRedirect(downloadUrl, archivePath)
     await execFileAsync('tar.exe', ['-xf', archivePath, '-C', targetDir], { windowsHide: true })
     const subDll = path.join(targetDir, '4.1.1b', 'amd_fidelityfx_upscaler_dx12.dll')
     if (fsRaw.existsSync(subDll)) {
       await fs.copyFile(subDll, targetFile)
     }
+    fs.unlink(archivePath).catch(() => {})
     if (fsRaw.existsSync(targetFile)) return targetFile
   } catch (e) {
     console.error('[OptiScaler] Falha ao resolver FSR 4.1.1b RDNA 2:', e)
@@ -686,6 +713,7 @@ async function applyOptiScaler(app, getLibraryStore, payload = {}) {
         const isOpti = await isOptiScalerLoader(oldLoaderPath, analysis.source.path)
         if (isOpti) {
           try {
+            await backupPathIfExists(oldLoaderPath, backupDir, manifest)
             await fs.unlink(oldLoaderPath)
           } catch {}
         }
@@ -695,14 +723,20 @@ async function applyOptiScaler(app, getLibraryStore, payload = {}) {
     // 2. Remove loose OptiScaler.dll in game root if present
     const looseOpti = path.join(targetDir, 'OptiScaler.dll')
     if (await exists(looseOpti)) {
-      try { await fs.unlink(looseOpti) } catch {}
+      try {
+        await backupPathIfExists(looseOpti, backupDir, manifest)
+        await fs.unlink(looseOpti)
+      } catch {}
     }
 
     // 3. Remove D3D12_Optiscaler if includeAgilitySdk is false
     if (!analysis.choices.includeAgilitySdk) {
       const d3d12Opti = path.join(targetDir, 'D3D12_Optiscaler')
       if (await exists(d3d12Opti)) {
-        try { await fs.rm(d3d12Opti, { recursive: true, force: true }) } catch {}
+        try {
+          await backupPathIfExists(d3d12Opti, backupDir, manifest)
+          await fs.rm(d3d12Opti, { recursive: true, force: true })
+        } catch {}
       }
     }
 
@@ -822,16 +856,29 @@ async function listBackups(payload = {}) {
   }
 }
 
+function isInsideDir(child, parent) {
+  const rel = path.relative(parent, child)
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel)
+}
+
+function resolveBackupDir(targetDir, payload = {}) {
+  const backupRoot = path.join(targetDir, 'OptiScaler_Backups')
+  const backupId = payload?.backupId || payload?.id
+  let candidate = null
+  if (payload?.backupPath) candidate = normalizeWinPath(payload.backupPath)
+  else if (backupId && typeof backupId === 'string' && !/[\\/]/.test(backupId) && backupId !== '..') candidate = path.join(backupRoot, backupId)
+  if (!candidate) return null
+  const resolved = path.resolve(candidate)
+  return isInsideDir(resolved.toLowerCase(), path.resolve(backupRoot).toLowerCase()) ? resolved : null
+}
+
 async function restoreBackup(app, getLibraryStore, payload = {}) {
   const targetDir = normalizeWinPath(payload?.targetDir || path.dirname(String(payload?.exePath ?? '')))
   if (!targetDir || !(await exists(targetDir))) return { ok: false, error: 'Pasta alvo do jogo não encontrada.' }
 
-  const backupRoot = path.join(targetDir, 'OptiScaler_Backups')
-  const backupId = payload?.backupId || payload?.id
-  let backupDir = payload?.backupPath ? normalizeWinPath(payload.backupPath) : null
-  if (!backupDir && backupId) {
-    backupDir = path.join(backupRoot, backupId)
-  }
+  const requestedExplicit = Boolean(payload?.backupPath || payload?.backupId || payload?.id)
+  let backupDir = resolveBackupDir(targetDir, payload)
+  if (requestedExplicit && !backupDir) return { ok: false, error: 'Backup informado fora da pasta OptiScaler_Backups do jogo.' }
 
   const listRes = await listBackups(payload)
   const allBackups = listRes.ok ? listRes.backups : []
@@ -846,15 +893,23 @@ async function restoreBackup(app, getLibraryStore, payload = {}) {
 
   const restored = []
   const removed = []
+  let usedManifest = null
 
   try {
     // 1. Restore backed up files if backup directory exists
     if (backupDir && (await exists(backupDir))) {
       const manifest = (await readJsonIfExists(path.join(backupDir, 'manifest.json'))) ||
                        (await readJsonIfExists(path.join(backupDir, 'manifest.failed.json')))
+      usedManifest = manifest
 
       if (manifest && Array.isArray(manifest.backedUp)) {
         for (const item of manifest.backedUp) {
+          const itemPath = path.resolve(String(item?.path ?? ''))
+          const itemBackup = path.resolve(String(item?.backupPath ?? ''))
+          if (!isInsideDir(itemPath.toLowerCase(), path.resolve(targetDir).toLowerCase()) ||
+              !isInsideDir(itemBackup.toLowerCase(), path.resolve(backupDir).toLowerCase())) {
+            continue
+          }
           if (await exists(item.backupPath)) {
             const stat = await fs.lstat(item.backupPath)
             if (stat.isDirectory()) {
@@ -917,9 +972,16 @@ async function restoreBackup(app, getLibraryStore, payload = {}) {
       }
     }
 
-    // Purge D3D12_Optiscaler & Licenses
+    // Purge D3D12_Optiscaler & Licenses only when OptiScaler put them there
+    const installedByUs = new Set(
+      (Array.isArray(usedManifest?.copied) ? usedManifest.copied : [])
+        .map((c) => path.resolve(String(c?.path ?? '')).toLowerCase())
+    )
     for (const dirName of ['D3D12_Optiscaler', 'Licenses']) {
       const p = path.join(targetDir, dirName)
+      const wasRestoredDir = restored.some((r) => path.resolve(r).toLowerCase() === path.resolve(p).toLowerCase())
+      const ownedByOptiScaler = dirName === 'D3D12_Optiscaler' || installedByUs.has(path.resolve(p).toLowerCase())
+      if (wasRestoredDir || !ownedByOptiScaler) continue
       if (await exists(p)) {
         try {
           await fs.rm(p, { recursive: true, force: true })
@@ -962,11 +1024,12 @@ async function restoreBackup(app, getLibraryStore, payload = {}) {
 
 async function deleteBackup(payload = {}) {
   const targetDir = normalizeWinPath(payload?.targetDir || path.dirname(String(payload?.exePath ?? '')))
-  const backupId = payload?.backupId || payload?.id
-  const backupRoot = path.join(targetDir, 'OptiScaler_Backups')
-  const backupDir = payload?.backupPath ? normalizeWinPath(payload.backupPath) : path.join(backupRoot, backupId || '')
+  const backupDir = resolveBackupDir(targetDir, payload)
 
-  if (!backupDir || !(await exists(backupDir))) {
+  if (!backupDir) {
+    return { ok: false, error: 'Backup invalido ou fora da pasta OptiScaler_Backups do jogo.' }
+  }
+  if (!(await exists(backupDir))) {
     return { ok: false, error: 'Pasta de backup nao encontrada.' }
   }
 
@@ -1066,119 +1129,78 @@ export function registerOptiScalerIPC({ app, ipcMain, getLibraryStore }) {
 
   ipcMain.handle('optiscaler:checkUpdate', async () => {
     try {
-      const https = await import('https');
-      return await new Promise((resolve) => {
-        const req = https.get('https://api.github.com/repos/optiscaler/OptiScaler/releases/latest', {
-          headers: { 'User-Agent': 'DarkHub' }
-        }, (res) => {
-          let data = '';
-          res.on('data', chunk => data += chunk);
-          res.on('end', async () => {
-            if (res.statusCode !== 200) {
-              return resolve({ ok: false, error: 'Erro GitHub API: ' + res.statusCode });
-            }
-            try {
-              const json = JSON.parse(data);
-              const version = json.tag_name || json.name;
-              const current = await getSourceVersion(app);
-
-              const asset = json.assets?.find(a => a.name.match(/\.(zip|7z)$/i));
-              if (!asset) return resolve({ ok: false, error: 'Nenhum ZIP/7Z encontrado no release.' });
-
-              resolve({
-                ok: true,
-                hasUpdate: version !== current,
-                latestVersion: version,
-                currentVersion: current,
-                downloadUrl: asset.browser_download_url
-              });
-            } catch (e) {
-              resolve({ ok: false, error: 'Erro de Parse JSON' });
-            }
-          });
-        });
-        req.on('error', err => resolve({ ok: false, error: err.message }));
-      });
+      const json = await fetchJson('https://api.github.com/repos/optiscaler/OptiScaler/releases/latest')
+      const version = json.tag_name || json.name
+      const current = await getSourceVersion(app)
+      const asset = json.assets?.find((a) => /\.(zip|7z)$/i.test(a.name))
+      if (!asset) return { ok: false, error: 'Nenhum ZIP/7Z encontrado no release.' }
+      return {
+        ok: true,
+        hasUpdate: version !== current,
+        latestVersion: version,
+        currentVersion: current,
+        downloadUrl: asset.browser_download_url,
+        sha256: assetSha256(asset)
+      }
     } catch (err) {
       return { ok: false, error: err?.message ?? String(err) }
     }
   })
 
   ipcMain.handle('optiscaler:downloadUpdate', async (_event, payload) => {
+    let workDir = null
     try {
-      const downloadUrl = payload?.url || payload;
-      const targetVersion = payload?.version || '';
-      const https = await import('https');
-      const http = await import('http');
-      const os = await import('os');
-      const fsRaw = await import('fs');
+      // Never trust a renderer-provided URL: resolve the official asset again and
+      // only accept the same URL (or none).
+      const json = await fetchJson('https://api.github.com/repos/optiscaler/OptiScaler/releases/latest')
+      const asset = json.assets?.find((a) => /\.(zip|7z)$/i.test(a.name))
+      if (!asset?.browser_download_url) return { ok: false, error: 'Nenhum ZIP/7Z encontrado no release.' }
+      const requested = typeof payload === 'string' ? payload : payload?.url
+      if (requested && requested !== asset.browser_download_url) {
+        return { ok: false, error: 'URL de atualizacao nao corresponde ao release oficial do OptiScaler.' }
+      }
+      const targetVersion = json.tag_name || json.name || ''
 
-      const ext = String(downloadUrl).toLowerCase().endsWith('.7z') ? '.7z' : '.zip';
-      const targetZip = path.join(os.tmpdir(), 'OptiScaler-Update-' + Date.now() + ext);
-      const destDir = resolveReleaseDir(app);
+      workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'darkhub-optiscaler-'))
+      const ext = asset.name.toLowerCase().endsWith('.7z') ? '.7z' : '.zip'
+      const archive = path.join(workDir, `release${ext}`)
+      const extractDir = path.join(workDir, 'extracted')
+      await fs.mkdir(extractDir, { recursive: true })
 
-      const downloadFileWithRedirects = (url, dest, maxRedirects = 5) => {
-        return new Promise((resolve, reject) => {
-          if (maxRedirects <= 0) return reject(new Error('Muitos redirecionamentos ao baixar OptiScaler.'));
-          const client = url.startsWith('https:') ? https : http;
-          const req = client.get(url, { headers: { 'User-Agent': 'DarkHub' } }, (res) => {
-            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-              return resolve(downloadFileWithRedirects(res.headers.location, dest, maxRedirects - 1));
-            }
-            if (res.statusCode !== 200) {
-              return reject(new Error(`Servidor respondeu com status ${res.statusCode}`));
-            }
-            const fileStream = fsRaw.createWriteStream(dest);
-            res.pipe(fileStream);
-            fileStream.on('finish', () => {
-              fileStream.close(() => resolve());
-            });
-            fileStream.on('error', (err) => {
-              fsRaw.unlink(dest, () => {});
-              reject(err);
-            });
-          });
-          req.on('error', reject);
-        });
-      };
+      await downloadToFile(asset.browser_download_url, archive, {
+        expectedSha256: assetSha256(asset),
+        maxBytes: 300 * 1024 * 1024
+      })
 
-      await downloadFileWithRedirects(downloadUrl, targetZip);
-      await fs.mkdir(destDir, { recursive: true });
-
-      let extracted = false;
-
+      let extracted = false
       try {
-        await execFileAsync('tar.exe', ['-xf', targetZip, '-C', destDir], { windowsHide: true });
-        extracted = true;
+        await execFileAsync('tar.exe', ['-xf', archive, '-C', extractDir], { windowsHide: true })
+        extracted = true
       } catch {}
-
       if (!extracted && ext === '.zip') {
-        try {
-          const script = `Expand-Archive -Path "${targetZip}" -DestinationPath "${destDir}" -Force`;
-          await runPowerShellJson(script);
-          extracted = true;
-        } catch {}
+        await execFileAsync('powershell.exe', [
+          '-NoProfile', '-NonInteractive', '-Command',
+          'Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force',
+          archive, extractDir
+        ], { windowsHide: true })
+        extracted = true
       }
+      if (!extracted) return { ok: false, error: 'Nao foi possivel extrair o pacote (formato 7z requer tar.exe do Windows 10+).' }
 
-      const files = await fs.readdir(destDir, { recursive: true });
-      const hasDll = files.some(f => {
-        const name = path.basename(f).toLowerCase();
-        return name === 'optiscaler.dll' || name === 'nvngx.dll' || name === 'dxgi.dll';
-      });
+      const entries = await fs.readdir(extractDir, { recursive: true })
+      const hasDll = entries.some((f) => ['optiscaler.dll', 'nvngx.dll', 'dxgi.dll'].includes(path.basename(f).toLowerCase()))
+      if (!hasDll) return { ok: false, error: 'Atualizacao falhou: DLL principal nao encontrada no pacote extraido.' }
 
-      fsRaw.unlink(targetZip, () => {});
+      const destDir = path.join(app.getPath('userData'), 'OptiScaler', RELEASE_FOLDER_NAME)
+      await fs.mkdir(destDir, { recursive: true })
+      await fs.cp(extractDir, destDir, { recursive: true, force: true })
+      if (targetVersion) await fs.writeFile(path.join(destDir, 'version.txt'), targetVersion, 'utf8')
 
-      if (!hasDll) {
-        return { ok: false, error: 'Atualização falhou: DLL principal não encontrada no pacote extraído.' };
-      }
-
-      if (targetVersion) {
-        await fs.writeFile(path.join(destDir, 'version.txt'), targetVersion, 'utf8');
-      }
-
-      return { ok: true };
+      return { ok: true, version: targetVersion }
     } catch (err) {
-      return { ok: false, error: err?.message ?? String(err) };
+      return { ok: false, error: err?.message ?? String(err) }
+    } finally {
+      if (workDir) fs.rm(workDir, { recursive: true, force: true }).catch(() => {})
     }
   })
 }

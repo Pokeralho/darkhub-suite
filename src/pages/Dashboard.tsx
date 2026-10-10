@@ -201,12 +201,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       if (window.darkhub?.optimizer?.applyTweak) {
         const res = await window.darkhub.optimizer.applyTweak('optimize-ram');
         if (res?.ok) {
-          const mbFreed = res?.freedBytes ? (res.freedBytes / (1024 * 1024)).toFixed(0) : 'vários';
-          setCleanFeedback(`Memória RAM otimizada! (${mbFreed} MB liberados)`);
+          const mbFreed = res?.freedBytes ? Math.round(res.freedBytes / (1024 * 1024)) : 0;
+          setCleanFeedback(mbFreed > 0
+            ? `Memória RAM otimizada! (${mbFreed} MB liberados)`
+            : 'Nenhuma RAM adicional pôde ser liberada — o Windows já gerencia a memória.');
           addActivity?.({
             type: 'optimization',
             label: 'Otimização de Memória RAM',
-            sublabel: `WorkingSets limpos (${mbFreed} MB)`
+            sublabel: `${mbFreed} MB liberados (medido)`
           });
         } else {
           setCleanFeedback(res?.error ?? 'Falha na otimização de RAM.');

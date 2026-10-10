@@ -3,6 +3,8 @@
 using System;
 using System.IO;
 using System.IO.Pipes;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Threading;
 using System.Diagnostics;
@@ -168,7 +170,9 @@ public class DarkHubLatencyEngine
         {
             try
             {
-                using (var server = new NamedPipeServerStream("DarkHubLatencyEngine", PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous))
+                var pipeSecurity = new PipeSecurity();
+                pipeSecurity.AddAccessRule(new PipeAccessRule(WindowsIdentity.GetCurrent().User, PipeAccessRights.ReadWrite, AccessControlType.Allow));
+                using (var server = new NamedPipeServerStream("DarkHubLatencyEngine", PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 4096, 4096, pipeSecurity))
                 {
                     server.WaitForConnection();
                     using (var reader = new StreamReader(server, Encoding.UTF8))

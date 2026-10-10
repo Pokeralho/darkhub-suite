@@ -63,27 +63,39 @@ namespace DarkHub.Injector
                 if (hProcess == IntPtr.Zero)
                     return "ERROR: Falha ao abrir o processo. Execute o DarkHub como Administrador.";
 
-                byte[] dllBytes = Encoding.ASCII.GetBytes(dllPath + "\0");
+                byte[] dllBytes = Encoding.Unicode.GetBytes(dllPath + "\0");
                 IntPtr allocMemAddress = VirtualAllocEx(hProcess, IntPtr.Zero, (uint)dllBytes.Length, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
                 if (allocMemAddress == IntPtr.Zero)
+                {
+                    CloseHandle(hProcess);
                     return "ERROR: Falha ao alocar memória no processo alvo (VirtualAllocEx).";
+                }
 
                 UIntPtr bytesWritten;
                 bool writeResult = WriteProcessMemory(hProcess, allocMemAddress, dllBytes, (uint)dllBytes.Length, out bytesWritten);
 
                 if (!writeResult)
+                {
+                    CloseHandle(hProcess);
                     return "ERROR: Falha ao gravar a DLL na memória alvo (WriteProcessMemory).";
+                }
 
-                IntPtr loadLibraryAddr = GetProcAddress(GetModuleHandle("kernel32.dll"), "LoadLibraryA");
+                IntPtr loadLibraryAddr = GetProcAddress(GetModuleHandle("kernel32.dll"), "LoadLibraryW");
 
                 if (loadLibraryAddr == IntPtr.Zero)
-                    return "ERROR: Falha ao encontrar o endereço de LoadLibraryA na kernel32.";
+                {
+                    CloseHandle(hProcess);
+                    return "ERROR: Falha ao encontrar o endereço de LoadLibraryW na kernel32.";
+                }
 
                 IntPtr hThread = CreateRemoteThread(hProcess, IntPtr.Zero, 0, loadLibraryAddr, allocMemAddress, 0, IntPtr.Zero);
 
                 if (hThread == IntPtr.Zero)
+                {
+                    CloseHandle(hProcess);
                     return "ERROR: Falha ao criar a Thread Remota para execução da DLL (CreateRemoteThread).";
+                }
 
                 WaitForSingleObject(hThread, 5000);
                 CloseHandle(hThread);

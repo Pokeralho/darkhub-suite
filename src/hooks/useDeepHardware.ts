@@ -1,4 +1,3 @@
-import { useI18n } from '../i18n/I18nProvider';
 import { useState, useEffect, useCallback } from 'react';
 
 export function useDeepHardware() {

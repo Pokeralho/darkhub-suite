@@ -5,9 +5,11 @@ import https from 'node:https';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
 import { execFile, exec, execSync } from 'node:child_process';
 import Logger from '../LoggerService.js';
 import ElevationHelper from '../optimizer/ElevationHelper.js';
+import { downloadToFile, fetchJson, assetSha256 } from '../SecureDownload.js';
 
 const fs = fsRaw.promises;
 const execAsync = promisify(exec);
@@ -17,6 +19,8 @@ const MANIFEST_NAME = 'DarkHubDLSS5.json';
 const BACKUP_DIR_NAME = 'DLSS5_Backups';
 const HISTORY_FILE_NAME = 'dlss5_history.json';
 const PRIMARY_BUNDLE_FOLDER = 'OptiScaler_DLSS5_Universal';
+const AMD_NR_FOLDER = 'AMD_NR';
+const AMD_NR_WEIGHTS = 'dlssnr_on_amd_weights.bin';
 
 /**
  * Portable Executable (PE) Inspector
@@ -664,11 +668,7 @@ class Dlss5Service {
     try {
       const userData = this.app?.getPath ? this.app.getPath('userData') : (process.env.APPDATA || path.join(process.cwd(), '.data'));
       candidateDirs.push(path.join(userData, 'OptiScaler', PRIMARY_BUNDLE_FOLDER));
-      candidateDirs.push(path.join(userData, 'OptiScaler'));
-      candidateDirs.push(path.join(process.env.APPDATA || '', 'DarkHub', 'OptiScaler', PRIMARY_BUNDLE_FOLDER));
     } catch {}
-
-    candidateDirs.push(path.resolve(process.cwd(), 'OptiScaler'));
 
     for (const d of candidateDirs) {
       if (fsRaw.existsSync(d)) {
@@ -779,111 +779,86 @@ class Dlss5Service {
     const userData = this.app?.getPath ? this.app.getPath('userData') : (process.env.APPDATA || path.join(process.cwd(), '.data'));
     const destFolder = path.join(userData, 'OptiScaler', PRIMARY_BUNDLE_FOLDER);
     await fs.mkdir(destFolder, { recursive: true });
+    const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'darkhub-dlss5-'));
+    const hashLogPath = path.join(destFolder, 'downloads.sha256.json');
+    let hashLog = {};
+    try { hashLog = JSON.parse(fsRaw.readFileSync(hashLogPath, 'utf8')); } catch {}
 
-    onProgress('Consultando release mais recente do repositório oficial OptiScaler (GitHub API)...');
-    const releaseUrl = 'https://api.github.com/repos/optiscaler/OptiScaler/releases/latest';
+    const extractArchive = async (archive, dest) => {
+      try {
+        await execFileAsync('tar.exe', ['-xf', archive, '-C', dest], { windowsHide: true });
+        return;
+      } catch (err) {
+        Logger.warn('Dlss5Service', 'tar.exe falhou, tentando fallback', err);
+      }
+      if (!archive.toLowerCase().endsWith('.zip')) throw new Error('Nao foi possivel extrair o pacote (tar.exe indisponivel).');
+      await execFileAsync('powershell.exe', [
+        '-NoProfile', '-NonInteractive', '-Command',
+        'Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force',
+        archive, dest
+      ], { windowsHide: true });
+    };
 
-    const getJson = (url) => new Promise((resolve, reject) => {
-      https.get(url, { headers: { 'User-Agent': 'DarkHubSuite-DLSS5' } }, (res) => {
-        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          return resolve(getJson(res.headers.location));
-        }
-        if (res.statusCode !== 200) return reject(new Error(`GitHub API Status: ${res.statusCode}`));
-        let body = '';
-        res.on('data', chunk => body += chunk);
-        res.on('end', () => {
-          try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
-        });
-      }).on('error', reject);
-    });
-
-    const releaseData = await getJson(releaseUrl);
-    const asset = releaseData.assets?.find(a => /\.(7z|zip)$/i.test(a.name));
-    if (!asset?.browser_download_url) throw new Error('Nenhum pacote 7z/zip encontrado na release oficial.');
-
-    onProgress(`Baixando binários compilados ${asset.name} (${(asset.size / (1024 * 1024)).toFixed(1)} MB)...`);
-    const ext = asset.name.toLowerCase().endsWith('.zip') ? '.zip' : '.7z';
-    const tempArchive = path.join(os.tmpdir(), `dlss5_opti_${Date.now()}${ext}`);
-
-    const downloadWithRedirects = (url, dest, redirects = 5) => new Promise((resolve, reject) => {
-      if (redirects <= 0) return reject(new Error('Muitos redirecionamentos'));
-      https.get(url, { headers: { 'User-Agent': 'DarkHubSuite-DLSS5' } }, (res) => {
-        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          return downloadWithRedirects(res.headers.location, dest, redirects - 1).then(resolve).catch(reject);
-        }
-        if (res.statusCode !== 200) return reject(new Error(`Download falhou com status: ${res.statusCode}`));
-        const total = parseInt(res.headers['content-length'] || '0', 10);
-        let downloaded = 0;
-        const out = fsRaw.createWriteStream(dest);
-        res.on('data', chunk => {
-          downloaded += chunk.length;
-          if (total) {
-            const pct = Math.round((downloaded / total) * 100);
-            if (pct % 25 === 0) onProgress(`Download em andamento: ${pct}%...`);
-          }
-        });
-        res.pipe(out);
-        out.on('finish', () => out.close(resolve));
-        out.on('error', reject);
-      }).on('error', reject);
-    });
-
-    await downloadWithRedirects(asset.browser_download_url, tempArchive);
-
-    onProgress('Extraindo pacote com tar.exe nativo (libarchive)...');
-    let extracted = false;
     try {
-      await execFileAsync('tar.exe', ['-xf', tempArchive, '-C', destFolder], { windowsHide: true });
-      extracted = true;
-    } catch (err) {
-      Logger.warn('Dlss5Service', 'tar.exe falhou, tentando fallback', err);
-    }
+      onProgress('Consultando release mais recente do repositório oficial OptiScaler (GitHub API)...');
+      const releaseData = await fetchJson('https://api.github.com/repos/optiscaler/OptiScaler/releases/latest');
+      const asset = releaseData.assets?.find(a => /\.(7z|zip)$/i.test(a.name));
+      if (!asset?.browser_download_url) throw new Error('Nenhum pacote 7z/zip encontrado na release oficial.');
 
-    if (!extracted && ext === '.zip') {
-      const psScript = `Expand-Archive -Path "${tempArchive}" -DestinationPath "${destFolder}" -Force`;
-      await execAsync(`powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "${psScript}"`);
-      extracted = true;
-    }
+      onProgress(`Baixando ${asset.name} (${(asset.size / (1024 * 1024)).toFixed(1)} MB)...`);
+      const ext = asset.name.toLowerCase().endsWith('.zip') ? '.zip' : '.7z';
+      const tempArchive = path.join(workDir, `optiscaler${ext}`);
+      const main = await downloadToFile(asset.browser_download_url, tempArchive, {
+        expectedSha256: assetSha256(asset),
+        maxBytes: 300 * 1024 * 1024
+      });
+      hashLog[asset.name] = { sha256: main.sha256, verifiedByPublisherDigest: Boolean(assetSha256(asset)), at: Date.now() };
 
-    try { fsRaw.unlinkSync(tempArchive); } catch {}
+      onProgress('Extraindo pacote...');
+      await extractArchive(tempArchive, destFolder);
+      if (!fsRaw.existsSync(path.join(destFolder, 'OptiScaler.dll'))) {
+        throw new Error('Falha ao extrair OptiScaler.dll do pacote baixado.');
+      }
+      onProgress('[OK] Binários do OptiScaler baixados.');
 
-    const hasDll = fsRaw.existsSync(path.join(destFolder, 'OptiScaler.dll'));
-    if (!hasDll) {
-      throw new Error('Falha ao extrair OptiScaler.dll do pacote baixado.');
-    }
+      const dlss5Assets = [
+        { name: 'nvngx_dlssnr.dll', tag: 'dlssnr-310.8.SF-v2', desc: 'DLSS-NR (reconstrução neural)' },
+        { name: 'nvngx_dlss.dll', tag: 'dlss-310.9.0', desc: 'Super Resolution 3.10' },
+        { name: 'nvngx_dlssg.dll', tag: 'dlssg-310.9.0', desc: 'Frame Generation 3.10' },
+        { name: 'nvngx_dlssd.dll', tag: 'dlssd-310.9.0', desc: 'Ray Reconstruction 3.10' }
+      ];
 
-    onProgress('[SUCESSO] Binários C++ x64 do OptiScaler baixados!');
-
-    // Download authentic DLSS 5 Neural Binaries (DLSS-NR, DLSS 3.10 Super Resolution, FrameGen, Ray Reconstruction)
-    const dlss5Assets = [
-      { name: 'nvngx_dlssnr.dll', url: 'https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.SF-v2/nvngx_dlssnr_310.8.SF-v2.zip', desc: 'Modelo Neural DLSS-NR (Reconstrução Neural DLSS 5)' },
-      { name: 'nvngx_dlss.dll', url: 'https://github.com/RankFTW/rhi-repo/releases/download/dlss-310.9.0/nvngx_dlss_310.9.0.zip', desc: 'Pesos Neurais Super Resolution v3.10 (Preset G)' },
-      { name: 'nvngx_dlssg.dll', url: 'https://github.com/RankFTW/rhi-repo/releases/download/dlssg-310.9.0/nvngx_dlssg_310.9.0.zip', desc: 'Frame Generation Neural v3.10' },
-      { name: 'nvngx_dlssd.dll', url: 'https://github.com/RankFTW/rhi-repo/releases/download/dlssd-310.9.0/nvngx_dlssd_310.9.0.zip', desc: 'Ray Reconstruction Neural v3.10' }
-    ];
-
-    for (const item of dlss5Assets) {
-      if (!fsRaw.existsSync(path.join(destFolder, item.name))) {
+      for (const item of dlss5Assets) {
+        if (fsRaw.existsSync(path.join(destFolder, item.name))) continue;
         try {
-          onProgress(`Baixando componente neural: ${item.desc}...`);
-          const tempZip = path.join(os.tmpdir(), `dlss5_${item.name}_${Date.now()}.zip`);
-          await downloadWithRedirects(item.url, tempZip);
-          try {
-            await execFileAsync('tar.exe', ['-xf', tempZip, '-C', destFolder], { windowsHide: true });
-          } catch {
-            const psScript = `Expand-Archive -Path "${tempZip}" -DestinationPath "${destFolder}" -Force`;
-            await execAsync(`powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "${psScript}"`);
+          onProgress(`Baixando componente: ${item.desc}...`);
+          const rel = await fetchJson(`https://api.github.com/repos/RankFTW/rhi-repo/releases/tags/${item.tag}`);
+          const compAsset = rel.assets?.find(a => /\.zip$/i.test(a.name));
+          if (!compAsset?.browser_download_url) throw new Error('asset zip nao encontrado');
+          const tempZip = path.join(workDir, `${item.name}.zip`);
+          const dl = await downloadToFile(compAsset.browser_download_url, tempZip, {
+            expectedSha256: assetSha256(compAsset),
+            maxBytes: 200 * 1024 * 1024
+          });
+          const previous = hashLog[compAsset.name];
+          if (previous && previous.sha256 !== dl.sha256) {
+            onProgress(`[AVISO] ${compAsset.name} mudou desde o ultimo download (hash diferente).`);
           }
-          try { fsRaw.unlinkSync(tempZip); } catch {}
-          onProgress(`[OK] ${item.name} integrado.`);
+          hashLog[compAsset.name] = { sha256: dl.sha256, verifiedByPublisherDigest: Boolean(assetSha256(compAsset)), at: Date.now() };
+          await extractArchive(tempZip, destFolder);
+          onProgress(`[OK] ${item.name} integrado (sha256 ${dl.sha256.slice(0, 12)}…).`);
         } catch (err) {
           Logger.warn('Dlss5Service', `Falha ao baixar ${item.name}`, err);
+          onProgress(`[ERRO] ${item.name}: ${err?.message ?? err}`);
         }
       }
-    }
 
-    onProgress('[COMPLETO] Todos os binários do ecossistema DLSS 5 e OptiScaler prontos!');
-    return destFolder;
+      try { fsRaw.writeFileSync(hashLogPath, JSON.stringify(hashLog, null, 2), 'utf8'); } catch {}
+      onProgress('[COMPLETO] Binários baixados.');
+      return destFolder;
+    } finally {
+      fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+    }
   }
 
   generateNvngxIni(profile, options = {}) {
@@ -1080,20 +1055,86 @@ OverlayKey=36
 `;
   }
 
-  async applySignatureCheckBypass() {
-    if (process.platform !== 'win32') return;
+  getUserDataDir() {
     try {
-      const regKey = 'HKLM:\\SOFTWARE\\NVIDIA Corporation\\Global\\NGXCore';
-      const psScript = `
-        if (!(Test-Path "${regKey}")) {
-          New-Item -Path "${regKey}" -Force | Out-Null
+      if (this.app?.getPath) return this.app.getPath('userData');
+    } catch {}
+    return process.env.APPDATA || path.join(os.tmpdir(), 'DarkHubSuite');
+  }
+
+  /** Looks for an imported AMD-NR package (dxgi.dll + dlssnr_on_amd_weights.bin). */
+  async resolveAmdNrSource(customPath) {
+    const candidates = [];
+    if (customPath && typeof customPath === 'string') candidates.push(path.resolve(customPath));
+    candidates.push(path.join(this.getUserDataDir(), 'OptiScaler', AMD_NR_FOLDER));
+    const isPackage = (d) => fsRaw.existsSync(path.join(d, 'dxgi.dll')) && fsRaw.existsSync(path.join(d, AMD_NR_WEIGHTS));
+    for (const d of candidates) {
+      if (!fsRaw.existsSync(d)) continue;
+      if (isPackage(d)) return d;
+      try {
+        for (const e of await fs.readdir(d, { withFileTypes: true })) {
+          if (e.isDirectory() && isPackage(path.join(d, e.name))) return path.join(d, e.name);
         }
-        Set-ItemProperty -Path "${regKey}" -Name "DisableNvidiaSignatureChecks" -Value 1 -Type DWord -Force
-      `;
-      await ElevationHelper.executeWithElevation(`powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "${psScript.replace(/\r?\n/g, ' ')}"`);
-      return { ok: true };
+      } catch {}
+    }
+    return null;
+  }
+
+  _resolveFsr4Rdna2() {
+    const rel = path.join('fsr4_rdna2', 'amd_fidelityfx_upscaler_dx12.dll');
+    const candidates = [
+      path.join(this.getUserDataDir(), 'OptiScaler', 'FSR4_RDNA2', 'amd_fidelityfx_upscaler_dx12.dll'),
+      path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', rel)
+    ];
+    return candidates.find((c) => fsRaw.existsSync(c)) || null;
+  }
+
+  async _readManifest(targetDir) {
+    try {
+      return JSON.parse(await fs.readFile(path.join(targetDir, MANIFEST_NAME), 'utf8'));
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * NVIDIA signature-check bypass (machine-wide registry value). Opt-in only.
+   * Returns the previous value so revert can restore it.
+   */
+  async applySignatureCheckBypass() {
+    if (process.platform !== 'win32') return { ok: false, error: 'unsupported' };
+    try {
+      const script = `
+$key = 'HKLM:\\SOFTWARE\\NVIDIA Corporation\\Global\\NGXCore'
+$name = 'DisableNvidiaSignatureChecks'
+$prev = $null
+if (Test-Path -LiteralPath $key) {
+  $prev = (Get-ItemProperty -LiteralPath $key -Name $name -ErrorAction SilentlyContinue).$name
+} else {
+  New-Item -Path $key -Force | Out-Null
+}
+Set-ItemProperty -LiteralPath $key -Name $name -Value 1 -Type DWord -Force
+if ($null -eq $prev) { 'PREV=none' } else { "PREV=$prev" }
+`;
+      const res = await ElevationHelper.runElevatedPowerShell(script, { timeoutMs: 60000 });
+      if (res.code !== 0) return { ok: false, error: (res.stderr || 'powershell failed').trim() };
+      const m = /PREV=(\w+)/.exec(res.stdout || '');
+      return { ok: true, previous: m && m[1] !== 'none' ? Number(m[1]) : null };
     } catch (e) {
       Logger.warn('Dlss5Service', 'Falha ao aplicar bypass de assinatura NVIDIA', e);
+      return { ok: false, error: e.message };
+    }
+  }
+
+  async restoreSignatureCheckBypass(previous) {
+    if (process.platform !== 'win32') return { ok: false };
+    try {
+      const script = previous === null || previous === undefined
+        ? `Remove-ItemProperty -LiteralPath 'HKLM:\\SOFTWARE\\NVIDIA Corporation\\Global\\NGXCore' -Name 'DisableNvidiaSignatureChecks' -ErrorAction SilentlyContinue`
+        : `Set-ItemProperty -LiteralPath 'HKLM:\\SOFTWARE\\NVIDIA Corporation\\Global\\NGXCore' -Name 'DisableNvidiaSignatureChecks' -Value ${Number(previous) | 0} -Type DWord -Force`;
+      const res = await ElevationHelper.runElevatedPowerShell(script, { timeoutMs: 60000 });
+      return { ok: res.code === 0 };
+    } catch (e) {
       return { ok: false, error: e.message };
     }
   }
@@ -1107,281 +1148,248 @@ OverlayKey=36
     const graphicsApi = scanRes.graphicsApi || {};
     const route = payload.route || scanRes.routeInfo?.recommendedRoute || 'optiscaler';
     const neuralUpstream = payload.neuralUpstream !== false;
+    const amdEngine = profile === 'amd' ? (['neural', 'zluda', 'fsr'].includes(payload.amdEngine) ? payload.amdEngine : 'fsr') : null;
+    const isNeural = amdEngine === 'neural';
+    const warnings = [];
 
-    // Auto-select loader based on API if auto or not specified
+    // Cross-tool conflict: the OptiScaler Manager owns this folder.
+    if (fsRaw.existsSync(path.join(targetDir, 'DarkHubOptiScaler.json'))) {
+      return {
+        ok: false,
+        error: 'Esta pasta já possui uma instalação do OptiScaler Manager. Remova-a lá antes de aplicar o DLSS 5 (os dois usam os mesmos arquivos proxy).'
+      };
+    }
+
     let loader = payload.loader || 'dxgi.dll';
-    if (!payload.loader || payload.loader === 'auto') {
-      loader = graphicsApi.recommendedLoader || 'dxgi.dll';
+    if (!payload.loader || payload.loader === 'auto') loader = graphicsApi.recommendedLoader || 'dxgi.dll';
+    if (!/^[A-Za-z0-9_.-]+\.dll$/.test(loader)) return { ok: false, error: 'Loader inválido.' };
+
+    // --- AMD Neural (AMD-NR) pre-flight -------------------------------------------------
+    let nrSource = null;
+    if (isNeural) {
+      const gpu = await this.detectGpu();
+      if (gpu.vendor !== 'amd') {
+        return { ok: false, error: 'O modo AMD Neural (AMD-NR) exige uma GPU AMD Radeon.' };
+      }
+      const apiName = String(graphicsApi.primaryApi || '');
+      if (!(/^dx12/.test(apiName) || graphicsApi.hasD3D12)) {
+        return { ok: false, error: 'O modo AMD Neural (AMD-NR) funciona apenas em jogos DirectX 12.' };
+      }
+      nrSource = await this.resolveAmdNrSource(payload.amdNrPath);
+      if (!nrSource) {
+        return {
+          ok: false,
+          code: 'AMD_NR_PACKAGE_MISSING',
+          error: `Pacote AMD-NR não encontrado. Baixe o pacote em github.com/3zwr1/AMD-NR---OptiScaler e extraia em: ${path.join(this.getUserDataDir(), 'OptiScaler', AMD_NR_FOLDER)} (precisa conter dxgi.dll e ${AMD_NR_WEIGHTS}).`
+        };
+      }
+      loader = 'dxgi.dll';
     }
 
-    onLog(`[DLSS 5] Iniciando aplicação autônoma em: ${targetDir}`);
+    onLog(`[DLSS 5] Iniciando aplicação em: ${targetDir}`);
     onLog(`[API DETECTADA] ${graphicsApi.apiName || 'DirectX'} (${graphicsApi.bitness || '64-bit'}) -> Loader: ${loader}`);
-    onLog(`[AUTOPILOT] Rota de injeção: ${route.toUpperCase()} | Neural Upstream: ${neuralUpstream ? 'ATIVADO (Pre-Upscale 1440p/4K)' : 'DESATIVADO'}`);
+    onLog(`[DLSS 5] Perfil: ${profile === 'amd' ? `AMD Radeon (${amdEngine})` : 'NVIDIA GeForce'} | Rota: ${String(route).toUpperCase()}`);
 
-    const amdEngine = payload.amdEngine || 'zluda';
-    const zludaCache = payload.zludaCache !== false;
-    let zludaCacheDir = '';
-
-    if (profile === 'amd') {
-      if (amdEngine === 'zluda') {
-        onLog('[DLSS 5] Perfil selecionado: AMD Radeon (ZLUDA HIP Neural Engine - Aceleração WMMA)');
-        onLog('[AMD ZLUDA] Motor Neural ROCm/HIP ativado (Aceleração WMMA FP16/FP8 para RDNA 3/4).');
-        try {
-          const userData = this.app?.getPath ? this.app.getPath('userData') : (process.env.APPDATA || path.join(process.cwd(), '.data'));
-          zludaCacheDir = path.join(userData, 'dlss5_zluda_cache');
-          await fs.mkdir(zludaCacheDir, { recursive: true });
-          if (zludaCache) {
-            onLog(`[AOT CACHE] Cache de pré-compilação antecipada configurado em: ${zludaCacheDir}`);
-          }
-        } catch {}
-      } else {
-        onLog('[DLSS 5] Perfil selecionado: AMD Radeon (FSR 3.1 / DirectCompute Fallback)');
-        onLog('[AMD FSR] Modo DirectCompute Fallback ativado para arquiteturas RDNA 1/2 e legadas.');
-      }
-    } else {
-      onLog(`[DLSS 5] Perfil selecionado: NVIDIA GeForce (Estável / Nativo)`);
-    }
-
-    // Resolve real C++ binaries from cache or download from official GitHub release
-    let sourceDir = await this.resolveOptiScalerSource();
-    if (!sourceDir) {
-      onLog('[DLSS 5] Baixando binários compilados oficiais do repositório OptiScaler/DLSS-NR...');
-      try {
-        sourceDir = await this.downloadOptiScalerBundle(onLog);
-      } catch (e) {
-        onLog(`[AVISO] Falha no download online: ${e.message}. Tentando arquivos locais.`);
-      }
-    }
-
-    // Create timestamped backup of existing files
+    // --- Baseline / backup bookkeeping ---------------------------------------------------
+    const prev = await this._readManifest(targetDir);
     const backupRoot = path.join(targetDir, BACKUP_DIR_NAME);
-    const backupDir = path.join(backupRoot, `backup_${Date.now()}`);
+    let backupDir = prev?.backupDir && fsRaw.existsSync(prev.backupDir) ? prev.backupDir : path.join(backupRoot, `backup_${Date.now()}`);
     await fs.mkdir(backupDir, { recursive: true });
+    const backedUp = new Set(Array.isArray(prev?.backedUp) ? prev.backedUp : []);
+    const ownedBefore = new Set((prev?.injectedFiles || []).map((f) => String(f.file).toLowerCase()));
+    const injected = new Map();
+    const createdDirs = new Set(prev?.createdDirs || []);
 
-    const backedUp = [];
-    const filesToBackup = [
-      loader, 'dxgi.dll', 'version.dll', 'winmm.dll', 'd3d12.dll',
-      'nvngx.ini', 'OptiScaler.ini', 'OptiScaler.dll',
-      'nvngx_dlss.dll', 'nvngx_dlssnr.dll', 'nvngx_dlssg.dll', 'nvngx_dlssd.dll',
-      'dlssg_to_fsr3_amd_is_better.dll',
-      'fakenvapi.dll', 'fakenvapi.ini',
-      'nvcuda.dll', 'nvapi64.dll', 'zluda.dll'
-    ];
-
-    for (const f of filesToBackup) {
-      const src = path.join(targetDir, f);
-      if (fsRaw.existsSync(src)) {
-        const dst = path.join(backupDir, f);
-        await fs.copyFile(src, dst);
-        backedUp.push(f);
-      }
-    }
-    onLog(`[DLSS 5] Backup automático criado com ${backedUp.length} arquivo(s) em ${path.basename(backupDir)}`);
-
-    // Write hardware-tuned configuration files
-    const iniOptions = {
-      ...payload,
-      amdEngine,
-      zludaCache,
-      zludaCacheDir,
-      route,
-      neuralUpstream,
-      isRemix: graphicsApi.isRemix,
-      primaryApi: graphicsApi.primaryApi || 'dx12'
+    const insideTarget = (p) => {
+      const rel = path.relative(targetDir, p);
+      return rel && !rel.startsWith('..') && !path.isAbsolute(rel);
     };
-    const iniContent = this.generateNvngxIni(profile, iniOptions);
-    await fs.writeFile(path.join(targetDir, 'OptiScaler.ini'), iniContent, 'utf8');
-    const legacyNvngxIni = path.join(targetDir, 'nvngx.ini');
-    if (fsRaw.existsSync(legacyNvngxIni)) {
-      try { await fs.unlink(legacyNvngxIni); } catch {}
-    }
-    onLog('[DLSS 5] Arquivo de configuração OptiScaler.ini gravado com parâmetros neurais.');
 
-    const injectedFiles = [];
-
-    // Copy authentic compiled binaries
-    if (sourceDir && fsRaw.existsSync(path.join(sourceDir, 'OptiScaler.dll'))) {
-      const optiSrc = path.join(sourceDir, 'OptiScaler.dll');
-      const optiDest = path.join(targetDir, 'OptiScaler.dll');
-      await fs.copyFile(optiSrc, optiDest);
-      const optiSha = await computeSha256(optiDest);
-      injectedFiles.push({ file: 'OptiScaler.dll', sha256: optiSha });
-      onLog(`[OPTISCALER] OptiScaler.dll implantado (SHA-256: ${optiSha?.slice(0, 16)}...)`);
-
-      // Deploy proxy hook loader (e.g. dxgi.dll or version.dll)
-      const loaderDest = path.join(targetDir, loader);
-      await fs.copyFile(optiSrc, loaderDest);
-      const loaderSha = await computeSha256(loaderDest);
-      injectedFiles.push({ file: loader, sha256: loaderSha });
-      onLog(`[HOOK LOADER] Proxy universal implantado como: ${loader}`);
-
-      // Deploy DLSS 5 Neural Reconstruction (nvngx_dlssnr.dll)
-      const dlssnrSrc = path.join(sourceDir, 'nvngx_dlssnr.dll');
-      if (fsRaw.existsSync(dlssnrSrc)) {
-        const dlssnrDest = path.join(targetDir, 'nvngx_dlssnr.dll');
-        await fs.copyFile(dlssnrSrc, dlssnrDest);
-        const dlssnrSha = await computeSha256(dlssnrDest);
-        injectedFiles.push({ file: 'nvngx_dlssnr.dll', sha256: dlssnrSha });
-        onLog(`[DLSS 5 NEURAL] nvngx_dlssnr.dll implantado (Modelo de Reconstrução Neural DLSS 5 ativo)`);
+    const ensureBackedUp = async (rel) => {
+      const dst = path.join(targetDir, rel);
+      if (!insideTarget(dst)) throw new Error(`Caminho fora da pasta do jogo: ${rel}`);
+      if (backedUp.has(rel) || ownedBefore.has(rel.toLowerCase())) return;
+      if (fsRaw.existsSync(dst)) {
+        const bak = path.join(backupDir, rel);
+        await fs.mkdir(path.dirname(bak), { recursive: true });
+        await fs.copyFile(dst, bak);
+        backedUp.add(rel);
       }
+    };
 
-      // Deploy DLSS 5 Super Resolution Neural Model (nvngx_dlss.dll)
-      const dlssSrc = path.join(sourceDir, 'nvngx_dlss.dll');
-      if (fsRaw.existsSync(dlssSrc)) {
-        const dlssDest = path.join(targetDir, 'nvngx_dlss.dll');
-        await fs.copyFile(dlssSrc, dlssDest);
-        const dlssSha = await computeSha256(dlssDest);
-        injectedFiles.push({ file: 'nvngx_dlss.dll', sha256: dlssSha });
-        onLog(`[DLSS 5 SR] nvngx_dlss.dll implantado (Pesos Neurais Atualizados Preset G)`);
+    const place = async (srcPath, rel, { quiet = false } = {}) => {
+      await ensureBackedUp(rel);
+      const dst = path.join(targetDir, rel);
+      const parent = path.dirname(dst);
+      if (!fsRaw.existsSync(parent)) {
+        await fs.mkdir(parent, { recursive: true });
+        createdDirs.add(path.relative(targetDir, parent));
       }
+      await fs.copyFile(srcPath, dst);
+      injected.set(rel, { file: rel, sha256: await computeSha256(dst) });
+      if (!quiet) onLog(`[DEPLOY] ${rel}`);
+    };
 
-      // Deploy DLSS 5 Frame Generation & Ray Reconstruction if present
-      for (const extraDlss of ['nvngx_dlssg.dll', 'nvngx_dlssd.dll']) {
-        const extraSrc = path.join(sourceDir, extraDlss);
-        if (fsRaw.existsSync(extraSrc)) {
-          const extraDest = path.join(targetDir, extraDlss);
-          await fs.copyFile(extraSrc, extraDest);
-          const extraSha = await computeSha256(extraDest);
-          injectedFiles.push({ file: extraDlss, sha256: extraSha });
-          onLog(`[DLSS 5 ENGINE] ${extraDlss} implantado com sucesso.`);
+    const placeContent = async (content, rel) => {
+      await ensureBackedUp(rel);
+      await fs.writeFile(path.join(targetDir, rel), content, 'utf8');
+      injected.set(rel, { file: rel, sha256: await computeSha256(path.join(targetDir, rel)) });
+    };
+
+    const placeDir = async (srcDir, relDir) => {
+      for (const e of await fs.readdir(srcDir, { withFileTypes: true })) {
+        const s = path.join(srcDir, e.name);
+        const r = path.join(relDir, e.name);
+        if (e.isDirectory()) await placeDir(s, r);
+        else if (e.isFile()) await place(s, r, { quiet: true });
+      }
+    };
+
+    let signatureState = prev?.signatureBypass || null;
+
+    try {
+      if (isNeural) {
+        // ----- AMD-NR: OptiScaler (DLSS-NR AMD backend) --------------------------------
+        const passes = [1, 2, 3].includes(Number(payload.neuralPasses)) ? Number(payload.neuralPasses) : 3;
+        await place(path.join(nrSource, 'dxgi.dll'), 'dxgi.dll');
+        for (let i = 1; i <= passes; i++) {
+          const f = `dlssnr_amd_pass${i}.dll`;
+          const s = path.join(nrSource, f);
+          if (fsRaw.existsSync(s)) await place(s, f);
+          else warnings.push(`Arquivo ausente no pacote AMD-NR: ${f}`);
         }
-      }
-
-      // Deploy Frame Generation bridge if enabled
-      if (payload.enableFrameGen !== false) {
-        const fgCandidates = [
-          'dlssg_to_fsr3_amd_is_better.dll',
-          'amd_fidelityfx_framegeneration_dx12.dll',
-          'amd_fidelityfx_upscaler_dx12.dll',
-          'amd_fidelityfx_dx12.dll',
-          'amd_fidelityfx_vk.dll'
-        ];
-        for (const fg of fgCandidates) {
-          const fgSrc = path.join(sourceDir, fg);
-          if (fsRaw.existsSync(fgSrc)) {
-            const fgDest = path.join(targetDir, fg);
-            await fs.copyFile(fgSrc, fgDest);
-            const fgSha = await computeSha256(fgDest);
-            injectedFiles.push({ file: fg, sha256: fgSha });
+        await place(path.join(nrSource, AMD_NR_WEIGHTS), AMD_NR_WEIGHTS);
+        const fwd = path.join(nrSource, 'nvngx.dll_dlssnr.dll');
+        if (fsRaw.existsSync(fwd)) await place(fwd, 'nvngx.dll_dlssnr.dll');
+        else warnings.push('Arquivo ausente no pacote AMD-NR: nvngx.dll_dlssnr.dll');
+        const libsDir = path.join(nrSource, 'OptiScaler');
+        if (fsRaw.existsSync(libsDir)) await placeDir(libsDir, 'OptiScaler');
+        const pkgIni = path.join(nrSource, 'OptiScaler.ini');
+        if (fsRaw.existsSync(pkgIni)) await place(pkgIni, 'OptiScaler.ini');
+        else warnings.push('OptiScaler.ini não veio no pacote; o OptiScaler criará um padrão no primeiro uso.');
+        onLog('[AMD-NR] Pacote implantado. Abra o jogo e use INSERT -> aba Neural para ajustar a resolução NR e os passes.');
+      } else {
+        // ----- Standard OptiScaler / DLSS-NR bundle -----------------------------------
+        let sourceDir = await this.resolveOptiScalerSource();
+        if (!sourceDir) {
+          onLog('[DLSS 5] Baixando binários oficiais...');
+          try {
+            sourceDir = await this.downloadOptiScalerBundle(onLog);
+          } catch (e) {
+            onLog(`[AVISO] Falha no download: ${e.message}`);
           }
         }
-        onLog('[FRAME GEN] Ponte de Frame Generation (dlssg_to_fsr3) implantada com sucesso.');
-
-        // Deploy FSR 4.1.1b INT8 (the3rdparty1917) specialized upscaler for AMD RDNA 2 if available
-        const fsr4Rdna2Candidate = path.resolve(process.cwd(), 'electron', 'services', 'fsr4_rdna2', 'amd_fidelityfx_upscaler_dx12.dll');
-        if (profile === 'amd' && fsRaw.existsSync(fsr4Rdna2Candidate)) {
-          const fgDest = path.join(targetDir, 'amd_fidelityfx_upscaler_dx12.dll');
-          await fs.copyFile(fsr4Rdna2Candidate, fgDest);
-          const fgSha = await computeSha256(fgDest);
-          injectedFiles.push({ file: 'amd_fidelityfx_upscaler_dx12.dll', sha256: fgSha });
-          onLog('[FSR 4.1.1b INT8] amd_fidelityfx_upscaler_dx12.dll modificado (the3rdparty1917 RDNA 2 fix) implantado com sucesso.');
-        }
-      }
-
-      // Deploy GPU & HAGS Spoofing if AMD or requested
-      if (profile === 'amd' || payload.signatureBypass !== false) {
-        const fakeSrc = path.join(sourceDir, 'fakenvapi.dll');
-        if (fsRaw.existsSync(fakeSrc)) {
-          const fakeDest = path.join(targetDir, 'fakenvapi.dll');
-          await fs.copyFile(fakeSrc, fakeDest);
-          const fakeSha = await computeSha256(fakeDest);
-          injectedFiles.push({ file: 'fakenvapi.dll', sha256: fakeSha });
-
-          // Also deploy as nvapi64.dll so Streamline/sl.interposer.dll can hook it directly
-          const nvapi64Dest = path.join(targetDir, 'nvapi64.dll');
-          await fs.copyFile(fakeSrc, nvapi64Dest);
-          const nvapi64Sha = await computeSha256(nvapi64Dest);
-          injectedFiles.push({ file: 'nvapi64.dll', sha256: nvapi64Sha });
+        if (!sourceDir || !fsRaw.existsSync(path.join(sourceDir, 'OptiScaler.dll'))) {
+          await fs.rm(backupDir, { recursive: true, force: true }).catch(() => {});
+          return { ok: false, error: 'Binários do OptiScaler indisponíveis. Baixe-os (botão de download) ou importe-os manualmente.' };
         }
 
-        // Write hardware-spoofing config for HAGS & RTX 4090
-        const fakeIni = `[fakenvapi]
-gpu_spoofing=1
-hags_spoofing=1
-force_spoofed_gpu=1
-spoofed_gpu=4090
-`;
-        await fs.writeFile(path.join(targetDir, 'fakenvapi.ini'), fakeIni, 'utf8');
-        injectedFiles.push({ file: 'fakenvapi.ini' });
-        onLog('[SPOOFING] fakenvapi e nvapi64 configurados com HAGS e RTX 4090 spoofing.');
-      }
+        const zludaCacheDir = path.join(this.getUserDataDir(), 'dlss5_zluda_cache');
+        const iniOptions = {
+          ...payload, amdEngine: amdEngine || 'fsr', zludaCache: payload.zludaCache !== false, zludaCacheDir,
+          route, neuralUpstream, isRemix: graphicsApi.isRemix, primaryApi: graphicsApi.primaryApi || 'dx12'
+        };
+        await placeContent(this.generateNvngxIni(profile, iniOptions), 'OptiScaler.ini');
+        onLog('[DLSS 5] OptiScaler.ini gravado.');
 
-      // Deploy XeSS runtime libraries if present in source bundle
-      const xessCandidates = ['libxess.dll', 'libxell.dll', 'libxess_fg.dll', 'libxess_dx11.dll'];
-      for (const xf of xessCandidates) {
-        const xfSrc = path.join(sourceDir, xf);
-        if (fsRaw.existsSync(xfSrc)) {
-          const xfDest = path.join(targetDir, xf);
-          await fs.copyFile(xfSrc, xfDest);
-          const xfSha = await computeSha256(xfDest);
-          injectedFiles.push({ file: xf, sha256: xfSha });
+        const optiSrc = path.join(sourceDir, 'OptiScaler.dll');
+        await place(optiSrc, 'OptiScaler.dll');
+        await place(optiSrc, loader);
+
+        const optional = ['nvngx_dlssnr.dll', 'nvngx_dlss.dll', 'nvngx_dlssg.dll', 'nvngx_dlssd.dll',
+          'libxess.dll', 'libxell.dll', 'libxess_fg.dll', 'libxess_dx11.dll'];
+        if (payload.enableFrameGen !== false) {
+          optional.push('dlssg_to_fsr3_amd_is_better.dll', 'amd_fidelityfx_framegeneration_dx12.dll',
+            'amd_fidelityfx_upscaler_dx12.dll', 'amd_fidelityfx_dx12.dll', 'amd_fidelityfx_vk.dll');
         }
-      }
+        for (const f of optional) {
+          const s = path.join(sourceDir, f);
+          if (fsRaw.existsSync(s)) await place(s, f);
+        }
 
-      // Deploy ZLUDA HIP Neural Runtime if AMD ZLUDA is selected
-      if (profile === 'amd' && amdEngine === 'zluda') {
-        const zludaCandidates = ['nvcuda.dll', 'nvapi64.dll', 'zluda.dll'];
-        for (const z of zludaCandidates) {
-          const zSrc = path.join(sourceDir, z);
-          if (fsRaw.existsSync(zSrc)) {
-            const zDest = path.join(targetDir, z);
-            await fs.copyFile(zSrc, zDest);
-            const zSha = await computeSha256(zDest);
-            injectedFiles.push({ file: z, sha256: zSha });
+        if (profile === 'amd' && payload.enableFrameGen !== false) {
+          const fsr4 = this._resolveFsr4Rdna2();
+          if (fsr4) await place(fsr4, 'amd_fidelityfx_upscaler_dx12.dll');
+        }
+
+        // GPU spoofing is only meaningful off NVIDIA hardware.
+        if (profile === 'amd') {
+          const fakeSrc = path.join(sourceDir, 'fakenvapi.dll');
+          if (fsRaw.existsSync(fakeSrc)) {
+            await place(fakeSrc, 'fakenvapi.dll');
+            await place(fakeSrc, 'nvapi64.dll');
+            await placeContent('[fakenvapi]\ngpu_spoofing=1\nhags_spoofing=1\nforce_spoofed_gpu=1\nspoofed_gpu=4090\n', 'fakenvapi.ini');
+            onLog('[SPOOFING] fakenvapi/nvapi64 implantados (GPU reportada como RTX 4090 para o jogo).');
           }
         }
-        onLog('[AMD ZLUDA] Bibliotecas de aceleração neural ZLUDA / ROCm implantadas.');
+
+        if (profile === 'amd' && amdEngine === 'zluda') {
+          for (const z of ['nvcuda.dll', 'zluda.dll']) {
+            const s = path.join(sourceDir, z);
+            if (fsRaw.existsSync(s)) await place(s, z);
+          }
+          onLog('[AMD ZLUDA] Bibliotecas ZLUDA copiadas apenas se presentes no pacote de origem.');
+        }
       }
-    } else {
-      onLog('[DLSS 5] Configurações gravadas. Nota: baixe os binários para completar o pacote se estiver offline.');
+
+      // Legacy config name from older versions
+      const legacyIni = path.join(targetDir, 'nvngx.ini');
+      if (fsRaw.existsSync(legacyIni) && !isNeural) {
+        await ensureBackedUp('nvngx.ini');
+        await fs.unlink(legacyIni).catch(() => {});
+      }
+
+      // Opt-in, NVIDIA only, machine-wide.
+      if (profile === 'nvidia' && payload.signatureBypass === true && !signatureState) {
+        onLog('[DLSS 5] Aplicando bypass de assinatura NVIDIA (opcional) no registro...');
+        const r = await this.applySignatureCheckBypass();
+        if (r.ok) signatureState = { applied: true, previous: r.previous };
+        else warnings.push(`Bypass de assinatura não aplicado: ${r.error || 'erro'}`);
+      }
+    } catch (err) {
+      Logger.warn('Dlss5Service', 'Falha durante apply; revertendo parcialmente', err);
+      for (const [rel] of injected) {
+        if (!ownedBefore.has(rel.toLowerCase())) await fs.unlink(path.join(targetDir, rel)).catch(() => {});
+      }
+      for (const rel of backedUp) {
+        const bak = path.join(backupDir, rel);
+        if (fsRaw.existsSync(bak)) await fs.copyFile(bak, path.join(targetDir, rel)).catch(() => {});
+      }
+      return { ok: false, error: err?.message || String(err) };
     }
 
-    // Apply driver signature check bypass in Windows registry
-    if (payload.signatureBypass !== false) {
-      onLog('[DLSS 5] Aplicando bypass de assinatura NVIDIA no registro do Windows...');
-      await this.applySignatureCheckBypass().catch(() => {});
-    }
-
+    const injectedFiles = [...injected.values(), ...(prev?.injectedFiles || []).filter((f) => !injected.has(f.file))];
     const manifest = {
       appliedAt: Date.now(),
       gameName: scanRes.gameName,
       targetDir,
       exePath: scanRes.exePath,
       profile,
+      amdEngine,
       loader,
       route,
       neuralUpstream,
       graphicsApi: scanRes.graphicsApi,
       routeInfo: scanRes.routeInfo,
       backupDir,
-      backedUp,
+      backedUp: [...backedUp],
+      createdDirs: [...createdDirs],
       injectedFiles,
+      signatureBypass: signatureState,
       options: payload
     };
     await fs.writeFile(path.join(targetDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2), 'utf8');
 
     await this.saveRecentGame({
-      gameName: scanRes.gameName,
-      targetDir,
-      exePath: scanRes.exePath,
-      profile,
-      loader,
-      route,
-      neuralUpstream,
-      engine: scanRes.engine,
-      graphicsApi: scanRes.graphicsApi
+      gameName: scanRes.gameName, targetDir, exePath: scanRes.exePath, profile, loader, route,
+      neuralUpstream, engine: scanRes.engine, graphicsApi: scanRes.graphicsApi
     });
 
-    onLog(`[SUCESSO] DLSS 5 & Reconstrução Neural ativados para ${scanRes.gameName}!`);
+    onLog(`[SUCESSO] DLSS 5 aplicado em ${scanRes.gameName}.`);
     return {
       ok: true,
-      msg: `DLSS 5 aplicado com sucesso para ${graphicsApi.apiName || 'o jogo'} (Rota: ${route}).`,
-      targetDir,
-      profile,
-      loader,
-      route,
-      neuralUpstream,
-      injectedFiles
+      msg: `DLSS 5 aplicado para ${graphicsApi.apiName || 'o jogo'} (Rota: ${route}).`,
+      targetDir, profile, amdEngine, loader, route, neuralUpstream, injectedFiles, warnings
     };
   }
 
@@ -1392,50 +1400,68 @@ spoofed_gpu=4090
     const targetDir = scanRes.targetDir;
     onLog(`[REVERSÃO] Revertendo modificações DLSS 5 em: ${targetDir}`);
 
-    const backupRoot = path.join(targetDir, BACKUP_DIR_NAME);
+    const manifest = await this._readManifest(targetDir);
+    if (!manifest) {
+      return { ok: false, error: 'Nenhuma instalação do DLSS 5 (manifesto) encontrada nesta pasta.' };
+    }
+
+    const inside = (p) => {
+      const rel = path.relative(targetDir, p);
+      return rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+    };
+
+    // 1) Remove only what we injected
+    for (const entry of manifest.injectedFiles || []) {
+      const rel = typeof entry === 'string' ? entry : entry.file;
+      if (!rel) continue;
+      const p = path.join(targetDir, rel);
+      if (!inside(p)) continue;
+      await fs.unlink(p).catch(() => {});
+    }
+
+    // 2) Restore originals recorded at install time
     let restoredCount = 0;
-
-    if (fsRaw.existsSync(backupRoot)) {
-      const backups = (await fs.readdir(backupRoot, { withFileTypes: true }))
-        .filter(e => e.isDirectory())
-        .map(e => e.name)
-        .sort()
-        .reverse();
-
-      if (backups.length > 0) {
-        const latestBackup = path.join(backupRoot, backups[0]);
-        onLog(`[REVERSÃO] Restaurando arquivos do backup: ${backups[0]}`);
-        const files = await fs.readdir(latestBackup);
-        for (const f of files) {
-          const src = path.join(latestBackup, f);
-          const dst = path.join(targetDir, f);
-          await fs.copyFile(src, dst);
-          restoredCount++;
-        }
+    const failed = [];
+    const backupDir = manifest.backupDir;
+    for (const rel of manifest.backedUp || []) {
+      const src = backupDir ? path.join(backupDir, rel) : null;
+      const dst = path.join(targetDir, rel);
+      if (!src || !inside(dst) || !fsRaw.existsSync(src)) { failed.push(rel); continue; }
+      try {
+        await fs.mkdir(path.dirname(dst), { recursive: true });
+        await fs.copyFile(src, dst);
+        restoredCount++;
+      } catch {
+        failed.push(rel);
       }
     }
 
-    const filesToRemove = [
-      'dxgi.dll', 'version.dll', 'winmm.dll', 'd3d12.dll', 'OptiScaler.dll',
-      'OptiScaler.ini', 'nvngx.ini', 'OptiScaler.log',
-      'nvngx_dlssnr.dll', 'nvngx_dlssd.dll', 'nvngx_dlssg.dll',
-      'dlssg_to_fsr3_amd_is_better.dll',
-      'amd_fidelityfx_framegeneration_dx12.dll', 'amd_fidelityfx_upscaler_dx12.dll',
-      'amd_fidelityfx_dx12.dll', 'amd_fidelityfx_vk.dll',
-      'libxess.dll', 'libxell.dll', 'libxess_fg.dll', 'libxess_dx11.dll',
-      'fakenvapi.dll', 'fakenvapi.ini', 'fakenvapi.log',
-      'nvcuda.dll', 'nvapi64.dll', 'zluda.dll', MANIFEST_NAME
-    ];
-
-    for (const f of filesToRemove) {
-      const p = path.join(targetDir, f);
-      if (fsRaw.existsSync(p)) {
-        try { await fs.unlink(p); } catch {}
-      }
+    // 3) Remove empty directories we created (deepest first)
+    const dirs = [...(manifest.createdDirs || [])].sort((a, b) => b.length - a.length);
+    for (const rel of dirs) {
+      const d = path.join(targetDir, rel);
+      if (inside(d)) await fs.rmdir(d).catch(() => {});
     }
 
-    onLog(`[SUCESSO] Mod DLSS 5 desinstalado. ${restoredCount} arquivo(s) original(is) restaurado(s).`);
-    return { ok: true, msg: 'DLSS 5 removido e arquivos originais restaurados com sucesso.', restoredCount };
+    // 4) Registry bypass
+    if (manifest.signatureBypass?.applied) {
+      await this.restoreSignatureCheckBypass(manifest.signatureBypass.previous);
+    }
+
+    // 5) Cleanup
+    if (failed.length === 0 && backupDir && inside(backupDir)) {
+      await fs.rm(backupDir, { recursive: true, force: true }).catch(() => {});
+      await fs.rmdir(path.join(targetDir, BACKUP_DIR_NAME)).catch(() => {});
+    }
+    await fs.unlink(path.join(targetDir, MANIFEST_NAME)).catch(() => {});
+
+    onLog(`[SUCESSO] DLSS 5 desinstalado. ${restoredCount} arquivo(s) original(is) restaurado(s).`);
+    return {
+      ok: true,
+      msg: failed.length ? `DLSS 5 removido, mas ${failed.length} arquivo(s) original(is) não puderam ser restaurados.` : 'DLSS 5 removido e arquivos originais restaurados com sucesso.',
+      restoredCount,
+      failed
+    };
   }
 }
 

@@ -1,4 +1,3 @@
-import { useI18n } from '../i18n/I18nProvider';
 import { useCallback, useEffect, useState } from 'react';
 
 interface ProgressEvent {

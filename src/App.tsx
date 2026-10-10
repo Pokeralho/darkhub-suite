@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import Layout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
-import { I18nProvider, useI18n } from './i18n/I18nProvider';
+import { I18nProvider } from './i18n/I18nProvider';
 import UpdaterOverlay from './components/UpdaterOverlay';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -26,6 +26,7 @@ const NetworkTools = lazy(() => import('./pages/NetworkTools'));
 const DevTools = lazy(() => import('./pages/DevTools'));
 const OptiScalerManager = lazy(() => import('./pages/OptiScalerManager'));
 const Dlss5Manager = lazy(() => import('./pages/Dlss5Manager'));
+const Downloads = lazy(() => import('./pages/Downloads'));
 const SetupHub = lazy(() => import('./pages/SetupHub'));
 const DllInjector = lazy(() => import('./pages/DllInjector'));
 const FramePacer = lazy(() => import('./pages/FramePacer'));
@@ -35,6 +36,8 @@ const Home = lazy(() => import('./pages/Home'));
 const App = () => {
   const [currentPage, setCurrentPage] = useState('home');
   const lastReportRef = useRef<number>(0)
+  const currentPageRef = useRef<string>('home')
+  currentPageRef.current = currentPage
 
   useEffect(() => {
     const report = async (payload: any) => {
@@ -44,7 +47,7 @@ const App = () => {
       try {
         const res = await window.darkhub?.discord?.reportError?.({
           source: 'renderer',
-          page: currentPage,
+          page: currentPageRef.current,
           ...payload
         })
         if (res && res.ok === false) {
@@ -72,7 +75,7 @@ const App = () => {
       window.removeEventListener('error', onError)
       window.removeEventListener('unhandledrejection', onRejection)
     }
-  }, [currentPage])
+  }, [])
 
   const renderPage = () => {
     switch (currentPage) {
@@ -113,6 +116,8 @@ const App = () => {
         return <OptiScalerManager onNavigate={(p: string) => setCurrentPage(p)} />;
       case 'dlss5':
         return <Dlss5Manager />;
+      case 'downloads':
+        return <Downloads />;
       case 'luluflix':
         return <LuluFlix />;
       case 'juuzou':
@@ -133,7 +138,7 @@ const App = () => {
       case 'settings':
         return <SettingsPage />;
       default:
-        return <Dashboard />;
+        return <Home onNavigate={(p: string) => setCurrentPage(p)} />;
     }
   };
 

@@ -19,18 +19,23 @@ public struct PacerConfig
     public uint enabled;
 }
 
-[StructLayout(LayoutKind.Sequential)]
-public struct PacerTelemetry
+// Telemetry v2 layout (see PacerTelemetryV2 in native_pacer/src/lib.rs). Offsets are explicit on purpose.
+class TelemetrySnapshot
 {
-    public uint magic;
-    public ulong frame_count;
-    public float current_fps;
-    public float current_frametime_ms;
-    public float avg_fps;
-    public float low1_percent;
-    public float jitter_ms;
-    public uint target_fps;
-    public uint game_pid;
+    public ulong FrameCount;
+    public long LastPresentQpc;
+    public long QpcFreq;
+    public uint GamePid;
+    public uint TargetFps;
+    public float CurrentFps;
+    public float CurrentFrametimeMs;
+    public float AvgFps;
+    public float Low1Fps;
+    public float Low01Fps;
+    public float JitterMs;
+    public uint StutterCount;
+    public uint SampleCount;
+    public float[] Ring;
 }
 
 class DarkHubFrameLimiter
@@ -274,27 +279,92 @@ class DarkHubFrameLimiter
         }
     }
 
-    static bool ReadSharedTelemetry(out PacerTelemetry tel)
+    const uint TEL_MAGIC = 0x324D4C54; // 'TLM2'
+    const int TEL_RING = 240;
+    const int TEL_SIZE = 80 + TEL_RING * 4;
+
+    static MemoryMappedFile telMap;
+    static MemoryMappedViewAccessor telView;
+    static readonly byte[] telBuf = new byte[TEL_SIZE];
+
+    static bool OpenTelemetry()
     {
-        tel = new PacerTelemetry();
-        string[] names = { "DarkHub_Pacer_Telemetry", "Local\\DarkHub_Pacer_Telemetry", "Global\\DarkHub_Pacer_Telemetry" };
+        if (telView != null) return true;
+        string[] names = { "DarkHub_Pacer_Telemetry2", "Local\\DarkHub_Pacer_Telemetry2", "Global\\DarkHub_Pacer_Telemetry2" };
         foreach (string name in names)
         {
             try
             {
-                using (var mmf = MemoryMappedFile.OpenExisting(name))
-                {
-                    using (var acc = mmf.CreateViewAccessor())
-                    {
-                        acc.Read(0, out tel);
-                        if (tel.magic == 0x54454C45 && tel.current_fps > 0.05f)
-                        {
-                            return true;
-                        }
-                    }
-                }
+                telMap = MemoryMappedFile.OpenExisting(name, MemoryMappedFileRights.Read);
+                telView = telMap.CreateViewAccessor(0, TEL_SIZE, MemoryMappedFileAccess.Read);
+                return true;
             }
             catch { }
+        }
+        return false;
+    }
+
+    static void CloseTelemetry()
+    {
+        try { if (telView != null) telView.Dispose(); } catch { }
+        try { if (telMap != null) telMap.Dispose(); } catch { }
+        telView = null;
+        telMap = null;
+    }
+
+    /// <summary>
+    /// Reads one consistent snapshot using the writer's seqlock. Returns false when the game is not
+    /// producing frames (no mapping, stale data, other process). Nothing is ever estimated here.
+    /// </summary>
+    static bool ReadSharedTelemetry(int expectedPid, out TelemetrySnapshot snap)
+    {
+        snap = null;
+        if (!OpenTelemetry()) return false;
+
+        for (int attempt = 0; attempt < 4; attempt++)
+        {
+            uint seq1, seq2;
+            try
+            {
+                seq1 = telView.ReadUInt32(4);
+                if ((seq1 & 1) != 0) { Thread.Sleep(1); continue; }
+                telView.ReadArray(0, telBuf, 0, TEL_SIZE);
+                seq2 = telView.ReadUInt32(4);
+            }
+            catch { CloseTelemetry(); return false; }
+
+            if (seq1 != seq2) continue;
+
+            if (BitConverter.ToUInt32(telBuf, 0) != TEL_MAGIC) return false;
+
+            TelemetrySnapshot t = new TelemetrySnapshot();
+            t.FrameCount = BitConverter.ToUInt64(telBuf, 8);
+            t.LastPresentQpc = BitConverter.ToInt64(telBuf, 16);
+            t.QpcFreq = BitConverter.ToInt64(telBuf, 24);
+            t.GamePid = BitConverter.ToUInt32(telBuf, 32);
+            t.TargetFps = BitConverter.ToUInt32(telBuf, 36);
+            t.CurrentFps = BitConverter.ToSingle(telBuf, 40);
+            t.CurrentFrametimeMs = BitConverter.ToSingle(telBuf, 44);
+            t.AvgFps = BitConverter.ToSingle(telBuf, 48);
+            t.Low1Fps = BitConverter.ToSingle(telBuf, 52);
+            t.Low01Fps = BitConverter.ToSingle(telBuf, 56);
+            t.JitterMs = BitConverter.ToSingle(telBuf, 60);
+            t.StutterCount = BitConverter.ToUInt32(telBuf, 64);
+            t.SampleCount = BitConverter.ToUInt32(telBuf, 68);
+            uint ringLen = BitConverter.ToUInt32(telBuf, 72);
+            if (ringLen > TEL_RING) ringLen = TEL_RING;
+            t.Ring = new float[ringLen];
+            for (int i = 0; i < ringLen; i++) t.Ring[i] = BitConverter.ToSingle(telBuf, 80 + i * 4);
+
+            if (t.FrameCount == 0 || t.QpcFreq <= 0 || t.LastPresentQpc <= 0) return false;
+            if (expectedPid > 0 && t.GamePid != (uint)expectedPid) return false;
+
+            // Stale = the game stopped presenting (paused, minimised, closed).
+            double ageSec = (double)(Stopwatch.GetTimestamp() - t.LastPresentQpc) / (double)Stopwatch.Frequency;
+            if (ageSec > 1.5 || ageSec < -1.0) return false;
+
+            snap = t;
+            return true;
         }
         return false;
     }
@@ -306,28 +376,37 @@ class DarkHubFrameLimiter
 
     static string EscJ(string s) { return s == null ? "" : s.Replace("\\", "\\\\").Replace("\"", "\\\""); }
 
-    static void EmitTelemetry(string game, double fps, double ft, double avgFps, double low1, double jit, List<double> history, string method)
+    static void EmitTelemetry(string game, TelemetrySnapshot t, string method)
     {
+        bool live = t != null;
         double tft = targetFps > 0 ? 1000.0 / targetFps : 0;
         StringBuilder sb = new StringBuilder(2048);
         sb.Append("{\"ok\":true,\"isRunning\":true");
+        sb.Append(",\"hasLiveTelemetry\":").Append(live ? "true" : "false");
         sb.Append(",\"targetFps\":").Append(targetFps);
         sb.Append(",\"pacingMode\":\"").Append(pacingMode).Append("\"");
         sb.Append(",\"targetFrametimeMs\":").Append(Fd(tft, 2));
-        sb.Append(",\"currentFps\":").Append(Fd(fps, 1));
-        sb.Append(",\"avgFps\":").Append(Fd(avgFps, 1));
-        sb.Append(",\"low1Percent\":").Append(Fd(low1, 1));
-        sb.Append(",\"low01Percent\":").Append(Fd(low1 * 0.92, 1));
-        sb.Append(",\"currentFrametimeMs\":").Append(Fd(ft, 2));
-        sb.Append(",\"frametimeJitterMs\":").Append(Fd(jit, 2));
-        sb.Append(",\"stutterCount\":0");
+        sb.Append(",\"currentFps\":").Append(live ? Fd(t.CurrentFps, 1) : "0");
+        sb.Append(",\"avgFps\":").Append(live ? Fd(t.AvgFps, 1) : "0");
+        sb.Append(",\"low1Percent\":").Append(live ? Fd(t.Low1Fps, 1) : "0");
+        // 0.1% low needs >= 1000 captured frames; until then it is reported as "not available" (null).
+        sb.Append(",\"low01Percent\":").Append(live && t.Low01Fps > 0 ? Fd(t.Low01Fps, 1) : "null");
+        sb.Append(",\"currentFrametimeMs\":").Append(live ? Fd(t.CurrentFrametimeMs, 2) : "0");
+        sb.Append(",\"frametimeJitterMs\":").Append(live ? Fd(t.JitterMs, 2) : "0");
+        sb.Append(",\"stutterCount\":").Append(live ? t.StutterCount.ToString(INV) : "0");
+        sb.Append(",\"sampleCount\":").Append(live ? t.SampleCount.ToString(INV) : "0");
         sb.Append(",\"activeGame\":\"").Append(EscJ(game)).Append("\"");
         sb.Append(",\"driverMethod\":\"").Append(EscJ(method)).Append("\"");
         sb.Append(",\"history\":[");
-        for (int i = 0; i < history.Count; i++)
+        if (live)
         {
-            if (i > 0) sb.Append(",");
-            sb.Append(history[i].ToString(INV));
+            // Real frame times straight from the hook (most recent 120), oldest first.
+            int start = Math.Max(0, t.Ring.Length - 120);
+            for (int i = start; i < t.Ring.Length; i++)
+            {
+                if (i > start) sb.Append(",");
+                sb.Append(Fd(t.Ring[i], 2));
+            }
         }
         sb.Append("]}");
         Console.Out.WriteLine(sb.ToString());
@@ -389,7 +468,6 @@ class DarkHubFrameLimiter
         stdinThread.IsBackground = true;
         stdinThread.Start();
 
-        List<double> localHistory = new List<double>();
         string activeGameName = "Nenhum Jogo Detectado";
         int currentGamePid = 0;
         DateTime lastScanTime = DateTime.MinValue;
@@ -398,7 +476,9 @@ class DarkHubFrameLimiter
         {
             DateTime now = DateTime.UtcNow;
 
-            if ((now - lastScanTime).TotalMilliseconds > 1500 || currentGamePid == 0)
+            // Enumerating every process is expensive: scan every 1.5s while tracking a game, every 4s while idle.
+            double scanEveryMs = currentGamePid == 0 ? 4000 : 1500;
+            if ((now - lastScanTime).TotalMilliseconds > scanEveryMs || lastScanTime == DateTime.MinValue)
             {
                 string detectedName;
                 int detectedPid = DetectActiveGame(out detectedName);
@@ -425,25 +505,14 @@ class DarkHubFrameLimiter
                 lastScanTime = now;
             }
 
-            PacerTelemetry tel;
-            bool hasLiveTelemetry = ReadSharedTelemetry(out tel);
-
-            if (hasLiveTelemetry)
+            TelemetrySnapshot tel;
+            if (ReadSharedTelemetry(currentGamePid, out tel))
             {
-                double currentFps = tel.current_fps;
-                double currentFt = tel.current_frametime_ms;
-                double avgFps = tel.avg_fps;
-                double low1 = tel.low1_percent;
-                double jitter = tel.jitter_ms;
-
-                localHistory.Add(Math.Round(currentFt, 2));
-                while (localHistory.Count > 120) localHistory.RemoveAt(0);
-
-                EmitTelemetry(activeGameName, currentFps, currentFt, avgFps, low1, jitter, localHistory, "In-Game DXGI Present Hook");
+                EmitTelemetry(activeGameName, tel, "In-Game DXGI Present Hook");
             }
             else
             {
-                EmitTelemetry(activeGameName, 0, 0, 0, 0, 0, localHistory, "Procurando Renderizador 3D...");
+                EmitTelemetry(activeGameName, null, currentGamePid > 0 ? "Aguardando frames do jogo..." : "Procurando Renderizador 3D...");
             }
 
             Thread.Sleep(80);

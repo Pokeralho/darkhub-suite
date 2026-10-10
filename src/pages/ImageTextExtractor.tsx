@@ -173,9 +173,9 @@ export default function ImageTextExtractor() {
             onChange={(e) => setLang(e.target.value as any)}
             className="bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 font-mono focus:outline-none"
           >
-            <option value="eng+por">Português + Inglês</option>
-            <option value="por">Apenas Português</option>
-            <option value="eng">Apenas Inglês</option>
+            <option value="eng+por">{t('ocr.langPorEng', 'Português + Inglês')}</option>
+            <option value="por">{t('ocr.langPor', 'Apenas Português')}</option>
+            <option value="eng">{t('ocr.langEng', 'Apenas Inglês')}</option>
           </select>
 
           <label className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 cursor-pointer select-none">
@@ -307,7 +307,7 @@ export default function ImageTextExtractor() {
             {isExtracting ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-2 text-xs text-zinc-400">
                 <Loader2 className="w-5 h-5 animate-spin text-rose-500" />
-                <span>Processando reconhecimento óptico de caracteres...</span>
+                <span>{t('ocr.processing', 'Processando reconhecimento óptico de caracteres...')}</span>
               </div>
             ) : (
               <textarea

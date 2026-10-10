@@ -1,4 +1,3 @@
-import { useI18n } from '../i18n/I18nProvider';
 import React, { useState } from 'react';
 import { HelpCircle, X } from 'lucide-react';
 
@@ -24,7 +23,6 @@ export const HelpTip: React.FC<HelpTipProps> = ({
   sections = [],
   children
 }) => {
-  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
 
   return (
