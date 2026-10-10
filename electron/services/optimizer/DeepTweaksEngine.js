@@ -501,7 +501,7 @@ class DeepTweaksEngine {
     }
     if (unique.length === 0) return new Map();
     try {
-      const res = await runPowerShell(buildRegistryReadScript(unique), { timeoutMs: 30000, trim: true });
+      const res = await runPowerShell(buildRegistryReadScript(unique), { timeoutMs: 15000, trim: true });
       if (res.code !== 0 && !res.stdout) return null;
       const map = parseRegistryReadOutput(res.stdout);
       return map.size ? map : null;

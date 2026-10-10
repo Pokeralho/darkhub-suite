@@ -381,7 +381,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
         </div>
 
-        {}
+        {/* Junk Card */}
         <div
           onClick={handleCleanJunk}
           title="Clique para limpar arquivos temporários e cache"
@@ -401,9 +401,21 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               </p>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              refreshJunk?.(true);
+            }}
+            disabled={junkLoading}
+            title="Recalcular lixo e caches residuais"
+            className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-500 hover:text-blue-400 transition"
+          >
+            <RefreshCw size={13} className={junkLoading ? 'animate-spin text-blue-400' : ''} />
+          </button>
         </div>
 
-        {}
+        {/* Disk Card */}
         <div
           onClick={() => onNavigate && onNavigate('optimizer')}
           title="Clique para abrir as Otimizações de Disco e Sistema"
@@ -413,7 +425,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <HardDrive size={20} />
           </div>
           <div className="min-w-0">
-            <p className="text-xs text-zinc-400 font-medium">{t('dashboard.disk')}</p>
+            <p className="text-xs text-zinc-400 font-medium">{t('dashboard.diskActivity', 'Atividade de disco')}</p>
             <p className="text-base sm:text-lg font-bold text-zinc-100 tabular-nums whitespace-nowrap font-mono">
               {diskActivityPct !== '...' && diskActivityPct !== 'Erro' ? `${diskActivityPct}%` : diskActivityPct}
             </p>
@@ -474,11 +486,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           <div className="flex items-center gap-3 text-xs text-zinc-400">
             <span className="flex items-center gap-1 font-mono">
               <Clock size={13} className="text-blue-400" />
-              Timer: <strong className="text-emerald-400">{timerInfo?.current_ms ? `${timerInfo.current_ms} ms` : '0.5000 ms'}</strong>
+              Timer: <strong className="text-emerald-400">{timerInfo?.current_ms != null && timerInfo.current_ms > 0 ? `${timerInfo.current_ms.toFixed(4)} ms` : '--'}</strong>
             </span>
             {cpuTopology?.logical_cores ? (
               <span className="font-mono text-zinc-300">
-                {cpuTopology.logical_cores} Threads {cpuTopology.logical_cores >= 12 ? '• P-Cores Ready' : ''}
+                {cpuTopology.logical_cores} Threads{cpuTopology.physical_cores ? ` • ${cpuTopology.physical_cores} Cores` : ''}
               </span>
             ) : null}
           </div>

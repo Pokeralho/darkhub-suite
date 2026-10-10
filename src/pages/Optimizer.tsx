@@ -78,6 +78,9 @@ export default function Optimizer() {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [tweakStatus, setTweakStatus] = useState<Record<string, boolean>>({});
   const [tweakPartial, setTweakPartial] = useState<Record<string, boolean>>({});
+  const [isCheckingStatus, setIsCheckingStatus] = useState<boolean>(true);
+  const [statusError, setStatusError] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<boolean>(false);
   const [isAdminUser, setIsAdminUser] = useState<boolean | null>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [optimizingId, setOptimizingId] = useState<string | null>(null);
@@ -170,47 +173,76 @@ export default function Optimizer() {
     labelsRef.current = map;
   }, [operations, t]);
 
+  const loadedTabsRef = useRef<Set<string>>(new Set());
+
   const loadInitialData = async () => {
     if (!api()) return;
+    setLoadError(false);
     try {
-      const [ops, deepList, statusRes, admin, profs] = await Promise.all([
+      const [ops, deepList, admin, profs] = await Promise.all([
         api().listOperations().catch(() => []),
         api().deepTweaksList().catch(() => []),
-        api().deepTweaksStatus().catch(() => ({ ok: false, status: {} })),
         api().checkIsAdmin().catch(() => false),
         api().listProfiles?.().catch(() => []) ?? Promise.resolve([])
       ]);
-      setOperations(Array.isArray(ops) ? ops : []);
-      setDeepTweaks(Array.isArray(deepList) ? deepList : []);
+      const validOps = Array.isArray(ops) ? ops : [];
+      const validDeep = Array.isArray(deepList) ? deepList : [];
+      setOperations(validOps);
+      setDeepTweaks(validDeep);
       setProfiles(Array.isArray(profs) ? profs : []);
+      setIsAdminUser(Boolean(admin));
+
+      if (validOps.length === 0 && validDeep.length === 0) {
+        setLoadError(true);
+      }
+    } catch (e: any) {
+      console.error(e);
+      setLoadError(true);
+    }
+
+    // Check status asynchronously without blocking UI render
+    setIsCheckingStatus(true);
+    setStatusError(false);
+    try {
+      const statusRes = await api().deepTweaksStatus().catch(() => null);
       if (statusRes?.ok) {
         setTweakStatus(statusRes.status || {});
         setTweakPartial(statusRes.partial || {});
+        setStatusError(false);
+      } else {
+        setStatusError(true);
       }
-      setIsAdminUser(Boolean(admin));
-    } catch (e: any) {
-      console.error(e);
+    } catch {
+      setStatusError(true);
+    } finally {
+      setIsCheckingStatus(false);
     }
   };
 
   const refreshStatus = async () => {
     if (!api()?.deepTweaksStatus) return null;
+    setIsCheckingStatus(true);
+    setStatusError(false);
     try {
       const res = await api().deepTweaksStatus();
       if (res?.ok) {
         setTweakStatus(res.status || {});
         setTweakPartial(res.partial || {});
+        setStatusError(false);
         return res.status || {};
+      } else {
+        setStatusError(true);
       }
-    } catch {}
+    } catch {
+      setStatusError(true);
+    } finally {
+      setIsCheckingStatus(false);
+    }
     return null;
   };
 
   useEffect(() => {
     loadInitialData();
-    loadDefenderStatus();
-    refreshDnsState();
-    loadGpuData();
 
     if (api()?.onRunEvent) {
       const unsub = api().onRunEvent((ev: any) => {
@@ -234,6 +266,21 @@ export default function Optimizer() {
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Lazy load tab data only when user navigates to the tab
+  useEffect(() => {
+    if (activeTab === 'defender' && !loadedTabsRef.current.has('defender')) {
+      loadedTabsRef.current.add('defender');
+      loadDefenderStatus();
+    } else if (activeTab === 'network' && !loadedTabsRef.current.has('network')) {
+      loadedTabsRef.current.add('network');
+      refreshDnsState();
+    } else if (activeTab === 'gpu' && !loadedTabsRef.current.has('gpu')) {
+      loadedTabsRef.current.add('gpu');
+      loadGpuData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   /** Runs operations (sequentially in the backend) and returns one honest result per operation. */
   const runOps = async (ids: string[]): Promise<RunResult[]> => {
@@ -437,14 +484,14 @@ export default function Optimizer() {
         securityRelated: Boolean(dt.securityRelated),
         warning: dt.warning ? String(dt.warning) : null,
         revertId: null,
-        applied: Boolean(tweakStatus[dt.id]),
+        applied: tweakStatus[dt.id] !== undefined ? Boolean(tweakStatus[dt.id]) : null,
         partial: Boolean(tweakPartial[dt.id]),
         recommended: dt.recommended === true
       });
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [operations, deepTweaks, tweakStatus, tweakPartial, t]);
+  }, [operations, deepTweaks, tweakStatus, tweakPartial, isCheckingStatus, t]);
 
   const filteredTweaks = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -1316,6 +1363,37 @@ export default function Optimizer() {
             </div>
           </div>
 
+          {statusError && (
+            <div className="p-3 bg-amber-950/30 border border-amber-500/30 rounded-xl flex items-center justify-between text-xs text-amber-200">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>{t('optimizer.audit.statusCheckError', 'Não foi possível verificar o estado dos ajustes no Windows.')}</span>
+              </div>
+              <button
+                onClick={refreshStatus}
+                disabled={isCheckingStatus}
+                className="px-2.5 py-1 bg-amber-900/60 hover:bg-amber-800 text-amber-100 rounded-lg text-xs font-medium border border-amber-500/40 transition flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isCheckingStatus ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                {t('optimizer.audit.retry', 'Tentar de novo')}
+              </button>
+            </div>
+          )}
+
+          {loadError && operations.length === 0 && deepTweaks.length === 0 && (
+            <div className="p-8 text-center bg-zinc-900/40 border border-red-500/30 rounded-2xl flex flex-col items-center justify-center gap-3">
+              <AlertTriangle className="w-8 h-8 text-red-400" />
+              <p className="text-sm text-zinc-300 font-medium">{t('optimizer.audit.loadFail', 'Erro ao carregar a lista de ajustes.')}</p>
+              <button
+                onClick={loadInitialData}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-lg transition flex items-center gap-2"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                {t('optimizer.audit.retry', 'Tentar de novo')}
+              </button>
+            </div>
+          )}
+
           {/* Tweaks Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
             {filteredTweaks.map((tweak) => {
@@ -1365,6 +1443,17 @@ export default function Optimizer() {
                         {tweak.requiresAdmin && (
                           <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
                             {t('optimizer.audit.badge.admin', 'ADMIN')}
+                          </span>
+                        )}
+                        {tweak.applied === null && isCheckingStatus && tweak.kind === 'deep' && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                            {t('optimizer.audit.badge.checking', 'verificando...')}
+                          </span>
+                        )}
+                        {tweak.applied === null && !isCheckingStatus && tweak.kind === 'deep' && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">
+                            {t('optimizer.audit.badge.unknown', 'NÃO VERIFICADO')}
                           </span>
                         )}
                         {tweak.applied === true && (

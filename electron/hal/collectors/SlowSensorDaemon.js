@@ -81,7 +81,8 @@ class SlowSensorDaemon extends EventEmitter {
       'while ($true) {',
       '  $tick++',
 
-      '  if (($tick % $procsEvery) -eq 1) {',
+      '  $procsFlag = Join-Path $env:TEMP "darkhub_procs_enabled.flag"',
+      '  if (($tick % $procsEvery) -eq 1 -and (Test-Path $procsFlag)) {',
       '    try {',
       '      $procs = Get-Process',
       '      $now = [DateTime]::UtcNow',

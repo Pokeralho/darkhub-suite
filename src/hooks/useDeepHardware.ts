@@ -1,40 +1,42 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
 export function useDeepHardware() {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<Record<string, any>>({});
+  const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
+  const [errorMap, setErrorMap] = useState<Record<string, string | null>>({});
 
-  const fetchDeepInfo = useCallback(async (forceRefresh = false) => {
-    if (!window.darkhub) {
-      setError('DarkHub API não disponível.');
-      setLoading(false);
-      return;
-    }
+  const fetchCategory = useCallback(async (cat: string, forceRefresh = false) => {
+    if (!window.darkhub?.system?.getDeepCategory) return null;
+    if (categories[cat] && !forceRefresh) return categories[cat];
 
-    setLoading(true);
-    setError(null);
+    setLoadingMap(prev => ({ ...prev, [cat]: true }));
+    setErrorMap(prev => ({ ...prev, [cat]: null }));
+
     try {
-      const result = await window.darkhub.system.getDeepHardwareInfo(forceRefresh);
-      setData(result);
+      const res = await window.darkhub.system.getDeepCategory(cat, forceRefresh);
+      setCategories(prev => {
+        const next = { ...prev, [cat]: res };
+        if (cat === 'mobo') next['mainboard'] = res;
+        if (cat === 'mainboard') next['mobo'] = res;
+        if (cat === 'ram') next['memory'] = res;
+        if (cat === 'memory') next['ram'] = res;
+        return next;
+      });
+      return res;
     } catch (e: any) {
-      setError(e.message || 'Falha ao buscar dados de hardware profundo.');
+      setErrorMap(prev => ({ ...prev, [cat]: e.message || 'Erro ao carregar dados' }));
+      return null;
     } finally {
-      setLoading(false);
+      setLoadingMap(prev => ({ ...prev, [cat]: false }));
     }
-  }, []);
+  }, [categories]);
 
-  useEffect(() => {
-    let active = true;
-
-    const init = async () => {
-      if (active) await fetchDeepInfo(false);
-    };
-
-    init();
-
-    return () => { active = false; };
-  }, [fetchDeepInfo]);
-
-  return { data, loading, error, refresh: () => fetchDeepInfo(true) };
+  return {
+    data: categories,
+    categories,
+    loadingMap,
+    errorMap,
+    fetchCategory,
+    refreshCategory: (cat: string) => fetchCategory(cat, true)
+  };
 }

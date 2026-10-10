@@ -1130,6 +1130,26 @@ ipcMain.handle('system:getDeepHardwareInfo', async (_, forceRefresh) => {
   return await DeepHardwareService.getDeepInfo(forceRefresh);
 })
 
+ipcMain.handle('system:getDeepCategory', async (_, category, forceRefresh) => {
+  return await DeepHardwareService.getCategory(category, forceRefresh);
+})
+
+const PROCS_FLAG = path.join(os.tmpdir(), 'darkhub_procs_enabled.flag');
+try { if (fs.existsSync(PROCS_FLAG)) fs.unlinkSync(PROCS_FLAG); } catch {}
+
+ipcMain.handle('system:enableProcessTracking', (_, enabled) => {
+  try {
+    if (enabled) {
+      fs.writeFileSync(PROCS_FLAG, '1', 'utf8');
+    } else {
+      if (fs.existsSync(PROCS_FLAG)) fs.unlinkSync(PROCS_FLAG);
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+})
+
 let cachedAdvancedHW = null
 ipcMain.handle('system:getAdvancedHardware', async () => {
   if (cachedAdvancedHW) return cachedAdvancedHW
@@ -4377,6 +4397,12 @@ app.on('before-quit', (event) => {
   try { void downloadsService.shutdown() } catch {}
   try {
     UpdateService.destroy()
+  } catch {}
+  try {
+    HardwareService.teardown()
+  } catch {}
+  try {
+    if (fs.existsSync(PROCS_FLAG)) fs.unlinkSync(PROCS_FLAG)
   } catch {}
   if (!latencyGuardianStopHandled && latencyGuardianHandle?.stop) {
     latencyGuardianStopHandled = true

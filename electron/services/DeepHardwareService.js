@@ -354,6 +354,32 @@ class DeepHardwareService {
 
     return this.cache;
   }
+
+  async getCategory(category, forceRefresh = false) {
+    if (!this.cache) this.cache = {};
+    if (this.cache[category] && !forceRefresh) return this.cache[category];
+
+    let result = null;
+    switch (category) {
+      case 'cpu': result = await this.fetchCpu(); break;
+      case 'mobo':
+      case 'mainboard': result = await this.fetchMainboard(); break;
+      case 'ram':
+      case 'memory': result = await this.fetchMemory(); break;
+      case 'gpu': result = await this.fetchGpu(); break;
+      case 'storage': result = await this.fetchStorage(); break;
+      case 'network': result = await this.fetchNetwork(); break;
+      case 'os': result = await this.fetchOS(); break;
+      case 'monitors': result = await this.fetchMonitors(); break;
+      default: return null;
+    }
+    this.cache[category] = result;
+    if (category === 'mobo') this.cache['mainboard'] = result;
+    if (category === 'mainboard') this.cache['mobo'] = result;
+    if (category === 'ram') this.cache['memory'] = result;
+    if (category === 'memory') this.cache['ram'] = result;
+    return result;
+  }
 }
 
 export default new DeepHardwareService();

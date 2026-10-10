@@ -1,10 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useI18n } from '../i18n/I18nProvider';
 import {
   Cpu, Server, HardDrive, Network, Monitor, Zap,
   RefreshCw, AlertTriangle, PlaySquare, ShieldCheck,
   CheckCircle2, LayoutTemplate, Wifi, FileDigit, CpuIcon, Activity, List, Thermometer, Copy, Clock,
-  Loader2
+  Loader2, Filter
 } from 'lucide-react';
 import { useSystemMetrics } from '../hooks/useSystemMetrics';
 import { useDeepHardware } from '../hooks/useDeepHardware';
@@ -21,7 +21,7 @@ const formatBytes = (bytes: number | null | undefined) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-const PropertyRow = ({ label, value, status }: { label: string, value: React.ReactNode, status?: string }) => (
+const PropertyRow = ({ label, value, status }: { label: string; value: React.ReactNode; status?: string }) => (
   <div className="flex justify-between items-center py-2.5 border-b border-zinc-800/80 last:border-0 hover:bg-zinc-800/30 px-3 rounded transition-colors group">
     <span className="text-sm text-zinc-400 group-hover:text-zinc-300">{label}</span>
     <div className="flex items-center gap-2">
@@ -32,22 +32,46 @@ const PropertyRow = ({ label, value, status }: { label: string, value: React.Rea
   </div>
 );
 
-const Gauge = React.memo(({ label, value, unit, history, color = "#3b82f6" }: any) => (
-  <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex flex-col gap-2">
-    <div className="flex justify-between items-end">
-      <span className="text-zinc-400 text-sm">{label}</span>
-      <span className="text-2xl font-bold text-white tracking-tighter">
-        {value != null ? value : '-'}
-        <span className="text-sm text-zinc-500 ml-1">{unit}</span>
-      </span>
-    </div>
-    <div className="h-10 mt-2">
-      <Sparkline data={history} min={0} max={100} color={color} />
-    </div>
-  </div>
-));
+const Gauge = React.memo(({ label, value, unit, history, color = "#3b82f6" }: any) => {
+  const { t } = useI18n();
 
-const SectionBlock = ({ title, children, icon: Icon }: { title: string, children: React.ReactNode, icon?: any }) => (
+  const stats = useMemo(() => {
+    if (!history || history.length === 0) return { min: null, avg: null, max: null };
+    const valid = history.filter((n: any) => typeof n === 'number' && !isNaN(n));
+    if (valid.length === 0) return { min: null, avg: null, max: null };
+    const min = Math.min(...valid);
+    const max = Math.max(...valid);
+    const sum = valid.reduce((a: number, b: number) => a + b, 0);
+    const avg = sum / valid.length;
+    return {
+      min: min.toFixed(1),
+      avg: avg.toFixed(1),
+      max: max.toFixed(1)
+    };
+  }, [history]);
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex flex-col gap-2 shadow-sm">
+      <div className="flex justify-between items-end">
+        <span className="text-zinc-400 text-sm font-medium">{label}</span>
+        <span className="text-2xl font-bold text-white tracking-tighter">
+          {value != null ? value : '-'}
+          <span className="text-sm text-zinc-500 ml-1">{unit}</span>
+        </span>
+      </div>
+      <div className="h-10 mt-1">
+        <Sparkline data={history} min={0} max={100} color={color} />
+      </div>
+      <div className="flex justify-between items-center text-[10px] text-zinc-500 pt-2 border-t border-zinc-800/80 font-mono">
+        <span>{t('monitor.stats.min', 'Mín')}: <strong className="text-zinc-300 font-semibold">{stats.min != null ? `${stats.min}${unit}` : '--'}</strong></span>
+        <span>{t('monitor.stats.avg', 'Média')}: <strong className="text-zinc-300 font-semibold">{stats.avg != null ? `${stats.avg}${unit}` : '--'}</strong></span>
+        <span>{t('monitor.stats.max', 'Máx')}: <strong className="text-zinc-300 font-semibold">{stats.max != null ? `${stats.max}${unit}` : '--'}</strong></span>
+      </div>
+    </div>
+  );
+});
+
+const SectionBlock = ({ title, children, icon: Icon }: { title: string; children: React.ReactNode; icon?: any }) => (
   <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mb-6 shadow-sm">
     <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-950 flex items-center gap-2">
       {Icon && <Icon size={16} className="text-blue-400" />}
@@ -66,17 +90,103 @@ const toFixedSafe = (v: any, d: number = 1) => {
   return v.toFixed(d);
 };
 
+const formatSource = (source?: string) => {
+  if (!source) return 'ACPI / Windows';
+  const s = source.toLowerCase();
+  if (s.includes('coretemp')) return 'CoreTemp';
+  if (s.includes('lhm') || s.includes('libre')) return 'LibreHardwareMonitor';
+  if (s.includes('ohm') || s.includes('openhardware')) return 'OpenHardwareMonitor';
+  if (s.includes('nvidia') || s.includes('smi')) return 'NVIDIA SMI';
+  if (s.includes('dts') || s.includes('thermal') || s.includes('acpi')) return 'ACPI Thermal Zone';
+  if (s.includes('storage') || s.includes('smart')) return 'SMART Storage';
+  if (s.includes('node')) return 'Kernel OS';
+  if (s.includes('wmi')) return 'Windows WMI';
+  return source.toUpperCase();
+};
+
+const isVirtualNet = (n: any) => {
+  if (n?.virtual) return true;
+  const name = `${n?.ifaceName || ''} ${n?.iface || ''} ${n?.type || ''}`.toLowerCase();
+  return /vethernet|hyper-v|wsl|loopback|isatap|teredo|tap|vpn|tailscale|zerotier|bluetooth|pseudo|npcap|virtual|vmware|virtualbox/.test(name);
+};
+
 const SystemMonitor = () => {
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
   const metrics = useSystemMetrics();
-  const { data: deepData, loading: deepLoading, error: deepError, refresh: deepRefresh } = useDeepHardware();
+  const { categories, loadingMap, errorMap, fetchCategory, refreshCategory } = useDeepHardware();
 
   const [benchmarkResult, setBenchmarkResult] = useState<{mops: string, time: string} | null>(null);
   const [isBenchmarking, setIsBenchmarking] = useState(false);
   const [procSearch, setProcSearch] = useState('');
   const [driverSearch, setDriverSearch] = useState('');
+  const [filterVirtualNet, setFilterVirtualNet] = useState(true);
+
+  // In-app toast notification to replace alert()
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(prev => (prev?.message === message ? null : prev));
+    }, 4000);
+  };
+
+  // Self-consumption of DarkHub Suite
+  const [darkhubUsage, setDarkhubUsage] = useState<{
+    totalCpuPercent: number;
+    totalWorkingSetMb: number;
+    processes: Array<{ pid: number; type: string; name: string; cpuPercent: number; workingSetMb: number }>;
+  } | null>(null);
+
+  // Lazy loading by active tab
+  useEffect(() => {
+    const deepTabs = ['cpu', 'ram', 'gpu', 'mobo', 'storage', 'network', 'monitors', 'os'];
+    if (deepTabs.includes(activeTab)) {
+      fetchCategory(activeTab);
+    }
+  }, [activeTab, fetchCategory]);
+
+  // Enable process polling only when procs tab is open
+  useEffect(() => {
+    if (activeTab === 'procs') {
+      window.darkhub?.system?.enableProcessTracking?.(true);
+    } else {
+      window.darkhub?.system?.enableProcessTracking?.(false);
+    }
+    return () => {
+      window.darkhub?.system?.enableProcessTracking?.(false);
+    };
+  }, [activeTab]);
+
+  // DarkHub resource usage polling on overview tab
+  useEffect(() => {
+    if (activeTab !== 'overview') return;
+
+    let mounted = true;
+    const fetchUsage = async () => {
+      try {
+        const usage = await window.darkhub?.app?.getResourceUsage?.();
+        if (mounted && usage?.ok) {
+          setDarkhubUsage({
+            totalCpuPercent: usage.totalCpuPercent,
+            totalWorkingSetMb: usage.totalWorkingSetMb,
+            processes: usage.processes || []
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to get app resource usage', err);
+      }
+    };
+
+    fetchUsage();
+    const interval = setInterval(fetchUsage, 3000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [activeTab]);
 
   const cpuLoadHistory = useSensorHistory(metrics?.cpu?.values?.currentLoad?.value, 60);
   const ramUseHistory = useSensorHistory(metrics?.ram?.values?.percent?.value, 60);
@@ -91,10 +201,15 @@ const SystemMonitor = () => {
       setBenchmarkResult(null);
       try {
         const res = await window.darkhub?.system?.runBenchmark?.();
-        if (res?.ok) setBenchmarkResult({ mops: res.mops, time: res.time });
-        else alert(t('monitor.benchmarkFailed', 'Falha no benchmark: ') + (res?.error ?? ''));
+        if (res?.ok) {
+          setBenchmarkResult({ mops: res.mops, time: res.time });
+          showToast(`${t('monitor.benchmarkSuccess', 'Benchmark concluído com sucesso!')} ${res.mops} MOPS (${res.time}ms)`, 'success');
+        } else {
+          showToast(t('monitor.benchmarkFailed', 'Falha no benchmark: ') + (res?.error ?? ''), 'error');
+        }
       } catch (e) {
         console.error('Benchmark error', e);
+        showToast('Erro inesperado ao executar o benchmark.', 'error');
       } finally {
         setIsBenchmarking(false);
       }
@@ -105,29 +220,39 @@ const SystemMonitor = () => {
     let report = "--- DARKHUB HARDWARE INSPECTOR REPORT ---\n";
     report += `Date: ${new Date().toLocaleString()}\n\n`;
     report += "[CPU]\n";
-    report += `Model: ${deepData?.cpu?.data?.manufacturer} ${deepData?.cpu?.data?.brand}\n`;
-    report += `Load: ${metrics?.cpu?.values?.currentLoad?.value}%\n\n`;
+    const cpuInfo = categories.cpu?.data;
+    report += `Model: ${cpuInfo?.manufacturer || ''} ${cpuInfo?.brand || ''}\n`;
+    report += `Load: ${metrics?.cpu?.values?.currentLoad?.value ?? '--'}%\n\n`;
     report += "[RAM]\n";
     report += `Total: ${formatBytes(metrics?.ram?.values?.total?.value)}\n`;
-    report += `Used: ${metrics?.ram?.values?.percent?.value}%\n\n`;
+    report += `Used: ${metrics?.ram?.values?.percent?.value ?? '--'}%\n\n`;
     navigator.clipboard.writeText(report);
-    alert(t('monitor.reportCopied', 'Relatório copiado para a área de transferência!'));
+    showToast(t('monitor.reportCopied', 'Relatório copiado para a área de transferência!'), 'success');
+  };
+
+  const isCurrentTabLoading = Boolean(loadingMap[activeTab]);
+
+  const handleTabRefresh = () => {
+    const deepTabs = ['cpu', 'ram', 'gpu', 'mobo', 'storage', 'network', 'monitors', 'os'];
+    if (deepTabs.includes(activeTab)) {
+      refreshCategory(activeTab);
+    }
   };
 
   const renderTabs = () => {
     const tabs = [
-      { id: 'overview', icon: Activity, label: t('monitor.tab.overview', 'Overview') },
-      { id: 'cpu', icon: Cpu, label: t('monitor.tab.cpu', 'Processor (CPU)') },
-      { id: 'gpu', icon: Monitor, label: t('monitor.tab.gpu', 'Graphics Cards') },
-      { id: 'ram', icon: Server, label: t('monitor.tab.ram', 'Memory (RAM)') },
-      { id: 'storage', icon: HardDrive, label: t('monitor.tab.storage', 'Storage & Drives') },
-      { id: 'network', icon: Network, label: t('monitor.tab.network', 'Network') },
-      { id: 'temps', icon: Thermometer, label: t('monitor.tab.temps', 'Temperatures') },
-      { id: 'latency', icon: Clock, label: t('monitor.tab.latency', 'DPC/ISR Latency') },
-      { id: 'procs', icon: List, label: t('monitor.tab.procs', 'Processes') },
-      { id: 'monitors', icon: LayoutTemplate, label: t('monitor.tab.displays', 'Displays') },
-      { id: 'mobo', icon: LayoutTemplate, label: t('monitor.tab.mobo', 'Motherboard & BIOS') },
-      { id: 'os', icon: FileDigit, label: t('monitor.tab.os', 'Operating System') }
+      { id: 'overview', icon: Activity, label: t('monitor.tab.overview', 'Visão Geral') },
+      { id: 'cpu', icon: Cpu, label: t('monitor.tab.cpu', 'Processador (CPU)') },
+      { id: 'gpu', icon: Monitor, label: t('monitor.tab.gpu', 'Placas de Vídeo (GPU)') },
+      { id: 'ram', icon: Server, label: t('monitor.tab.ram', 'Memória (RAM)') },
+      { id: 'storage', icon: HardDrive, label: t('monitor.tab.storage', 'Armazenamento') },
+      { id: 'network', icon: Network, label: t('monitor.tab.network', 'Rede') },
+      { id: 'temps', icon: Thermometer, label: t('monitor.tab.temps', 'Temperaturas') },
+      { id: 'latency', icon: Clock, label: t('monitor.tab.latency', 'Latência DPC/ISR') },
+      { id: 'procs', icon: List, label: t('monitor.tab.procs', 'Processos') },
+      { id: 'monitors', icon: LayoutTemplate, label: t('monitor.tab.displays', 'Monitores') },
+      { id: 'mobo', icon: LayoutTemplate, label: t('monitor.tab.mobo', 'Placa-Mãe & BIOS') },
+      { id: 'os', icon: FileDigit, label: t('monitor.tab.os', 'Sistema Operacional') }
     ];
 
     return (
@@ -148,13 +273,13 @@ const SystemMonitor = () => {
         ))}
 
         <div className="mt-4 pt-4 border-t border-zinc-800 space-y-3 pb-4">
-           <button
-            onClick={deepRefresh}
-            disabled={deepLoading}
+          <button
+            onClick={handleTabRefresh}
+            disabled={isCurrentTabLoading}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm transition-colors disabled:opacity-50"
           >
-            <RefreshCw size={16} className={deepLoading ? 'animate-spin' : ''} />
-            {t('monitor.refreshSensors', 'Refresh Sensors')}
+            <RefreshCw size={16} className={isCurrentTabLoading ? 'animate-spin' : ''} />
+            {t('monitor.refreshSensors', 'Atualizar')}
           </button>
 
           <button
@@ -163,7 +288,7 @@ const SystemMonitor = () => {
             className="w-full py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 border border-blue-500/20"
           >
             {isBenchmarking ? <RefreshCw size={16} className="animate-spin" /> : <PlaySquare size={16} />}
-            <span>{isBenchmarking ? t('monitor.running', 'Running...') : t('monitor.runBenchmark', 'Run CPU Benchmark')}</span>
+            <span>{isBenchmarking ? t('monitor.running', 'Executando...') : t('monitor.runBenchmark', 'Executar Benchmark de CPU')}</span>
           </button>
 
           <button
@@ -171,13 +296,13 @@ const SystemMonitor = () => {
             className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors border border-zinc-700"
           >
             <Copy size={16} />
-            {t('monitor.copyReport', 'Copy Report')}
+            {t('monitor.copyReport', 'Copiar Relatório')}
           </button>
 
           {benchmarkResult && (
             <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-lg text-center animate-in fade-in zoom-in">
               <p className="text-emerald-400 font-bold text-lg">{benchmarkResult.mops} <span className="text-xs">MOPS</span></p>
-              <p className="text-zinc-500 text-[10px]">Time: {benchmarkResult.time}ms</p>
+              <p className="text-zinc-500 text-[10px]">Tempo: {benchmarkResult.time}ms</p>
             </div>
           )}
         </div>
@@ -185,68 +310,174 @@ const SystemMonitor = () => {
     );
   };
 
+  const renderTabLoadingState = () => (
+    <div className="flex flex-col items-center justify-center h-64 text-zinc-400 space-y-3">
+      <Loader2 className="animate-spin text-blue-500" size={32} />
+      <p className="text-sm">{t('monitor.tabLoading', 'Carregando dados desta seção...')}</p>
+    </div>
+  );
+
+  const renderTabErrorState = (tabKey: string) => (
+    <div className="p-6 border border-amber-500/20 bg-amber-500/10 rounded-xl flex items-start gap-4">
+      <AlertTriangle className="text-amber-500 shrink-0 mt-1" />
+      <div>
+        <h3 className="text-amber-200 font-semibold mb-1">{t('monitor.tabError', 'Falha ao obter dados desta seção')}</h3>
+        <p className="text-amber-400/80 text-sm mb-4">{errorMap[tabKey] || 'O Windows não retornou os dados para esta categoria.'}</p>
+        <button
+          onClick={() => refreshCategory(tabKey)}
+          className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm"
+        >
+          {t('monitor.tabRetry', 'Tentar Novamente')}
+        </button>
+      </div>
+    </div>
+  );
+
   const renderContent = () => {
-    if (deepLoading && !deepData) {
-      return (
-        <div className="flex flex-col items-center justify-center h-full text-zinc-400 space-y-4 pt-20">
-          <RefreshCw className="animate-spin text-blue-500" size={32} />
-          <p>Extraindo arquitetura profunda do sistema...</p>
-        </div>
-      );
-    }
-
-    if (deepError) {
-      return (
-        <div className="p-6 border border-amber-500/20 bg-amber-500/10 rounded-xl flex items-start gap-4">
-          <AlertTriangle className="text-amber-500 shrink-0 mt-1" />
-          <div>
-            <h3 className="text-amber-200 font-semibold mb-1">Falha Crítica na Telemetria</h3>
-            <p className="text-amber-400/80 text-sm mb-4">{deepError}</p>
-            <button onClick={deepRefresh} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm">
-              Tentar Novamente
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    if (!deepData) return null;
-
     switch (activeTab) {
       case 'overview': {
+        const cores = metrics?.cpu?.values?.coresLoad || [];
         return (
-          <div className="space-y-4 animate-in fade-in duration-300">
-            <h2 className="text-xl font-semibold text-white mb-4">Painel de Sensores (Real-time)</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Gauge label="CPU Load" value={toFixedSafe(metrics?.cpu?.values?.currentLoad?.value, 1)} unit="%" history={cpuLoadHistory} color="#3b82f6" />
-              <Gauge label="RAM Usage" value={toFixedSafe(metrics?.ram?.values?.percent?.value, 1)} unit="%" history={ramUseHistory} color="#8b5cf6" />
-              <Gauge label="GPU Util" value={toFixedSafe(metrics?.gpu?.values?.gpus?.[0]?.utilization?.value, 1)} unit="%" history={gpuUtilHistory} color="#10b981" />
-              <Gauge label="Disk Act" value={toFixedSafe(metrics?.diskIo?.values?.activity?.value, 1)} unit="%" history={diskActHistory} color="#f59e0b" />
-              <Gauge label="CPU Temp" value={toFixedSafe(metrics?.temps?.values?.main?.value, 0)} unit="°C" history={tempHistory} color="#ef4444" />
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <div>
+              <h2 className="text-xl font-semibold text-white mb-4">
+                {t('monitor.overview.realtime', 'Painel de Sensores (Tempo Real)')}
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Gauge label={t('monitor.gauge.cpuLoad', 'Carga da CPU')} value={toFixedSafe(metrics?.cpu?.values?.currentLoad?.value, 1)} unit="%" history={cpuLoadHistory} color="#3b82f6" />
+                <Gauge label={t('monitor.gauge.ramUsage', 'Uso de RAM')} value={toFixedSafe(metrics?.ram?.values?.percent?.value, 1)} unit="%" history={ramUseHistory} color="#8b5cf6" />
+                <Gauge label={t('monitor.gauge.gpuUtil', 'Uso da GPU')} value={toFixedSafe(metrics?.gpu?.values?.gpus?.[0]?.utilization?.value, 1)} unit="%" history={gpuUtilHistory} color="#10b981" />
+                <Gauge label={t('monitor.gauge.diskAct', 'Atividade do Disco')} value={toFixedSafe(metrics?.diskIo?.values?.activity?.value, 1)} unit="%" history={diskActHistory} color="#f59e0b" />
+                <Gauge label={t('monitor.gauge.cpuTemp', 'Temp. da CPU')} value={toFixedSafe(metrics?.temps?.values?.main?.value, 0)} unit="°C" history={tempHistory} color="#ef4444" />
+              </div>
+            </div>
+
+            {/* Compact Per-Core CPU Preview */}
+            {cores.length > 0 && (
+              <SectionBlock title="Distribuição de Carga por Núcleo" icon={Zap}>
+                <div className="p-3 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                  {cores.map((core: any, idx: number) => {
+                    const val = core?.value ?? 0;
+                    const barColor = val > 80 ? 'bg-rose-500' : val > 50 ? 'bg-amber-500' : 'bg-blue-500';
+                    return (
+                      <div key={idx} className="bg-zinc-950 p-2 rounded-lg border border-zinc-800 flex flex-col justify-between">
+                        <div className="flex justify-between text-[11px] text-zinc-400 mb-1">
+                          <span>C{idx}</span>
+                          <span className="font-mono text-zinc-200">{toFixedSafe(val, 0)}%</span>
+                        </div>
+                        <div className="w-full bg-zinc-800 rounded-full h-1 overflow-hidden">
+                          <div className={`${barColor} h-full transition-all duration-300`} style={{ width: `${Math.min(100, Math.max(3, val))}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </SectionBlock>
+            )}
+
+            {/* DarkHub Suite Self-Consumption Card */}
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20">
+                    <ShieldCheck size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-zinc-100 text-sm">
+                      {t('monitor.darkhubUsage.title', 'Consumo do DarkHub Suite')}
+                    </h3>
+                    <p className="text-xs text-zinc-500">
+                      {t('monitor.darkhubUsage.desc', 'Pegada de recursos em tempo real do próprio aplicativo')}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">
+                  Otimizado
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800">
+                  <span className="text-xs text-zinc-400">{t('monitor.darkhubUsage.cpu', 'Uso de CPU')}</span>
+                  <div className="text-xl font-bold text-blue-400 mt-1">
+                    {darkhubUsage ? `${darkhubUsage.totalCpuPercent}%` : '--'}
+                  </div>
+                  <span className="text-[10px] text-zinc-500">
+                    {t('monitor.darkhubUsage.cpuHint', 'Threads de renderização e main')}
+                  </span>
+                </div>
+
+                <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800">
+                  <span className="text-xs text-zinc-400">{t('monitor.darkhubUsage.ram', 'Memória RAM')}</span>
+                  <div className="text-xl font-bold text-purple-400 mt-1">
+                    {darkhubUsage ? `${darkhubUsage.totalWorkingSetMb} MB` : '--'}
+                  </div>
+                  <span className="text-[10px] text-zinc-500">
+                    {t('monitor.darkhubUsage.ramHint', 'Working Set (processos somados)')}
+                  </span>
+                </div>
+
+                <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800">
+                  <span className="text-xs text-zinc-400">{t('monitor.darkhubUsage.procs', 'Processos Ativos')}</span>
+                  <div className="text-xl font-bold text-emerald-400 mt-1">
+                    {darkhubUsage ? `${darkhubUsage.processes.length}` : '--'}
+                  </div>
+                  <span className="text-[10px] text-zinc-500">
+                    {t('monitor.darkhubUsage.procsHint', 'Main, Renderer & GPU')}
+                  </span>
+                </div>
+              </div>
+
+              {darkhubUsage && darkhubUsage.processes.length > 0 && (
+                <div className="pt-2 border-t border-zinc-800/60">
+                  <div className="text-[11px] font-medium text-zinc-400 mb-2">
+                    {t('monitor.darkhubUsage.internalProcs', 'Processos Internos:')}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {darkhubUsage.processes.map((p, idx) => (
+                      <div key={idx} className="bg-zinc-950/60 px-2.5 py-1.5 rounded border border-zinc-800/60 flex items-center justify-between text-[11px]">
+                        <span className="text-zinc-300 font-mono capitalize truncate mr-2" title={`${p.type} (${p.pid})`}>
+                          {p.type || p.name || 'Process'} ({p.pid})
+                        </span>
+                        <span className="text-zinc-400 font-mono shrink-0">
+                          {p.workingSetMb} MB • {p.cpuPercent}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );
       }
 
       case 'cpu': {
-        const d = deepData.cpu?.data || {};
+        if (loadingMap['cpu'] && !categories['cpu']) return renderTabLoadingState();
+        if (errorMap['cpu']) return renderTabErrorState('cpu');
+
+        const d = categories.cpu?.data || {};
         const r = metrics?.cpu?.values || {};
 
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
             <SectionBlock title="Desempenho por Núcleo" icon={Zap}>
               <div className="px-4 py-3 grid grid-cols-2 md:grid-cols-4 gap-4">
-                {r.coresLoad?.map((core: any, idx: number) => (
-                   <div key={idx} className="bg-zinc-950 p-3 rounded-lg border border-zinc-800">
-                     <div className="flex justify-between text-xs text-zinc-400 mb-2">
-                       <span>Core {idx}</span>
-                       <span>{toFixedSafe(core.value, 1)}%</span>
-                     </div>
-                     <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                       <div className="bg-blue-500 h-full transition-all" style={{ width: `${core.value}%` }}></div>
-                     </div>
-                   </div>
-                ))}
+                {r.coresLoad?.map((core: any, idx: number) => {
+                  const val = core?.value ?? 0;
+                  const barColor = val > 80 ? 'bg-rose-500' : val > 50 ? 'bg-amber-500' : 'bg-blue-500';
+                  return (
+                    <div key={idx} className="bg-zinc-950 p-3 rounded-lg border border-zinc-800">
+                      <div className="flex justify-between text-xs text-zinc-400 mb-2">
+                        <span>Core {idx}</span>
+                        <span className="font-mono text-zinc-200">{toFixedSafe(val, 1)}%</span>
+                      </div>
+                      <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                        <div className={`${barColor} h-full transition-all duration-300`} style={{ width: `${val}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
                 {(!r.coresLoad || r.coresLoad.length === 0) && <p className="text-zinc-500 text-sm">Carregando dados dos núcleos...</p>}
               </div>
             </SectionBlock>
@@ -270,7 +501,10 @@ const SystemMonitor = () => {
       }
 
       case 'ram': {
-        const list = deepData.memory?.data || [];
+        if (loadingMap['ram'] && !categories['ram']) return renderTabLoadingState();
+        if (errorMap['ram']) return renderTabErrorState('ram');
+
+        const list = (categories.ram || categories.memory)?.data || [];
         const r = metrics?.ram?.values || {};
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -298,7 +532,10 @@ const SystemMonitor = () => {
       }
 
       case 'gpu': {
-        const staticList = deepData.gpu?.data || [];
+        if (loadingMap['gpu'] && !categories['gpu']) return renderTabLoadingState();
+        if (errorMap['gpu']) return renderTabErrorState('gpu');
+
+        const staticList = categories.gpu?.data || [];
         const realtimeList = metrics?.gpu?.values?.gpus || [];
 
         return (
@@ -311,7 +548,7 @@ const SystemMonitor = () => {
 
               return (
                 <div key={idx} className="space-y-4">
-                  <SectionBlock title={`Adaptador Gráfico ${idx+1}: ${g.vendor} ${g.model}`} icon={Monitor}>
+                  <SectionBlock title={`Adaptador Gráfico ${idx+1}: ${g.vendor || ''} ${g.model || ''}`} icon={Monitor}>
                     <PropertyRow label="Uso de GPU" value={utilVal != null ? `${utilVal}%` : '—'} />
                     <div className="px-3 pb-3 mb-2">
                        <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
@@ -343,8 +580,10 @@ const SystemMonitor = () => {
 
       case 'temps': {
         const probes = metrics?.temps?.values?.probes || [];
+        const mainTemp = metrics?.temps?.values?.main;
+        const cpuTempUnavailable = !mainTemp || mainTemp.availability !== 'available' || mainTemp.value == null;
 
-        const categories: Record<string, { title: string; icon: any; items: any[] }> = {
+        const categoriesGroup: Record<string, { title: string; icon: any; items: any[] }> = {
           cpu: { title: 'Processador', icon: Cpu, items: [] },
           gpu: { title: 'Placa de Vídeo', icon: Monitor, items: [] },
           storage: { title: 'Armazenamento', icon: HardDrive, items: [] },
@@ -353,15 +592,14 @@ const SystemMonitor = () => {
 
         probes.forEach((p: any) => {
           const cat = p.category || 'system';
-          if (categories[cat]) {
-            categories[cat].items.push(p);
+          if (categoriesGroup[cat]) {
+            categoriesGroup[cat].items.push(p);
           } else {
-            categories['system'].items.push(p);
+            categoriesGroup['system'].items.push(p);
           }
         });
 
         const getTempStyle = (sensor: any) => {
-          const val = sensor?.value;
           const status = sensor?.status || 'OK';
 
           if (status === 'Critical') {
@@ -369,7 +607,7 @@ const SystemMonitor = () => {
               text: 'text-red-400',
               bg: 'bg-red-500/10 border-red-500/20',
               bar: 'bg-red-500',
-              label: 'Crítico'
+              label: t('monitor.temps.critical', 'Crítico')
             };
           }
           if (status === 'Hot') {
@@ -377,61 +615,70 @@ const SystemMonitor = () => {
               text: 'text-amber-400',
               bg: 'bg-amber-500/10 border-amber-500/20',
               bar: 'bg-amber-500',
-              label: 'Quente'
+              label: t('monitor.temps.warm', 'Quente')
             };
           }
           return {
             text: 'text-emerald-400',
             bg: 'bg-emerald-500/10 border-emerald-500/20',
             bar: 'bg-emerald-500',
-            label: 'Ótimo'
+            label: t('monitor.temps.optimal', 'Ótimo')
           };
         };
 
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            {}
+            {/* Warning if CPU temperature is unavailable */}
+            {cpuTempUnavailable && (
+              <div className="p-4 border border-amber-500/30 bg-amber-500/10 rounded-xl flex items-start gap-3 text-amber-300">
+                <AlertTriangle size={20} className="text-amber-400 shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-semibold text-amber-200">
+                    {t('monitor.temps.unavailableTitle', 'Temperatura da CPU indisponível')}
+                  </p>
+                  <p className="text-xs text-amber-400/80 mt-1 leading-relaxed">
+                    {t('monitor.temps.unavailableDesc', 'O Windows não expõe a temperatura do processador por padrão via WMI nesta placa-mãe. Para monitorar as temperaturas com máxima precisão, você pode manter o LibreHardwareMonitor ou CoreTemp aberto em segundo plano.')}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Main Temp Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {}
-              <div className="bg-zinc-905 border border-zinc-800 p-5 rounded-2xl flex items-center justify-between shadow-xl">
+              <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-2xl flex items-center justify-between shadow-xl">
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl border border-blue-500/20">
                     <Cpu size={28} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-zinc-400">CPU Package</h3>
-                    <p className="text-xs text-zinc-500 mt-0.5">Temperatura principal do processador</p>
+                    <h3 className="text-sm font-medium text-zinc-300">{t('monitor.temps.cpuPackage', 'CPU Package')}</h3>
+                    <p className="text-xs text-zinc-500 mt-0.5">{t('monitor.temps.cpuPackageDesc', 'Temperatura principal do processador')}</p>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className={`text-3xl font-extrabold tracking-tight ${
-                    metrics?.temps?.values?.main?.value != null
-                      ? getTempStyle(metrics?.temps?.values?.main).text
-                      : 'text-zinc-500'
+                    !cpuTempUnavailable ? getTempStyle(mainTemp).text : 'text-zinc-500'
                   }`}>
-                    {metrics?.temps?.values?.main?.value != null
-                      ? `${metrics.temps.values.main.value.toFixed(1)}°C`
-                      : '—'}
+                    {!cpuTempUnavailable ? `${mainTemp.value.toFixed(1)}°C` : '—'}
                   </span>
-                  <div className="text-[10px] text-zinc-500 mt-1 font-mono uppercase">
-                    Fonte: {metrics?.temps?.values?.main?.source || 'si'}
+                  <div className="text-[10px] text-zinc-400 mt-1 font-mono uppercase">
+                    {t('monitor.temps.source', 'Fonte')}: <span className="text-zinc-300 font-semibold">{formatSource(mainTemp?.source)}</span>
                   </div>
                 </div>
               </div>
 
-              {}
               {(() => {
                 const primaryGpu = metrics?.gpu?.values?.gpus?.[0];
                 const gpuTempObj = probes.find((p: any) => p.category === 'gpu')?.temperature;
                 const style = getTempStyle(gpuTempObj);
                 return (
-                  <div className="bg-zinc-905 border border-zinc-800 p-5 rounded-2xl flex items-center justify-between shadow-xl">
+                  <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-2xl flex items-center justify-between shadow-xl">
                     <div className="flex items-center gap-4">
                       <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
                         <Monitor size={28} />
                       </div>
                       <div>
-                        <h3 className="text-sm font-medium text-zinc-400">GPU Primária</h3>
+                        <h3 className="text-sm font-medium text-zinc-300">{t('monitor.temps.primaryGpu', 'GPU Primária')}</h3>
                         <p className="text-xs text-zinc-500 mt-0.5">{primaryGpu?.name || 'Placa de Vídeo'}</p>
                       </div>
                     </div>
@@ -441,8 +688,8 @@ const SystemMonitor = () => {
                           <span className={`text-3xl font-extrabold tracking-tight ${style.text}`}>
                             {gpuTempObj.value != null ? `${gpuTempObj.value.toFixed(1)}°C` : '—'}
                           </span>
-                          <div className="text-[10px] text-zinc-500 mt-1 font-mono uppercase">
-                            Fonte: {gpuTempObj.source}
+                          <div className="text-[10px] text-zinc-400 mt-1 font-mono uppercase">
+                            {t('monitor.temps.source', 'Fonte')}: <span className="text-zinc-300 font-semibold">{formatSource(gpuTempObj.source)}</span>
                           </div>
                         </>
                       ) : (
@@ -461,9 +708,9 @@ const SystemMonitor = () => {
               })()}
             </div>
 
-            {}
+            {/* Probe list categorized */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {Object.entries(categories).map(([key, cat]) => {
+              {Object.entries(categoriesGroup).map(([key, cat]) => {
                 if (cat.items.length === 0) return null;
                 const Icon = cat.icon;
                 return (
@@ -511,7 +758,6 @@ const SystemMonitor = () => {
                               </div>
                             </div>
 
-                            {}
                             {tempObj?.availability === 'available' && val != null && (
                               <div className="w-full bg-zinc-900 h-1 rounded-full overflow-hidden border border-zinc-900">
                                 <div
@@ -521,10 +767,13 @@ const SystemMonitor = () => {
                               </div>
                             )}
 
-                            {}
                             <div className="flex justify-between text-[9px] text-zinc-500 mt-0.5">
-                              <span>Qualidade: {tempObj?.quality === 'high' ? 'Alta' : tempObj?.quality === 'medium' ? 'Média' : 'Nenhuma'}</span>
-                              <span className="uppercase font-mono">Fonte: {tempObj?.source || 'si'}</span>
+                              <span>
+                                {t('monitor.temps.quality', 'Qualidade')}: {tempObj?.quality === 'high' ? t('monitor.temps.high', 'Alta') : tempObj?.quality === 'medium' ? t('monitor.temps.medium', 'Média') : t('monitor.temps.none', 'Nenhuma')}
+                              </span>
+                              <span className="uppercase font-mono">
+                                {t('monitor.temps.source', 'Fonte')}: {formatSource(tempObj?.source)}
+                              </span>
                             </div>
                           </div>
                         );
@@ -540,7 +789,6 @@ const SystemMonitor = () => {
 
       case 'procs': {
         const topCpu = metrics?.procs?.values?.topCpu || [];
-        const topMem = metrics?.procs?.values?.topMem || [];
         const filteredCpu = topCpu.filter((p: any) => p.name.toLowerCase().includes(procSearch.toLowerCase()));
 
         return (
@@ -548,33 +796,40 @@ const SystemMonitor = () => {
             <div className="flex gap-4">
               <input
                 type="text"
-                placeholder="Buscar processo..."
+                placeholder={t('monitor.procs.search', 'Buscar processo...')}
                 value={procSearch}
                 onChange={e => setProcSearch(e.target.value)}
                 className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-sm text-zinc-200 outline-none focus:border-blue-500"
               />
             </div>
 
-            <SectionBlock title="Top Processos (Por CPU)" icon={Activity}>
+            <SectionBlock title={t('monitor.procs.topCpu', 'Top Processos (Por CPU)')} icon={Activity}>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                   <thead className="text-xs text-zinc-400 bg-zinc-900/50">
                     <tr>
-                      <th className="px-4 py-2 font-medium">Nome</th>
-                      <th className="px-4 py-2 font-medium">PID</th>
-                      <th className="px-4 py-2 font-medium">CPU %</th>
-                      <th className="px-4 py-2 font-medium">RAM</th>
+                      <th className="px-4 py-2 font-medium">{t('monitor.procs.name', 'Nome')}</th>
+                      <th className="px-4 py-2 font-medium">{t('monitor.procs.pid', 'PID')}</th>
+                      <th className="px-4 py-2 font-medium">{t('monitor.procs.cpu', 'CPU %')}</th>
+                      <th className="px-4 py-2 font-medium">{t('monitor.procs.ram', 'RAM')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredCpu.map((p: any) => (
                       <tr key={p.pid} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                        <td className="px-4 py-2 text-zinc-300">{p.name}</td>
-                        <td className="px-4 py-2 text-zinc-500">{p.pid}</td>
+                        <td className="px-4 py-2 text-zinc-300 font-medium">{p.name}</td>
+                        <td className="px-4 py-2 text-zinc-500 font-mono text-xs">{p.pid}</td>
                         <td className="px-4 py-2 text-emerald-400 font-medium">{toFixedSafe(p.cpu, 1)}%</td>
                         <td className="px-4 py-2 text-zinc-400">{formatBytes(p.memRss)}</td>
                       </tr>
                     ))}
+                    {filteredCpu.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-6 text-center text-zinc-500 italic">
+                          {procSearch ? 'Nenhum processo correspondente encontrado.' : 'Carregando lista de processos ativos...'}
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -584,7 +839,10 @@ const SystemMonitor = () => {
       }
 
       case 'storage': {
-        const list = deepData.storage?.data || [];
+        if (loadingMap['storage'] && !categories['storage']) return renderTabLoadingState();
+        if (errorMap['storage']) return renderTabErrorState('storage');
+
+        const list = categories.storage?.data || [];
         const io = metrics?.diskIo?.values || {};
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -608,7 +866,10 @@ const SystemMonitor = () => {
       }
 
       case 'monitors': {
-         const list = deepData.monitors?.data || [];
+         if (loadingMap['monitors'] && !categories['monitors']) return renderTabLoadingState();
+         if (errorMap['monitors']) return renderTabErrorState('monitors');
+
+         const list = categories.monitors?.data || [];
          return (
            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
              {list.map((m: any, idx: number) => (
@@ -626,7 +887,10 @@ const SystemMonitor = () => {
       }
 
       case 'mobo': {
-        const d = deepData.mainboard?.data || {};
+        if (loadingMap['mobo'] && !categories['mobo']) return renderTabLoadingState();
+        if (errorMap['mobo']) return renderTabErrorState('mobo');
+
+        const d = (categories.mobo || categories.mainboard)?.data || {};
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
             <SectionBlock title="Placa Principal (Baseboard)" icon={LayoutTemplate}>
@@ -645,28 +909,79 @@ const SystemMonitor = () => {
       }
 
       case 'network': {
-        const list = deepData.network?.data || [];
+        if (loadingMap['network'] && !categories['network']) return renderTabLoadingState();
+        if (errorMap['network']) return renderTabErrorState('network');
+
+        const rawList = categories.network?.data || [];
+        const physicalList = rawList.filter((n: any) => !isVirtualNet(n));
+        const displayList = filterVirtualNet ? physicalList : rawList;
+        const hiddenCount = rawList.length - physicalList.length;
         const r = metrics?.network?.values || {};
+
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
             <SectionBlock title="Tráfego Consolidado" icon={Activity}>
               <PropertyRow label="Banda de Download" value={r.rxBps?.value != null ? `${formatBytes(r.rxBps.value)}/s` : '—'} />
               <PropertyRow label="Banda de Upload" value={r.txBps?.value != null ? `${formatBytes(r.txBps.value)}/s` : '—'} />
             </SectionBlock>
-            {list.map((n: any, idx: number) => (
-              <SectionBlock key={idx} title={`Adaptador: ${n.ifaceName || n.iface}`} icon={Wifi}>
-                <PropertyRow label="Status da Camada (Link)" value={n.speed ? `${n.speed} Mbps` : 'Desconectado'} status={n.speed ? 'OK' : undefined} />
-                <PropertyRow label="Tipo de Adaptador" value={n.type || '—'} />
-                <PropertyRow label="Endereço IPv4" value={n.ip4 || '—'} />
-                <PropertyRow label="Endereço MAC" value={n.mac || '—'} />
-              </SectionBlock>
-            ))}
+
+            {/* Filter Bar */}
+            <div className="flex items-center justify-between bg-zinc-950 p-3 rounded-xl border border-zinc-800">
+              <div className="flex items-center gap-2">
+                <Filter size={16} className="text-blue-400" />
+                <span className="text-xs text-zinc-300 font-medium">
+                  {t('monitor.network.filterLabel', 'Filtro de Adaptadores')}
+                </span>
+                {hiddenCount > 0 && filterVirtualNet && (
+                  <span className="text-[10px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded font-mono">
+                    {hiddenCount} {t('monitor.network.virtualHidden', 'virtuais ocultos')}
+                  </span>
+                )}
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-400 hover:text-zinc-200">
+                <input
+                  type="checkbox"
+                  checked={filterVirtualNet}
+                  onChange={e => setFilterVirtualNet(e.target.checked)}
+                  className="rounded bg-zinc-900 border-zinc-700 text-blue-500 focus:ring-0"
+                />
+                <span>{t('monitor.network.filterVirtual', 'Apenas Físicos')}</span>
+              </label>
+            </div>
+
+            {displayList.map((n: any, idx: number) => {
+              const isVirt = isVirtualNet(n);
+              return (
+                <SectionBlock key={idx} title={`Adaptador: ${n.ifaceName || n.iface}`} icon={Wifi}>
+                  <div className="px-3 py-1 flex items-center justify-between border-b border-zinc-800/60">
+                    <span className="text-xs text-zinc-500">Classificação</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-semibold uppercase ${
+                      isVirt ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    }`}>
+                      {isVirt ? t('monitor.network.virtualTag', 'Virtual / VPN') : t('monitor.network.physicalTag', 'Físico')}
+                    </span>
+                  </div>
+                  <PropertyRow label="Status da Camada (Link)" value={n.speed ? `${n.speed} Mbps` : 'Desconectado'} status={n.speed ? 'OK' : undefined} />
+                  <PropertyRow label="Tipo de Adaptador" value={n.type || '—'} />
+                  <PropertyRow label="Endereço IPv4" value={n.ip4 || '—'} />
+                  <PropertyRow label="Endereço MAC" value={n.mac || '—'} />
+                </SectionBlock>
+              );
+            })}
+            {displayList.length === 0 && (
+              <p className="text-zinc-500 text-sm italic p-4 text-center">
+                Nenhum adaptador encontrado com os filtros atuais.
+              </p>
+            )}
           </div>
         );
       }
 
       case 'os': {
-        const d = deepData.os?.data || {};
+        if (loadingMap['os'] && !categories['os']) return renderTabLoadingState();
+        if (errorMap['os']) return renderTabErrorState('os');
+
+        const d = categories.os?.data || {};
         const win = d.windowsDetails || {};
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -808,18 +1123,30 @@ const SystemMonitor = () => {
   };
 
   return (
-    <div className="space-y-6 h-[calc(100vh-6rem)] flex flex-col">
+    <div className="space-y-6 h-[calc(100vh-6rem)] flex flex-col relative">
+      {/* Toast Alert Banner */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl animate-in slide-in-from-bottom-2 duration-200 ${
+          toast.type === 'error' ? 'bg-rose-950/95 border-rose-600/50 text-rose-200' :
+          toast.type === 'success' ? 'bg-emerald-950/95 border-emerald-600/50 text-emerald-200' :
+          'bg-zinc-900/95 border-zinc-700 text-zinc-200'
+        }`}>
+          {toast.type === 'error' ? <AlertTriangle size={18} className="text-rose-400 shrink-0" /> : <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />}
+          <span className="text-sm font-medium">{toast.message}</span>
+        </div>
+      )}
+
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <h1 className="text-2xl font-bold text-white">Hardware Inspector</h1>
+          <h1 className="text-2xl font-bold text-white">{t('monitor.title', 'Monitor de Sistema')}</h1>
           <HelpTip
-            title="Sobre o Hardware Inspector"
-            description="Plataforma avançada de diagnóstico de hardware modular com coletas de WMI, nvidia-smi e polling de kernel nativo."
+            title={t('monitor.helpTitle', 'Sobre o Hardware Inspector')}
+            description={t('monitor.helpDesc', 'Plataforma avançada de diagnóstico de hardware modular com coletas de WMI, nvidia-smi e polling de kernel nativo.')}
             sections={[]}
             buttonLabel="Entendi"
           />
         </div>
-        <p className="text-zinc-400">Varredura extrema do top-level ao Ring-0.</p>
+        <p className="text-zinc-400">{t('monitor.subtitle', 'Varredura profunda do sistema ao Ring-0.')}</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0">

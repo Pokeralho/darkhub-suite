@@ -1,5 +1,8 @@
 import crypto from 'node:crypto';
 import cp from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { EventEmitter } from 'node:events';
 import Logger from '../../services/LoggerService.js';
 import { encodePowerShellScript } from '../../services/PowerShellRunner.js';
@@ -113,6 +116,48 @@ public class DarkHubPdh : IDisposable {
         }
     }
 
+    public double[] ReadMultiNet(int idx) {
+        if (idx < 0 || idx >= _multi.Count) return new double[] { 0, 0 };
+        IntPtr h = _multi[idx];
+        uint size = 0, count = 0;
+        if (PdhGetFormattedCounterArrayW(h, PDH_FMT_DOUBLE | PDH_FMT_NOCAP100, ref size, ref count, IntPtr.Zero) != PDH_MORE_DATA) return new double[] { 0, 0 };
+        if (size == 0) return new double[] { 0, 0 };
+
+        IntPtr buf = Marshal.AllocHGlobal((int)size);
+        try {
+            if (PdhGetFormattedCounterArrayW(h, PDH_FMT_DOUBLE | PDH_FMT_NOCAP100, ref size, ref count, buf) != 0) return new double[] { 0, 0 };
+            double sum = 0, max = 0;
+            int stride = IntPtr.Size + 16;
+            int valueOffset = IntPtr.Size + 8;
+            for (int i = 0; i < count; i++) {
+                IntPtr item = new IntPtr(buf.ToInt64() + (long)i * stride);
+                IntPtr namePtr = Marshal.ReadIntPtr(item, 0);
+                if (namePtr != IntPtr.Zero) {
+                    string name = Marshal.PtrToStringUni(namePtr);
+                    if (!string.IsNullOrEmpty(name)) {
+                        string lower = name.ToLowerInvariant();
+                        if (lower.Contains("isatap") || lower.Contains("teredo") ||
+                            lower.Contains("vethernet") || lower.Contains("hyper-v") ||
+                            lower.Contains("wsl") || lower.Contains("loopback") ||
+                            lower.Contains("bluetooth") || lower.Contains("vpn") ||
+                            lower.Contains("tap") || lower.Contains("tailscale") ||
+                            lower.Contains("zerotier") || lower.Contains("pseudo") ||
+                            lower.Contains("npcap") || lower.Contains("virtual")) {
+                            continue;
+                        }
+                    }
+                }
+                double val = BitConverter.Int64BitsToDouble(Marshal.ReadInt64(item, valueOffset));
+                if (double.IsNaN(val) || double.IsInfinity(val)) continue;
+                sum += val;
+                if (val > max) max = val;
+            }
+            return new double[] { sum, max };
+        } finally {
+            Marshal.FreeHGlobal(buf);
+        }
+    }
+
     public void Dispose() {
         if (_query != IntPtr.Zero) { PdhCloseQuery(_query); _query = IntPtr.Zero; }
     }
@@ -197,8 +242,8 @@ class FastSensorDaemon extends EventEmitter {
 
       '  if ($iNetRx -ge 0 -or $iNetTx -ge 0) {',
       '    $rx = 0; $tx = 0',
-      '    if ($iNetRx -ge 0) { $rx = [Math]::Round(($pdh.ReadMulti($iNetRx))[0]) }',
-      '    if ($iNetTx -ge 0) { $tx = [Math]::Round(($pdh.ReadMulti($iNetTx))[0]) }',
+      '    if ($iNetRx -ge 0) { $rx = [Math]::Round(($pdh.ReadMultiNet($iNetRx))[0]) }',
+      '    if ($iNetTx -ge 0) { $tx = [Math]::Round(($pdh.ReadMultiNet($iNetTx))[0]) }',
       `    $out.WriteLine('{"type":"network","rxBps":' + $rx + ',"txBps":' + $tx + '}')`,
       '  }',
 
@@ -219,14 +264,20 @@ class FastSensorDaemon extends EventEmitter {
   start() {
     if (this.process) return;
     this._stopped = false;
-    Logger.info('FastSensorDaemon', 'Iniciando coleta PDH de alta frequência (1s).');
 
-    const encoded = encodePowerShellScript(this._buildScript());
-    this.process = cp.spawn(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
-      { windowsHide: true }
-    );
+    const nativeExe = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../services/DarkHub.SensorDaemon.exe');
+    if (fs.existsSync(nativeExe)) {
+      Logger.info('FastSensorDaemon', 'Iniciando daemon de telemetria nativo C# (alta performance, zero recompilação).');
+      this.process = cp.spawn(nativeExe, [], { windowsHide: true });
+    } else {
+      Logger.info('FastSensorDaemon', 'Iniciando coleta PDH via PowerShell (fallback).');
+      const encoded = encodePowerShellScript(this._buildScript());
+      this.process = cp.spawn(
+        'powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
+        { windowsHide: true }
+      );
+    }
 
     this.process.stdout.on('data', (data) => {
       this.buffer += data.toString('utf8');

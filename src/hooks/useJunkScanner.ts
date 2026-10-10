@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { visibleInterval } from '../utils/visibleInterval'
 
 const STORAGE_KEY = 'darkhub.dashboard.junkEstimate'
 const TTL_MS = 30 * 60 * 1000
@@ -34,51 +33,42 @@ export const useJunkScanner = () => {
   const [junk, setJunk] = useState<any>(() => loadCached())
   const [loading, setLoading] = useState(() => loadCached() === null)
 
-  useEffect(() => {
-    let alive = true
+  const fetchJunk = async (forceFetch = false) => {
+    if (!window.darkhub) return
 
-    const fetchJunk = async (forceFetch = false) => {
-      if (!window.darkhub) return
-
-      if (!forceFetch) {
-        const cached = loadCached()
-        if (cached) {
-          if (alive) {
-            setJunk(cached)
-            setLoading(false)
-          }
-          return
-        }
-      }
-
-      try {
-        const res = await window.darkhub.system.getJunkEstimate({ timeoutMs: 900, cacheTtlMs: 60_000 })
-        if (!alive) return
-        if (res?.ok && typeof res?.bytes === 'number') {
-          saveCache({ bytes: res.bytes, ok: true, truncated: res.truncated })
-        }
-        setJunk(res)
-      } catch (e) {
-        if (!alive) return
-        setJunk(null)
-        if (import.meta.env.DEV) {
-          console.warn('[Dashboard] Falha ao buscar Lixo Residual:', e)
-        }
-      } finally {
-        if (alive) setLoading(false)
+    if (!forceFetch) {
+      const cached = loadCached()
+      if (cached) {
+        setJunk(cached)
+        setLoading(false)
+        return
       }
     }
 
-    const start = window.setTimeout(() => fetchJunk(false), 900)
+    setLoading(true)
+    try {
+      const res = await window.darkhub.system.getJunkEstimate({ timeoutMs: 900, cacheTtlMs: 60_000 })
+      if (res?.ok && typeof res?.bytes === 'number') {
+        saveCache({ bytes: res.bytes, ok: true, truncated: res.truncated })
+      }
+      setJunk(res)
+    } catch (e) {
+      setJunk(null)
+      if (import.meta.env.DEV) {
+        console.warn('[Dashboard] Falha ao buscar Lixo Residual:', e)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    const stopPolling = visibleInterval(() => fetchJunk(true), 45_000)
-
-    return () => {
-      alive = false
-      window.clearTimeout(start)
-      stopPolling()
+  useEffect(() => {
+    const cached = loadCached()
+    if (!cached) {
+      const start = window.setTimeout(() => fetchJunk(false), 900)
+      return () => window.clearTimeout(start)
     }
   }, [])
 
-  return { junk, loading }
+  return { junk, loading, refresh: (force = true) => fetchJunk(force) }
 }

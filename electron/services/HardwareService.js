@@ -142,8 +142,8 @@ class HardwareService {
   }
 
   start() {
+    this._clearIdleTimer();
     if (this._paused) {
-
       return;
     }
     Logger.info('HardwareService', 'Iniciando telemetria de hardware...');
@@ -151,7 +151,20 @@ class HardwareService {
   }
 
   stop() {
-    Logger.info('HardwareService', 'Encerrando telemetria de hardware...');
+    Logger.info('HardwareService', 'Pausando telemetria de hardware (sensores permanecem vivos por 60s)...');
+    this._stopTimer();
+    this._lastSentRefs = {};
+    this._clearIdleTimer();
+    this._idleTimer = setTimeout(() => {
+      this._idleTimer = null;
+      if (this.activeConsumers === 0) {
+        Logger.info('HardwareService', 'Nenhum consumidor de telemetria ativo por 60s — encerrando daemons de sensores.');
+        this._stopDaemons();
+      }
+    }, IDLE_TEARDOWN_MS);
+  }
+
+  teardown() {
     this._clearIdleTimer();
     this._stopTimer();
     this._stopDaemons();

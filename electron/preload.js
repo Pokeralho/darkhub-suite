@@ -24,6 +24,8 @@ const darkhubApi = {
     getSnapshot: () => ipcRenderer.invoke('system:getSnapshot'),
     getAdvancedHardware: () => ipcRenderer.invoke('system:getAdvancedHardware'),
     getDeepHardwareInfo: (forceRefresh = false) => ipcRenderer.invoke('system:getDeepHardwareInfo', forceRefresh),
+    getDeepCategory: (category, forceRefresh = false) => ipcRenderer.invoke('system:getDeepCategory', category, forceRefresh),
+    enableProcessTracking: (enabled) => ipcRenderer.invoke('system:enableProcessTracking', enabled),
     runBenchmark: () => ipcRenderer.invoke('system:runBenchmark')
   },
   app: {
