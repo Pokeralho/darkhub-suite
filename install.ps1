@@ -12,7 +12,7 @@ function Start-DarkHubInstall {
     } catch {}
 
     $repo = "Pokeralho/darkhub-suite"
-    $Version = "0.4.7"
+    $Version = "0.4.8"
     $directUrl = $null
 
     try {
