@@ -72,6 +72,7 @@ const darkhubApi = {
   optimizer: {
     applyTweak: (id) => ipcRenderer.invoke('optimizer:applyTweak', id),
     listOperations: () => ipcRenderer.invoke('optimizer:listOperations'),
+    checkOperationsStatus: () => ipcRenderer.invoke('optimizer:checkOperationsStatus'),
     listProfiles: () => ipcRenderer.invoke('optimizer:listProfiles'),
     checkIsAdmin: () => ipcRenderer.invoke('optimizer:checkIsAdmin'),
     createRestorePoint: () => ipcRenderer.invoke('optimizer:createRestorePoint'),

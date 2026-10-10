@@ -866,8 +866,12 @@ ipcMain.handle('system:getSnapshot', async () => {
   return HardwareHAL.getSnapshot()
 })
 
-ipcMain.handle('optimizer:listOperations', async () => {
+ipcMain.handle('optimizer:listOperations', () => {
   return SystemOptimizerService.listOperations()
+})
+
+ipcMain.handle('optimizer:checkOperationsStatus', async () => {
+  return await SystemOptimizerService.checkOperationsStatus()
 })
 
 ipcMain.handle('optimizer:analyze', async (_event, payload) => {

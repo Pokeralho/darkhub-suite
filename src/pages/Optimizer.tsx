@@ -76,6 +76,8 @@ export default function Optimizer() {
   const [operations, setOperations] = useState<any[]>([]);
   const [deepTweaks, setDeepTweaks] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
+  const [opStatus, setOpStatus] = useState<Record<string, boolean | null>>({});
+  const [opPartial, setOpPartial] = useState<Record<string, boolean>>({});
   const [tweakStatus, setTweakStatus] = useState<Record<string, boolean>>({});
   const [tweakPartial, setTweakPartial] = useState<Record<string, boolean>>({});
   const [isCheckingStatus, setIsCheckingStatus] = useState<boolean>(true);
@@ -204,10 +206,14 @@ export default function Optimizer() {
     setIsCheckingStatus(true);
     setStatusError(false);
     try {
-      const statusRes = await api().deepTweaksStatus().catch(() => null);
+      const statusRes = api().checkOperationsStatus
+        ? await api().checkOperationsStatus().catch(() => null)
+        : await api().deepTweaksStatus().catch(() => null);
       if (statusRes?.ok) {
-        setTweakStatus(statusRes.status || {});
-        setTweakPartial(statusRes.partial || {});
+        if (statusRes.status) setOpStatus(statusRes.status);
+        if (statusRes.partial) setOpPartial(statusRes.partial);
+        setTweakStatus(statusRes.deepStatus || statusRes.status || {});
+        setTweakPartial(statusRes.deepPartial || statusRes.partial || {});
         setStatusError(false);
       } else {
         setStatusError(true);
@@ -220,16 +226,19 @@ export default function Optimizer() {
   };
 
   const refreshStatus = async () => {
-    if (!api()?.deepTweaksStatus) return null;
     setIsCheckingStatus(true);
     setStatusError(false);
     try {
-      const res = await api().deepTweaksStatus();
+      const res = api()?.checkOperationsStatus
+        ? await api().checkOperationsStatus()
+        : await api()?.deepTweaksStatus();
       if (res?.ok) {
-        setTweakStatus(res.status || {});
-        setTweakPartial(res.partial || {});
+        if (res.status) setOpStatus(res.status);
+        if (res.partial) setOpPartial(res.partial);
+        setTweakStatus(res.deepStatus || res.status || {});
+        setTweakPartial(res.deepPartial || res.partial || {});
         setStatusError(false);
-        return res.status || {};
+        return res.deepStatus || res.status || {};
       } else {
         setStatusError(true);
       }
@@ -244,8 +253,14 @@ export default function Optimizer() {
   useEffect(() => {
     loadInitialData();
 
+    // Safety fallback in case contextBridge had a microtask delay
+    const retryTimer = setTimeout(() => {
+      loadInitialData();
+    }, 250);
+
+    let unsub: any = null;
     if (api()?.onRunEvent) {
-      const unsub = api().onRunEvent((ev: any) => {
+      unsub = api().onRunEvent((ev: any) => {
         const label = labelsRef.current[ev?.opId] || ev?.opId;
         if (ev?.type === 'op-start') addLog('info', fmt(t('optimizer.audit.log.opStart', 'Iniciando: {name}...'), { name: label }));
         if (ev?.type === 'op-finish') {
@@ -261,9 +276,11 @@ export default function Optimizer() {
           }
         }
       });
-      return () => unsub();
     }
-    return undefined;
+    return () => {
+      clearTimeout(retryTimer);
+      if (unsub) unsub();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -453,6 +470,7 @@ export default function Optimizer() {
     for (const op of operations) {
       if (op.isRevert) continue;
       if (Array.isArray(op.tweakIds) && op.tweakIds.length === 1) covered.add(op.tweakIds[0]);
+      const isApplied = opStatus[op.id] !== undefined ? opStatus[op.id] : (op.applied === true ? true : op.applied === false ? false : null);
       list.push({
         id: op.id,
         kind: 'op',
@@ -465,8 +483,8 @@ export default function Optimizer() {
         securityRelated: Boolean(op.securityRelated),
         warning: op.warning ? t(`optimizer.audit.op.${op.id}.warning`, op.warning) : null,
         revertId: op.revertId || null,
-        applied: op.applied === true ? true : op.applied === false ? false : null,
-        partial: Boolean(op.partial),
+        applied: isApplied,
+        partial: Boolean(op.partial || opPartial[op.id]),
         recommended: false
       });
     }
@@ -491,7 +509,7 @@ export default function Optimizer() {
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [operations, deepTweaks, tweakStatus, tweakPartial, isCheckingStatus, t]);
+  }, [operations, deepTweaks, opStatus, opPartial, tweakStatus, tweakPartial, isCheckingStatus, t]);
 
   const filteredTweaks = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -572,7 +590,6 @@ export default function Optimizer() {
   };
 
   const afterChange = async () => {
-    await loadInitialData();
     await refreshStatus();
   };
 
@@ -1445,13 +1462,13 @@ export default function Optimizer() {
                             {t('optimizer.audit.badge.admin', 'ADMIN')}
                           </span>
                         )}
-                        {tweak.applied === null && isCheckingStatus && tweak.kind === 'deep' && (
+                        {tweak.applied === null && isCheckingStatus && (tweak.kind === 'deep' || Boolean(tweak.revertId)) && (
                           <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1">
                             <Loader2 className="w-2.5 h-2.5 animate-spin" />
                             {t('optimizer.audit.badge.checking', 'verificando...')}
                           </span>
                         )}
-                        {tweak.applied === null && !isCheckingStatus && tweak.kind === 'deep' && (
+                        {tweak.applied === null && !isCheckingStatus && (tweak.kind === 'deep' || Boolean(tweak.revertId)) && (
                           <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">
                             {t('optimizer.audit.badge.unknown', 'NÃO VERIFICADO')}
                           </span>

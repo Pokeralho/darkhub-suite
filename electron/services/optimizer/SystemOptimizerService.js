@@ -640,16 +640,33 @@ class SystemOptimizerService {
     return null;
   }
 
-  async listOperations() {
+  listOperations() {
+    const ops = Array.from(this.operations.values());
+    return ops.map((op) => ({
+      ...this._publicOp(op),
+      applied: null,
+      partial: false
+    }));
+  }
+
+  async checkOperationsStatus() {
     let statusMap = null;
     try { statusMap = await DeepTweaksEngine.checkTweaksStatus(); } catch { statusMap = null; }
     const ops = Array.from(this.operations.values());
     const applied = await Promise.all(ops.map((op) => this._appliedState(op, statusMap)));
-    return ops.map((op, i) => ({
-      ...this._publicOp(op),
-      applied: applied[i],
-      partial: Boolean(op.tweakIds?.length && applied[i] === false && op.tweakIds.some((id) => statusMap?.partial?.[id] || statusMap?.status?.[id]))
-    }));
+    const status = {};
+    const partial = {};
+    ops.forEach((op, i) => {
+      status[op.id] = applied[i];
+      partial[op.id] = Boolean(op.tweakIds?.length && applied[i] === false && op.tweakIds.some((id) => statusMap?.partial?.[id] || statusMap?.status?.[id]));
+    });
+    return {
+      ok: true,
+      status,
+      partial,
+      deepStatus: statusMap?.status || {},
+      deepPartial: statusMap?.partial || {}
+    };
   }
 
   listProfiles() {
