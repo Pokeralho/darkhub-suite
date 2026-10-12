@@ -393,6 +393,7 @@ function New-DkFakeBackend {
     $b['PowerSetActive'] = { param($Guid) $s = Load-DkFakeState; $s.powerActive = $Guid; Save-DkFakeState $s }
     $b['PowerSchemeExists'] = { param($Guid) $s = Load-DkFakeState; return (@($s.powerSchemes) -contains $Guid) }
     $b['FileCopy'] = { param($Src, $Dst) $s = Load-DkFakeState; $s.files[$Dst] = $Src; Save-DkFakeState $s; return $true }
+    $b['AppxFixAcl'] = { param($Path) return $true }
     $b['AppxPackageFolders'] = {
         param($ShortName)
         $s = Load-DkFakeState
@@ -567,6 +568,14 @@ function New-DkRealBackend {
         if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
         $null = robocopy (Split-Path -Parent $Src) $dir (Split-Path -Leaf $Src) /B /NJH /NJS /NP /R:1 /W:1
         return ($LASTEXITCODE -lt 8)
+    }
+    # A payload copied back into WindowsApps only inherits the WindowsApps root ACEs (no BUILTIN\Users read),
+    # so Add-AppxPackage -Register fails with 0x80073D04/0x80070005 (VM run 2, confirmed in-guest). Grant
+    # Users and ALL APPLICATION PACKAGES read+execute, as on installed package folders.
+    $b['AppxFixAcl'] = {
+        param($Path)
+        $null = icacls $Path /grant '*S-1-5-32-545:(OI)(CI)(RX)' '*S-1-15-2-1:(OI)(CI)(RX)' /C /Q
+        return ($LASTEXITCODE -eq 0)
     }
     $b['AppxPackageFolders'] = {
         param($ShortName)
@@ -777,7 +786,9 @@ function Invoke-DkDefaultAssocRevert { param($Change, $Original) } # association
 function Resolve-DkPayloadPath {
     param([string]$Rel)
     if ([System.IO.Path]::IsPathRooted($Rel)) { return $Rel }
-    return (Join-Path (Get-DkPath Root) $Rel)
+    # Payload paths (index.json preservedPath 'AppPackages\<PFN>', catalog 'policy\...') are relative to
+    # the Recovery folder, not the DarkOS root (VM run 1: appx restore looked in DarkOS\AppPackages).
+    return (Join-Path (Get-DkPath Recovery) $Rel)
 }
 
 # ================================================================ APPX HANDLER (payload-preserving)
@@ -928,6 +939,9 @@ function Restore-DkAppxPackage {
         if (-not (Invoke-Dk 'FileExists' @($target))) {
             if (Invoke-Dk 'FileCopy' @($preserved, $target)) { $pathUsed += "copyback:$pfn" } else { $errors += "copy falhou: $pfn" }
         } else { $pathUsed += "present:$pfn" }
+        if (Invoke-Dk 'FileExists' @($target)) {
+            if (-not (Invoke-Dk 'AppxFixAcl' @($target))) { $errors += "acl falhou: $pfn" }
+        }
     }
     foreach ($e in @($entries | Where-Object { -not $_.kind -or $_.kind -eq 'main' })) {
         $pfn = $e.packageFullName
