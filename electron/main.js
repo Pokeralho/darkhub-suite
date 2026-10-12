@@ -28,6 +28,8 @@ import { registerOptiScalerIPC } from './optiscalerManager.js'
 import { registerDlss5IPC } from './services/dlss5/Dlss5Service.js'
 import { registerDownloadsIPC } from './services/downloads/registerDownloadsIPC.js'
 import { registerDarkOSIPC } from './ipc/darkosIpc.js'
+import { registerDriverIPC } from './ipc/driverIpc.js'
+import { registerPowerShellIPC } from './ipc/powershellIpc.js'
 import Logger from './services/LoggerService.js'
 import { runCommand, runPowerShell, runPowerShellJson, stripBom, encodePowerShellScript, powerShellArgsForEncodedScript } from './services/PowerShellRunner.js'
 import HardwareService from './services/HardwareService.js'
@@ -171,6 +173,8 @@ registerOptiScalerIPC({ app, ipcMain, getLibraryStore })
 registerDlss5IPC({ app, ipcMain, shell })
 const downloadsService = registerDownloadsIPC({ app, ipcMain, dialog, shell, BrowserWindow, logger: Logger })
 registerDarkOSIPC({ app, ipcMain, dialog, BrowserWindow, logger: Logger })
+registerDriverIPC({ ipcMain, shell, logger: Logger })
+registerPowerShellIPC({ ipcMain, logger: Logger })
 
 async function getYtDlpTools() {
   ytdlpToolsPromise ||= import('./ytdlp.js')
@@ -1889,6 +1893,50 @@ ipcMain.handle('settings:updateStartupBehavior', async (_event, payload) => {
       }
     })
     return { ok: true, openAtLogin: await isStartupTaskEnabled() }
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err) }
+  }
+})
+
+// Lightweight live host stats for the DarkOS Center (process/service counts + CPU/RAM). One cheap
+// PowerShell call per request; the renderer polls only while its page is visible (footprint rule).
+ipcMain.handle('system:getLiveStats', async () => {
+  if (process.platform !== 'win32') return { ok: false, error: 'Disponível apenas no Windows.' }
+  try {
+    const script = `
+$ErrorActionPreference = 'SilentlyContinue'
+$procs = @(Get-Process).Count
+$svc = Get-Service
+$run = @($svc | Where-Object { $_.Status -eq 'Running' }).Count
+$all = @($svc).Count
+$os = Get-CimInstance Win32_OperatingSystem
+$cpuAvg = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average
+[pscustomobject]@{
+  processes = $procs
+  servicesRunning = $run
+  servicesTotal = $all
+  cpuPercent = if ($cpuAvg -ne $null) { [int][math]::Round([double]$cpuAvg, 0) } else { 0 }
+  memTotalMb = [int][math]::Round($os.TotalVisibleMemorySize / 1024, 0)
+  memFreeMb = [int][math]::Round($os.FreePhysicalMemory / 1024, 0)
+  uptimeSec = [int]((Get-Date) - $os.LastBootUpTime).TotalSeconds
+} | ConvertTo-Json -Compress`
+    const res = await runPowerShell(script, { timeoutMs: 12000, trim: true })
+    let d = null
+    try { d = JSON.parse(stripBom(res.stdout || '').trim()) } catch { d = null }
+    if (!d) return { ok: false, error: (res.stderr || '').trim() || 'Sem dados de telemetria do sistema.' }
+    const memTotalMb = Number(d.memTotalMb) || 0
+    const memUsedMb = Math.max(0, memTotalMb - (Number(d.memFreeMb) || 0))
+    return {
+      ok: true,
+      processes: Number(d.processes) || 0,
+      servicesRunning: Number(d.servicesRunning) || 0,
+      servicesTotal: Number(d.servicesTotal) || 0,
+      cpuPercent: Number(d.cpuPercent) || 0,
+      memUsedMb,
+      memTotalMb,
+      memPercent: memTotalMb ? Math.round((memUsedMb / memTotalMb) * 100) : 0,
+      uptimeSec: Number(d.uptimeSec) || 0
+    }
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) }
   }

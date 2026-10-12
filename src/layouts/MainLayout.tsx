@@ -5,7 +5,8 @@ import {
   PlaySquare, ScanText, ShieldAlert, Lock, Image as ImageIcon,
   Edit3, MousePointerClick, LibraryBig, Gamepad2, Film,
   Download, Fingerprint, Network, Code, ChevronLeft, ChevronRight,
-  Cpu, Crosshair, Activity, Flame, Sparkles, Minus, Square, X, LifeBuoy
+  Cpu, Crosshair, Activity, Flame, Sparkles, Minus, Square, X, LifeBuoy,
+  MonitorCog, Terminal
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nProvider';
 
@@ -84,6 +85,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
       category: t('nav.cat.diagnostics', 'Diagnostics & Hardware'),
       items: [
         { id: 'monitor', label: t('nav.monitor', 'System Monitor'), icon: Monitor },
+        { id: 'driver', label: t('nav.driver', 'Driver Center'), icon: MonitorCog },
         { id: 'networktools', label: t('nav.networktools', 'Network & Latency'), icon: Network },
         { id: 'setuphub', label: t('nav.setuphub', 'Post-Install Hub'), icon: Zap }
       ]
@@ -104,6 +106,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
         { id: 'summarizer', label: t('nav.summarizer', 'Summarizer'), icon: Sparkles },
         { id: 'autoclicker', label: t('nav.autoclicker', 'AutoClicker'), icon: MousePointerClick },
         { id: 'devtools', label: t('nav.devtools', 'Developer Tools'), icon: Code },
+        { id: 'powershell', label: t('nav.powershell', 'PowerShell Tools'), icon: Terminal },
         { id: 'luluflix', label: t('nav.luluflix', 'LuluFlix'), icon: Film },
         { id: 'juuzou', label: t('nav.juuzou', 'Juuzou'), icon: Download }
       ]

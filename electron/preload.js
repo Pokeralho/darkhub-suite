@@ -26,7 +26,8 @@ const darkhubApi = {
     getDeepHardwareInfo: (forceRefresh = false) => ipcRenderer.invoke('system:getDeepHardwareInfo', forceRefresh),
     getDeepCategory: (category, forceRefresh = false) => ipcRenderer.invoke('system:getDeepCategory', category, forceRefresh),
     enableProcessTracking: (enabled) => ipcRenderer.invoke('system:enableProcessTracking', enabled),
-    runBenchmark: () => ipcRenderer.invoke('system:runBenchmark')
+    runBenchmark: () => ipcRenderer.invoke('system:runBenchmark'),
+    getLiveStats: () => ipcRenderer.invoke('system:getLiveStats')
   },
   app: {
     getAbout: () => ipcRenderer.invoke('app:getAbout'),
@@ -348,6 +349,17 @@ const darkhubApi = {
   },
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url)
+  },
+  driver: {
+    detect: () => ipcRenderer.invoke('driver:detect'),
+    openOfficial: (payload) => ipcRenderer.invoke('driver:openOfficial', payload)
+  },
+  powershell: {
+    getPolicies: () => ipcRenderer.invoke('powershell:getPolicies'),
+    listScripts: () => ipcRenderer.invoke('powershell:listScripts'),
+    getSignature: (payload) => ipcRenderer.invoke('powershell:getSignature', payload),
+    runScript: (payload) => ipcRenderer.invoke('powershell:runScript', payload),
+    openElevatedTerminal: (payload) => ipcRenderer.invoke('powershell:openElevatedTerminal', payload)
   },
   discord: {
     sendMessage: (payload) => ipcRenderer.invoke('discord:sendMessage', payload),

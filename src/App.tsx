@@ -32,6 +32,8 @@ const DllInjector = lazy(() => import('./pages/DllInjector'));
 const FramePacer = lazy(() => import('./pages/FramePacer'));
 const Home = lazy(() => import('./pages/Home'));
 const DarkOSCenter = lazy(() => import('./pages/DarkOSCenter'));
+const DriverCenter = lazy(() => import('./pages/DriverCenter'));
+const PowerShellTools = lazy(() => import('./pages/PowerShellTools'));
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState('home');
@@ -87,6 +89,10 @@ const App = () => {
         return <Optimizer onNavigate={(p: string) => setCurrentPage(p)} />;
       case 'darkos':
         return <DarkOSCenter onNavigate={(p: string) => setCurrentPage(p)} />;
+      case 'driver':
+        return <DriverCenter />;
+      case 'powershell':
+        return <PowerShellTools />;
       case 'monitor':
         return <SystemMonitor />;
       case 'security':

@@ -53,6 +53,7 @@ export interface DarkHubAPI {
     getAdvancedHardware: () => Promise<any>;
     getDeepHardwareInfo: (forceRefresh?: boolean) => Promise<any>;
     runBenchmark: () => Promise<any>;
+    getLiveStats: () => Promise<{ ok: boolean; processes?: number; servicesRunning?: number; servicesTotal?: number; cpuPercent?: number; memUsedMb?: number; memTotalMb?: number; memPercent?: number; uptimeSec?: number; error?: string }>;
   };
   app: {
     getAbout: () => Promise<any>;
@@ -434,6 +435,35 @@ export interface DarkHubAPI {
   };
   shell: {
     openExternal: (url: string) => Promise<void>;
+  };
+  driver: {
+    detect: () => Promise<{
+      ok: boolean;
+      error?: string;
+      rebootPending?: boolean;
+      adapters?: Array<{
+        model: string;
+        vendor: 'nvidia' | 'amd' | 'intel' | 'virtual' | 'other';
+        driverVersion: string;
+        driverDate: string;
+        driverProvider: string;
+        videoProcessor: string;
+        pnpId: string;
+        vramMb: number;
+        status: string;
+        problem: string;
+        isDedicated: boolean;
+        officialSources: { manual: string; autoDetect: string; app: string } | null;
+      }>;
+    }>;
+    openOfficial: (payload: { vendor: string; kind?: 'manual' | 'autoDetect' | 'app' }) => Promise<{ ok: boolean; url?: string; vendor?: string; kind?: string; error?: string }>;
+  };
+  powershell: {
+    getPolicies: () => Promise<{ ok: boolean; error?: string; scopes?: Array<{ scope: string; policy: string }>; effective?: { scope: string; policy: string } }>;
+    listScripts: () => Promise<{ ok: boolean; error?: string; rootExists?: boolean; root?: string; scripts?: Array<{ name: string; path: string; sizeBytes: number; modified: string; signature: { status: string; trusted: boolean; signer: string } }> }>;
+    getSignature: (payload: { path: string }) => Promise<{ ok: boolean; error?: string; signature?: { status: string; trusted: boolean; signer: string } }>;
+    runScript: (payload: { path: string }) => Promise<{ ok: boolean; code?: number; stdout?: string; stderr?: string; signature?: { status: string; trusted: boolean; signer: string }; error?: string }>;
+    openElevatedTerminal: (payload?: { startingPath?: string }) => Promise<{ ok: boolean; error?: string }>;
   };
   discord: {
     sendMessage: (payload: any) => Promise<any>;
