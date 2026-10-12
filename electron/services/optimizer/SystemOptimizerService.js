@@ -133,6 +133,24 @@ class SystemOptimizerService {
     });
 
     this._op({
+      id: 'optimizer:powerPlanUltimate',
+      name: 'Plano de Energia: Desempenho Máximo',
+      description: 'Ativa o plano Desempenho Máximo (oculto, criado sob demanda). Elimina qualquer economia de energia; indicado para desktops. O plano anterior é lembrado e pode ser restaurado.',
+      technicalDescription: 'powercfg /duplicatescheme e /setactive e9a42b02-d5df-448d-aa00-03f14749eb61, confirmando pela leitura do plano ativo.',
+      category: 'power',
+      risk: 'moderate',
+      requiresAdmin: false,
+      isReversible: true,
+      estimatedTimeMs: 600,
+      execute: async () => adaptResult(await PowerEngine.setUltimate(), { resources: ['Powercfg'] }),
+      revert: async () => adaptResult(await PowerEngine.restorePrevious(), { resources: ['Powercfg'] }),
+      statusFn: async () => {
+        const g = await PowerEngine._getActiveSchemeGuid();
+        return g === POWER_GUIDS.ultimate;
+      }
+    });
+
+    this._op({
       id: 'optimizer:powerPlanBalanced',
       name: 'Plano de Energia: Equilibrado',
       description: 'Ativa o plano Equilibrado (padrão do Windows) e confirma lendo o plano ativo.',
@@ -143,6 +161,19 @@ class SystemOptimizerService {
       isReversible: false,
       estimatedTimeMs: 500,
       execute: async () => adaptResult(await PowerEngine.setBalanced(), { resources: ['Powercfg'] })
+    });
+
+    this._op({
+      id: 'optimizer:powerPlanRestore',
+      name: 'Plano de Energia: Restaurar anterior',
+      description: 'Volta ao plano de energia que estava ativo antes do DarkHub trocar por Alto Desempenho ou Desempenho Máximo. Se nenhum plano anterior foi lembrado, aplica o Equilibrado.',
+      technicalDescription: 'Lê o GUID salvo em optimizer_power_previous.json e faz powercfg /setactive; sem registro, cai para o plano Equilibrado.',
+      category: 'power',
+      risk: 'safe',
+      requiresAdmin: false,
+      isReversible: false,
+      estimatedTimeMs: 500,
+      execute: async () => adaptResult(await PowerEngine.restorePrevious(), { resources: ['Powercfg'] })
     });
 
     // ---------------------------------------------------------------- privacidade (tweaks verificados + snapshot)

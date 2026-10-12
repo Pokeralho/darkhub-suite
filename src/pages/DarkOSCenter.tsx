@@ -6,13 +6,14 @@ import {
 import { useI18n } from '../i18n/I18nProvider';
 import DarkOSProgress from '../components/darkos/DarkOSProgress';
 import DarkOSConfirmDialog from '../components/darkos/DarkOSConfirmDialog';
+import DarkOSSystemPanel from '../components/darkos/DarkOSSystemPanel';
 import type { DarkOSInfo, DarkOSManifest, DarkOSProfileId, DarkOSSnapshot } from '../types/darkos';
 import {
   DARKOS_PROFILES, DarkOSRow, DarkOSFailure, RemovedApp, countStatuses, mergeChanges, normalizeFailures,
   normalizeReboot, normalizeRemovedApps, normalizeSnapshots, profileDiff
 } from '../utils/darkosData';
 
-type TabId = 'overview' | 'changes' | 'profiles' | 'recovery' | 'snapshots' | 'failures' | 'diagnostics';
+type TabId = 'overview' | 'system' | 'changes' | 'profiles' | 'recovery' | 'snapshots' | 'failures' | 'diagnostics';
 
 interface Banner { ok: boolean; pending?: boolean; message: string }
 
@@ -241,12 +242,14 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
             </div>
           </div>
         </Card>
+        <DarkOSSystemPanel onNavigate={onNavigate} />
       </div>
     );
   }
 
   const tabs: { id: TabId; label: string; icon: React.ComponentType<{ className?: string }>; count?: number }[] = [
     { id: 'overview', label: t('darkos.tab.overview', 'Overview'), icon: Gauge },
+    { id: 'system', label: t('darkos.sys.title', 'System & updates'), icon: HardDrive },
     { id: 'changes', label: t('darkos.tab.changes', 'Applied optimizations'), icon: Layers, count: rows.length },
     { id: 'profiles', label: t('darkos.tab.profiles', 'Profiles'), icon: Gauge },
     { id: 'recovery', label: t('darkos.tab.recovery', 'Recovery'), icon: RotateCcw, count: apps.length },
@@ -486,6 +489,7 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
 
   const content: Record<TabId, () => React.ReactNode> = {
     overview: renderOverview,
+    system: () => <DarkOSSystemPanel onNavigate={onNavigate} />,
     changes: renderChanges,
     profiles: renderProfiles,
     recovery: renderRecovery,
