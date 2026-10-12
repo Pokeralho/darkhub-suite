@@ -70,7 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 - Pre-existing test failure: `tests/dlss5Lifecycle.test.ts` requires `fsr4_rdna2/amd_fidelityfx_upscaler_dx12.dll` (not in repo).
-- `SystemEngine.activateWindows` left as original implementation (executes remote PowerShell script with admin elevation).
+- `SystemEngine.activateWindows` no longer downloads/executes a remote activation script; it now opens the official Windows activation settings page (`ms-settings:activation`) only (fixed in 0.5.0 / DarkOS iteration 2).
 - Browser extension for downloads deferred to future release.
 
 ---

