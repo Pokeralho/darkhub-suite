@@ -4,6 +4,29 @@ All notable changes to the DarkHub Suite project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-10-12
+
+### Added
+- **DarkOS Center** (management and recovery area for DarkOS):
+  - New sidebar entry "DarkOS" with tabs: Overview (DarkOS version, Windows build, active profile,
+    status counts, reboot-pending banner), Applied optimizations (grouped by category, status badge,
+    per-item Undo/Reapply, reboot flag), Profiles (DarkOS Default / Competitive / Maximum Performance
+    with a concise diff), Recovery (restore removed Appx packages, "restore everything to original"),
+    Snapshots, Failures and Diagnostics export (.zip chosen in a native dialog).
+  - Security-related changes require an explicit, never pre-checked confirmation with pt-BR trade-off text.
+  - On a regular Windows the page shows an explanatory empty state; no operation can run without
+    `C:\ProgramData\DarkOS\Recovery\manifest.json`.
+- **DarkOSRecoveryService + `darkos:*` IPC**: all reads/changes go through the shared
+  `DarkOS.Recovery.psm1` CLI (`DarkOS.Cli.ps1`), installed copy in `C:\ProgramData\DarkOS\bin` first,
+  bundled copy (app.asar.unpacked) as fallback. Strict input validation, serialized queue, timeouts,
+  live progress on `darkos:runEvent`; success is only reported when the module returns `verified: true`.
+- System Optimizer shows a hint linking to the DarkOS area when running on DarkOS.
+- `tests/darkosService.test.ts` (parsing, validation, queue, verified gating, UI data helpers).
+
+### Changed
+- Inter and JetBrains Mono are bundled locally via `@fontsource` (no Google Fonts request; works offline).
+- Autostart remains opt-in (Settings); nothing is registered at install or first launch.
+
 ## [0.4.8] - 2026-10-10
 
 ### Added
