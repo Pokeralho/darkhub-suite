@@ -32,6 +32,7 @@ const DllInjector = lazy(() => import('./pages/DllInjector'));
 const FramePacer = lazy(() => import('./pages/FramePacer'));
 const SteamLuaTools = lazy(() => import('./pages/SteamLuaTools'));
 const Home = lazy(() => import('./pages/Home'));
+const DarkOSCenter = lazy(() => import('./pages/DarkOSCenter'));
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState('home');
@@ -84,7 +85,9 @@ const App = () => {
       case 'dashboard':
         return <Dashboard onNavigate={(p: string) => setCurrentPage(p)} />;
       case 'optimizer':
-        return <Optimizer />;
+        return <Optimizer onNavigate={(p: string) => setCurrentPage(p)} />;
+      case 'darkos':
+        return <DarkOSCenter onNavigate={(p: string) => setCurrentPage(p)} />;
       case 'monitor':
         return <SystemMonitor />;
       case 'security':

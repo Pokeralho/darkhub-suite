@@ -5,6 +5,7 @@ import {
   RotateCcw, Headphones, Package, Network, ShieldAlert, FolderOpen, AlertTriangle, History
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nProvider';
+import DarkOSOptimizerHint from '../components/darkos/DarkOSOptimizerHint';
 
 type OptimizerTab = 'tweaks' | 'gpu' | 'priority' | 'uninstaller' | 'network' | 'defender' | 'debloat' | 'startup';
 type LogLevel = 'info' | 'ok' | 'err' | 'warn';
@@ -63,7 +64,7 @@ const tabBtn = (active: boolean) =>
 const heroBtn = (hover: string) =>
   `p-3 rounded-xl bg-zinc-900/80 hover:bg-zinc-900 border border-zinc-800/80 ${hover} text-left transition flex flex-col justify-between gap-2 shadow-sm disabled:opacity-50 group`;
 
-export default function Optimizer() {
+export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) => void } = {}) {
   const { t } = useI18n();
 
   // Navigation & View
@@ -1067,6 +1068,7 @@ export default function Optimizer() {
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-4 p-1 md:p-2 animate-fadeIn text-zinc-100 pb-16">
+      <DarkOSOptimizerHint onNavigate={onNavigate} />
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80">
         <div>

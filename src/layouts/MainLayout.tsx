@@ -5,7 +5,7 @@ import {
   PlaySquare, ScanText, ShieldAlert, Lock, Image as ImageIcon,
   Edit3, MousePointerClick, LibraryBig, Gamepad2, Film,
   Download, Fingerprint, Network, Code, ChevronLeft, ChevronRight,
-  Cpu, Crosshair, Activity, Flame, Sparkles, Minus, Square, X
+  Cpu, Crosshair, Activity, Flame, Sparkles, Minus, Square, X, LifeBuoy
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nProvider';
 
@@ -39,6 +39,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
   const [showGuardian, setShowGuardian] = React.useState(false);
   const [pgeBusy, setPgeBusy] = React.useState(false);
   const [pgeStatus, setPgeStatus] = React.useState<{ ok: boolean; message: string } | null>(null);
+  const [isDarkOS, setIsDarkOS] = React.useState(false);
+
+  React.useEffect(() => {
+    // Cheap check (file existence in main process); no PowerShell is spawned.
+    window.darkhub?.darkos?.isDarkOS?.().then((r) => setIsDarkOS(Boolean(r?.isDarkOS))).catch(() => {});
+  }, []);
 
   React.useEffect(() => {
     try {
@@ -56,7 +62,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
       category: t('nav.cat.overview', 'Overview'),
       items: [
         { id: 'home', label: t('nav.home', 'Home'), icon: HomeIcon },
-        { id: 'dashboard', label: t('nav.dashboard', 'Dashboard'), icon: LayoutGrid }
+        { id: 'dashboard', label: t('nav.dashboard', 'Dashboard'), icon: LayoutGrid },
+        // Always listed: on DarkOS it is the management/recovery center; elsewhere it shows an
+        // explanatory empty state (nothing can run, the main process refuses without manifest.json).
+        { id: 'darkos', label: t('nav.darkos', 'DarkOS'), icon: LifeBuoy, badge: isDarkOS ? 'ON' : undefined }
       ]
     },
     {

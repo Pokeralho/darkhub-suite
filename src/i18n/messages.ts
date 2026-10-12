@@ -1,3 +1,5 @@
+import { darkosMessages } from './darkosMessages';
+
 export type SupportedLang = 'pt-BR' | 'en-US' | 'es-ES' | 'de-DE' | 'fr-FR' | 'it-IT' | 'ru-RU' | 'zh-CN' | 'ja-JP';
 
 export interface LanguageOption {
@@ -3498,6 +3500,10 @@ export const messages: Record<string, Record<string, string>> = {
   }
 
 };
+
+for (const [code, dict] of Object.entries(darkosMessages)) {
+  messages[code] = { ...(messages[code] || {}), ...dict };
+}
 
 export function registerLanguage(code: string, dict: Record<string, string>) {
   messages[code] = { ...(messages['en-US'] || {}), ...dict };
