@@ -83,6 +83,24 @@ function Write-DkProgress {
 
 function Get-DkTimestamp { return (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') }
 
+# DWord helpers: catalog stores unsigned values (e.g. 0xFFF6823B); the registry provider returns Int32.
+function ConvertTo-DkSignedDword {
+    param($Value)
+    $u = [uint32]([int64]$Value -band 0xFFFFFFFFL)
+    return [BitConverter]::ToInt32([BitConverter]::GetBytes($u), 0)
+}
+function ConvertTo-DkUInt32 {
+    param($Value)
+    return [uint32]([int64]$Value -band 0xFFFFFFFFL)
+}
+function Test-DkRegValueEqual {
+    param($Type, $Actual, $Expected)
+    if ($Type -eq 'DWord') {
+        try { return ((ConvertTo-DkUInt32 $Actual) -eq (ConvertTo-DkUInt32 $Expected)) } catch { return $false }
+    }
+    return ([string]$Actual -eq [string]$Expected)
+}
+
 function Write-DkLog {
     param([string]$Message, [string]$Level = 'INFO')
     try {
@@ -375,6 +393,13 @@ function New-DkFakeBackend {
     $b['PowerSetActive'] = { param($Guid) $s = Load-DkFakeState; $s.powerActive = $Guid; Save-DkFakeState $s }
     $b['PowerSchemeExists'] = { param($Guid) $s = Load-DkFakeState; return (@($s.powerSchemes) -contains $Guid) }
     $b['FileCopy'] = { param($Src, $Dst) $s = Load-DkFakeState; $s.files[$Dst] = $Src; Save-DkFakeState $s; return $true }
+    $b['AppxPackageFolders'] = {
+        param($ShortName)
+        $s = Load-DkFakeState
+        $out = @()
+        foreach ($k in $s.appx.Keys) { if ($s.appx[$k].name -eq $ShortName -and $s.appx[$k].installLocation) { $out += $s.appx[$k].installLocation } }
+        return , $out
+    }
     $b['FileExists'] = { param($Path) $s = Load-DkFakeState; return ($s.files.Contains($Path)) }
     $b['HiveLoad'] = {
         param($KeyName, $HivePath)
@@ -410,26 +435,31 @@ function New-DkRealBackend {
         if ($pfro -and $pfro.PendingFileRenameOperations) { return $true }
         return $false
     }
+    # Hive token (LocalMachine|CurrentUser) -> PS drive; DWord values > Int32.MaxValue are written as
+    # their signed two's-complement equivalent (registry stores the same 32 bits).
     $b['RegGet'] = {
         param($Hive, $Path, $Name)
-        $full = "$Hive`:\$Path"
+        $drive = if ($Hive -eq 'CurrentUser') { 'HKCU' } else { 'HKLM' }
+        $full = "$drive`:\$Path"
         if (-not (Test-Path -LiteralPath $full)) { return $null }
         $item = Get-ItemProperty -LiteralPath $full -Name $Name -ErrorAction SilentlyContinue
         if ($null -eq $item) { return $null }
         $prop = $item.PSObject.Properties[$Name]
         if (-not $prop) { return $null }
-        $rk = [Microsoft.Win32.Registry]::$Hive
         return @{ value = $prop.Value }
     }
     $b['RegSet'] = {
         param($Hive, $Path, $Name, $Type, $Value)
-        $full = "$Hive`:\$Path"
+        $drive = if ($Hive -eq 'CurrentUser') { 'HKCU' } else { 'HKLM' }
+        $full = "$drive`:\$Path"
         if (-not (Test-Path -LiteralPath $full)) { New-Item -Path $full -Force | Out-Null }
+        if ($Type -eq 'DWord') { $Value = ConvertTo-DkSignedDword $Value }
         New-ItemProperty -LiteralPath $full -Name $Name -PropertyType $Type -Value $Value -Force | Out-Null
     }
     $b['RegRemove'] = {
         param($Hive, $Path, $Name)
-        $full = "$Hive`:\$Path"
+        $drive = if ($Hive -eq 'CurrentUser') { 'HKCU' } else { 'HKLM' }
+        $full = "$drive`:\$Path"
         if (Test-Path -LiteralPath $full) { Remove-ItemProperty -LiteralPath $full -Name $Name -ErrorAction SilentlyContinue }
     }
     $b['SvcGet'] = {
@@ -502,7 +532,11 @@ function New-DkRealBackend {
     }
     $b['AppxAddProvisioned'] = {
         param($PackagePath, $PackageFullName, $DisplayName)
-        Add-AppxProvisionedPackage -Online -PackagePath $PackagePath -SkipLicense -ErrorAction Stop | Out-Null
+        if (Test-Path -LiteralPath $PackagePath -PathType Container) {
+            Add-AppxProvisionedPackage -Online -FolderPath $PackagePath -SkipLicense -ErrorAction Stop | Out-Null
+        } else {
+            Add-AppxProvisionedPackage -Online -PackagePath $PackagePath -SkipLicense -ErrorAction Stop | Out-Null
+        }
         return $true
     }
     $b['PowerActiveGuid'] = {
@@ -512,7 +546,7 @@ function New-DkRealBackend {
     }
     $b['PowerDuplicate'] = {
         param($SourceGuid, $TargetGuid)
-        $out = (powercfg /duplicatescheme $SourceGuid) 2>$null
+        $out = (powercfg /duplicatescheme $SourceGuid $TargetGuid) 2>$null
         if ($out -match '([0-9a-fA-F-]{36})') { return $Matches[1] }
         return $null
     }
@@ -524,10 +558,22 @@ function New-DkRealBackend {
     }
     $b['FileCopy'] = {
         param($Src, $Dst)
+        # Directories: full tree with backup semantics (/B) so WindowsApps ACLs do not block SYSTEM/admin.
+        if (Test-Path -LiteralPath $Src -PathType Container) {
+            $null = robocopy $Src $Dst /E /B /COPY:DAT /R:1 /W:1 /NFL /NDL /NJH /NJS /NP /XJ
+            return ($LASTEXITCODE -lt 8)
+        }
         $dir = Split-Path -Parent $Dst
         if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-        $rc = robocopy (Split-Path -Parent $Src) $dir (Split-Path -Leaf $Src) /B /NJH /NJS /NP /R:1 /W:1
+        $null = robocopy (Split-Path -Parent $Src) $dir (Split-Path -Leaf $Src) /B /NJH /NJS /NP /R:1 /W:1
         return ($LASTEXITCODE -lt 8)
+    }
+    $b['AppxPackageFolders'] = {
+        param($ShortName)
+        $root = Join-Path $env:ProgramW6432 'WindowsApps'
+        $out = @()
+        try { $out = @(Get-ChildItem -LiteralPath $root -Directory -Filter ($ShortName + '_*') -ErrorAction Stop | ForEach-Object { $_.FullName }) } catch { }
+        return , $out
     }
     $b['FileExists'] = { param($Path) return (Test-Path -LiteralPath $Path) }
     $b['HiveLoad'] = {
@@ -635,7 +681,7 @@ function Invoke-DkRegistryVerify {
             if ($null -ne $cur) { return $false }
         } else {
             if ($null -eq $cur) { return $false }
-            if ([string]$cur.value -ne [string]$e.value) { return $false }
+            if (-not (Test-DkRegValueEqual $e.type $cur.value $e.value)) { return $false }
         }
     }
     return $true
@@ -699,22 +745,26 @@ function Invoke-DkPowercfgApply {
     param($Change)
     $target = $null
     if ($Change.apply.scheme -eq 'ultimate') {
-        if (-not (Invoke-Dk 'PowerSchemeExists' @($script:DK.UltimateGuid))) {
-            $new = Invoke-Dk 'PowerDuplicate' @($script:DK.UltimateGuid, $script:DK.UltimateGuid)
+        $plan = $script:DK.DarkOSPlanGuid
+        if (Invoke-Dk 'PowerSchemeExists' @($plan)) { $target = $plan }
+        else {
+            $new = Invoke-Dk 'PowerDuplicate' @($script:DK.UltimateGuid, $plan)
             if ($new) { $target = $new }
-        } else { $target = $script:DK.UltimateGuid }
-        if (-not $target) {
-            # fallback High Performance
-            if (-not (Invoke-Dk 'PowerSchemeExists' @($script:DK.HighPerfGuid))) { [void](Invoke-Dk 'PowerDuplicate' @($script:DK.HighPerfGuid, $script:DK.HighPerfGuid)) }
-            $target = $script:DK.HighPerfGuid
         }
+        if (-not $target) {
+            if (Invoke-Dk 'PowerSchemeExists' @($script:DK.HighPerfGuid)) { $target = $script:DK.HighPerfGuid }
+            else { $target = Invoke-Dk 'PowerDuplicate' @($script:DK.HighPerfGuid, $script:DK.HighPerfGuid) }
+        }
+        if (-not $target) { throw 'Nem Desempenho Maximo nem Alto Desempenho disponiveis.' }
     } else { $target = $Change.apply.guid }
     Invoke-Dk 'PowerSetActive' @($target)
 }
 function Invoke-DkPowercfgVerify {
     param($Change)
-    $active = Invoke-Dk 'PowerActiveGuid' @()
-    if ($Change.apply.scheme -eq 'ultimate') { return (($active -eq $script:DK.UltimateGuid) -or ($active -eq $script:DK.HighPerfGuid)) }
+    $active = [string](Invoke-Dk 'PowerActiveGuid' @())
+    if ($Change.apply.scheme -eq 'ultimate') {
+        return (@($script:DK.DarkOSPlanGuid, $script:DK.UltimateGuid, $script:DK.HighPerfGuid) -contains $active.ToLowerInvariant())
+    }
     return ($active -eq $Change.apply.guid)
 }
 function Invoke-DkPowercfgRevert { param($Change, $Original) if ($Original -and $Original.activeGuid) { Invoke-Dk 'PowerSetActive' @($Original.activeGuid) } }
@@ -744,14 +794,30 @@ function Get-DkWindowsAppsRoot {
 }
 
 # Package folders to preserve: main installed package(s) for the family + resource/bundle siblings.
+function Get-DkAppxKind {
+    param([string]$FolderName)
+    if ($FolderName -like '*_~_*') { return 'bundle' }
+    if ($FolderName -like '*_split.*') { return 'resource' }
+    return 'main'
+}
+
 function Get-DkAppxPreserveSet {
     param([string]$ShortName)
     $installed = Invoke-Dk 'AppxInstalledList' @("$ShortName")
-    $set = @()
-    $deps = @()
+    $set = @(); $seen = @{}; $deps = @()
     foreach ($p in @($installed)) {
-        $set += @{ fullName = $p.fullName; installLocation = $p.installLocation; name = $p.name }
         if ($p.Contains('dependencies')) { $deps += @($p.dependencies) }
+        if ($p.installLocation -and -not $seen.ContainsKey($p.fullName)) {
+            $seen[$p.fullName] = $true
+            $set += @{ fullName = $p.fullName; installLocation = $p.installLocation; name = $p.name }
+        }
+    }
+    foreach ($f in @(Invoke-Dk 'AppxPackageFolders' @("$ShortName"))) {
+        if (-not $f) { continue }
+        $pfn = Split-Path -Leaf $f
+        if ($seen.ContainsKey($pfn)) { continue }
+        $seen[$pfn] = $true
+        $set += @{ fullName = $pfn; installLocation = $f; name = $ShortName }
     }
     return @{ packages = $set; dependencies = @($deps | Select-Object -Unique) }
 }
@@ -789,6 +855,7 @@ function Save-DkAppxPayload {
         [void](Invoke-Dk 'FileCopy' @($src, $dst))
         $indexEntries += @{
             packageFullName = $pfn
+            kind            = (Get-DkAppxKind $pfn)
             displayName     = $short
             source          = $src
             preservedPath   = "AppPackages\$pfn"
@@ -820,7 +887,7 @@ function Invoke-DkAppxApply {
     $short = $Captured.packageName
     # 2. remove installed for all users
     if ($Change.apply.removeInstalled -ne $false) {
-        foreach ($pkg in @($Captured.installed)) {
+        foreach ($pkg in @(Invoke-Dk 'AppxInstalledList' @("$short"))) {
             if ($pkg.fullName) { [void](Invoke-Dk 'AppxRemoveInstalled' @($pkg.fullName)) }
         }
     }
@@ -853,27 +920,41 @@ function Restore-DkAppxPackage {
     $registered = $false
     $pathUsed = @()
     $reprovisioned = $false
+    $errors = @()
     foreach ($e in $entries) {
         $pfn = $e.packageFullName
         $target = Join-Path $winapps $pfn
         $preserved = Resolve-DkPayloadPath $e.preservedPath
         if (-not (Invoke-Dk 'FileExists' @($target))) {
-            [void](Invoke-Dk 'FileCopy' @($preserved, $target))
-            $pathUsed += 'robocopy /B -> WindowsApps'
-        } else { $pathUsed += 'already-present' }
-        $manifest = Join-Path $target 'AppxManifest.xml'
-        if (Invoke-Dk 'AppxRegister' @($manifest, $pfn, $ShortName)) { $registered = $true }
+            if (Invoke-Dk 'FileCopy' @($preserved, $target)) { $pathUsed += "copyback:$pfn" } else { $errors += "copy falhou: $pfn" }
+        } else { $pathUsed += "present:$pfn" }
+    }
+    foreach ($e in @($entries | Where-Object { -not $_.kind -or $_.kind -eq 'main' })) {
+        $pfn = $e.packageFullName
+        $manifest = Join-Path (Join-Path $winapps $pfn) 'AppxManifest.xml'
+        try { if (Invoke-Dk 'AppxRegister' @($manifest, $pfn, $ShortName)) { $registered = $true; $pathUsed += "register:$pfn" } }
+        catch { $errors += ("register {0}: {1}" -f $pfn, $_.Exception.Message) }
         if ($e.provisioned) {
-            if (Invoke-Dk 'AppxAddProvisioned' @($preserved, $pfn, $ShortName)) { $reprovisioned = $true }
+            try { if (Invoke-Dk 'AppxAddProvisioned' @((Join-Path $winapps $pfn), $pfn, $ShortName)) { $reprovisioned = $true; $pathUsed += "reprovision:$pfn" } }
+            catch { $errors += ("reprovision {0}: {1}" -f $pfn, $_.Exception.Message) }
         }
     }
     $installed = @(Invoke-Dk 'AppxInstalledList' @("$ShortName"))
     $verified = ($installed.Count -gt 0)
-    return @{ packageName = $ShortName; ok = $registered; verified = $verified; reprovisioned = $reprovisioned; pathUsed = ($pathUsed -join '; '); error = $(if ($verified) { $null } else { 'Registro nao confirmado por leitura.' }) }
+    $err = $null
+    if (-not $verified) { $err = 'Registro nao confirmado por leitura. ' + ($errors -join ' | ') }
+    return @{ packageName = $ShortName; ok = $registered; verified = $verified; reprovisioned = $reprovisioned; pathUsed = ($pathUsed -join '; '); error = $err; warnings = @($errors) }
+}
+
+function Test-DkAppxOriginallyPresent {
+    param($Original)
+    if (-not $Original) { return $true }   # unknown original: assume present (restore if payload exists)
+    return ([bool]$Original.wasProvisioned -or @($Original.installed).Count -gt 0)
 }
 
 function Invoke-DkAppxRevert {
     param($Change, $Original)
+    if (-not (Test-DkAppxOriginallyPresent $Original)) { return }   # was never present: nothing to restore
     $short = Get-DkAppxShortName $Change
     $r = Restore-DkAppxPackage $short
     if (-not $r.verified) { throw ("Falha ao restaurar Appx {0}: {1}" -f $short, $r.error) }
@@ -908,6 +989,42 @@ function Test-DkApplied {
         'powercfg'     { return (Invoke-DkPowercfgVerify $Change) }
         'defaultassoc' { return (Invoke-DkDefaultAssocVerify $Change) }
         default        { return $false }
+    }
+}
+
+function Test-DkOriginal {
+    param($Change, $Original)
+    switch ($Change.component) {
+        'registry' {
+            foreach ($e in @($Original.entries)) {
+                $t = Resolve-DkRegTarget $Change.scope $e.path
+                $cur = Invoke-Dk 'RegGet' @($t.HiveToken, $t.Sub, $e.name)
+                if ($e.existed) {
+                    if ($null -eq $cur) { return $false }
+                    if (-not (Test-DkRegValueEqual $e.type $cur.value $e.value)) { return $false }
+                } elseif ($null -ne $cur) { return $false }
+            }
+            return $true
+        }
+        'service' {
+            if ($Original.missing) { return $true }
+            $cur = Invoke-Dk 'SvcGet' @($Change.apply.name)
+            return ($null -ne $cur -and $cur.startType -eq $Original.startType)
+        }
+        'task' {
+            if (-not $Original.exists) { return $true }
+            $cur = Invoke-Dk 'TaskGet' @($Change.apply.path, $Change.apply.name)
+            return ([bool]$cur.exists -and (($cur.state -eq 'Disabled') -eq ($Original.state -eq 'Disabled')))
+        }
+        'powercfg' { return ([string](Invoke-Dk 'PowerActiveGuid' @()) -eq [string]$Original.activeGuid) }
+        'appx' {
+            if (-not (Test-DkAppxOriginallyPresent $Original)) { return $true }
+            $short = Get-DkAppxShortName $Change
+            $inst = @(Invoke-Dk 'AppxInstalledList' @("$short"))
+            $prov = @(Invoke-Dk 'AppxProvisionedList' @() | Where-Object { $_.displayName -eq $short })
+            return ($inst.Count -gt 0 -or $prov.Count -gt 0)
+        }
+        default { return $true }
     }
 }
 
@@ -968,6 +1085,16 @@ function Invoke-DkChangeApplyOne {
         $entry.lastResult = @{ ts = (Get-DkTimestamp); action = 'apply'; ok = $false; verified = $false; error = 'Requer privilegios de administrador.'; source = $Source }
         Set-DkEntry $Manifest $entry
         return @{ id = $id; ok = $false; verified = $false; rebootRequired = $false; error = $entry.lastResult.error }
+    }
+    # not present on this build (service/task absent): skip, never fail
+    $present = $true
+    if ($Change.component -eq 'service') { $present = ($null -ne (Invoke-Dk 'SvcGet' @($Change.apply.name))) }
+    elseif ($Change.component -eq 'task') { $present = [bool]((Invoke-Dk 'TaskGet' @($Change.apply.path, $Change.apply.name)).exists) }
+    if (-not $present) {
+        $entry.status = 'notApplied'
+        $entry.lastResult = @{ ts = (Get-DkTimestamp); action = 'apply'; ok = $true; verified = $true; error = $null; source = $Source; note = 'notPresent' }
+        Set-DkEntry $Manifest $entry
+        return @{ id = $id; ok = $true; verified = $true; rebootRequired = $false; error = $null; skipped = $true; reason = 'notPresent' }
     }
     # idempotency: already applied and verified?
     try {
@@ -1045,11 +1172,9 @@ function Invoke-DkChangeRevertOne {
         Set-DkEntry $Manifest $entry
         return @{ id = $id; ok = $false; verified = $false; rebootRequired = $false; error = $entry.lastResult.error }
     }
-    # verify revert = change no longer "applied"
-    $stillApplied = $false
-    try { $stillApplied = [bool](Test-DkApplied $Change) } catch { $stillApplied = $false }
-    $verified = (-not $stillApplied)
-    if ($Change.component -eq 'appx') { $verified = $true } # appx revert verified inside handler
+    # verify revert by read-back: live state must equal the captured originalState
+    $verified = $false
+    try { $verified = [bool](Test-DkOriginal $Change $entry.originalState) } catch { $verified = $false }
     $entry.status = if ($verified) { 'reverted' } else { 'failed' }
     $entry.lastResult = @{ ts = (Get-DkTimestamp); action = 'revert'; ok = $verified; verified = $verified; error = $(if ($verified) { $null } else { 'Verificacao de reversao falhou.' }); source = $Source }
     Set-DkEntry $Manifest $entry
@@ -1061,7 +1186,7 @@ function Get-DarkOSCatalog {
     [CmdletBinding()] param([ValidateSet('darkosDefault', 'competitive', 'maxPerformance')][string]$Profile)
     $cat = Get-DkCatalogRaw
     if ($Profile) { $cat = @($cat | Where-Object { $_.profiles -contains $Profile }) }
-    return , @($cat)
+    return @($cat)
 }
 
 function Get-DarkOSManifest { [CmdletBinding()] param() return (Get-DkManifestOrInit) }
@@ -1073,6 +1198,9 @@ function Get-DarkOSStatus {
     if ($Id) { $cat = @($cat | Where-Object { $Id -contains $_.id }) }
     $rebootPending = [bool](Invoke-Dk 'RebootPending' @())
     $out = @()
+    $hive = (@($cat | Where-Object { Test-DkNeedsHive $_ }).Count -gt 0) -and [bool](Invoke-Dk 'IsAdmin' @())
+    if ($hive) { [void](Enter-DkDefaultUser) }
+    try {
     foreach ($c in @($cat)) {
         $entry = Get-DkEntry $manifest $c.id
         $status = if ($entry) { $entry.status } else { 'notApplied' }
@@ -1087,7 +1215,8 @@ function Get-DarkOSStatus {
             rebootPending  = ($rebootPending -or $status -eq 'pending-reboot')
         }
     }
-    return , @($out)
+    } finally { if ($hive) { Exit-DkDefaultUser } }
+    return @($out)
 }
 
 # Run a batch of change ids through apply/revert with lock + optional hive, honoring dependsOn order.
@@ -1137,7 +1266,17 @@ function Invoke-DarkOSChange {
         Add-DkHistory $manifest $Action @($Id) (@($results | Where-Object { -not $_.ok }).Count -eq 0)
         Save-DkManifest $manifest
     } finally { Exit-DkLock }
-    return , @($results)
+    return @($results)
+}
+
+# Append result objects to a flat list. Accepts a single result, an array, or nested arrays.
+function Add-DkResults {
+    param([System.Collections.ArrayList]$List, $Items)
+    foreach ($it in @($Items)) {
+        if ($null -eq $it) { continue }
+        if (($it -is [System.Array]) -or ($it -is [System.Collections.ArrayList])) { Add-DkResults $List $it }
+        else { [void]$List.Add($it) }
+    }
 }
 
 function Sort-DkByDependency {
@@ -1171,33 +1310,36 @@ function Set-DarkOSProfile {
     $appliedIds = @($manifest.changes | Where-Object { $_.status -eq 'applied' } | ForEach-Object { $_.id })
     $toRevert = @($appliedIds | Where-Object { $targetIds -notcontains $_ })
 
-    # Refuse security items without confirmation (do not silently skip the whole op; report per-item)
-    $results = @()
+    # Security items without confirmation are SKIPPED (not failures, never recorded in the manifest).
+    $results = New-Object System.Collections.ArrayList
     $applyable = @()
     foreach ($c in $target) {
         if ($c.securityRelated -and -not $ConfirmSecurity) {
-            $results += @{ id = $c.id; ok = $false; verified = $false; rebootRequired = $false; error = 'Alteracao de seguranca requer confirmacao (ConfirmSecurity).' }
+            [void]$results.Add([ordered]@{ id = $c.id; ok = $false; verified = $false; skipped = $true; reason = 'requiresConfirmation'; error = $null; rebootRequired = $false })
         } else { $applyable += $c.id }
     }
-    if ($toRevert.Count -gt 0) { $results += @(Invoke-DarkOSChange -Id $toRevert -Action Revert -Source darkhub) }
-    if ($applyable.Count -gt 0) { $results += @(Invoke-DarkOSChange -Id $applyable -Action Apply -Source darkhub -ConfirmSecurity:$ConfirmSecurity) }
+    if ($toRevert.Count -gt 0) { Add-DkResults $results (Invoke-DarkOSChange -Id $toRevert -Action Revert -Source darkhub) }
+    if ($applyable.Count -gt 0) { Add-DkResults $results (Invoke-DarkOSChange -Id $applyable -Action Apply -Source darkhub -ConfirmSecurity:$ConfirmSecurity) }
 
     $manifest = Get-DkManifestOrInit
     $manifest.activeProfile = $Profile
     Enter-DkLock; try { Save-DkManifest $manifest } finally { Exit-DkLock }
-    return [ordered]@{ profile = $Profile; results = @($results); ok = (@($results | Where-Object { -not $_.ok }).Count -eq 0) }
+    $flat = @($results.ToArray())
+    $failed = @($flat | Where-Object { -not $_.ok -and -not $_.skipped })
+    return [ordered]@{ profile = $Profile; results = $flat; ok = ($failed.Count -eq 0); skipped = @($flat | Where-Object { $_.skipped } | ForEach-Object { $_.id }) }
 }
 
 function Restore-DarkOSProfile {
     [CmdletBinding()] param([switch]$ConfirmSecurity)
     $manifest = Get-DkManifestOrInit
     $appliedIds = @($manifest.changes | Where-Object { $_.status -eq 'applied' -or $_.status -eq 'pending-reboot' -or $_.status -eq 'failed' } | ForEach-Object { $_.id })
-    $results = @()
-    if ($appliedIds.Count -gt 0) { $results = @(Invoke-DarkOSChange -Id $appliedIds -Action Revert -Source darkhub -ConfirmSecurity:$ConfirmSecurity) }
+    $results = New-Object System.Collections.ArrayList
+    if ($appliedIds.Count -gt 0) { Add-DkResults $results (Invoke-DarkOSChange -Id $appliedIds -Action Revert -Source darkhub -ConfirmSecurity:$ConfirmSecurity) }
     $manifest = Get-DkManifestOrInit
     $manifest.activeProfile = 'none'
     Enter-DkLock; try { Save-DkManifest $manifest } finally { Exit-DkLock }
-    return [ordered]@{ ok = (@($results | Where-Object { -not $_.ok }).Count -eq 0); results = @($results) }
+    $flat = @($results.ToArray())
+    return [ordered]@{ ok = (@($flat | Where-Object { -not $_.ok -and -not $_.skipped }).Count -eq 0); results = $flat }
 }
 
 function Get-DarkOSRemovedApps {
@@ -1214,12 +1356,12 @@ function Get-DarkOSRemovedApps {
             $out += [ordered]@{ packageName = $dn; preserved = $true; restorable = $true; currentlyInstalled = ($installed.Count -gt 0); preservedPath = $p.preservedPath }
         }
     }
-    return , @($out)
+    return @($out)
 }
 
 function Restore-DarkOSAppx {
     [CmdletBinding()] param([Parameter(Mandatory)][string[]]$PackageName)
-    if (-not (Invoke-Dk 'IsAdmin' @())) { return , @(@{ id = 'appx'; ok = $false; verified = $false; error = 'Requer administrador.' }) }
+    if (-not (Invoke-Dk 'IsAdmin' @())) { return @(@{ id = 'appx'; ok = $false; verified = $false; error = 'Requer administrador.' }) }
     $results = @()
     Enter-DkLock
     try {
@@ -1238,7 +1380,7 @@ function Restore-DarkOSAppx {
         Add-DkHistory $manifest 'restore-appx' @($PackageName) (@($results | Where-Object { -not $_.verified }).Count -eq 0)
         Save-DkManifest $manifest
     } finally { Exit-DkLock }
-    return , @($results)
+    return @($results)
 }
 
 # ---- snapshots
@@ -1263,7 +1405,7 @@ function New-DarkOSSnapshot {
 function Get-DarkOSSnapshot {
     [CmdletBinding()] param()
     $manifest = Get-DkManifestOrInit
-    return , @($manifest.snapshots)
+    return @($manifest.snapshots)
 }
 
 function Restore-DarkOSSnapshot {
@@ -1279,10 +1421,11 @@ function Restore-DarkOSSnapshot {
     $nowApplied = @($manifest.changes | Where-Object { $_.status -eq 'applied' } | ForEach-Object { $_.id })
     $toApply = @($desiredApplied | Where-Object { $nowApplied -notcontains $_ })
     $toRevert = @($nowApplied | Where-Object { $desiredApplied -notcontains $_ })
-    $results = @()
-    if ($toRevert.Count -gt 0) { $results += @(Invoke-DarkOSChange -Id $toRevert -Action Revert -Source darkhub -ConfirmSecurity:$ConfirmSecurity) }
-    if ($toApply.Count -gt 0) { $results += @(Invoke-DarkOSChange -Id $toApply -Action Apply -Source darkhub -ConfirmSecurity:$ConfirmSecurity) }
-    return [ordered]@{ ok = (@($results | Where-Object { -not $_.ok }).Count -eq 0); id = $Id; results = @($results) }
+    $results = New-Object System.Collections.ArrayList
+    if ($toRevert.Count -gt 0) { Add-DkResults $results (Invoke-DarkOSChange -Id $toRevert -Action Revert -Source darkhub -ConfirmSecurity:$ConfirmSecurity) }
+    if ($toApply.Count -gt 0) { Add-DkResults $results (Invoke-DarkOSChange -Id $toApply -Action Apply -Source darkhub -ConfirmSecurity:$ConfirmSecurity) }
+    $flat = @($results.ToArray())
+    return [ordered]@{ ok = (@($flat | Where-Object { -not $_.ok -and -not $_.skipped }).Count -eq 0); id = $Id; results = $flat }
 }
 
 function Get-DarkOSFailures {
@@ -1294,7 +1437,7 @@ function Get-DarkOSFailures {
             $out += [ordered]@{ id = $c.id; status = $c.status; error = $(if ($c.lastResult) { $c.lastResult.error } else { $null }); ts = $(if ($c.lastResult) { $c.lastResult.ts } else { $null }) }
         }
     }
-    return , @($out)
+    return @($out)
 }
 
 function Get-DarkOSRebootPending {

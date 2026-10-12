@@ -17,7 +17,8 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
-function Write-DhFail { param([string]$Message) $m = ($Message -replace '[\r\n]+', ' '); Write-Output ('DHFAIL|' + $m); exit 1 }
+function Write-DhLine { param([string]$Text) [Console]::Out.WriteLine($Text); [Console]::Out.Flush() }
+function Write-DhFail { param([string]$Message) $m = ($Message -replace '[\r\n]+', ' '); Write-DhLine ('DHFAIL|' + $m); exit 1 }
 
 # Local JSON compressor (module internal ConvertTo-DarkOSJson is not exported): escape non-ASCII.
 function ConvertTo-CliJson {
@@ -51,7 +52,13 @@ try {
     }
 
     # progress handler streams DKPROG lines to the host
-    $progress = { param($pct, $msg) Write-Output ("DKPROG:{0}|{1}" -f $pct, ($msg -replace '[\r\n]+', ' ')) }
+    # Written straight to the process stdout (not the pipeline) so lines stream live and can never
+    # leak into the command's return value / DKJSON payload.
+    $progress = {
+        param($pct, $msg)
+        [Console]::Out.WriteLine(("DKPROG:{0}|{1}" -f $pct, ([string]$msg -replace '[\r\n]+', ' ')))
+        [Console]::Out.Flush()
+    }
     $envArgs = @{ ProgressHandler = $progress }
     if ($Root) { $envArgs.Root = $Root }
     if ($DryRun) { $envArgs.DryRun = $true }
@@ -68,11 +75,15 @@ try {
         if ($callArgs.ContainsKey($sw)) { $callArgs[$sw] = [bool]$callArgs[$sw] }
     }
 
-    $result = & $Command @callArgs
+    # List-returning commands always serialize as a JSON array (also when empty or single item).
+    $listCommands = @('Get-DarkOSCatalog', 'Get-DarkOSStatus', 'Invoke-DarkOSChange', 'Restore-DarkOSAppx',
+        'Get-DarkOSRemovedApps', 'Get-DarkOSSnapshot', 'Get-DarkOSFailures')
+    if ($listCommands -contains $Command) { $result = @(& $Command @callArgs) }
+    else { $result = & $Command @callArgs }
 
     $json = ConvertTo-CliJson -InputObject $result
-    Write-Output ('DKJSON:' + $json)
-    Write-Output 'DHDONE'
+    Write-DhLine ('DKJSON:' + $json)
+    Write-DhLine 'DHDONE'
     exit 0
 } catch {
     $msg = $_.Exception.Message
