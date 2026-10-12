@@ -130,6 +130,37 @@ export function parseProgressLine(line) {
   return { progress: Math.max(0, Math.min(100, Number(m[1]))), message: (m[2] ?? '').trim() }
 }
 
+const PROG_STR_RE = /^DKPROG:/
+
+/**
+ * Defensive cleanup: if the module's progress callback wrote DKPROG lines to the pipeline of the
+ * called function, they end up inside the DKJSON payload. Remove them (top level and `results`)
+ * and unwrap the single remaining value. Returns { data, progress: string[] }.
+ */
+export function stripLeakedProgress(data) {
+  const progress = []
+  const clean = (arr) => arr.filter((x) => {
+    if (typeof x === 'string' && PROG_STR_RE.test(x)) { progress.push(x); return false }
+    return true
+  })
+  let out = data
+  if (Array.isArray(out)) {
+    const kept = clean(out)
+    if (kept.length !== out.length) {
+      out = kept.length === 1 ? kept[0] : kept
+    }
+  }
+  // `$results += @(Invoke-DarkOSChange ...)` in PowerShell nests the returned array, so per-item
+  // result lists are always flattened (and cleaned) here.
+  if (out && typeof out === 'object' && !Array.isArray(out) && Array.isArray(out.results)) {
+    const kept = clean(out.results.flat(Infinity))
+    if (kept.length !== out.results.length || kept.some((x, i) => x !== out.results[i])) out = { ...out, results: kept }
+  } else if (Array.isArray(out) && out.some(Array.isArray) && out.every((x) => Array.isArray(x) || (x && typeof x === 'object' && 'id' in x))) {
+    out = clean(out.flat(Infinity))
+  }
+  return { data: out, progress }
+}
+
 /** Extracts per-change results from whatever shape the module returned. */
 export function extractChangeResults(data) {
   if (Array.isArray(data)) return data
@@ -147,7 +178,7 @@ export function extractChangeResults(data) {
  * verified===true. The operation is ok only when every item is verified (and there is at least one
  * item, or the module returned an explicit top-level verified===true for non-itemized ops).
  */
-export function summarizeChangeResults(data) {
+export function summarizeChangeResults(data, { securityDeclined = false } = {}) {
   const items = extractChangeResults(data)
   if (!items) {
     const verified = Boolean(data && typeof data === 'object' && data.verified === true && data.ok !== false)
@@ -159,22 +190,42 @@ export function summarizeChangeResults(data) {
       error: verified ? null : (data?.error || 'O modulo DarkOS nao confirmou (verified) a operacao.')
     }
   }
-  const results = items.map((r) => ({
-    id: typeof r?.id === 'string' ? r.id : String(r?.id ?? r?.PackageName ?? r?.packageName ?? '?'),
-    ok: r?.ok === true && r?.verified === true,
-    verified: r?.verified === true,
-    rebootRequired: r?.rebootRequired === true,
-    error: r?.ok === true && r?.verified !== true ? (r?.error || 'Aplicado, mas a verificacao nao confirmou o estado.') : (r?.error ?? null)
-  }))
-  const failed = results.filter((r) => !r.ok)
+  const results = items.map((r) => {
+    const verified = r?.verified === true
+    const ok = r?.ok === true && verified
+    // Applied but only verifiable after a restart: never a success, never a hard failure.
+    const pendingReboot = !verified && r?.ok === true && r?.rebootRequired === true
+    // Security item refused by the module because the user did not confirm it: skipped on purpose.
+    const skipped = !ok && securityDeclined && /ConfirmSecurity/.test(String(r?.error ?? ''))
+    return {
+      id: typeof r?.id === 'string' ? r.id : String(r?.id ?? r?.PackageName ?? r?.packageName ?? '?'),
+      ok,
+      verified,
+      rebootRequired: r?.rebootRequired === true,
+      pendingReboot,
+      skipped,
+      error: pendingReboot
+        ? 'Aguardando reinicio para verificar.'
+        : r?.ok === true && !verified ? (r?.error || 'Aplicado, mas a verificacao nao confirmou o estado.') : (r?.error ?? null)
+    }
+  })
+  const failed = results.filter((r) => !r.ok && !r.pendingReboot && !r.skipped)
+  const pending = results.filter((r) => r.pendingReboot)
+  const skipped = results.filter((r) => r.skipped)
   // An empty result list means the module had nothing to change (DHDONE was still required upstream).
+  let error = null
+  if (failed.length) error = `${failed.length} de ${results.length} item(ns) nao verificados.`
+  else if (pending.length) error = `${pending.length} item(ns) aplicados; a verificacao so sera possivel apos reiniciar.`
   return {
-    ok: failed.length === 0,
+    ok: failed.length === 0 && pending.length === 0,
+    status: failed.length ? 'failed' : pending.length ? 'pending-reboot' : 'ok',
     noop: results.length === 0,
     results,
     failed,
+    pending,
+    skipped,
     rebootRequired: results.some((r) => r.rebootRequired) || data?.rebootRequired === true,
-    error: failed.length ? `${failed.length} de ${results.length} item(ns) nao verificados.` : null
+    error
   }
 }
 
@@ -360,6 +411,16 @@ export class DarkOSRecoveryService extends EventEmitter {
       } finally {
         this._current = null
       }
+      if (parsed.data != null) {
+        const stripped = stripLeakedProgress(parsed.data)
+        parsed.data = stripped.data
+        if (spec.mutates) {
+          for (const line of stripped.progress) {
+            const prog = parseProgressLine(line)
+            if (prog) this._emit({ runId, type: 'log', message: `[${prog.progress}%] ${prog.message}` }, onEvent)
+          }
+        }
+      }
       try { this.logger?.info?.('DarkOS', `${command} ok=${parsed.ok}${parsed.error ? ` err=${parsed.error}` : ''}`) } catch { /* ignore */ }
       return { ok: parsed.ok, data: parsed.data, error: parsed.error, runId }
     })
@@ -373,12 +434,14 @@ export class DarkOSRecoveryService extends EventEmitter {
       if (runId) this._emit({ runId, type: 'error', ok: false, error: res.error, message: res.error }, opts.onEvent)
       return { ok: false, error: res.error, results: extractChangeResults(res.data) ? summarizeChangeResults(res.data).results : [], runId }
     }
-    const summary = summarizeChangeResults(res.data)
+    const summary = summarizeChangeResults(res.data, { securityDeclined: opts.securityDeclined === true })
+    const verifiedCount = summary.results.filter((r) => r.ok).length
+    const skippedNote = summary.skipped?.length ? ` ${summary.skipped.length} item(ns) de seguranca ignorados (sem confirmacao).` : ''
     const message = summary.ok
-      ? (summary.noop ? 'Nada a alterar.' : `Concluido e verificado (${summary.results.length} item(ns)).`)
+      ? (verifiedCount === 0 ? `Nada a alterar.${skippedNote}` : `Concluido e verificado (${verifiedCount} item(ns)).${skippedNote}`)
       : (summary.error || 'Falha na verificacao.')
     this._emit({ runId, type: summary.ok ? 'run-finish' : 'error', ok: summary.ok, progress: 100, message, error: summary.ok ? undefined : message }, opts.onEvent)
-    return { ...summary, runId }
+    return { ...summary, message, runId }
   }
 
   async _read(command, args, opts) {
@@ -416,7 +479,7 @@ export class DarkOSRecoveryService extends EventEmitter {
     // Security-related items are refused by the module unless this is an explicit boolean true.
     if (payload?.confirmSecurity === true) args.ConfirmSecurity = true
     const label = `${action === 'Apply' ? 'Reaplicar' : 'Desfazer'} ${ids.length === 1 ? ids[0] : `${ids.length} itens`}`
-    return this._runChange('Invoke-DarkOSChange', args, { ...opts, label })
+    return this._runChange('Invoke-DarkOSChange', args, { ...opts, label, securityDeclined: args.ConfirmSecurity !== true })
   }
 
   applyChange(payload, opts) {
@@ -431,7 +494,7 @@ export class DarkOSRecoveryService extends EventEmitter {
     if (!isValidProfile(payload?.profile)) return Promise.resolve({ ok: false, error: 'Perfil invalido.', results: [] })
     const args = { Profile: payload.profile }
     if (payload?.confirmSecurity === true) args.ConfirmSecurity = true
-    return this._runChange('Set-DarkOSProfile', args, { ...opts, label: `Perfil ${payload.profile}` })
+    return this._runChange('Set-DarkOSProfile', args, { ...opts, label: `Perfil ${payload.profile}`, securityDeclined: args.ConfirmSecurity !== true })
   }
 
   restoreProfile(opts) {
@@ -468,7 +531,7 @@ export class DarkOSRecoveryService extends EventEmitter {
 
   restoreSnapshot(payload, opts) {
     if (!isValidChangeId(payload?.id)) return Promise.resolve({ ok: false, error: 'Id de snapshot invalido.', results: [] })
-    return this._runChange('Restore-DarkOSSnapshot', { Id: payload.id }, { ...opts, label: `Restaurar snapshot ${payload.id}` })
+    return this._runChange('Restore-DarkOSSnapshot', { Id: payload.id }, { ...opts, label: `Restaurar snapshot ${payload.id}`, securityDeclined: true })
   }
 
   getFailures(opts) {

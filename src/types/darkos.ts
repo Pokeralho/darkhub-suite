@@ -34,10 +34,22 @@ export interface DarkOSManifest {
 
 export interface DarkOSSnapshot { id: string; ts?: string; label?: string; path?: string }
 
-export interface DarkOSChangeResult { id: string; ok: boolean; verified: boolean; rebootRequired: boolean; error: string | null }
+export interface DarkOSChangeResult {
+  id: string;
+  ok: boolean;
+  verified: boolean;
+  rebootRequired: boolean;
+  pendingReboot?: boolean;
+  skipped?: boolean;
+  error: string | null;
+}
 
 export interface DarkOSChangeResponse {
   ok: boolean;
+  status?: 'ok' | 'pending-reboot' | 'failed';
+  message?: string;
+  pending?: DarkOSChangeResult[];
+  skipped?: DarkOSChangeResult[];
   noop?: boolean;
   results?: DarkOSChangeResult[];
   failed?: DarkOSChangeResult[];

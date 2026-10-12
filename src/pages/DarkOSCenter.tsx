@@ -14,7 +14,7 @@ import {
 
 type TabId = 'overview' | 'changes' | 'profiles' | 'recovery' | 'snapshots' | 'failures' | 'diagnostics';
 
-interface Banner { ok: boolean; message: string }
+interface Banner { ok: boolean; pending?: boolean; message: string }
 
 interface ConfirmState {
   title: string;
@@ -109,7 +109,9 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
       if (res?.canceled) return;
       if (res?.ok === true) {
         const reboot = res.rebootRequired ? ` ${t('darkos.reboot.body', 'Restart required.')}` : '';
-        setBanner({ ok: true, message: `${t('darkos.result.ok', 'Done and verified.')}${reboot}` });
+        setBanner({ ok: true, message: `${res.message || t('darkos.result.ok', 'Done and verified.')}${reboot}` });
+      } else if (res?.status === 'pending-reboot') {
+        setBanner({ ok: false, pending: true, message: t('darkos.result.pending', 'Applied; it can only be verified after a restart.') });
       } else {
         const failed = Array.isArray(res?.failed) && res.failed.length
           ? ` (${res.failed.map((f: any) => `${f.id}${f.error ? `: ${f.error}` : ''}`).slice(0, 3).join('; ')})`
@@ -384,7 +386,9 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
                   <div className="text-xs text-zinc-200 truncate">{a.displayName}</div>
                   <div className="text-[10.5px] font-mono text-zinc-600 truncate">{a.packageName}</div>
                 </div>
-                {a.restorable ? (
+                {a.installed ? (
+                  <span className="text-[10.5px] text-emerald-300/90 shrink-0">{t('darkos.recovery.installed', 'Installed')}</span>
+                ) : a.restorable ? (
                   <button disabled={busy} onClick={() => runAction(() => api()!.restoreAppx({ packageNames: [a.packageName] }))} className={btnGhost}>
                     <RotateCcw className="w-3.5 h-3.5" />{t('darkos.recovery.restore', 'Restore')}
                   </button>
@@ -513,8 +517,8 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
       ) : null}
 
       {banner ? (
-        <div className={`rounded-lg border px-3 py-2 text-xs flex items-start gap-2 ${banner.ok ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-red-500/30 bg-red-500/10 text-red-300'}`}>
-          {banner.ok ? <CheckCircle className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
+        <div className={`rounded-lg border px-3 py-2 text-xs flex items-start gap-2 ${banner.ok ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : banner.pending ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-red-500/30 bg-red-500/10 text-red-300'}`}>
+          {banner.ok ? <CheckCircle className="w-4 h-4 shrink-0" /> : banner.pending ? <AlertTriangle className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
           <span className="break-words">{banner.message}</span>
         </div>
       ) : null}

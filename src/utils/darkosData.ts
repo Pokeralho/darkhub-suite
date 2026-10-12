@@ -64,14 +64,16 @@ export function profileDiff(rows: DarkOSRow[], target: DarkOSProfileId) {
   return { apply, revert, security };
 }
 
-export interface RemovedApp { packageName: string; displayName: string; restorable: boolean }
+export interface RemovedApp { packageName: string; displayName: string; restorable: boolean; installed?: boolean }
 
 export function normalizeRemovedApps(data: any): RemovedApp[] {
   return asArray(data, ['apps', 'packages', 'removed'])
     .map((a: any) => {
       const packageName = String(a?.packageName ?? a?.PackageName ?? a?.name ?? a?.Name ?? '');
       const restorable = a?.restorable ?? a?.payloadAvailable ?? a?.hasPayload ?? Boolean(a?.payload ?? a?.payloadPath);
-      return { packageName, displayName: String(a?.displayName ?? a?.DisplayName ?? packageName), restorable: restorable === true };
+      const app: RemovedApp = { packageName, displayName: String(a?.displayName ?? a?.DisplayName ?? packageName), restorable: restorable === true };
+      if (a?.currentlyInstalled === true) app.installed = true;
+      return app;
     })
     .filter((a) => a.packageName);
 }
@@ -89,7 +91,7 @@ export function normalizeFailures(data: any): DarkOSFailure[] {
 
 export function normalizeReboot(data: any): { pending: boolean; ids: string[] } {
   if (typeof data === 'boolean') return { pending: data, ids: [] };
-  const ids = asArray<string>(data, ['ids', 'changes']).map((x: any) => (typeof x === 'string' ? x : String(x?.id ?? ''))).filter(Boolean);
+  const ids = asArray<string>(data, ['pendingChanges', 'ids', 'changes']).map((x: any) => (typeof x === 'string' ? x : String(x?.id ?? ''))).filter(Boolean);
   const pending = data?.pending === true || data?.rebootPending === true || data?.RebootPending === true || ids.length > 0;
   return { pending, ids };
 }

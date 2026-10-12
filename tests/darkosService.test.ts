@@ -68,12 +68,43 @@ describe('verified gating', () => {
   it('only counts items with ok AND verified', () => {
     const s = D.summarizeChangeResults([
       { id: 'a', ok: true, verified: true, rebootRequired: false, error: null },
-      { id: 'b', ok: true, verified: false, rebootRequired: true, error: null }
+      { id: 'b', ok: true, verified: false, rebootRequired: false, error: null }
     ]);
     expect(s.ok).toBe(false);
     expect(s.failed.map((f: any) => f.id)).toEqual(['b']);
-    expect(s.rebootRequired).toBe(true);
     expect(s.results[1].error).toMatch(/verificacao/);
+  });
+  it('treats applied-but-unverified reboot items as pending, never as success', () => {
+    const s = D.summarizeChangeResults([{ id: 'r', ok: true, verified: false, rebootRequired: true, error: null }]);
+    expect(s.ok).toBe(false);
+    expect(s.status).toBe('pending-reboot');
+    expect(s.failed).toEqual([]);
+    expect(s.pending.map((p: any) => p.id)).toEqual(['r']);
+  });
+  it('marks unconfirmed security refusals as skipped only when the user declined', () => {
+    const items = [
+      { id: 'a', ok: true, verified: true },
+      { id: 'sec', ok: false, verified: false, error: 'Alteracao de seguranca requer confirmacao (ConfirmSecurity).' }
+    ];
+    const declined = D.summarizeChangeResults({ results: items }, { securityDeclined: true });
+    expect(declined.ok).toBe(true);
+    expect(declined.skipped.map((x: any) => x.id)).toEqual(['sec']);
+    expect(D.summarizeChangeResults({ results: items }).ok).toBe(false);
+  });
+  it('strips DKPROG strings leaked into the JSON payload', () => {
+    const a = D.stripLeakedProgress(['DKPROG:50|Apply: x', [{ id: 'x', ok: true, verified: true }]]);
+    expect(a.data).toEqual([{ id: 'x', ok: true, verified: true }]);
+    expect(a.progress).toEqual(['DKPROG:50|Apply: x']);
+    const b = D.stripLeakedProgress({ profile: 'competitive', results: ['DKPROG:10|y', { id: 'y', ok: true, verified: true }] });
+    expect(b.data.results).toEqual([{ id: 'y', ok: true, verified: true }]);
+    const c = D.stripLeakedProgress(['DKPROG:1|z', { id: 'snap-1' }]);
+    expect(c.data).toEqual({ id: 'snap-1' });
+    // PowerShell `$results += @(Invoke-DarkOSChange ...)` nests arrays even without leaks.
+    const nested = D.stripLeakedProgress({ ok: true, results: [[{ id: 'n', ok: true, verified: true }]] });
+    expect(D.summarizeChangeResults(nested.data).ok).toBe(true);
+    expect(D.stripLeakedProgress([[{ id: 'm' }]]).data).toEqual([{ id: 'm' }]);
+    const untouched = [{ id: 'q' }];
+    expect(D.stripLeakedProgress(untouched).data).toBe(untouched);
   });
   it('treats a missing verified flag as not verified', () => {
     expect(D.summarizeChangeResults([{ id: 'a', ok: true }]).ok).toBe(false);
