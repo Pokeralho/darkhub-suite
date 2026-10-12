@@ -127,6 +127,29 @@ const darkhubApi = {
     applyExtremeNetworkMod: () => ipcRenderer.invoke('optimizer:applyExtremeNetworkMod'),
     applyCpuUnpark: () => ipcRenderer.invoke('optimizer:applyCpuUnpark')
   },
+  darkos: {
+    isDarkOS: () => ipcRenderer.invoke('darkos:isDarkOS'),
+    getCatalog: (payload) => ipcRenderer.invoke('darkos:getCatalog', payload),
+    getManifest: () => ipcRenderer.invoke('darkos:getManifest'),
+    getStatus: (payload) => ipcRenderer.invoke('darkos:getStatus', payload),
+    applyChange: (payload) => ipcRenderer.invoke('darkos:applyChange', payload),
+    revertChange: (payload) => ipcRenderer.invoke('darkos:revertChange', payload),
+    setProfile: (payload) => ipcRenderer.invoke('darkos:setProfile', payload),
+    restoreProfile: () => ipcRenderer.invoke('darkos:restoreProfile'),
+    getRemovedApps: () => ipcRenderer.invoke('darkos:getRemovedApps'),
+    restoreAppx: (payload) => ipcRenderer.invoke('darkos:restoreAppx', payload),
+    listSnapshots: () => ipcRenderer.invoke('darkos:listSnapshots'),
+    createSnapshot: (payload) => ipcRenderer.invoke('darkos:createSnapshot', payload),
+    restoreSnapshot: (payload) => ipcRenderer.invoke('darkos:restoreSnapshot', payload),
+    getFailures: () => ipcRenderer.invoke('darkos:getFailures'),
+    getRebootPending: () => ipcRenderer.invoke('darkos:getRebootPending'),
+    exportDiagnostics: () => ipcRenderer.invoke('darkos:exportDiagnostics'),
+    onRunEvent: (callback) => {
+      const listener = (_event, payload) => callback(payload)
+      ipcRenderer.on('darkos:runEvent', listener)
+      return () => ipcRenderer.removeListener('darkos:runEvent', listener)
+    }
+  },
   dialog: {
     selectFiles: (options) => ipcRenderer.invoke('dialog:selectFiles', options),
     selectFolder: (options) => ipcRenderer.invoke('dialog:selectFolder', options),

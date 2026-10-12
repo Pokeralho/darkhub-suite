@@ -27,6 +27,7 @@ import { registerNetworkIPC } from './networkIPC.js'
 import { registerOptiScalerIPC } from './optiscalerManager.js'
 import { registerDlss5IPC } from './services/dlss5/Dlss5Service.js'
 import { registerDownloadsIPC } from './services/downloads/registerDownloadsIPC.js'
+import { registerDarkOSIPC } from './ipc/darkosIpc.js'
 import Logger from './services/LoggerService.js'
 import { runCommand, runPowerShell, runPowerShellJson, stripBom, encodePowerShellScript, powerShellArgsForEncodedScript } from './services/PowerShellRunner.js'
 import HardwareService from './services/HardwareService.js'
@@ -172,6 +173,7 @@ async function getLibraryStore() {
 registerOptiScalerIPC({ app, ipcMain, getLibraryStore })
 registerDlss5IPC({ app, ipcMain, shell })
 const downloadsService = registerDownloadsIPC({ app, ipcMain, dialog, shell, BrowserWindow, logger: Logger })
+registerDarkOSIPC({ app, ipcMain, dialog, BrowserWindow, logger: Logger })
 
 async function getYtDlpTools() {
   ytdlpToolsPromise ||= import('./ytdlp.js')

@@ -33,6 +33,7 @@ export interface DownloadSettings {
 }
 
 export interface DarkHubAPI {
+  darkos: import('./types/darkos').DarkOSAPI;
   hardware: {
     onUpdate: (callback: (data: any) => void) => () => void;
     startPolling: () => Promise<{ ok: boolean; activeConsumers?: number }>;
