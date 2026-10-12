@@ -91,7 +91,6 @@
       "electron/services/*.ps1",
       "electron/services/darkos/*.ps1",
       "electron/services/darkos/*.psm1",
-      "electron/services/goldberg/**",
       "electron/services/fsr4_rdna2/**",
       "node_modules/sharp/**",
       "node_modules/@img/**",

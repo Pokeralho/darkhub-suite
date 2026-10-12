@@ -30,7 +30,6 @@ const Downloads = lazy(() => import('./pages/Downloads'));
 const SetupHub = lazy(() => import('./pages/SetupHub'));
 const DllInjector = lazy(() => import('./pages/DllInjector'));
 const FramePacer = lazy(() => import('./pages/FramePacer'));
-const SteamLuaTools = lazy(() => import('./pages/SteamLuaTools'));
 const Home = lazy(() => import('./pages/Home'));
 const DarkOSCenter = lazy(() => import('./pages/DarkOSCenter'));
 
@@ -135,9 +134,6 @@ const App = () => {
         return <SetupHub />;
       case 'dll-injector':
         return <DllInjector />;
-      case 'steam-lua':
-      case 'steamlua':
-        return <SteamLuaTools />;
       case 'settings':
         return <SettingsPage />;
       default:

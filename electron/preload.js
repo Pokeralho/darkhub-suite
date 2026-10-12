@@ -369,36 +369,6 @@ const darkhubApi = {
     adapterInfo: () => ipcRenderer.invoke('network:adapterInfo'),
     renewIp: () => ipcRenderer.invoke('network:renewIp')
   },
-  steamLua: {
-    getStatus: () => ipcRenderer.invoke('steamLua:getStatus'),
-    listInstalled: () => ipcRenderer.invoke('steamLua:listInstalled'),
-    getDetails: (appId) => ipcRenderer.invoke('steamLua:getDetails', appId),
-    saveLuaText: (payload) => ipcRenderer.invoke('steamLua:saveLuaText', payload),
-    toggleDepot: (payload) => ipcRenderer.invoke('steamLua:toggleDepot', payload),
-    toggleOnlineFix: (payload) => ipcRenderer.invoke('steamLua:toggleOnlineFix', payload),
-    deleteLua: (appId) => ipcRenderer.invoke('steamLua:deleteLua', appId),
-    installLua: (payload) => ipcRenderer.invoke('steamLua:installLua', payload),
-    installManifest: (filePath) => ipcRenderer.invoke('steamLua:installManifest', filePath),
-    restartSteam: () => ipcRenderer.invoke('steamLua:restartSteam'),
-    fetchStoreInfo: (appId) => ipcRenderer.invoke('steamLua:fetchStoreInfo', appId),
-    openStPlugInFolder: () => ipcRenderer.invoke('steamLua:openStPlugInFolder'),
-    downloadAndInstallPackage: (params) => ipcRenderer.invoke('steamLua:downloadAndInstallPackage', params),
-    configureSpacewarAppIdTxt: (payload) => ipcRenderer.invoke('steamLua:configureSpacewarAppIdTxt', payload)
-  },
-  steamUnlocker: {
-    getStatus: () => ipcRenderer.invoke('steamUnlocker:getStatus'),
-    install: (mode) => ipcRenderer.invoke('steamUnlocker:install', mode),
-    uninstall: () => ipcRenderer.invoke('steamUnlocker:uninstall')
-  },
-  goldberg: {
-    applyFix: (payload) => ipcRenderer.invoke('goldberg:applyFix', payload),
-    removeFix: (gameDir) => ipcRenderer.invoke('goldberg:removeFix', gameDir),
-    checkStatus: (gameDir) => ipcRenderer.invoke('goldberg:checkStatus', gameDir),
-    getSupportedLanguages: () => ipcRenderer.invoke('goldberg:getSupportedLanguages'),
-    applyFixAuto: (payload) => ipcRenderer.invoke('goldberg:applyFixAuto', payload),
-    removeFixAuto: (appId) => ipcRenderer.invoke('goldberg:removeFixAuto', appId),
-    checkStatusAuto: (appId) => ipcRenderer.invoke('goldberg:checkStatusAuto', appId)
-  }
 }
 
 darkhubApi.framepacer = darkhubApi.darkpacer

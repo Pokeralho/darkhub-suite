@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Inter and JetBrains Mono are bundled locally via `@fontsource` (no Google Fonts request; works offline).
 - Autostart remains opt-in (Settings); nothing is registered at install or first launch.
 
+### Removed
+- **Steam Lua / Depot Tools, Steam unlocker, and Goldberg Steam-emulator modules**: removed entirely from
+  the application source, IPC surface, preload bridge, UI routes, type declarations, and packaging config.
+  DarkOS does not ship DRM-circumvention or Steam-emulation functionality. Unrelated modules (OptiScaler,
+  DLSS, and upscaling helpers) are unaffected.
+
 ## [0.4.8] - 2026-10-10
 
 ### Added
@@ -65,7 +71,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Notes
 - Pre-existing test failure: `tests/dlss5Lifecycle.test.ts` requires `fsr4_rdna2/amd_fidelityfx_upscaler_dx12.dll` (not in repo).
 - `SystemEngine.activateWindows` left as original implementation (executes remote PowerShell script with admin elevation).
-- Steam/Goldberg unlock modules untouched per user boundary.
 - Browser extension for downloads deferred to future release.
 
 ---

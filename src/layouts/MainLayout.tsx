@@ -74,7 +74,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
         { id: 'darkpacer', label: t('nav.darkpacer', 'DarkPacer (FPS Lock)'), icon: Activity, badge: 'DXGI' },
         { id: 'optiscaler', label: t('nav.optiscaler', 'OptiScaler Manager'), icon: Cpu },
         { id: 'dlss5', label: t('nav.dlss5', 'DLSS 5 Manager'), icon: Sparkles, badge: 'EXP' },
-        { id: 'steam-lua', label: t('nav.steamLua', 'Steam Lua Tools'), icon: Gamepad2, badge: 'stplug-in' },
         { id: 'pge-portable', label: 'PGE Portable', icon: Gamepad2 },
         { id: 'optimizer', label: t('nav.optimizer', 'System Optimizer'), icon: Zap },
         { id: 'ultra-latency', label: t('nav.ultralatency', 'Ultra Low Latency'), icon: Flame },
