@@ -2305,6 +2305,7 @@ ipcMain.handle('optimizer:runRoutine', async (_event, routineId) => {
         case 'revert-gaming-mode': res = await SystemEngine.revertHardcoreGamerMode(); break;
         case 'defender-disable': res = await DefenderControlEngine.runNativeDefenderControl('disable'); break;
         case 'defender-enable': res = await DefenderControlEngine.runNativeDefenderControl('enable'); break;
+        case 'defender-restore-image': res = await DefenderControlEngine.restoreImageDefender(); break;
         case 'open-tamper-settings': res = DefenderControlEngine.openTamperSettings(); break;
         case 'dns-benchmark': res = { ok: true, msg: 'Use a aba DNS' }; break;
         default: throw new Error(`Unknown routine: ${routineId}`);
@@ -2325,6 +2326,9 @@ ipcMain.handle('optimizer:getDefenderControlStatus', async () => {
 });
 ipcMain.handle('optimizer:applyDefenderControl', async (_e, payload) => {
   return await DefenderControlEngine.runNativeDefenderControl(payload?.action || 'disable');
+});
+ipcMain.handle('optimizer:restoreImageDefender', async () => {
+  return await DefenderControlEngine.restoreImageDefender();
 });
 ipcMain.handle('optimizer:openTamperSettings', async () => {
   return DefenderControlEngine.openTamperSettings();

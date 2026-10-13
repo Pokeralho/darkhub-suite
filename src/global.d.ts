@@ -147,6 +147,7 @@ export interface DarkHubAPI {
     globalRecommendedTweaks: () => Promise<any>;
     getDefenderControlStatus: () => Promise<any>;
     applyDefenderControl: (payload: { action: 'disable' | 'enable' | 'check' }) => Promise<any>;
+    restoreImageDefender: () => Promise<any>;
     openTamperSettings: () => Promise<any>;
     applyMsiMode: () => Promise<any>;
     applyExtremeKernelMod: () => Promise<any>;

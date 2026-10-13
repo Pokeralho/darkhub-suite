@@ -120,6 +120,7 @@ const darkhubApi = {
     globalRecommendedTweaks: () => ipcRenderer.invoke('optimizer:globalRecommendedTweaks'),
     getDefenderControlStatus: () => ipcRenderer.invoke('optimizer:getDefenderControlStatus'),
     applyDefenderControl: (payload) => ipcRenderer.invoke('optimizer:applyDefenderControl', payload),
+    restoreImageDefender: () => ipcRenderer.invoke('optimizer:restoreImageDefender'),
     openTamperSettings: () => ipcRenderer.invoke('optimizer:openTamperSettings'),
     applyMsiMode: () => ipcRenderer.invoke('optimizer:applyMsiMode'),
     applyExtremeKernelMod: () => ipcRenderer.invoke('optimizer:applyExtremeKernelMod'),

@@ -2,6 +2,7 @@ import DeepTweaksEngine from './DeepTweaksEngine.js';
 import Logger from '../LoggerService.js';
 import { spawn } from 'node:child_process';
 import { runPowerShell } from '../PowerShellRunner.js';
+import ElevationHelper from './ElevationHelper.js';
 
 const POLICY_KEY = 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows Defender';
 const RTP_KEY = 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Real-Time Protection';
@@ -30,6 +31,8 @@ $tpReg = (Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows Defender\\
 $disAntiSpy = (Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender' -Name 'DisableAntiSpyware' -ErrorAction SilentlyContinue).DisableAntiSpyware
 $disRealtime = (Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Real-Time Protection' -Name 'DisableRealtimeMonitoring' -ErrorAction SilentlyContinue).DisableRealtimeMonitoring
 $winDefendSvc = (Get-Service -Name 'WinDefend' -ErrorAction SilentlyContinue).Status
+$imgRemoved = (Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkOS' -Name 'DefenderRemovedOffline' -ErrorAction SilentlyContinue).DefenderRemovedOffline
+$svcStart = (Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\WinDefend' -Name 'Start' -ErrorAction SilentlyContinue).Start
 $tamper = $false
 if ($null -ne $wmi.IsTamperProtected) { $tamper = [bool]$wmi.IsTamperProtected } elseif ($null -ne $tpReg) { $tamper = (($tpReg -band 1) -ne 0) -or ($tpReg -eq 5) }
 [PSCustomObject]@{
@@ -40,6 +43,8 @@ if ($null -ne $wmi.IsTamperProtected) { $tamper = [bool]$wmi.IsTamperProtected }
   policyDisableRealtime = if ($null -ne $disRealtime) { [int]$disRealtime } else { $null }
   serviceRunning = ($winDefendSvc -eq 'Running')
   serviceStatus = [string]$winDefendSvc
+  imageLevelRemoved = ($imgRemoved -eq 1)
+  serviceStart = if ($null -ne $svcStart) { [int]$svcStart } else { $null }
 } | ConvertTo-Json -Compress`;
       const { code, stdout, stderr } = await runPowerShell(script, { timeoutMs: 20000, trim: true });
       if (code === 0 && stdout) {
@@ -106,6 +111,50 @@ if ($null -ne $wmi.IsTamperProtected) { $tamper = [bool]$wmi.IsTamperProtected }
         ? 'Proteção em tempo real do Microsoft Defender DESATIVADA (confirmado pelo próprio Defender). Seu PC está sem antivírus ativo: reative quando terminar. Isto não desliga o SmartScreen nem o Firewall.'
         : 'Proteção do Microsoft Defender restaurada (confirmado pelo próprio Defender).'
     };
+  }
+
+  /**
+   * Restore Defender when it was removed at IMAGE LEVEL by the DarkOS golden build (services set to Start=4
+   * offline, with the original Start values kept in HKLM\SOFTWARE\DarkOS\DefenderServiceStart). This resets each
+   * service's Start to its backed-up value (or a sane default), clears the disable policies and the TamperProtection
+   * override, and asks for a reboot. Elevated; a single UAC prompt. Does NOT reinstall removed capabilities/FODs.
+   */
+  async restoreImageDefender() {
+    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    const before = await this.getStatus();
+    if (before.ok && !before.status?.imageLevelRemoved) {
+      return { ok: false, error: 'Este sistema não teve o Defender removido no nível da imagem (marcador DarkOS ausente). Use o botão de proteção em tempo real.' };
+    }
+    const defaults = { WinDefend: 2, WdNisSvc: 3, Sense: 3, WdBoot: 0, WdFilter: 0, WdNisDrv: 3, MsSecFlt: 0, MsSecWfp: 0, MsSecCore: 0, SecurityHealthService: 2, webthreatdefsvc: 3, webthreatdefusersvc: 3 };
+    const svcJson = JSON.stringify(defaults).replace(/"/g, '""');
+    const script = `
+$ErrorActionPreference = 'Stop'
+$defaults = '${svcJson}' | ConvertFrom-Json
+$bak = 'HKLM:\\SOFTWARE\\DarkOS\\DefenderServiceStart'
+foreach ($p in $defaults.PSObject.Properties) {
+  $svc = $p.Name
+  $start = $p.Value
+  if (Test-Path $bak) { $b = (Get-ItemProperty -Path $bak -Name $svc -ErrorAction SilentlyContinue).$svc; if ($null -ne $b) { $start = [int]$b } }
+  $k = "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\$svc"
+  if (Test-Path $k) { Set-ItemProperty -Path $k -Name Start -Value ([int]$start) -Type DWord -Force }
+}
+$pol = 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender'
+Remove-ItemProperty -Path $pol -Name 'DisableAntiSpyware','DisableAntiVirus','ServiceKeepAlive' -ErrorAction SilentlyContinue
+Remove-Item -Path "$pol\\Real-Time Protection" -Recurse -ErrorAction SilentlyContinue
+Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows Defender\\Features' -Name 'TamperProtection' -Value 0 -Type DWord -Force -ErrorAction SilentlyContinue
+Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkOS' -Name 'DefenderRemovedOffline' -ErrorAction SilentlyContinue
+Write-Output 'DKRESTORE-OK'`;
+    try {
+      const res = await ElevationHelper.runElevatedPowerShell(script, { timeoutMs: 60000 });
+      const out = `${res.stdout || ''}`;
+      if (res.code !== 0 && !out.includes('DKRESTORE-OK')) {
+        return { ok: false, error: res.stderr || 'Falha ao restaurar os serviços do Defender.' };
+      }
+      return { ok: true, rebootRequired: true, msg: 'Serviços do Microsoft Defender reativados no registro. Reinicie o PC para que o Defender volte a carregar. Componentes removidos da imagem (app Segurança do Windows) podem exigir reinstalação via Windows Update.' };
+    } catch (e) {
+      Logger.error('DefenderControlEngine', 'restoreImageDefender', e);
+      return { ok: false, error: e.message };
+    }
   }
 
   /** Synchronous on purpose (callers do not await it): opens Windows Security > Tamper Protection page, not elevated. */

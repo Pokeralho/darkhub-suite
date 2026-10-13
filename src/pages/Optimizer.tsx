@@ -964,6 +964,22 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
     });
   };
 
+  const handleRestoreImageDefender = async () => {
+    const ok = await askConfirm({
+      title: t('optimizer.audit.defender.restoreImageTitle', 'Reativar o Microsoft Defender?'),
+      body: t('optimizer.audit.defender.restoreImageBody', 'O Defender foi removido no nível da imagem DarkOS (serviços desativados offline). Isto reativa os serviços no registro e remove as políticas de desativação. É preciso reiniciar o PC. O app Segurança do Windows pode precisar ser reinstalado pelo Windows Update.'),
+      confirmLabel: t('optimizer.audit.defender.restoreImageBtn', 'Reativar e exigir reinício'),
+      danger: false
+    });
+    if (!ok) return;
+    await withBusy(async () => {
+      addLog('info', t('optimizer.audit.defender.restoringImage', 'Reativando os serviços do Defender no registro...'));
+      const res = await api().restoreImageDefender();
+      reportResult(res, t('optimizer.audit.defender.restoreImageOk', 'Serviços reativados. Reinicie o PC.'), t('optimizer.audit.defender.restoreImageFail', 'Falha ao reativar o Defender'));
+      await loadDefenderStatus();
+    });
+  };
+
   const handleOpenTamper = async () => {
     try {
       const res = await api().openTamperSettings();
@@ -2024,6 +2040,9 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
                     label={defenderStatus.policyDisableRealtime === 1 ? t('optimizer.audit.defender.policyOn', 'Política de desativação presente') : t('optimizer.audit.defender.policyOff', 'Sem política de desativação')}
                   />
                   <StatusPill ok={Boolean(defenderStatus.serviceRunning)} label={`WinDefend: ${defenderStatus.serviceStatus || '?'}`} />
+                  {defenderStatus.imageLevelRemoved && (
+                    <StatusPill ok={false} label={t('optimizer.audit.defender.imageRemoved', 'Removido na imagem DarkOS')} />
+                  )}
                 </>
               )}
               <button
@@ -2034,6 +2053,21 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
                 {t('optimizer.audit.refresh', 'Atualizar')}
               </button>
             </div>
+
+            {defenderStatus?.imageLevelRemoved && (
+              <div className="p-3 rounded-lg bg-sky-500/10 border border-sky-500/20 text-[11px] text-sky-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span>
+                  {t('optimizer.audit.defender.imageRemovedHelp', 'O Microsoft Defender foi removido nesta imagem DarkOS para liberar CPU em jogos. Para reativá-lo, reative os serviços e reinicie o PC. O botão de proteção em tempo real acima não funciona enquanto os serviços estiverem desativados.')}
+                </span>
+                <button
+                  onClick={handleRestoreImageDefender}
+                  disabled={isOptimizing}
+                  className="shrink-0 px-3 py-1 rounded bg-sky-500/20 hover:bg-sky-500/30 text-sky-100 border border-sky-500/30 text-xs font-semibold transition disabled:opacity-50"
+                >
+                  {t('optimizer.audit.defender.restoreImageBtn', 'Reativar e exigir reinício')}
+                </button>
+              </div>
+            )}
 
             {(defenderTamperBlocked || defenderStatus?.tamperProtected) && (
               <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
