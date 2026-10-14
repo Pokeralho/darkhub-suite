@@ -136,6 +136,7 @@ const darkhubApi = {
     getStatus: (payload) => ipcRenderer.invoke('darkos:getStatus', payload),
     applyChange: (payload) => ipcRenderer.invoke('darkos:applyChange', payload),
     revertChange: (payload) => ipcRenderer.invoke('darkos:revertChange', payload),
+    reinstallEdge: () => ipcRenderer.invoke('darkos:reinstallEdge'),
     setProfile: (payload) => ipcRenderer.invoke('darkos:setProfile', payload),
     restoreProfile: () => ipcRenderer.invoke('darkos:restoreProfile'),
     getRemovedApps: () => ipcRenderer.invoke('darkos:getRemovedApps'),

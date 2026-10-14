@@ -24,6 +24,32 @@ export function registerDarkOSIPC({ ipcMain, dialog, BrowserWindow, app, logger,
     })
   }
 
+  // DarkOS removes Microsoft Edge from the image (owner decision). This puts it back: first revert the catalog
+  // items that block Edge (update services/tasks + EdgeUpdate policies), then install it with winget (machine
+  // scope, elevated). If winget is unavailable or fails, open Microsoft's official download page instead.
+  handle('darkos:reinstallEdge', async (_p, o) => {
+    const ids = ['edge.noDesktopShortcut', 'svc.lean.edgeupdate', 'svc.lean.edgeupdatem', 'svc.lean.microsoftedgeelevationservice',
+      'task.edge.updatecore.disabled', 'task.edge.updateua.disabled']
+    const rev = await svc.revertChange({ ids }, o)
+    const { default: ElevationHelper } = await import('../services/optimizer/ElevationHelper.js')
+    const script = [
+      "$ErrorActionPreference = 'Continue'",
+      "Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\EdgeUpdateDev' -Name 'AllowUninstall' -ErrorAction SilentlyContinue",
+      "$w = Get-Command winget.exe -ErrorAction SilentlyContinue",
+      "if (-not $w) { Write-Output 'DKEDGE:NOWINGET'; exit 2 }",
+      "& $w.Source install --id Microsoft.Edge -e --silent --scope machine --accept-package-agreements --accept-source-agreements",
+      "if (Test-Path \"${env:ProgramFiles(x86)}\\Microsoft\\Edge\\Application\\msedge.exe\") { Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkOS' -Name 'EdgeRemoved' -ErrorAction SilentlyContinue; Write-Output 'DKEDGE:OK'; exit 0 }",
+      "Write-Output 'DKEDGE:FAIL'; exit 1"
+    ].join('\r\n')
+    const r = await ElevationHelper.runElevatedPowerShell(script, { timeoutMs: 15 * 60 * 1000 })
+    const out = `${r?.stdout || ''}`
+    if (out.includes('DKEDGE:OK')) return { ok: true, revert: rev, msg: 'Microsoft Edge reinstalado.' }
+    try { const { shell } = await import('electron'); await shell.openExternal('https://www.microsoft.com/edge/download') } catch { /* ignore */ }
+    return { ok: false, revert: rev, error: out.includes('DKEDGE:NOWINGET')
+      ? 'winget nao esta disponivel. Abri a pagina oficial de download do Edge; os bloqueios do DarkOS ja foram desfeitos.'
+      : 'A instalacao automatica falhou. Abri a pagina oficial de download do Edge; os bloqueios do DarkOS ja foram desfeitos.' }
+  })
+
   handle('darkos:isDarkOS', async () => svc.info())
   handle('darkos:getCatalog', (p, o) => svc.getCatalog(p, o))
   handle('darkos:getManifest', (_p, o) => svc.getManifest(o))

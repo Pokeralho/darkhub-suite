@@ -65,6 +65,15 @@ export default function DarkOSSystemPanel({ onNavigate }: { onNavigate?: (page: 
   // --- (b) updater: status on open + live events; no background polling added here ---
   const [upd, setUpd] = useState<UpdState>({ status: 'idle' });
   const [updBusy, setUpdBusy] = useState(false);
+  const [edgeBusy, setEdgeBusy] = useState(false);
+  const [edgeMsg, setEdgeMsg] = useState<string | null>(null);
+  const reinstallEdge = async () => {
+    setEdgeBusy(true); setEdgeMsg(null);
+    try {
+      const r = await window.darkhub?.darkos?.reinstallEdge?.();
+      setEdgeMsg(r?.ok ? (r.msg || 'OK') : (r?.error || 'Falha ao reinstalar o Edge.'));
+    } finally { setEdgeBusy(false); }
+  };
   useEffect(() => {
     let off: (() => void) | undefined;
     (async () => {
@@ -169,6 +178,16 @@ export default function DarkOSSystemPanel({ onNavigate }: { onNavigate?: (page: 
             <Stat icon={Clock} label={t('darkos.sys.live.uptime', 'Uptime')} value={fmtUptime(stats.uptimeSec ?? 0)} />
           </div>
         )}
+      </Card>
+
+      {/* Microsoft Edge (removed by DarkOS) */}
+      <Card>
+        <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2"><DownloadCloud className="w-4 h-4 text-zinc-400" />{t('darkos.sys.edge.title', 'Microsoft Edge')}</h3>
+        <p className="mt-1 text-xs text-zinc-400">{t('darkos.sys.edge.desc', 'O DarkOS vem sem o Microsoft Edge (o navegador padrão é o Zen). Se precisar dele, reinstale aqui: os bloqueios do DarkOS são desfeitos e o Edge é instalado pelo winget.')}</p>
+        <div className="mt-2 flex items-center gap-2">
+          <button onClick={reinstallEdge} disabled={edgeBusy} className={btnGhost}><DownloadCloud className="w-3.5 h-3.5" />{edgeBusy ? t('darkos.sys.edge.busy', 'Reinstalando...') : t('darkos.sys.edge.do', 'Reinstalar Microsoft Edge')}</button>
+          {edgeMsg && <span className="text-xs text-zinc-300">{edgeMsg}</span>}
+        </div>
       </Card>
 
       {/* Update status */}

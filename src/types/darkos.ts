@@ -86,6 +86,7 @@ export interface DarkOSAPI {
   getStatus: (payload?: { ids?: string[] }) => Promise<DarkOSReadResponse<any>>;
   applyChange: (payload: { ids: string[]; confirmSecurity?: boolean }) => Promise<DarkOSChangeResponse>;
   revertChange: (payload: { ids: string[]; confirmSecurity?: boolean }) => Promise<DarkOSChangeResponse>;
+  reinstallEdge: () => Promise<{ ok: boolean; msg?: string; error?: string }>;
   setProfile: (payload: { profile: DarkOSProfileId; confirmSecurity?: boolean }) => Promise<DarkOSChangeResponse>;
   restoreProfile: () => Promise<DarkOSChangeResponse>;
   getRemovedApps: () => Promise<DarkOSReadResponse<any>>;
