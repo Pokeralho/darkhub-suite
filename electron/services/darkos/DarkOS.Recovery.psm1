@@ -394,6 +394,13 @@ function New-DkFakeBackend {
     $b['PowerSchemeExists'] = { param($Guid) $s = Load-DkFakeState; return (@($s.powerSchemes) -contains $Guid) }
     $b['FileCopy'] = { param($Src, $Dst) $s = Load-DkFakeState; $s.files[$Dst] = $Src; Save-DkFakeState $s; return $true }
     $b['AppxFixAcl'] = { param($Path) return $true }
+    $b['StoreInstall'] = {
+        param($StoreId, $ShortName)
+        $s = Load-DkFakeState
+        $s.appx["$ShortName.msstore"] = @{ name = $ShortName; fullName = "$ShortName.msstore"; storeId = $StoreId }
+        Save-DkFakeState $s
+        return $true
+    }
     $b['AppxPackageFolders'] = {
         param($ShortName)
         $s = Load-DkFakeState
@@ -537,6 +544,27 @@ function New-DkRealBackend {
             Add-AppxProvisionedPackage -Online -FolderPath $PackagePath -SkipLicense -ErrorAction Stop | Out-Null
         } else {
             Add-AppxProvisionedPackage -Online -PackagePath $PackagePath -SkipLicense -ErrorAction Stop | Out-Null
+        }
+        return $true
+    }
+    $b['StoreInstall'] = {
+        param($StoreId, $ShortName)
+        # Store downloads need Delivery Optimization; the DarkOS image ships DoSvc disabled (Start=4).
+        # The SCM denies administrators config changes on DoSvc, so it is set to Manual by a one-shot SYSTEM task.
+        $k = 'HKLM:\SYSTEM\CurrentControlSet\Services\DoSvc'
+        if ((Get-ItemProperty $k -Name Start -ErrorAction SilentlyContinue).Start -eq 4) {
+            $tn = 'DarkOS-EnableDoSvc'
+            & schtasks.exe /Create /TN $tn /RU SYSTEM /SC ONCE /ST 00:00 /TR 'sc.exe config DoSvc start= demand' /F 2>&1 | Out-Null
+            & schtasks.exe /Run /TN $tn 2>&1 | Out-Null
+            Start-Sleep -Seconds 4
+            & schtasks.exe /Delete /TN $tn /F 2>&1 | Out-Null
+        }
+        $wg = (Get-Command winget.exe -ErrorAction SilentlyContinue).Source
+        if (-not $wg) { $wg = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\winget.exe' }
+        if (-not (Test-Path -LiteralPath $wg)) { throw 'winget nao encontrado (App Installer ausente).' }
+        $out = & $wg install --id $StoreId --source msstore --accept-package-agreements --accept-source-agreements --disable-interactivity --silent 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0 -and $out -notmatch 'already installed|instalad') {
+            throw ('winget msstore {0} exit {1}: {2}' -f $StoreId, $LASTEXITCODE, (($out.Trim() -split "`n") | Select-Object -Last 1))
         }
         return $true
     }
@@ -926,7 +954,17 @@ function Restore-DkAppxPackage {
     $idx = Read-DkJsonFile (Get-DkPath AppIndex)
     $entries = @()
     if ($idx -and $idx.packages) { $entries = @($idx.packages | Where-Object { $_.displayName -eq $ShortName -or $_.packageFullName -like "$ShortName*" }) }
-    if ($entries.Count -eq 0) { return @{ packageName = $ShortName; ok = $false; verified = $false; error = 'Sem payload preservado no index.json.'; pathUsed = $null } }
+    if ($entries.Count -eq 0) {
+        # No local payload (the golden image keeps only apps that are not in the Microsoft Store):
+        # reinstall from the Store via winget when the catalog entry has a storeId.
+        $sid = @(Get-DkCatalogRaw | Where-Object { $_.component -eq 'appx' -and $_.apply.packageName -eq $ShortName -and $_.apply.storeId } | ForEach-Object { [string]$_.apply.storeId } | Select-Object -First 1)
+        if ($sid.Count -eq 0) { return @{ packageName = $ShortName; ok = $false; verified = $false; error = 'Sem payload preservado no index.json.'; pathUsed = $null } }
+        $err = $null
+        try { [void](Invoke-Dk 'StoreInstall' @($sid[0], $ShortName)) } catch { $err = $_.Exception.Message }
+        $verified = (@(Invoke-Dk 'AppxInstalledList' @("$ShortName")).Count -gt 0)
+        if (-not $verified -and -not $err) { $err = 'Instalacao pela Microsoft Store nao confirmada.' }
+        return @{ packageName = $ShortName; ok = $verified; verified = $verified; reprovisioned = $false; pathUsed = ('msstore:' + $sid[0]); error = $err; warnings = @() }
+    }
     $winapps = Get-DkWindowsAppsRoot
     $registered = $false
     $pathUsed = @()
