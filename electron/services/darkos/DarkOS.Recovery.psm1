@@ -549,23 +549,19 @@ function New-DkRealBackend {
     }
     $b['StoreInstall'] = {
         param($StoreId, $ShortName)
-        # Store downloads need Delivery Optimization; the DarkOS image ships DoSvc disabled (Start=4).
-        # The SCM denies administrators config changes on DoSvc, so it is set to Manual by a one-shot SYSTEM task.
-        $k = 'HKLM:\SYSTEM\CurrentControlSet\Services\DoSvc'
-        if ((Get-ItemProperty $k -Name Start -ErrorAction SilentlyContinue).Start -eq 4) {
-            $tn = 'DarkOS-EnableDoSvc'
-            & schtasks.exe /Create /TN $tn /RU SYSTEM /SC ONCE /ST 00:00 /TR 'sc.exe config DoSvc start= demand' /F 2>&1 | Out-Null
-            & schtasks.exe /Run /TN $tn 2>&1 | Out-Null
-            Start-Sleep -Seconds 4
-            & schtasks.exe /Delete /TN $tn /F 2>&1 | Out-Null
-        }
+        # VM test 16/10: Store installs via winget work with DoSvc disabled (no DO needed); DoSvc is NOT touched here.
+        # (Even SYSTEM gets "Acesso negado" from the SCM on DoSvc; its Start value is restored via the registry backup.)
         $wg = (Get-Command winget.exe -ErrorAction SilentlyContinue).Source
         if (-not $wg) { $wg = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\winget.exe' }
         if (-not (Test-Path -LiteralPath $wg)) { throw 'winget nao encontrado (App Installer ausente).' }
         $out = & $wg install --id $StoreId --source msstore --accept-package-agreements --accept-source-agreements --disable-interactivity --silent 2>&1 | Out-String
-        if ($LASTEXITCODE -ne 0 -and $out -notmatch 'already installed|instalad') {
-            throw ('winget msstore {0} exit {1}: {2}' -f $StoreId, $LASTEXITCODE, (($out.Trim() -split "`n") | Select-Object -Last 1))
+        $rc = $LASTEXITCODE
+        # 0 = installed; 0x8A15002B (-1978335189) = already installed / no applicable update
+        if ($rc -ne 0 -and $rc -ne -1978335189) {
+            throw ('winget msstore {0} exit {1}: {2}' -f $StoreId, $rc, (($out.Trim() -split "`n") | Select-Object -Last 1))
         }
+        # registration for the user can lag a few seconds behind winget's exit
+        for ($i = 0; $i -lt 15; $i++) { if (@(Get-AppxPackage -Name $ShortName -ErrorAction SilentlyContinue).Count) { break }; Start-Sleep -Seconds 2 }
         return $true
     }
     $b['PowerActiveGuid'] = {
