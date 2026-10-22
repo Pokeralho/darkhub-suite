@@ -156,9 +156,9 @@
     "semantic_hash": ""
   },
   "electron/main.js": {
-    "mtime": 1792604589.9857874,
-    "seen": 1792605178.4434426,
-    "ast_hash": "6794d041e5baf5aa5ecedbf0867c02fa",
+    "mtime": 1792668309.7526553,
+    "seen": 1792668613.2705421,
+    "ast_hash": "facaabf20281bd677068475f7ecd864f",
     "semantic_hash": ""
   },
   "electron/networkIPC.js": {
@@ -342,9 +342,9 @@
     "semantic_hash": ""
   },
   "electron/services/downloads/registerDownloadsIPC.js": {
-    "mtime": 1791639481.5103161,
-    "seen": 1792528297.5132642,
-    "ast_hash": "ea87e835141e8be5149ed8e9d3b6ab18",
+    "mtime": 1792668309.753155,
+    "seen": 1792668613.2705421,
+    "ast_hash": "b76fb41d4f663c60e2746bf49238d9b8",
     "semantic_hash": ""
   },
   "electron/services/optimizer/AppManagerEngine.js": {
@@ -918,9 +918,9 @@
     "semantic_hash": ""
   },
   "tests/downloads.test.ts": {
-    "mtime": 1792525942.298172,
-    "seen": 1792528297.5132642,
-    "ast_hash": "231c2b72cc8fa8f232f67bf724cf7056",
+    "mtime": 1792668341.7544603,
+    "seen": 1792668613.2705421,
+    "ast_hash": "503ededc264a16337019e74c867dbcbe",
     "semantic_hash": ""
   },
   "tests/driverCenter.test.ts": {

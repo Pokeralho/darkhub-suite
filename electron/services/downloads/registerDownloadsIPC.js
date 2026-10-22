@@ -1,3 +1,4 @@
+import os from 'node:os'
 import path from 'node:path'
 import { DownloadManager } from './DownloadManager.js'
 
@@ -6,9 +7,13 @@ import { DownloadManager } from './DownloadManager.js'
  * file operations: paths are always looked up from the manager, never trusted from the UI.
  */
 export function registerDownloadsIPC({ app, ipcMain, dialog, shell, BrowserWindow, logger }) {
+  // getPath('downloads') throws when the Downloads known folder cannot be resolved (redirected to a missing drive,
+  // offline OneDrive, broken profile): fall back to the profile folder instead of failing the app's startup.
+  let downloadsDir
+  try { downloadsDir = app.getPath('downloads') } catch { downloadsDir = path.join(os.homedir(), 'Downloads') }
   const manager = new DownloadManager({
     dataDir: path.join(app.getPath('userData'), 'downloads'),
-    defaultDownloadDir: path.join(app.getPath('downloads'), 'DarkHub'),
+    defaultDownloadDir: path.join(downloadsDir, 'DarkHub'),
     logger
   })
 

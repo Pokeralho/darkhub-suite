@@ -70,6 +70,8 @@ const __dirname = path.dirname(__filename)
 
 log.info(`[startup] process started isPackaged=${app.isPackaged} argv=${process.argv.join(' ')}`)
 
+// Declared before the second-instance handler below, which can run before the rest of this module has executed.
+let mainWindow = null
 const gotTheLock = app.requestSingleInstanceLock()
 if (!gotTheLock) {
   log.info('[startup] Second instance detected, quitting...')
@@ -168,18 +170,23 @@ async function getLibraryStore() {
   return libraryStorePromise
 }
 
-registerOptiScalerIPC({ app, ipcMain, getLibraryStore })
-registerDlss5IPC({ app, ipcMain, shell })
-const downloadsService = registerDownloadsIPC({ app, ipcMain, dialog, shell, BrowserWindow, logger: Logger })
-const darkosService = registerDarkOSIPC({ app, ipcMain, dialog, BrowserWindow, logger: Logger })
-registerDriverIPC({
+// One feature failing to register (an unresolvable known folder, a broken profile...) must not stop the app from
+// starting: it is logged and that screen reports its channels as missing.
+const safeRegister = (name, fn) => {
+  try { return fn() } catch (err) { log.error(`[startup] ${name} registration failed: ${err?.stack || err}`); return null }
+}
+safeRegister('optiscaler', () => registerOptiScalerIPC({ app, ipcMain, getLibraryStore }))
+safeRegister('dlss5', () => registerDlss5IPC({ app, ipcMain, shell }))
+const downloadsService = safeRegister('downloads', () => registerDownloadsIPC({ app, ipcMain, dialog, shell, BrowserWindow, logger: Logger }))
+const darkosService = safeRegister('darkos', () => registerDarkOSIPC({ app, ipcMain, dialog, BrowserWindow, logger: Logger }))
+safeRegister('driver', () => registerDriverIPC({
   ipcMain, shell, logger: Logger, darkos: darkosService,
   elevatedRunner: async (script, opts) => (await import('./services/optimizer/ElevationHelper.js')).default.runElevatedPowerShell(script, opts)
-})
-registerPowerShellIPC({ ipcMain, logger: Logger })
-registerWinToolsIPC({ ipcMain, logger: Logger })
-registerDiskScanIPC({ ipcMain, dialog, shell, BrowserWindow, logger: Logger })
-registerHwSensorsIPC({ ipcMain, logger: Logger })
+}))
+safeRegister('powershell', () => registerPowerShellIPC({ ipcMain, logger: Logger }))
+safeRegister('wintools', () => registerWinToolsIPC({ ipcMain, logger: Logger }))
+safeRegister('diskscan', () => registerDiskScanIPC({ ipcMain, dialog, shell, BrowserWindow, logger: Logger }))
+safeRegister('hwsensors', () => registerHwSensorsIPC({ ipcMain, logger: Logger }))
 
 async function getYtDlpTools() {
   ytdlpToolsPromise ||= import('./ytdlp.js')
@@ -203,7 +210,6 @@ const discordDedup = new Map()
 let junkEstimateCache = { ts: 0, result: null, inFlight: null }
 const grantedFilePaths = new Set()
 const grantedDirectoryPaths = new Set()
-let mainWindow = null
 let tray = null
 let appIsQuitting = false
 let closeToTrayEnabled = true
@@ -4178,7 +4184,7 @@ let latencyGuardianStopHandled = false
 
 app.on('before-quit', (event) => {
   appIsQuitting = true
-  try { void downloadsService.shutdown() } catch {}
+  try { void downloadsService?.shutdown() } catch {}
   try {
     UpdateService.destroy()
   } catch {}

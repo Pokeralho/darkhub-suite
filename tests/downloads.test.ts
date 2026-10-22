@@ -192,3 +192,16 @@ describe('DownloadManager (real HTTP server)', () => {
     await waitFor(() => m.list().every((i: any) => i.status === 'completed'), 60000);
   }, 70000);
 });
+
+describe('registerDownloadsIPC startup', () => {
+  it('does not throw when the Downloads known folder cannot be resolved (app startup must survive)', async () => {
+    // @ts-ignore plain JS module
+    const { registerDownloadsIPC } = await import('../electron/services/downloads/registerDownloadsIPC.js');
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-dl-'));
+    const app = { getPath: (n: string) => { if (n === 'downloads') throw new Error("Failed to get 'downloads' path"); return tmp; } };
+    const ipcMain = { handle: () => {}, on: () => {} };
+    const svc = registerDownloadsIPC({ app, ipcMain, dialog: {}, shell: {}, BrowserWindow: { getAllWindows: () => [] }, logger: null });
+    expect(svc).toBeTruthy();
+    await svc?.shutdown?.();
+  });
+});
