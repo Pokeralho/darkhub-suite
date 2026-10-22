@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-10-21T20:39:59. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-10-21T21:31:42. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 

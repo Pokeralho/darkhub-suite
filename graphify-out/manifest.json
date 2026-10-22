@@ -450,9 +450,9 @@
     "semantic_hash": ""
   },
   "install.ps1": {
-    "mtime": 1791642318.4441168,
-    "seen": 1792528297.5132642,
-    "ast_hash": "df032b4ea2cc0699745cd3c0a8383865",
+    "mtime": 1792628350.2713733,
+    "seen": 1792629127.0816367,
+    "ast_hash": "815803be87e0e417a6ad7b0c39fd9668",
     "semantic_hash": ""
   },
   "native_pacer/Cargo.toml": {
@@ -972,9 +972,9 @@
     "semantic_hash": ""
   },
   ".github/ISSUE_TEMPLATE/bug_report.md": {
-    "mtime": 1788295241.7584803,
-    "seen": 1792528297.5132642,
-    "ast_hash": "11da5205c93f12b545a027bd3695a511",
+    "mtime": 1792629082.8053768,
+    "seen": 1792629127.082645,
+    "ast_hash": "e3369cb281069fe5067140f24556e45c",
     "semantic_hash": ""
   },
   ".github/ISSUE_TEMPLATE/security_rule.md": {
@@ -996,9 +996,9 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792605160.5229805,
-    "seen": 1792605178.4439437,
-    "ast_hash": "490f89b088628bb01a912d867ede8dd6",
+    "mtime": 1792627884.2359598,
+    "seen": 1792629127.082645,
+    "ast_hash": "e17b0846494fe44e1d2a7a6c4027b2d4",
     "semantic_hash": ""
   },
   "CONTRIBUTING.md": {
@@ -1008,9 +1008,9 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1792525549.0403788,
-    "seen": 1792528297.5132642,
-    "ast_hash": "58671283a73ae1e3e6971cf3463bd22d",
+    "mtime": 1792629064.1731973,
+    "seen": 1792629127.082645,
+    "ast_hash": "67f3f013a293de3769f7b5fdbcf72a7e",
     "semantic_hash": ""
   },
   "SECURITY_RULES.md": {
@@ -1080,9 +1080,9 @@
     "semantic_hash": ""
   },
   "src/components/DevTracePanel.tsx": {
-    "mtime": 1792534607.0515063,
-    "seen": 1792536988.9978266,
-    "ast_hash": "25d10c7e408d20aca5ab07098d8c1f4f",
+    "mtime": 1792628792.9835494,
+    "seen": 1792629127.0816367,
+    "ast_hash": "06a526d5694958a8194830d12b7f86a8",
     "semantic_hash": ""
   },
   "src/components/icons/IconSheet.tsx": {
@@ -1116,9 +1116,9 @@
     "semantic_hash": ""
   },
   "electron/devSelfTest.js": {
-    "mtime": 1792625771.0211172,
-    "seen": 1792626022.9862592,
-    "ast_hash": "2cbac7b87b044ae8af7263081c7a4255",
+    "mtime": 1792628995.2766838,
+    "seen": 1792629127.0816367,
+    "ast_hash": "6b4fb5fe1d43aaf3172f20c669ee0a07",
     "semantic_hash": ""
   },
   "tests/darkosModuleCache.test.ts": {
@@ -1281,6 +1281,36 @@
     "mtime": 1792625594.7008922,
     "seen": 1792626022.9862592,
     "ast_hash": "68550f4dfb7a25b2efb4c751bb676897",
+    "semantic_hash": ""
+  },
+  ".github/ISSUE_TEMPLATE/config.yml": {
+    "mtime": 1792629082.7337465,
+    "seen": 1792629127.082645,
+    "ast_hash": "33ee197b7ea5a9d4c5e2bdcd9ab70d6e",
+    "semantic_hash": ""
+  },
+  ".github/ISSUE_TEMPLATE/feature_request.md": {
+    "mtime": 1792629082.6981049,
+    "seen": 1792629127.082645,
+    "ast_hash": "bbfefed6106a860f7c4bad1ba8df9fa2",
+    "semantic_hash": ""
+  },
+  ".github/dependabot.yml": {
+    "mtime": 1792629082.6127713,
+    "seen": 1792629127.082645,
+    "ast_hash": "6f5246e5f2e3e7182ef19c7d53b778c7",
+    "semantic_hash": ""
+  },
+  ".github/workflows/ci.yml": {
+    "mtime": 1792629082.5574474,
+    "seen": 1792629127.082645,
+    "ast_hash": "333c7e76345a4cc0dcc614b012e8daf9",
+    "semantic_hash": ""
+  },
+  "SECURITY.md": {
+    "mtime": 1792629082.6536014,
+    "seen": 1792629127.082645,
+    "ast_hash": "01cba198685ca6997c87c37d986b6360",
     "semantic_hash": ""
   }
 }

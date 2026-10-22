@@ -1,174 +1,148 @@
 <p align="center">
-  <img src="./build/icon.png" width="80" height="80" alt="DarkHub Suite Logo" />
+  <img src="./build/icon.png" width="80" height="80" alt="DarkHub Suite logo" />
 </p>
 
 <h1 align="center">DarkHub Suite</h1>
 
 <p align="center">
-  A high-performance modular Windows desktop utility for system configuration, gaming optimization, defensive security, media workflows, and offline tools.
+  Windows utility for gaming performance, latency, hardware monitoring, system repair, security and offline tools.<br/>
+  Every change it makes to Windows is snapshotted, verified and reversible.
 </p>
 
 <p align="center">
-  <a href="https://github.com/Pokeralho/darkhub-suite/releases"><img src="https://img.shields.io/badge/Release-v0.4.7-blue?style=flat-square" alt="Release Version" /></a>
-  <a href="https://github.com/Pokeralho/darkhub-suite/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" /></a>
-  <img src="https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011%20(x64)-zinc?style=flat-square" alt="Platform" />
-  <img src="https://img.shields.io/badge/PRs-Welcome-green?style=flat-square" alt="PRs Welcome" />
+  <a href="https://github.com/Pokeralho/darkhub-suite/releases/latest"><img src="https://img.shields.io/github/v/release/Pokeralho/darkhub-suite?style=flat-square&label=release" alt="Latest release" /></a>
+  <a href="https://github.com/Pokeralho/darkhub-suite/releases"><img src="https://img.shields.io/github/downloads/Pokeralho/darkhub-suite/total?style=flat-square" alt="Downloads" /></a>
+  <a href="https://github.com/Pokeralho/darkhub-suite/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Pokeralho/darkhub-suite/ci.yml?branch=main&style=flat-square&label=ci" alt="CI" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT license" /></a>
+  <img src="https://img.shields.io/badge/platform-Windows%2010%20%2F%2011%20x64-informational?style=flat-square" alt="Windows 10/11 x64" />
 </p>
 
 <p align="center">
-  <a href="#quick-installation">Installation</a> •
-  <a href="#overview">Overview</a> •
-  <a href="#core-modules">Core Modules</a> •
-  <a href="#architecture">Architecture</a> •
-  <a href="#extensibility">Extensibility</a> •
-  <a href="#building-from-source">Build</a> •
-  <a href="#contributing">Contributing</a> •
-  <a href="#license">License</a>
+  <a href="#install">Install</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#how-it-stays-safe">Safety</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#building-from-source">Build</a> ·
+  <a href="#contributing">Contributing</a>
 </p>
 
 <p align="center">
-  <img src="./docs/assets/preview.png" width="92%" alt="DarkHub Suite Dashboard Preview" style="border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);" />
+  <img src="./docs/assets/preview.png" width="94%" alt="DarkHub Suite home screen" />
 </p>
 
 ---
 
-## Quick Installation
+## Install
 
-Run the following command in **PowerShell (Administrator)**:
+**Installer (recommended):** download `DarkHub-Setup-x.y.z.exe` from the
+[latest release](https://github.com/Pokeralho/darkhub-suite/releases/latest). A portable build is attached too.
 
-```powershell
-irm darkhub.ink/win | iex
-```
+**One line, PowerShell as Administrator** (downloads the latest release and checks its SHA-512 before installing):
 
-Direct GitHub repository installer:
 ```powershell
 irm https://raw.githubusercontent.com/Pokeralho/darkhub-suite/main/install.ps1 | iex
 ```
 
----
-
-## Overview
-
-DarkHub Suite consolidates kernel-level Windows optimization, latency reduction engines, local defensive security, media processing, and offline utilities into a unified desktop interface built with Electron, React, and native C#/C++ background services.
-
-All operations execute locally on the host machine. No user telemetry, telemetry payloads, or private data are transmitted to external servers.
+Requirements: Windows 10 or 11, 64-bit. DarkHub runs as administrator because the optimizer, repairs and hardware
+sensors need it. It updates itself from GitHub releases (the download is checked against the published SHA-512).
 
 ---
 
-## Core Modules
+## Features
 
-### 1. System Optimizer & Hardware Telemetry
-- **Hardware Telemetry Engine**: Real-time polling of CPU frequency, per-core utilization, physical memory allocation, GPU load, storage health, and high-accuracy thermal sensors (Core Temp shared memory mapping and DTS thermal curves).
-- **Software Uninstaller with Deep Leftovers Cleaner**: Runs official uninstallers and executes thorough heuristic scanning of residual traces in `%APPDATA%`, `%LOCALAPPDATA%`, `%PROGRAMDATA%`, and Windows Registry keys.
-- **Advanced Network Stack Tuning**: Configures TCP NoDelay, multithreaded Receive Side Scaling (RSS 4 queues), MTU 1500, disables Energy Efficient Ethernet (EEE), and unlocks 100% QoS Psched bandwidth.
-- **Process Scheduling Quanta & GPU Priority**: Configures `Win32PrioritySeparation` (0x26), CPU process scheduling priority, and DirectX `UserGpuPreferences` to force dedicated GPU execution.
-- **Memory Management & RAM Cleaner**: 1-click working set flush, standby memory purge, and `DisablePagingExecutive` enforcement to maintain kernel-mode drivers in physical RAM.
-- **Windows Debloat & Service Control**: 35+ fully reversible Windows registry and kernel tweaks with instant snapshot rollback (Undo).
+### Gaming and latency
+- **System Optimizer**: registry, power, network, services and scheduling tweaks, each with a snapshot of the
+  original value, read-back verification and undo. Includes the WinUtil (Chris Titus) tweak set, adapted.
+- **DarkOS Mods on any Windows**: the 167 tweaks of the DarkOS image, applied one by one or by profile
+  (Balanced / Competitive gaming / Maximum performance), gaming and latency first.
+- **Ultra Low Latency**: timer resolution, MMCSS, interrupt and input-path tuning, bound to hotkeys.
+- **DarkPacer**: frame limiter with precise pacing and a frametime overlay.
+- **OptiScaler and DLSS 5 managers**: detect games, inject and roll back upscaler DLLs (DLSS, FSR, XeSS).
+- **PGE Portable**: Lossless Scaling and ReSwitch bundled.
 
-### 2. DarkPacer & Low-Latency Gaming Engine
-- **Hardware Frame Limiter**: Enforces ultra-stable frame pacing via high-resolution QueryPerformanceCounter (QPC) spin loops and driver integration.
-- **Frametime Oscilloscope Overlay**: Real-time transparent DirectX overlay rendering frametime metrics, 1% low, 0.1% low, and frame variance.
-- **Low-Level Native AutoClicker**: Dedicated C# background engine utilizing Win32 `SendInput` with `mouse_event` fallback for sub-millisecond precision, zero jitter, and global hotkeys (<kbd>F6</kbd>) functional in full-screen games.
-- **Global Timer Resolution**: Enforces high-precision 0.5ms system timer resolution for input latency reduction.
-- **OptiScaler Manager**: Detection, configuration, and injection of upscaling libraries (DLSS, FSR, XeSS) for supported titles.
+### Hardware
+- **System Monitor**: CPU per core, RAM, GPU per adapter (DXGI), disk active time, network, DPC rate, processes.
+  Only real readings: anything that cannot be read is shown as unavailable, never estimated.
+- **All sensors**: every LibreHardwareMonitor sensor per component (temperatures, voltages, power, clocks, fans,
+  SMART), HWMonitor style with min/max. The PawnIO driver is installed for you when you turn it on.
+- **Driver Center**: GPU detection (including cards on Microsoft's generic driver), official driver links, camera
+  and capture repair.
+- **Disk map**: native multi-threaded scanner (a full C: drive in seconds), live treemap, filters, reports.
 
-### 3. Endpoint Defensive Security & Hardening
-- **DNS Sinkhole (Hosts)**: Local filtering of tracking, telemetry, and malicious domains by routing queries to `0.0.0.0`.
-- **URL Heuristic Analyzer**: Scans URLs for IDN homograph punycode attacks, typosquatting signatures, and credential harvester patterns.
-- **Network Port Sentry**: Audits active TCP and UDP listening sockets with associated process identifiers and executable paths.
-- **Windows Defender & SmartScreen Control**: Elevation engine managing Microsoft Defender and telemetry services via TrustedInstaller privileges.
+### Windows maintenance
+- **Windows features and repairs**: WSL, Hyper-V, Sandbox, .NET 3.5, OpenSSH; Windows Update reset, winget repair,
+  component store cleanup, Edge remove/reinstall.
+- **Post-Install Hub**: bulk install through winget, open-source alternatives, apps from official GitHub releases
+  with the SHA-256 checked.
+- **DarkOS Center**: status, profiles, recovery and snapshots on DarkOS machines.
 
-### 4. Media Processing & YouTube Engine
-- **YouTube and Media Downloader**: Multi-fragment media extraction powered by integrated yt-dlp and FFmpeg binaries.
-- **Format and Codec Presets**: Direct export to MP3 (320 kbps), AAC, WAV, FLAC, and high-resolution video streams (up to 4K/2K/1080p).
-- **Metadata and Cover Art Injection**: Automatic extraction and embedding of ID3 tags, artist/album metadata, and high-resolution album thumbnails.
-- **Playlist Management**: Structured multi-track extraction with ordered index formatting and custom output directory routing.
+### Security and tools
+- Hosts-based tracker/telemetry blocking, URL heuristics, listening-port audit, Defender control.
+- AES-256-GCM password vault, file decryption tools.
+- Video downloader (yt-dlp + FFmpeg), file converter, metadata editor (ExifTool), offline OCR, text tools,
+  auto-clicker, DLL injector, PowerShell tools.
 
-### 5. Universal Offline Privacy & Productivity Tools
-- **Universal Non-Destructive Metadata & Exif Editor**: Safe viewing, editing, and stripping of metadata across Images, Audio (`MP3, FLAC, WAV`), Video (`MP4, MKV, AVI`), and Documents (`PDF, DOCX`) using embedded ExifTool without stream re-encoding or corruption.
-- **Offline OCR Text Extractor**: Offline text recognition supporting drag-and-drop, clipboard paste (<kbd>Ctrl+V</kbd>), Sharp preprocessing, and dual-language extraction (English + Portuguese).
-- **Universal File Converter**: Local offline conversion between image, audio, video, and document formats.
-- **Encrypted Password Vault**: Local credential repository utilizing AES-256-GCM encryption with master key derivation.
+Full list of changes: [CHANGELOG.md](./CHANGELOG.md).
+
+---
+
+## How it stays safe
+
+- **Reversible by design**: tweaks store the original value before changing it, read it back to verify, and can be
+  undone one by one or all at once.
+- **Local only**: no telemetry. Network access is limited to what you ask for (updates, downloads, winget).
+- **Verified downloads**: tools fetched from GitHub releases are checked against a pinned SHA-256; the PawnIO driver is
+  also checked for a valid Authenticode signature.
+- **Tested on a VM**: operations that change the system are applied, verified and reverted on a DarkOS/Windows VM
+  before release; every screen and read-only backend channel runs in an automated self-test.
 
 ---
 
 ## Architecture
 
 ```
-+------------------------------------------------------------------------+
-|                        DarkHub Suite Architecture                      |
-+-----------------------------------+------------------------------------+
-|         Frontend (Renderer)       |         Backend (Electron/Main)    |
-|  * React 19 + TypeScript + Vite 8 |  * Electron 41 (ESM)               |
-|  * Tailwind CSS + Lucide Icons    |  * Node.js Runtime                 |
-|  * Bilingual i18n Engine (EN/PT)  |  * Secure Preload & IPC Handlers   |
-|  * Component Error Boundaries     |  * Hardware Abstraction Layer (HAL)|
-+-----------------------------------+------------------------------------+
-|                       Native Services & Binaries                       |
-|  * DarkHub.FrameLimiter.exe (C#)      * DarkHub.LatencyEngine.exe (C#) |
-|  * yt-dlp.exe (Media Extractor)       * ffmpeg.exe (Static Media Core) |
-|  * OptiScaler DLL Bridge              * ExifTool Metadata Engine       |
-+------------------------------------------------------------------------+
+Renderer   React 19 + TypeScript + Vite + Tailwind 4, Frost design system, pt-BR / en-US
+   |  contextBridge (electron/preload.js)
+Main       Electron 41 (ESM): IPC handlers -> services (optimizer engines, HAL, downloads, security)
+   |  child processes, stdin/stdout JSON
+Native     DarkHub.SensorDaemon (PDH, DXGI)      DarkHub.HwSensors (LibreHardwareMonitorLib)
+           DarkHub.DiskScan (FindFirstFileEx)    DarkHub.LatencyEngine / FrameLimiter / ClickEngine
+           native_pacer (Rust)                   yt-dlp, FFmpeg, ExifTool
 ```
 
----
-
-## Extensibility
-
-### Custom Translations (i18n)
-DarkHub Suite supports runtime internationalization:
-1. Navigate to **Settings > Language > Collaborate / Import**.
-2. Download the language template (`darkhub-i18n-template.json`).
-3. Fill in translated strings for your target locale code.
-4. Import the JSON file directly into the application.
-5. Refer to [TRANSLATIONS.md](./TRANSLATIONS.md) for pull request guidelines.
-
-### Community Threat Rules
-1. Navigate to **Advanced Security > Community Rules**.
-2. Download the threat indicators template.
-3. Add verified domain blocks or heuristic patterns.
-4. Import into the application or submit a Pull Request following [SECURITY_RULES.md](./SECURITY_RULES.md).
+Code map for contributors: [docs/PROJECT_MAP.md](./docs/PROJECT_MAP.md). Design rules: [DESIGN.md](./DESIGN.md).
 
 ---
 
-## Building from Source
+## Building from source
 
-### Prerequisites
-- Node.js 20+ or 22+ LTS
-- npm 10+
-- Windows 10 or 11 (64-bit)
-- .NET Framework 4.0+ (for native C# helper compilation)
+Prerequisites: Windows 10/11 x64, Node.js 22 LTS, npm 10, .NET Framework 4.x (for the C# helpers), Rust/cargo
+(only to rebuild `native_pacer`).
 
-### Build Instructions
 ```bash
-# Clone the repository
 git clone https://github.com/Pokeralho/darkhub-suite.git
 cd darkhub-suite
-
-# Install dependencies
 npm install
 
-# Run development mode
-npm run dev
+npm run dev            # Vite + Electron with hot restart
+npx tsc --noEmit -p .  # type check
+npx vitest run         # unit tests
+npm run selftest       # every screen and read-only backend channel on this machine (with npm run dev running)
 
-# Compile native services and renderer
-npm run build:native
-npm run build:renderer
-
-# Package production installer
-npm run build
+npm run build          # native helpers + renderer + installer
 ```
 
-The production NSIS installer will be generated at `dist_app/DarkHub Setup 0.4.5.exe`.
+Installers are written to `dist_release/` (`DarkHub Setup x.y.z.exe` and `DarkHub x.y.z-portable.exe`).
 
 ---
 
 ## Contributing
 
-Contributions, bug reports, and optimizations are welcome. Please read [CONTRIBUTING.md](./CONTRIBUTING.md) before submitting pull requests.
-
----
+Bug reports, translations, security rules and pull requests are welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md),
+[TRANSLATIONS.md](./TRANSLATIONS.md) and [SECURITY_RULES.md](./SECURITY_RULES.md). To report a vulnerability, see
+[SECURITY.md](./SECURITY.md).
 
 ## License
 
-This project is licensed under the [MIT License](./LICENSE).
+[MIT](./LICENSE). Third-party components keep their own licenses
+(see [electron/services/hwsensors/THIRD_PARTY.md](./electron/services/hwsensors/THIRD_PARTY.md)).

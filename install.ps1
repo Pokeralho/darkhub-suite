@@ -12,7 +12,7 @@ function Start-DarkHubInstall {
     } catch {}
 
     $repo = "Pokeralho/darkhub-suite"
-    $Version = "0.4.8"
+    $Version = "0.6.0"
     $directUrl = $null
 
     try {
@@ -56,7 +56,7 @@ function Start-DarkHubInstall {
 
     # 2. Terminate running processes before installing
     Write-Host "[*] Terminating active DarkHub processes if running..." -ForegroundColor Yellow
-    Get-Process -Name 'DarkHub','DarkHub.FrameLimiter','DarkHub.LatencyEngine','DarkHub.ClickEngine','ReSwitch','LSEFree' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Get-Process -Name 'DarkHub','DarkHub.FrameLimiter','DarkHub.LatencyEngine','DarkHub.ClickEngine','DarkHub.SensorDaemon','DarkHub.HwSensors','DarkHub.DiskScan','ReSwitch','LSEFree' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 400
 
     # 3. Build candidate URLs (prioritize direct API asset, then dots notation, then hyphens)
@@ -120,13 +120,39 @@ function Start-DarkHubInstall {
     }
 
     $fileSizeMB = [math]::Round((Get-Item $tempInstaller).Length / 1MB, 2)
-    Write-Host "[+] Package verified successfully ($fileSizeMB MB)." -ForegroundColor Green
+
+    # Integrity: the release's latest.yml (also used by the in-app updater) carries the installer's SHA-512.
+    $expected = $null
+    try {
+        $wcYml = New-Object System.Net.WebClient
+        $wcYml.Headers.Add("User-Agent", "DarkHub-Installer")
+        $yml = $wcYml.DownloadString("https://github.com/$repo/releases/download/v$Version/latest.yml")
+        $m = [regex]::Match([string]$yml, '(?m)^sha512:\s*(\S+)')
+        if ($m.Success) { $expected = $m.Groups[1].Value.Trim() }
+    } catch {}
+    if ($expected) {
+        $sha = [System.Security.Cryptography.SHA512]::Create()
+        $fs = [System.IO.File]::OpenRead($tempInstaller)
+        try { $actual = [Convert]::ToBase64String($sha.ComputeHash($fs)) } finally { $fs.Dispose(); $sha.Dispose() }
+        if ($actual -ne $expected) {
+            Remove-Item $tempInstaller -Force -ErrorAction SilentlyContinue
+            Write-Host "[!] Error: the downloaded installer does not match the SHA-512 published in the release. Aborted." -ForegroundColor Red
+            return
+        }
+        Write-Host "[+] Package verified: SHA-512 matches the release ($fileSizeMB MB)." -ForegroundColor Green
+    } else {
+        Write-Host "[~] Release has no latest.yml to verify against; continuing ($fileSizeMB MB)." -ForegroundColor DarkYellow
+    }
 
     # 4. Silent installation
     Write-Host "[*] Installing DarkHub Suite v$Version silently..." -ForegroundColor Yellow
     $proc = Start-Process -FilePath $tempInstaller -ArgumentList "/S" -WindowStyle Hidden -Wait -PassThru -RedirectStandardOutput $outLog -RedirectStandardError $errLog
 
     Start-Sleep -Milliseconds 500
+    if ($proc -and $proc.ExitCode -ne 0) {
+        Write-Host "[!] Error: the installer exited with code $($proc.ExitCode). Run $tempInstaller manually to see the message." -ForegroundColor Red
+        return
+    }
 
     # 5. Launch application
     $possiblePaths = @(

@@ -7,7 +7,7 @@ labels: 'bug'
 
 ### System Information
 - **OS Version:** Windows 10 / Windows 11 (build number)
-- **DarkHub Suite Version:** 0.4.5
+- **DarkHub Suite Version:** (Settings > About, e.g. 0.6.0)
 
 ### Description of Bug
 A clear and concise description of what the bug is.

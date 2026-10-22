@@ -37,7 +37,7 @@ async function mainWindow() {
 export async function run(listeners) {
   fs.mkdirSync(outDir, { recursive: true })
   const win = await mainWindow()
-  win.setSize(1366, 820)
+  win.setSize(...(process.env.SELFTEST_SIZE || "1366x820").split("x").map(Number))
   await sleep(6000) // let startup background work settle
 
   // ---------------------------------------------------------------- 1. read-only IPC
@@ -157,6 +157,11 @@ export async function run(listeners) {
     let shot = null
     try {
       shot = path.join(outDir, `${r.replace(/[^\w-]+/g, '_')}.png`)
+      // SELFTEST_CLEAN_SHOTS=1: no dev trace pill in the picture (README / release images)
+      if (process.env.SELFTEST_CLEAN_SHOTS) await win.webContents.insertCSS('[data-dev-trace]{display:none!important}').catch(() => {})
+      // a window that is not on screen keeps its last painted frame: repaint before capturing
+      win.webContents.invalidate()
+      await sleep(400)
       fs.writeFileSync(shot, (await win.webContents.capturePage()).toPNG())
     } catch { shot = null }
     const errorCard = await win.webContents.executeJavaScript(`!!document.querySelector('[role="alert"]')`).catch(() => false)
