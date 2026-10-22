@@ -5,8 +5,8 @@ import { DriverCenterService } from '../services/DriverCenterService.js'
  * The official-URL validation lives on the main side: the renderer can only ask to open a
  * (vendor, kind) pair, never an arbitrary URL.
  */
-export function registerDriverIPC({ ipcMain, shell, logger, service } = {}) {
-  const svc = service || new DriverCenterService()
+export function registerDriverIPC({ ipcMain, shell, logger, service, elevatedRunner, darkos } = {}) {
+  const svc = service || new DriverCenterService({ elevatedRunner })
 
   const handle = (channel, fn) => {
     ipcMain.handle(channel, async (event, payload) => {
@@ -20,6 +20,13 @@ export function registerDriverIPC({ ipcMain, shell, logger, service } = {}) {
   }
 
   handle('driver:detect', () => svc.detectAdapters())
+
+  handle('driver:cameraStatus', () => svc.cameraStatus())
+
+  // On DarkOS, first undo (through the DarkOS module, so it stays reversible) the catalog items that block the camera.
+  handle('driver:repairCamera', () => svc.repairCamera({
+    darkosRevert: darkos?.isDarkOS?.() ? (ids) => darkos.revertChange({ ids }) : undefined
+  }))
 
   handle('driver:openOfficial', async (payload) => {
     const r = svc.resolveOfficialUrl(payload?.vendor, payload?.kind)

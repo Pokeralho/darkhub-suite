@@ -1,14 +1,25 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RotateCcw } from 'lucide-react';
+import { AlertTriangle, Home, RotateCcw } from './icons';
 
 interface Props {
   children: ReactNode;
   fallbackTitle?: string;
+  /** Render nothing instead of the error card (for non-essential widgets such as overlays). */
+  silent?: boolean;
+  onError?: (error: Error, componentStack?: string | null) => void;
+  onNavigateHome?: () => void;
 }
 
 interface State {
   hasError: boolean;
   error: Error | null;
+}
+
+// A lazy() chunk that failed to load (e.g. the app was updated underneath the running renderer) stays
+// rejected in React's cache, so "Try again" cannot recover it: only a full reload can.
+function isChunkLoadError(error: Error | null): boolean {
+  const msg = String(error?.message ?? '');
+  return /dynamically imported module|Importing a module script failed|Loading chunk|ChunkLoadError/i.test(msg);
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -23,34 +34,48 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error in component tree:', error, errorInfo);
+    try {
+      this.props.onError?.(error, errorInfo?.componentStack);
+    } catch {}
   }
 
   private handleReset = () => {
+    if (isChunkLoadError(this.state.error)) {
+      window.location.reload();
+      return;
+    }
     this.setState({ hasError: false, error: null });
   };
 
   public render() {
     if (this.state.hasError) {
+      if (this.props.silent) return null;
+      const chunkError = isChunkLoadError(this.state.error);
       return (
-        <div className="flex flex-col items-center justify-center p-8 bg-zinc-900 border border-zinc-800 rounded-xl max-w-xl mx-auto my-12 text-center space-y-4 shadow-xl">
-          <div className="p-3 bg-amber-500/10 text-amber-400 rounded-full">
-            <AlertTriangle size={32} />
+        <div role="alert" className="max-w-xl mx-auto my-12 dh-card p-6 space-y-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className="text-red-400 shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <h2 className="dh-section-title">
+                {this.props.fallbackTitle || 'Ocorreu um erro ao carregar este módulo / An error occurred'}
+              </h2>
+              <pre className="mt-2 text-[11.5px] leading-relaxed text-red-300/90 font-mono bg-zinc-950 px-3 py-2 rounded-md border border-zinc-800/80 whitespace-pre-wrap break-words max-h-40 overflow-auto select-text">
+                {this.state.error?.message || 'Component failed to render'}
+              </pre>
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-semibold text-zinc-100">
-              {this.props.fallbackTitle || 'Ocorreu um erro ao carregar este módulo / An error occurred'}
-            </h2>
-            <p className="text-xs text-zinc-400 mt-1 max-w-md font-mono bg-zinc-950 p-2.5 rounded border border-zinc-800 text-left overflow-x-auto">
-              {this.state.error?.message || 'Component failed to render'}
-            </p>
+          <div className="flex items-center gap-2 pl-[30px]">
+            <button onClick={this.handleReset} className="dh-btn dh-btn-primary">
+              <RotateCcw size={14} />
+              <span>{chunkError ? 'Recarregar app / Reload app' : 'Recarregar Módulo / Try Again'}</span>
+            </button>
+            {this.props.onNavigateHome ? (
+              <button onClick={this.props.onNavigateHome} className="dh-btn">
+                <Home size={14} />
+                <span>Início / Home</span>
+              </button>
+            ) : null}
           </div>
-          <button
-            onClick={this.handleReset}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-2"
-          >
-            <RotateCcw size={14} />
-            <span>Recarregar Módulo / Try Again</span>
-          </button>
         </div>
       );
     }

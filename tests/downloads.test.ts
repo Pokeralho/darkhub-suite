@@ -20,6 +20,10 @@ describe('download utils', () => {
     expect(sanitizeFileName('bad:name?.zip')).toBe('bad_name_.zip');
     expect(sanitizeFileName('')).toBe('download');
     expect(sanitizeFileName('x'.repeat(400) + '.mp4').length).toBeLessThanOrEqual(180);
+    expect(sanitizeFileName('invoice‮gpj.exe')).toBe('invoicegpj.exe');
+    expect(sanitizeFileName('%2e%2e%2f%2e%2e%2fevil.dll')).toBe('evil.dll');
+    expect(parseContentDisposition('attachment; filename="..\\..\\AppData\\evil.exe"')).not.toBeNull();
+    expect(sanitizeFileName(parseContentDisposition('attachment; filename="..\\..\\AppData\\evil.exe"'))).toBe('evil.exe');
   });
   it('never escapes the destination folder', () => {
     const root = path.join(os.tmpdir(), 'dhroot');

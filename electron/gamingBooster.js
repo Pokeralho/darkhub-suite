@@ -1,6 +1,6 @@
 
 
-import { exec } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import os from 'node:os'
 import ManagedProcessRegistry from './services/ManagedProcessRegistry.js'
@@ -29,7 +29,8 @@ export class GamingBooster extends EventEmitter {
           this.emit('log', 'Otimizações em tempo real aplicadas')
         }
       } catch (err) {
-        this.emit('error', err.message)
+        // EventEmitter throws on 'error' with no listener; nothing subscribes to this singleton.
+        if (this.listenerCount('error') > 0) this.emit('error', err.message)
       }
     }, independent ? 90000 : 60000)
   }
@@ -38,6 +39,7 @@ export class GamingBooster extends EventEmitter {
     if (!this.isRunning) return
     this.isRunning = false
     if (this.interval) clearInterval(this.interval)
+    this.interval = null
     this.emit('log', 'Gaming Booster parado')
   }
 
@@ -45,7 +47,7 @@ export class GamingBooster extends EventEmitter {
     const gameProcesses = ['cs2', 'valorant', 'fortnite', 'minecraft', 'warframe', 'league of legends', 'overwatch', 'apex', 'javaw', 'fortniteclient-win64-shipping', 'r5apex']
 
     return new Promise((resolve) => {
-      exec('tasklist /FO CSV /NH', { windowsHide: true }, (err, stdout) => {
+      execFile('tasklist.exe', ['/FO', 'CSV', '/NH'], { windowsHide: true }, (err, stdout) => {
         if (!err && stdout) {
           const lines = stdout.split('\n')
           for (const line of lines) {
@@ -71,11 +73,6 @@ export class GamingBooster extends EventEmitter {
         resolve()
       })
     })
-  }
-
-  async clearStandbyMemory() {
-    // Migrado para uso apenas na ferramenta dedicada do latencyGuardian.
-    // O GC() do PowerShell apenas limpava a memória do próprio PowerShell.
   }
 }
 

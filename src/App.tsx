@@ -1,10 +1,11 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import Layout from './layouts/MainLayout';
-import Dashboard from './pages/Dashboard';
 import { I18nProvider } from './i18n/I18nProvider';
 import UpdaterOverlay from './components/UpdaterOverlay';
 import ErrorBoundary from './components/ErrorBoundary';
 
+// Every page is a separate chunk: only the shell (layout, i18n, updater) is in the startup bundle.
+const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Optimizer = lazy(() => import('./pages/Optimizer'));
 const SystemMonitor = lazy(() => import('./pages/SystemMonitor'));
 const FileConverter = lazy(() => import('./pages/FileConverter'));
@@ -31,15 +32,47 @@ const SetupHub = lazy(() => import('./pages/SetupHub'));
 const DllInjector = lazy(() => import('./pages/DllInjector'));
 const FramePacer = lazy(() => import('./pages/FramePacer'));
 const Home = lazy(() => import('./pages/Home'));
+const SpaceSniffer = lazy(() => import('./pages/SpaceSniffer'));
+// Dev-only IPC trace panel (tree-shaken out of production builds).
+const DevTracePanel = import.meta.env.DEV ? lazy(() => import('./components/DevTracePanel')) : null;
+const IconSheet = import.meta.env.DEV ? lazy(() => import('./components/icons/IconSheet')) : null;
+
+// The page lives in the URL hash (#optimizer): reload / `npm run dev -- --page=x` open straight on a screen.
+const pageFromHash = () => (typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '').replace(/[^\w-]/g, '') : '') || 'home';
 const DarkOSCenter = lazy(() => import('./pages/DarkOSCenter'));
 const DriverCenter = lazy(() => import('./pages/DriverCenter'));
 const PowerShellTools = lazy(() => import('./pages/PowerShellTools'));
 
+const PageLoading = () => (
+  // Skeleton shaped like a page header + content (no spinner): the layout does not jump when the chunk lands.
+  <div role="status" aria-live="polite" aria-label="Carregando" className="space-y-6 animate-pulse motion-reduce:animate-none">
+    <div className="space-y-2">
+      <div className="h-5 w-48 rounded bg-zinc-900" />
+      <div className="h-3 w-80 max-w-full rounded bg-zinc-900/70" />
+    </div>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <div className="h-28 rounded-lg bg-zinc-900/70 lg:col-span-2" />
+      <div className="h-28 rounded-lg bg-zinc-900/70" />
+    </div>
+    <div className="h-40 rounded-lg bg-zinc-900/50" />
+  </div>
+);
+
 const App = () => {
-  const [currentPage, setCurrentPage] = useState('home');
+  const [currentPage, setCurrentPage] = useState(pageFromHash);
   const lastReportRef = useRef<number>(0)
-  const currentPageRef = useRef<string>('home')
+  const currentPageRef = useRef<string>(currentPage)
   currentPageRef.current = currentPage
+
+  useEffect(() => {
+    if (window.location.hash.replace(/^#/, '') !== currentPage) window.history.replaceState(null, '', `#${currentPage}`);
+  }, [currentPage]);
+
+  useEffect(() => {
+    const onHash = () => { const p = pageFromHash(); setCurrentPage((cur) => (cur === p ? cur : p)); };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
 
   useEffect(() => {
     const report = async (payload: any) => {
@@ -78,6 +111,21 @@ const App = () => {
       window.removeEventListener('unhandledrejection', onRejection)
     }
   }, [])
+
+  const reportRenderError = (error: Error, componentStack?: string | null) => {
+    const now = Date.now()
+    if (now - lastReportRef.current < 3000) return
+    lastReportRef.current = now
+    try {
+      window.darkhub?.discord?.reportError?.({
+        source: 'renderer',
+        page: currentPageRef.current,
+        message: error?.message ?? 'Render error',
+        stack: `${error?.stack ?? ''}${componentStack ? `
+${componentStack}` : ''}`
+      })?.catch?.(() => {})
+    } catch {}
+  }
 
   const renderPage = () => {
     switch (currentPage) {
@@ -138,8 +186,13 @@ const App = () => {
         return <DevTools />;
       case 'setuphub':
         return <SetupHub />;
+      case 'spacesniffer':
+        return <SpaceSniffer />;
       case 'dll-injector':
         return <DllInjector />;
+      case 'dev-icons':
+        if (IconSheet) return <IconSheet />;
+        return <Home onNavigate={(p: string) => setCurrentPage(p)} />;
       case 'settings':
         return <SettingsPage />;
       default:
@@ -150,14 +203,23 @@ const App = () => {
   return (
     <I18nProvider>
       <Layout currentPage={currentPage} setCurrentPage={setCurrentPage}>
-          <Suspense fallback={<div className="p-8 text-center text-zinc-500 text-xs font-mono">Loading module...</div>}>
-            <ErrorBoundary>
-              {renderPage()}
-            </ErrorBoundary>
+        {/* One boundary per route (keyed by page): a crash in one module never takes down the shell, and
+            navigating away clears the error. Suspense sits inside so chunk-load failures are caught too. */}
+        <ErrorBoundary key={currentPage} onError={reportRenderError} onNavigateHome={currentPage === 'home' ? undefined : () => setCurrentPage('home')}>
+          <Suspense fallback={<PageLoading />}>
+            <div className="dh-page">{renderPage()}</div>
           </Suspense>
+        </ErrorBoundary>
+        <ErrorBoundary silent onError={reportRenderError}>
           <UpdaterOverlay />
-        </Layout>
-      </I18nProvider>
+        </ErrorBoundary>
+        {DevTracePanel && (
+          <ErrorBoundary silent>
+            <Suspense fallback={null}><DevTracePanel currentPage={currentPage} /></Suspense>
+          </ErrorBoundary>
+        )}
+      </Layout>
+    </I18nProvider>
   );
 };
 

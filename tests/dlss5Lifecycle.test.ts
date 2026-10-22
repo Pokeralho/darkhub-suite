@@ -43,6 +43,21 @@ describe('DLSS5 apply/revert lifecycle', () => {
     expect(dx11.ok).toBe(false);
   });
 
+  it('drops the previous proxy loader when re-applying with a different one', async () => {
+    const { userData, game } = setup();
+    fs.writeFileSync(path.join(game, 'winmm.dll'), 'orig-winmm');
+    const svc: any = new (Dlss5Service as any)({ getPath: () => userData });
+    expect((await svc.apply({ targetDir: game, profile: 'nvidia', loader: 'dxgi.dll' }, () => {})).ok).toBe(true);
+    expect((await svc.apply({ targetDir: game, profile: 'nvidia', loader: 'winmm.dll' }, () => {})).ok).toBe(true);
+    expect(fs.readFileSync(path.join(game, 'dxgi.dll'), 'utf8')).toBe('orig-dxgi');
+    expect(fs.readFileSync(path.join(game, 'winmm.dll'), 'utf8')).toBe('opti');
+    const res = await svc.revert({ targetDir: game }, () => {});
+    expect(res.ok).toBe(true);
+    expect(fs.readFileSync(path.join(game, 'dxgi.dll'), 'utf8')).toBe('orig-dxgi');
+    expect(fs.readFileSync(path.join(game, 'winmm.dll'), 'utf8')).toBe('orig-winmm');
+    expect(fs.existsSync(path.join(game, 'OptiScaler.dll'))).toBe(false);
+  });
+
   it('has AMD Neural i18n keys in both locales', () => {
     for (const k of ['dlss5.amdEngineNeural', 'dlss5.amdEngineNeuralDesc', 'dlss5.neuralPasses', 'dlss5.amdNrPackageHint']) {
       expect(messages['pt-BR'][k]).toBeTruthy();

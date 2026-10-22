@@ -2,7 +2,7 @@ import fsRaw from 'node:fs'
 import https from 'node:https'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { spawn } from 'node:child_process'
+import { spawn, execFile } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -170,8 +170,11 @@ export async function ensureFfmpeg(toolsDir, platform) {
 
   if (platform === 'win32') {
     try {
-      const cp = await import('node:child_process')
-      const whereOut = cp.execSync('where.exe ffmpeg', { windowsHide: true, encoding: 'utf8' }).trim().split(/\r?\n/)[0]
+      // async lookup: execSync here blocked the Electron main process
+      const stdout = await new Promise((resolve, reject) => {
+        execFile('where.exe', ['ffmpeg'], { windowsHide: true, encoding: 'utf8', timeout: 5000 }, (err, out) => (err ? reject(err) : resolve(out)))
+      })
+      const whereOut = String(stdout ?? '').trim().split(/\r?\n/)[0]
       if (whereOut && fsRaw.existsSync(whereOut)) {
         return whereOut
       }
@@ -188,11 +191,8 @@ export function cancelActiveYtDlp() {
     try {
       const pid = activeYtDlpChild.pid
       if (process.platform === 'win32' && pid) {
-        import('node:child_process').then(cp => {
-          try {
-            cp.execSync(`taskkill /F /T /PID ${pid}`, { windowsHide: true })
-          } catch {}
-        })
+        // non-blocking tree kill (yt-dlp spawns ffmpeg children)
+        execFile('taskkill.exe', ['/F', '/T', '/PID', String(pid)], { windowsHide: true }, () => {})
       }
       activeYtDlpChild.kill('SIGKILL')
     } catch {}

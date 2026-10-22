@@ -32,6 +32,27 @@ export interface DownloadSettings {
   schedule: { enabled: boolean; start: string; stop: string };
 }
 
+export interface CameraState {
+  ok: boolean;
+  error?: string;
+  devices?: Array<{ name: string; status: string; problem: string; cls: string }>;
+  cameraApp?: boolean;
+  issues?: string[];
+}
+
+export interface DevTraceEntry {
+  id: number;
+  channel: string;
+  at: number;
+  ms: number;
+  ok: boolean;
+  noisy: boolean;
+  threw?: boolean;
+  error?: string;
+  args?: unknown;
+  result?: unknown;
+}
+
 export interface DarkHubAPI {
   darkos: import('./types/darkos').DarkOSAPI;
   hardware: {
@@ -52,12 +73,18 @@ export interface DarkHubAPI {
     getSnapshot: () => Promise<any>;
     getAdvancedHardware: () => Promise<any>;
     getDeepHardwareInfo: (forceRefresh?: boolean) => Promise<any>;
+    getDeepCategory: (category: string, forceRefresh?: boolean) => Promise<any>;
+    enableProcessTracking: (enabled: boolean) => Promise<{ ok: boolean; error?: string }>;
     runBenchmark: () => Promise<any>;
+    getMemory: () => Promise<{ ok: boolean; total: number; used: number; available: number }>;
     getLiveStats: () => Promise<{ ok: boolean; processes?: number; servicesRunning?: number; servicesTotal?: number; cpuPercent?: number; memUsedMb?: number; memTotalMb?: number; memPercent?: number; uptimeSec?: number; error?: string }>;
   };
   app: {
     getAbout: () => Promise<any>;
-    getResourceUsage: () => Promise<{ ok: boolean; totalCpuPercent?: number; totalWorkingSetMb?: number; processes?: Array<{ pid: number; type: string; name?: string; cpuPercent: number; workingSetMb: number }>; error?: string }>;
+    getResourceUsage: () => Promise<
+      | { ok: true; totalCpuPercent: number; totalWorkingSetMb: number; processes: Array<{ pid: number; type: string; name: string; cpuPercent: number; workingSetMb: number }> }
+      | { ok: false; error: string }
+    >;
   };
   downloads: {
     list: () => Promise<{ ok: boolean; items?: DownloadItem[]; settings?: DownloadSettings; error?: string }>;
@@ -104,6 +131,7 @@ export interface DarkHubAPI {
   };
     optimizer: {
     listOperations: () => Promise<any>;
+    checkOperationsStatus: () => Promise<any>;
     listProfiles: () => Promise<any>;
     checkIsAdmin: () => Promise<boolean>;
     createRestorePoint: () => Promise<any>;
@@ -133,7 +161,7 @@ export interface DarkHubAPI {
     deepTweaksAnalyze: (payload: { tweakIds: string[] }) => Promise<any>;
     deepTweaksApply: (payload: { tweakIds: string[] }) => Promise<any>;
     deepTweaksRevert: (payload: { tweakIds: string[] }) => Promise<any>;
-    deepTweaksUndo: (payload: { undoToken: string }) => Promise<any>;
+    deepTweaksUndo: (payload: { tweakIds?: string[]; undoToken?: string }) => Promise<any>;
     setDnsServers: (payload: { primary: string; secondary: string }) => Promise<any>;
     getStartupItems: () => Promise<any>;
     disableStartupItem: (payload: {name: string, type: string, path: string}) => Promise<any>;
@@ -157,10 +185,11 @@ export interface DarkHubAPI {
     applyCpuUnpark: () => Promise<any>;
   };
   dialog: {
-    selectFiles: (options: any) => Promise<any>;
+    selectFiles: (options: any) => Promise<{ canceled: boolean; filePaths: string[]; ok: boolean; files: string[] }>;
     selectFolder: (options: any) => Promise<any>;
     saveFile: (options: any) => Promise<any>;
-    grantDroppedFiles: (filePaths: string[]) => Promise<{ ok: boolean; granted?: string[]; error?: string }>;
+    grantDroppedFiles: (files: FileList | File[]) => Promise<{ ok: boolean; granted?: string[]; error?: string }>;
+    pathsForDroppedFiles: (files: FileList | File[]) => string[];
   };
   files: {
     convertImages: (payload: any) => Promise<any>;
@@ -435,7 +464,40 @@ export interface DarkHubAPI {
     update: (payload: any) => Promise<any>;
   };
   shell: {
-    openExternal: (url: string) => Promise<void>;
+    openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>;
+  };
+  /** Dev-only IPC trace (electron/devBootstrap.js). Its channels are not registered when packaged. */
+  dev?: {
+    getTrace: () => Promise<DevTraceEntry[]>;
+    clearTrace: () => Promise<{ ok: boolean }>;
+    onIpcTrace: (callback: (entry: DevTraceEntry) => void) => () => void;
+  };
+  hwsensors: {
+    status: () => Promise<HwSensorsStatus>;
+    setEnabled: (payload: { enabled: boolean }) => Promise<HwSensorsStatus & { reboot?: boolean }>;
+  };
+  diskscan: {
+    drives: () => Promise<{ ok: boolean; error?: string; drives?: DiskMapDrive[] }>;
+    pickFolder: () => Promise<{ ok: boolean; canceled?: boolean; path?: string }>;
+    start: (payload: { root: string }) => Promise<{ ok: boolean; error?: string; root?: string }>;
+    cancel: () => Promise<{ ok: boolean }>;
+    status: () => Promise<DiskMapStatus>;
+    view: (payload: { id?: string; minFraction?: number; maxNodes?: number; filter?: string; showFree?: boolean }) => Promise<{
+      ok: boolean; error?: string; tree?: DiskMapNode; volume?: { total: number; free: number } | null; trail?: { id: string; name: string }[]; total?: number; filterErrors?: string[]; status?: DiskMapStatus;
+    }>;
+    info: (payload: { id: string; filter?: string }) => Promise<{ ok: boolean; error?: string; info?: DiskMapInfo }>;
+    tag: (payload: { id: string; color: DiskMapTag | null }) => Promise<{ ok: boolean; error?: string }>;
+    open: (payload: { id: string }) => Promise<{ ok: boolean; error?: string }>;
+    reveal: (payload: { id: string }) => Promise<{ ok: boolean; error?: string }>;
+    trash: (payload: { id: string }) => Promise<{ ok: boolean; error?: string; path?: string }>;
+    exportReport: (payload: { id?: string; format: 'txt' | 'csv'; filter?: string }) => Promise<{ ok: boolean; canceled?: boolean; error?: string; path?: string; rows?: number }>;
+    onProgress: (callback: (status: DiskMapStatus) => void) => () => void;
+  };
+  wintools: {
+    listFeatures: () => Promise<{ ok: boolean; error?: string; features?: Record<string, 'enabled' | 'disabled' | 'pending' | 'unavailable'> }>;
+    setFeature: (payload: { id: string; enable: boolean }) => Promise<{ ok: boolean; error?: string; state?: string; requiresReboot?: boolean }>;
+    run: (payload: { action: string }) => Promise<{ ok: boolean; error?: string; msg?: string }>;
+    openPanel: (payload: { id: string }) => Promise<{ ok: boolean; error?: string }>;
   };
   driver: {
     detect: () => Promise<{
@@ -454,16 +516,20 @@ export interface DarkHubAPI {
         status: string;
         problem: string;
         isDedicated: boolean;
+        genericDriver?: boolean;
+        deviceId?: string;
         officialSources: { manual: string; autoDetect: string; app: string } | null;
       }>;
     }>;
     openOfficial: (payload: { vendor: string; kind?: 'manual' | 'autoDetect' | 'app' }) => Promise<{ ok: boolean; url?: string; vendor?: string; kind?: string; error?: string }>;
+    cameraStatus: () => Promise<CameraState>;
+    repairCamera: () => Promise<CameraState & { steps?: string[] }>;
   };
   powershell: {
     getPolicies: () => Promise<{ ok: boolean; error?: string; scopes?: Array<{ scope: string; policy: string }>; effective?: { scope: string; policy: string } }>;
     listScripts: () => Promise<{ ok: boolean; error?: string; rootExists?: boolean; root?: string; scripts?: Array<{ name: string; path: string; sizeBytes: number; modified: string; signature: { status: string; trusted: boolean; signer: string } }> }>;
     getSignature: (payload: { path: string }) => Promise<{ ok: boolean; error?: string; signature?: { status: string; trusted: boolean; signer: string } }>;
-    runScript: (payload: { path: string }) => Promise<{ ok: boolean; code?: number; stdout?: string; stderr?: string; signature?: { status: string; trusted: boolean; signer: string }; error?: string }>;
+    runScript: (payload: { path: string; confirmUnsigned?: boolean }) => Promise<{ ok: boolean; needsConfirmation?: boolean; code?: number; stdout?: string; stderr?: string; signature?: { status: string; trusted: boolean; signer: string }; error?: string }>;
     openElevatedTerminal: (payload?: { startingPath?: string }) => Promise<{ ok: boolean; error?: string }>;
   };
   discord: {
@@ -494,4 +560,21 @@ declare global {
   interface Window {
     darkhub: DarkHubAPI;
   }
+}
+
+export interface HwSensorsStatus { ok: boolean; error?: string | null; enabled?: boolean; available?: boolean; running?: boolean; pawnio?: boolean; lastSample?: number }
+export type DiskMapTag = 'red' | 'yellow' | 'green' | 'blue';
+export interface DiskMapDrive { root: string; label: string; fs: string; total: number; free: number; type: 'local' | 'removable' | 'network' }
+export interface DiskMapStatus {
+  ok: boolean; active: boolean; root?: string; running?: boolean; error?: string | null;
+  done?: { dirs: number; files: number; errors: number; ms: number } | null;
+  dirs?: number; files?: number; bytes?: number; errors?: number; elapsedMs?: number; volume?: { total: number; free: number } | null;
+}
+export interface DiskMapNode {
+  id: string; name: string; size: number; kind: 'dir' | 'file' | 'rest' | 'free' | 'unknown';
+  files?: number; count?: number; cls?: string; tag?: DiskMapTag; children?: DiskMapNode[];
+}
+export interface DiskMapInfo {
+  id: string; kind: 'dir' | 'file'; name: string; path: string; size: number; files?: number; dirs?: number; cls?: string;
+  mtime: number | null; ctime: number | null; atime?: number | null; attr: number; tag: DiskMapTag | null; isRoot?: boolean; parent?: string;
 }

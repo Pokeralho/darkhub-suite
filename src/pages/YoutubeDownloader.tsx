@@ -12,14 +12,13 @@ import {
   ShieldCheck,
   Clock,
   Eye,
-  Sparkles,
-  Zap,
   ListMusic,
   Image as ImageIcon,
   Tag
-} from 'lucide-react';
+} from '../components/icons';
 import { useI18n } from '../i18n/I18nProvider';
 import { HelpTip } from '../components/HelpTip';
+import PageHeader from '../components/ui/PageHeader';
 
 type DownloadPreset =
   | 'video-1080p'
@@ -146,7 +145,7 @@ const YoutubeDownloader = () => {
           setPreset('audio-mp3');
         }
       } catch (err: any) {
-        setDownloadStatus({ ok: false, msg: err.message });
+        setDownloadStatus({ ok: false, msg: err?.message ?? String(err) });
       }
     }
     setIsSearching(false);
@@ -213,6 +212,9 @@ const YoutubeDownloader = () => {
             eta: '',
             line: t('youtube.finished', 'Download e conversão finalizados.')
           });
+        } else {
+          setDownloadStatus({ ok: false, msg: res?.error ?? res?.msg ?? 'Download falhou.' });
+          setProgress(null);
         }
       } catch (err: any) {
         setDownloadStatus({ ok: false, msg: err.message });
@@ -237,38 +239,37 @@ const YoutubeDownloader = () => {
     ? info.formats.filter((f: any) => f?.vcodec && f.vcodec !== 'none')
     : [];
 
-  return (
-    <div className="w-full max-w-6xl mx-auto space-y-6 pb-12">
-      {}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
-            <Video className="text-red-400" size={28} />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-zinc-100 flex items-center gap-2">
-              {t('youtube.title', 'YouTube & Media Downloader')}
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">
-                {t('youtube.badge', 'Playlists + Tags ID3')}
-              </span>
-            </h1>
-            <p className="text-zinc-400 text-sm mt-1">
-              {t('youtube.subtitle', 'Baixe vídeos, canais ou playlists inteiras do YouTube em alta velocidade com tags ID3 automáticas, capas embutidas e anti-bot.')}
-            </p>
-          </div>
-        </div>
-        <HelpTip
-          title={t('youtube.helpTitle', 'Downloader de Vídeos & Playlists')}
-          description={t('youtube.helpDesc', 'Inspirado nas melhores práticas do YoutubePlaylistDownloader. Suporta download de playlists completas com organização automática em subpastas, embutimento de tags e capas em MP3/MP4.')}
-          sections={[
-            { title: t('youtube.helpSection1Title', 'Playlists & Canais'), content: t('youtube.helpSection1Content', 'Ao colar o link de uma playlist, você pode baixar todas as faixas organizadas com numeração (01 - Nome, 02 - Nome).') },
-            { title: t('youtube.helpSection2Title', 'Metadados Automáticos'), content: t('youtube.helpSection2Content', 'Embute nome da música, artista, álbum e capa de alta resolução diretamente nas tags do arquivo.') }
-          ]}
-          buttonLabel={t('youtube.guide', 'Guia')}
-        />
-      </div>
+  const presetOptions: { id: DownloadPreset; icon: React.ReactNode; label: string; desc: string }[] = [
+    { id: 'audio-mp3', icon: <Music size={14} />, label: t('youtube.audioMp3', 'Áudio MP3 (320k)'), desc: t('youtube.audioMp3Desc', 'Alta Fidelidade com Capa') },
+    { id: 'audio-m4a', icon: <Music size={14} />, label: t('youtube.audioM4a', 'Áudio M4A / AAC'), desc: t('youtube.audioM4aDesc', 'Áudio Nativo do YT') },
+    { id: 'audio-wav', icon: <Music size={14} />, label: t('youtube.audioWav', 'Áudio WAV Lossless'), desc: t('youtube.audioWavDesc', 'Estúdio Sem Perdas') },
+    { id: 'video-1080p', icon: <Video size={14} />, label: t('youtube.video1080p', 'Vídeo 1080p MP4'), desc: t('youtube.video1080pDesc', 'Full HD Recomendado') },
+    { id: 'video-4k', icon: <Video size={14} />, label: t('youtube.video4k', 'Vídeo 4K / 2K Max'), desc: t('youtube.video4kDesc', 'Máxima Resolução') },
+    { id: 'video-720p', icon: <Video size={14} />, label: t('youtube.video720p', 'Vídeo 720p HD'), desc: t('youtube.video720pDesc', 'Rápido e Leve') }
+  ];
 
-      {}
+  const segBtn = (active: boolean) =>
+    `h-7 px-2.5 rounded-md text-xs font-medium transition-colors ${active ? 'bg-zinc-800 text-zinc-50' : 'text-zinc-400 hover:text-zinc-200'}`;
+
+  return (
+    <div className="w-full space-y-6 pb-12">
+      <PageHeader
+        title={t('youtube.title', 'YouTube & Media Downloader')}
+        subtitle={t('youtube.subtitle', 'Baixe vídeos, canais ou playlists inteiras do YouTube em alta velocidade com tags ID3 automáticas, capas embutidas e anti-bot.')}
+        actions={
+          <HelpTip
+            title={t('youtube.helpTitle', 'Downloader de Vídeos & Playlists')}
+            description={t('youtube.helpDesc', 'Inspirado nas melhores práticas do YoutubePlaylistDownloader. Suporta download de playlists completas com organização automática em subpastas, embutimento de tags e capas em MP3/MP4.')}
+            sections={[
+              { title: t('youtube.helpSection1Title', 'Playlists & Canais'), content: t('youtube.helpSection1Content', 'Ao colar o link de uma playlist, você pode baixar todas as faixas organizadas com numeração (01 - Nome, 02 - Nome).') },
+              { title: t('youtube.helpSection2Title', 'Metadados Automáticos'), content: t('youtube.helpSection2Content', 'Embute nome da música, artista, álbum e capa de alta resolução diretamente nas tags do arquivo.') }
+            ]}
+            buttonLabel={t('youtube.guide', 'Guia')}
+          />
+        }
+      />
+
+      {/* URL */}
       <div className="flex gap-2">
         <div className="relative flex-1">
           <input
@@ -277,12 +278,12 @@ const YoutubeDownloader = () => {
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
             placeholder={t('youtube.placeholder', 'Cole o link do YouTube aqui (vídeo, Shorts ou playlist: https://www.youtube.com/playlist?list=...)')}
-            className="w-full bg-zinc-900 border border-zinc-800 focus:border-red-500/80 rounded-xl pl-4 pr-10 py-3.5 text-zinc-100 placeholder-zinc-500 text-sm focus:outline-none transition-colors shadow-inner"
+            className="dh-input w-full pr-20 select-text"
           />
           {url && (
             <button
               onClick={() => setUrl('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500 hover:text-zinc-300 px-1.5 py-0.5 rounded bg-zinc-800"
+              className="dh-btn dh-btn-ghost dh-btn-sm !h-6 absolute right-1 top-1/2 -translate-y-1/2"
             >
               {t('youtube.clear', 'Limpar')}
             </button>
@@ -291,74 +292,56 @@ const YoutubeDownloader = () => {
         <button
           onClick={handleSearch}
           disabled={isSearching || !url.trim()}
-          className="px-6 py-3.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-red-600/25 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          className={`dh-btn shrink-0 ${info ? '' : 'dh-btn-primary'}`}
         >
-          {isSearching ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+          {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
           <span>{isSearching ? t('youtube.analyzing', 'Analisando...') : t('youtube.search', 'Buscar')}</span>
         </button>
       </div>
 
-      {}
-      <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 transition-all">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ShieldCheck size={18} className="text-emerald-400" />
-            <span className="text-xs font-semibold text-zinc-300">
-              {t('youtube.antiBotActive', 'Anti-Bot Ativo')}
-            </span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-bold">
-              {t('youtube.multiClient', 'Multi-Client (iOS/Android/Web)')}
-            </span>
+      {/* Connection options */}
+      <section className="dh-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px]">
+            <ShieldCheck size={16} className="text-zinc-400" />
+            <span className="text-zinc-200 font-medium">{t('youtube.antiBotActive', 'Anti-Bot Ativo')}</span>
+            <span className="text-zinc-500">{t('youtube.multiClient', 'Multi-Client (iOS/Android/Web)')}</span>
             {cookiesPath && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20 font-bold">
-                {t('youtube.cookiesImported', 'Cookies Importados')}
-              </span>
+              <span className="text-zinc-400">· {t('youtube.cookiesImported', 'Cookies Importados')}</span>
             )}
           </div>
-          <button
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-xs text-zinc-400 hover:text-zinc-200 flex items-center gap-1 font-medium hover:underline"
-          >
-            <Sliders size={13} />
+          <button onClick={() => setShowAdvanced(!showAdvanced)} className="dh-btn dh-btn-ghost dh-btn-sm">
+            <Sliders size={14} />
             <span>{showAdvanced ? t('youtube.hideOptions', 'Ocultar Opções') : t('youtube.configureCookies', 'Configurar Cookies / Navegador')}</span>
           </button>
         </div>
 
         {showAdvanced && (
-          <div className="mt-4 pt-4 border-t border-zinc-800/80 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs animate-in fade-in">
-            <div className="p-3 bg-zinc-950 rounded-xl border border-zinc-800 space-y-2">
-              <span className="text-zinc-300 font-semibold block">{t('youtube.cookieFileTitle', 'Arquivo de Cookies (.txt)')}</span>
-              <p className="text-zinc-500 text-[11px]">
-                {t('youtube.cookieFileDesc', 'Importe cookies do youtube.com para acessar vídeos com restrição de idade ou membros.')}
-              </p>
+          <div className="mt-4 pt-4 border-t border-zinc-800/80 grid grid-cols-1 md:grid-cols-3 gap-6 animate-in">
+            <div className="space-y-2">
+              <h3 className="dh-label text-zinc-200">{t('youtube.cookieFileTitle', 'Arquivo de Cookies (.txt)')}</h3>
+              <p className="dh-help">{t('youtube.cookieFileDesc', 'Importe cookies do youtube.com para acessar vídeos com restrição de idade ou membros.')}</p>
               <div className="flex gap-2 pt-1">
-                <button
-                  onClick={handlePickCookies}
-                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg font-medium flex items-center gap-1.5 transition-colors"
-                >
+                <button onClick={handlePickCookies} className="dh-btn dh-btn-sm">
                   <Cookie size={14} />
                   <span>{t('youtube.importCookieBtn', 'Importar cookies.txt')}</span>
                 </button>
                 {cookiesPath && (
-                  <button
-                    onClick={handleClearCookies}
-                    className="px-2.5 py-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                  >
+                  <button onClick={handleClearCookies} className="dh-btn dh-btn-ghost dh-btn-sm">
                     {t('youtube.clear', 'Limpar')}
                   </button>
                 )}
               </div>
+              {cookiesPath && <p className="text-[11px] font-mono text-zinc-500 truncate select-text" title={cookiesPath}>{cookiesPath}</p>}
             </div>
 
-            <div className="p-3 bg-zinc-950 rounded-xl border border-zinc-800 space-y-2">
-              <span className="text-zinc-300 font-semibold block">{t('youtube.browserCookiesTitle', 'Ler Cookies do Navegador')}</span>
-              <p className="text-zinc-500 text-[11px]">
-                {t('youtube.browserCookiesDesc', 'Lê cookies diretamente do perfil do navegador instalado no Windows.')}
-              </p>
+            <div className="space-y-2">
+              <h3 className="dh-label text-zinc-200">{t('youtube.browserCookiesTitle', 'Ler Cookies do Navegador')}</h3>
+              <p className="dh-help">{t('youtube.browserCookiesDesc', 'Lê cookies diretamente do perfil do navegador instalado no Windows.')}</p>
               <select
                 value={cookiesFromBrowser}
                 onChange={(e) => handleChangeBrowserCookies(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-red-500"
+                className="dh-input w-full"
               >
                 <option value="">{t('youtube.browserDisabled', 'Desativado (Usar Anti-Bot Nativo)')}</option>
                 <option value="chrome">Google Chrome</option>
@@ -370,16 +353,14 @@ const YoutubeDownloader = () => {
               </select>
             </div>
 
-            <div className="p-3 bg-zinc-950 rounded-xl border border-zinc-800 space-y-2">
-              <span className="text-zinc-300 font-semibold block">{t('youtube.clientDelayTitle', 'Player Client & Delay')}</span>
-              <p className="text-zinc-500 text-[11px]">
-                {t('youtube.clientDelayDesc', 'Identificador de cliente enviado ao YouTube.')}
-              </p>
+            <div className="space-y-2">
+              <h3 className="dh-label text-zinc-200">{t('youtube.clientDelayTitle', 'Player Client & Delay')}</h3>
+              <p className="dh-help">{t('youtube.clientDelayDesc', 'Identificador de cliente enviado ao YouTube.')}</p>
               <div className="flex gap-2">
                 <select
                   value={client}
                   onChange={(e) => handleChangeClient(e.target.value)}
-                  className="flex-1 bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-red-500"
+                  className="dh-input flex-1 min-w-0"
                 >
                   <option value="android,web">{t('youtube.clientAuto', 'Automático (Multi-Client)')}</option>
                   <option value="android">{t('youtube.clientAndroid', 'Android (Leve)')}</option>
@@ -395,102 +376,86 @@ const YoutubeDownloader = () => {
                   onChange={(e) => handleChangeSleep(Number(e.target.value))}
                   placeholder={t('youtube.delayPlaceholder', 'Delay')}
                   title={t('youtube.delayTooltip', 'Delay entre requisições em segundos')}
-                  className="w-16 bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:border-red-500"
+                  className="dh-input w-16 text-center font-mono"
                 />
               </div>
             </div>
           </div>
         )}
-      </div>
+      </section>
 
-      {}
+      {/* Status */}
       {downloadStatus && (
-        <div className={`p-4 rounded-xl flex items-center space-x-3 text-sm font-medium ${
-          downloadStatus.ok
-            ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
-            : 'bg-rose-500/10 text-rose-300 border border-rose-500/20'
-        }`}>
-          {downloadStatus.ok ? <CheckCircle size={20} className="shrink-0 text-emerald-400" /> : <AlertCircle size={20} className="shrink-0 text-rose-400" />}
-          <span>{downloadStatus.msg}</span>
+        <div role="status" className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] ${downloadStatus.ok ? 'text-emerald-300' : 'text-red-300'}`}>
+          {downloadStatus.ok ? <CheckCircle size={14} className="shrink-0" /> : <AlertCircle size={14} className="shrink-0" />}
+          <span className="min-w-0">{downloadStatus.msg}</span>
+          {!downloadStatus.ok && !info && url.trim() && !isSearching && (
+            <button onClick={handleSearch} className="dh-btn dh-btn-ghost dh-btn-sm">{t('youtube.retry', 'Tentar novamente')}</button>
+          )}
         </div>
       )}
 
-      {}
+      {/* Progress */}
       {progress && (
-        <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/90 shadow-sm space-y-3 animate-fadeIn">
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2 min-w-0 flex-1 mr-3">
-              <Loader2 className="w-4 h-4 text-rose-500 animate-spin flex-shrink-0" />
-              <span className="font-semibold text-zinc-100 truncate">
+        <section className="dh-card p-4 space-y-3 animate-fadeIn">
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              {isDownloading && <Loader2 size={14} className="text-zinc-400 animate-spin shrink-0" />}
+              <span className="text-zinc-200 truncate">
                 {progress.line || t('youtube.downloading', 'Baixando...')}
               </span>
             </div>
-            <div className="flex items-center gap-3 font-mono flex-shrink-0">
-              {progress.speed && <span className="text-emerald-400 text-[11px]">{progress.speed}</span>}
-              {progress.eta && <span className="text-zinc-400 text-[11px]">ETA: {progress.eta}</span>}
-              <span className="text-rose-400 font-bold">{Math.round(progress.percent)}%</span>
-              <button
-                onClick={handleCancelDownload}
-                className="ml-2 px-2.5 py-1 bg-zinc-800 hover:bg-rose-950 text-rose-400 hover:text-rose-300 border border-zinc-700/60 hover:border-rose-500/40 rounded-lg text-xs font-semibold transition"
-              >
-                Parar / Cancelar
+            <div className="flex items-center gap-3 shrink-0 text-[11px] text-zinc-500">
+              {progress.speed && <span className="font-mono text-zinc-300">{progress.speed}</span>}
+              {progress.eta && <span>ETA <span className="font-mono text-zinc-300">{progress.eta}</span></span>}
+              <span className="font-mono text-zinc-100 text-xs">{Math.round(progress.percent)}<span className="text-zinc-500">%</span></span>
+              <button onClick={handleCancelDownload} className="dh-btn dh-btn-danger dh-btn-sm">
+                {t('youtube.cancelDownload', 'Parar / Cancelar')}
               </button>
             </div>
           </div>
-
-          <div className="h-2 w-full bg-zinc-950 rounded-full overflow-hidden border border-zinc-800/80">
+          <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-rose-600 rounded-full transition-all duration-300"
+              className="h-full bg-blue-400 rounded-full transition-[width] duration-200 ease-out"
               style={{ width: `${Math.max(2, progress.percent)}%` }}
             />
           </div>
-        </div>
+        </section>
       )}
 
-      {}
+      {/* Loading skeleton */}
+      {isSearching && !info && (
+        <section className="dh-card p-5 grid grid-cols-1 md:grid-cols-12 gap-6" aria-hidden>
+          <div className="md:col-span-4 aspect-video rounded-lg bg-zinc-900 animate-pulse" />
+          <div className="md:col-span-8 space-y-3">
+            <div className="h-4 w-3/4 rounded bg-zinc-900 animate-pulse" />
+            <div className="h-3 w-1/3 rounded bg-zinc-900 animate-pulse" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-3">
+              {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="h-12 rounded-lg bg-zinc-900 animate-pulse" />)}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Result */}
       {info && (
-        <div className="p-6 rounded-2xl border border-zinc-800 bg-zinc-900 space-y-6 animate-in fade-in">
-          {}
+        <section className="dh-card p-5 space-y-6 animate-in">
           {info.isPlaylist && (
-            <div className="p-4 rounded-xl bg-gradient-to-r from-red-950/50 to-purple-950/40 border border-red-500/30 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-red-500/20 rounded-xl text-red-400">
-                  <ListMusic size={24} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">
-                      {t('youtube.playlistDetected', 'Playlist Detectada')}
-                    </span>
-                    <span className="text-xs text-zinc-400">
-                      {info.itemCount} {t('youtube.tracksAvailable', 'faixas disponíveis')}
-                    </span>
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-zinc-800/80">
+              <div className="flex items-center gap-3 min-w-0">
+                <ListMusic size={18} className="text-zinc-400 shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-[11px] text-zinc-500">
+                    {t('youtube.playlistDetected', 'Playlist Detectada')} · <span className="font-mono text-zinc-300">{info.itemCount}</span> {t('youtube.tracksAvailable', 'faixas disponíveis')}
                   </div>
-                  <h3 className="text-base font-bold text-zinc-100 mt-0.5">
-                    {info.title}
-                  </h3>
+                  <h3 className="dh-section-title truncate mt-0.5">{info.title}</h3>
                 </div>
               </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setDownloadEntirePlaylist(true)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    downloadEntirePlaylist
-                      ? 'bg-red-600 text-white shadow'
-                      : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'
-                  }`}
-                >
-                  {t('youtube.downloadEntirePlaylist', 'Baixar Playlist Inteira')} ({info.itemCount})
+              <div className="flex items-center gap-1 p-0.5 rounded-lg border border-zinc-800">
+                <button onClick={() => setDownloadEntirePlaylist(true)} aria-pressed={downloadEntirePlaylist} className={segBtn(downloadEntirePlaylist)}>
+                  {t('youtube.downloadEntirePlaylist', 'Baixar Playlist Inteira')} (<span className="font-mono">{info.itemCount}</span>)
                 </button>
-                <button
-                  onClick={() => setDownloadEntirePlaylist(false)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    !downloadEntirePlaylist
-                      ? 'bg-red-600 text-white shadow'
-                      : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'
-                  }`}
-                >
+                <button onClick={() => setDownloadEntirePlaylist(false)} aria-pressed={!downloadEntirePlaylist} className={segBtn(!downloadEntirePlaylist)}>
                   {t('youtube.downloadFirstOnly', 'Apenas 1º Vídeo')}
                 </button>
               </div>
@@ -498,176 +463,81 @@ const YoutubeDownloader = () => {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-            {}
-            <div className="md:col-span-4 relative rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950 aspect-video flex items-center justify-center group">
+            <div className="md:col-span-4 relative rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950 aspect-video flex items-center justify-center">
               {info.thumbnail ? (
-                <img
-                  src={info.thumbnail}
-                  alt={info.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
+                <img src={info.thumbnail} alt={info.title} className="w-full h-full object-cover" />
               ) : (
                 <div className="flex flex-col items-center justify-center text-zinc-500">
-                  <ListMusic size={36} />
+                  <ListMusic size={20} />
                   <span className="text-xs mt-2">{t('youtube.playlistCover', 'Capa da Playlist')}</span>
                 </div>
               )}
               {info.duration > 0 && (
-                <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/80 backdrop-blur-sm text-white text-[11px] font-mono font-bold flex items-center gap-1">
+                <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-zinc-100 text-[11px] font-mono flex items-center gap-1">
                   <Clock size={11} />
                   {formatDuration(info.duration)}
                 </div>
               )}
             </div>
 
-            {}
-            <div className="md:col-span-8 flex flex-col justify-between space-y-4">
+            <div className="md:col-span-8 flex flex-col justify-between gap-4">
               <div>
-                <h2 className="text-lg font-bold text-zinc-100 line-clamp-2 leading-snug mb-1">
-                  {info.title}
-                </h2>
-                <div className="flex items-center gap-3 text-xs text-zinc-400">
-                  <span className="font-semibold text-zinc-300">{info.author}</span>
+                <h2 className="text-[15px] font-semibold text-zinc-100 line-clamp-2 leading-snug mb-1 select-text">{info.title}</h2>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+                  <span className="text-zinc-300">{info.author}</span>
                   {info.viewCount > 0 && (
                     <span className="flex items-center gap-1">
-                      <Eye size={13} />
-                      {info.viewCount.toLocaleString()} {t('youtube.views', 'visualizações')}
+                      <Eye size={14} />
+                      <span className="font-mono text-zinc-300">{info.viewCount.toLocaleString()}</span> {t('youtube.views', 'visualizações')}
                     </span>
                   )}
                   {info.isPlaylist && (
-                    <span className="text-red-400 font-semibold">
-                      {info.itemCount} {t('youtube.songsVideos', 'músicas / vídeos')}
-                    </span>
+                    <span><span className="font-mono text-zinc-300">{info.itemCount}</span> {t('youtube.songsVideos', 'músicas / vídeos')}</span>
                   )}
                 </div>
               </div>
 
-              {}
               <div className="space-y-2">
-                <span className="text-xs text-zinc-400 font-semibold block">{t('youtube.selectFormat', 'Selecione o Formato / Qualidade:')}</span>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {}
-                  <button
-                    onClick={() => setPreset('audio-mp3')}
-                    className={`p-2.5 rounded-xl border text-left transition-all ${
-                      preset === 'audio-mp3'
-                        ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm'
-                        : 'bg-zinc-950/70 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 font-bold text-xs">
-                      <Music size={13} className="text-blue-400" />
-                      {t('youtube.audioMp3', 'Áudio MP3 (320k)')}
-                    </div>
-                    <span className="text-[10px] text-zinc-500 block mt-0.5">{t('youtube.audioMp3Desc', 'Alta Fidelidade com Capa')}</span>
-                  </button>
-
-                  <button
-                    onClick={() => setPreset('audio-m4a')}
-                    className={`p-2.5 rounded-xl border text-left transition-all ${
-                      preset === 'audio-m4a'
-                        ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm'
-                        : 'bg-zinc-950/70 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 font-bold text-xs">
-                      <Music size={13} className="text-indigo-400" />
-                      {t('youtube.audioM4a', 'Áudio M4A / AAC')}
-                    </div>
-                    <span className="text-[10px] text-zinc-500 block mt-0.5">{t('youtube.audioM4aDesc', 'Áudio Nativo do YT')}</span>
-                  </button>
-
-                  <button
-                    onClick={() => setPreset('audio-wav')}
-                    className={`p-2.5 rounded-xl border text-left transition-all ${
-                      preset === 'audio-wav'
-                        ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm'
-                        : 'bg-zinc-950/70 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 font-bold text-xs">
-                      <Music size={13} className="text-purple-400" />
-                      {t('youtube.audioWav', 'Áudio WAV Lossless')}
-                    </div>
-                    <span className="text-[10px] text-zinc-500 block mt-0.5">{t('youtube.audioWavDesc', 'Estúdio Sem Perdas')}</span>
-                  </button>
-
-                  {}
-                  <button
-                    onClick={() => setPreset('video-1080p')}
-                    className={`p-2.5 rounded-xl border text-left transition-all ${
-                      preset === 'video-1080p'
-                        ? 'bg-red-600/20 border-red-500 text-white shadow-sm'
-                        : 'bg-zinc-950/70 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 font-bold text-xs">
-                      <Video size={13} className="text-red-400" />
-                      {t('youtube.video1080p', 'Vídeo 1080p MP4')}
-                    </div>
-                    <span className="text-[10px] text-zinc-500 block mt-0.5">{t('youtube.video1080pDesc', 'Full HD Recomendado')}</span>
-                  </button>
-
-                  <button
-                    onClick={() => setPreset('video-4k')}
-                    className={`p-2.5 rounded-xl border text-left transition-all ${
-                      preset === 'video-4k'
-                        ? 'bg-red-600/20 border-red-500 text-white shadow-sm'
-                        : 'bg-zinc-950/70 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 font-bold text-xs">
-                      <Sparkles size={13} className="text-amber-400" />
-                      {t('youtube.video4k', 'Vídeo 4K / 2K Max')}
-                    </div>
-                    <span className="text-[10px] text-zinc-500 block mt-0.5">{t('youtube.video4kDesc', 'Máxima Resolução')}</span>
-                  </button>
-
-                  <button
-                    onClick={() => setPreset('video-720p')}
-                    className={`p-2.5 rounded-xl border text-left transition-all ${
-                      preset === 'video-720p'
-                        ? 'bg-red-600/20 border-red-500 text-white shadow-sm'
-                        : 'bg-zinc-950/70 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 font-bold text-xs">
-                      <Video size={13} className="text-zinc-400" />
-                      {t('youtube.video720p', 'Vídeo 720p HD')}
-                    </div>
-                    <span className="text-[10px] text-zinc-500 block mt-0.5">{t('youtube.video720pDesc', 'Rápido e Leve')}</span>
-                  </button>
+                <span className="dh-label block">{t('youtube.selectFormat', 'Selecione o Formato / Qualidade:')}</span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" role="radiogroup">
+                  {presetOptions.map((o) => {
+                    const active = preset === o.id;
+                    return (
+                      <button
+                        key={o.id}
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => setPreset(o.id)}
+                        className={`px-3 py-2 rounded-lg border text-left transition-colors ${
+                          active ? 'border-blue-400/70 bg-zinc-800/60 text-zinc-50' : 'border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 text-xs font-medium">
+                          <span className={active ? 'text-blue-300' : 'text-zinc-500'}>{o.icon}</span>
+                          {o.label}
+                        </div>
+                        <span className="text-[11px] text-zinc-500 block mt-0.5">{o.desc}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {}
-              <div className="flex flex-wrap items-center gap-4 pt-2 text-xs text-zinc-400">
-                <label className="flex items-center gap-1.5 cursor-pointer hover:text-zinc-200 select-none">
-                  <input
-                    type="checkbox"
-                    checked={embedThumbnail}
-                    onChange={(e) => setEmbedThumbnail(e.target.checked)}
-                    className="rounded bg-zinc-800 border-zinc-700 text-red-600 focus:ring-0"
-                  />
-                  <ImageIcon size={13} className="text-blue-400" />
+              <div className="flex flex-wrap items-center gap-5 text-[12.5px] text-zinc-300">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={embedThumbnail} onChange={(e) => setEmbedThumbnail(e.target.checked)} />
+                  <ImageIcon size={14} className="text-zinc-500" />
                   <span>{t('youtube.embedThumbnail', 'Embutir Capa (Cover Art)')}</span>
                 </label>
-
-                <label className="flex items-center gap-1.5 cursor-pointer hover:text-zinc-200 select-none">
-                  <input
-                    type="checkbox"
-                    checked={embedMetadata}
-                    onChange={(e) => setEmbedMetadata(e.target.checked)}
-                    className="rounded bg-zinc-800 border-zinc-700 text-red-600 focus:ring-0"
-                  />
-                  <Tag size={13} className="text-emerald-400" />
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={embedMetadata} onChange={(e) => setEmbedMetadata(e.target.checked)} />
+                  <Tag size={14} className="text-zinc-500" />
                   <span>{t('youtube.embedMetadata', 'Embutir Tags ID3 (Artista/Álbum)')}</span>
                 </label>
               </div>
 
-              {}
-              <div className="flex items-center justify-between pt-2 border-t border-zinc-800/80">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-zinc-800/80">
+                <div className="flex items-center gap-2 min-w-0">
                   {!info.isPlaylist && videoFormats.length > 0 && (
                     <select
                       value={preset === 'custom' ? customFormatId : ''}
@@ -677,7 +547,7 @@ const YoutubeDownloader = () => {
                           setCustomFormatId(e.target.value);
                         }
                       }}
-                      className="bg-zinc-950 border border-zinc-800 text-zinc-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-red-500 max-w-xs truncate"
+                      className="dh-input max-w-xs truncate font-mono text-xs"
                     >
                       <option value="">{t('youtube.customFormatOption', 'Ou formato customizado...')}</option>
                       {videoFormats.map((f: any) => (
@@ -689,56 +559,44 @@ const YoutubeDownloader = () => {
                   )}
                 </div>
 
-                {}
                 <button
                   onClick={handleDownload}
-                  disabled={isDownloading}
-                  className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2 disabled:opacity-50 shrink-0"
+                  disabled={isDownloading || (preset === 'custom' && !customFormatId)}
+                  className="dh-btn dh-btn-primary shrink-0"
                 >
-                  {isDownloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                  {isDownloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                   <span>{isDownloading ? t('youtube.downloadingBtn', 'Baixando...') : (info.isPlaylist && downloadEntirePlaylist ? `${t('youtube.downloadPlaylistBtn', 'Baixar Playlist')} (${info.itemCount})` : t('youtube.downloadNow', 'Baixar Agora'))}</span>
                 </button>
               </div>
             </div>
           </div>
 
-          {}
           {info.isPlaylist && Array.isArray(info.entries) && info.entries.length > 0 && (
-            <div className="pt-4 border-t border-zinc-800 space-y-2">
-              <div className="flex items-center justify-between text-xs text-zinc-400 font-semibold">
-                <span className="flex items-center gap-1.5">
-                  <ListMusic size={14} className="text-red-400" />
-                  {t('youtube.playlistTracksList', 'Lista de Faixas na Playlist')} ({info.entries.length})
-                </span>
-                <span className="text-[11px] text-zinc-500">
-                  {t('youtube.subfolderNotice', 'Serão organizadas em subpasta dedicada')}
-                </span>
+            <div className="pt-5 border-t border-zinc-800/80 space-y-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="dh-section-title">
+                  {t('youtube.playlistTracksList', 'Lista de Faixas na Playlist')} <span className="font-mono text-zinc-500 font-normal">{info.entries.length}</span>
+                </h3>
+                <span className="dh-help">{t('youtube.subfolderNotice', 'Serão organizadas em subpasta dedicada')}</span>
               </div>
-              <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar rounded-xl bg-zinc-950/80 p-2 border border-zinc-800/80">
+              <div className="max-h-56 overflow-y-auto custom-scrollbar divide-y divide-zinc-800/80 border-y border-zinc-800/80">
                 {info.entries.map((entry: any, idx: number) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/60 border border-zinc-800/40 text-xs"
-                  >
-                    <div className="flex items-center gap-2 min-w-0 pr-2">
-                      <span className="font-mono text-zinc-500 text-[10px] w-5 text-right font-bold">
+                  <div key={idx} className="flex items-center justify-between gap-3 py-2 pr-1 text-xs">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="font-mono text-zinc-500 text-[11px] w-5 text-right shrink-0">
                         {String(idx + 1).padStart(2, '0')}
                       </span>
-                      <span className="text-zinc-200 font-medium truncate">
-                        {entry.title}
-                      </span>
+                      <span className="text-zinc-200 truncate">{entry.title}</span>
                     </div>
                     {entry.duration > 0 && (
-                      <span className="font-mono text-zinc-500 text-[11px] shrink-0">
-                        {formatDuration(entry.duration)}
-                      </span>
+                      <span className="font-mono text-zinc-500 text-[11px] shrink-0">{formatDuration(entry.duration)}</span>
                     )}
                   </div>
                 ))}
               </div>
             </div>
           )}
-        </div>
+        </section>
       )}
     </div>
   );

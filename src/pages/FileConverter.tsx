@@ -5,19 +5,16 @@ import {
   Music,
   Video,
   Archive,
-  FileCode,
   ArrowRight,
   CheckCircle2,
   AlertCircle,
   FolderOpen,
   Trash2,
-  Layers,
-  RefreshCw,
-  Sliders,
-  Sparkles
-} from 'lucide-react';
+  RefreshCw
+} from '../components/icons';
 import { useI18n } from '../i18n/I18nProvider';
 import { HelpTip } from '../components/HelpTip';
+import PageHeader from '../components/ui/PageHeader';
 
 type ConvertCategory = 'image' | 'audio' | 'video' | 'document' | 'archive';
 
@@ -171,7 +168,7 @@ const FileConverter = () => {
             inputFiles,
             extractDir: outputDir
           });
-          setResults([{ inputFile: inputFiles[0], outputFile: outputDir, ok: res?.ok }]);
+          setResults([{ inputFile: inputFiles[0], outputFile: outputDir, ok: res?.ok, error: res?.error }]);
         } else {
           const archiveOut = `${outputDir}\\DarkHub_Archive_${Date.now()}.${targetFormat === 'tar.gz' ? 'tar.gz' : 'zip'}`;
           const res = await window.darkhub.files.archiveOperation({
@@ -179,7 +176,7 @@ const FileConverter = () => {
             inputFiles,
             outputArchive: archiveOut
           });
-          setResults([{ inputFile: `${inputFiles.length} arquivos`, outputFile: archiveOut, ok: res?.ok }]);
+          setResults([{ inputFile: `${inputFiles.length} arquivos`, outputFile: archiveOut, ok: res?.ok, error: res?.error }]);
         }
       } else if (category === 'image') {
         const res = await window.darkhub.files.convertImages({
@@ -228,158 +225,117 @@ const FileConverter = () => {
     return FORMAT_MAP[category] || [];
   }, [category]);
 
+  const categories: { id: ConvertCategory; fmt: string; icon: React.ReactNode; label: string }[] = [
+    { id: 'image', fmt: 'png', icon: <ImageIcon size={16} />, label: 'Imagens' },
+    { id: 'audio', fmt: 'mp3', icon: <Music size={16} />, label: 'Áudio' },
+    { id: 'video', fmt: 'mp4', icon: <Video size={16} />, label: 'Vídeo & GIF' },
+    { id: 'document', fmt: 'txt', icon: <FileText size={16} />, label: 'Documentos' },
+    { id: 'archive', fmt: 'zip', icon: <Archive size={16} />, label: 'Compactador' }
+  ];
+
+  const chip = (active: boolean) =>
+    `h-7 text-xs font-mono rounded-md border transition-colors ${
+      active ? 'border-blue-400/70 bg-zinc-800/60 text-zinc-50' : 'border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+    }`;
+
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-12">
-      {}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-            <RefreshCw className="text-blue-400" size={28} />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-zinc-100 flex items-center gap-2">
-              Conversor Universal de Arquivos
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                Multi-Engine
-              </span>
-            </h1>
-            <p className="text-zinc-400 text-sm mt-1">
-              Converta imagens, vídeos, áudios, documentos e compacte arquivos com máxima fidelidade e processamento paralelo multithread.
-            </p>
-          </div>
-        </div>
-        <HelpTip
-          title="Conversor Universal"
-          description="Converta múltiplos arquivos em lote. Suporta conversão cruzada de vídeo para áudio, criação de ícones ICO, extração de texto de PDF e compactação nativa."
-          sections={[
-            { title: "Multithread", content: "Imagens e mídias utilizam todos os núcleos da CPU simultaneamente." },
-            { title: "Vídeo para GIF", content: "Cria GIFs de alta resolução com paleta dinâmica calculada." }
-          ]}
-          buttonLabel="Guia"
-        />
+    <div className="w-full space-y-6 pb-12">
+      <PageHeader
+        title="Conversor Universal de Arquivos"
+        subtitle="Converta imagens, vídeos, áudios, documentos e compacte arquivos com máxima fidelidade e processamento paralelo multithread."
+        actions={
+          <HelpTip
+            title="Conversor Universal"
+            description="Converta múltiplos arquivos em lote. Suporta conversão cruzada de vídeo para áudio, criação de ícones ICO, extração de texto de PDF e compactação nativa."
+            sections={[
+              { title: "Multithread", content: "Imagens e mídias utilizam todos os núcleos da CPU simultaneamente." },
+              { title: "Vídeo para GIF", content: "Cria GIFs de alta resolução com paleta dinâmica calculada." }
+            ]}
+            buttonLabel="Guia"
+          />
+        }
+      />
+
+      {/* Category */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-1 p-1 rounded-lg border border-zinc-800" role="tablist">
+        {categories.map((c) => {
+          const active = category === c.id;
+          return (
+            <button
+              key={c.id}
+              role="tab"
+              aria-selected={active}
+              onClick={() => { setCategory(c.id); setTargetFormat(c.fmt); }}
+              className={`flex items-center justify-center gap-2 h-8 px-3 rounded-md text-[12.5px] font-medium transition-colors ${
+                active ? 'bg-zinc-800 text-zinc-50' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+              }`}
+            >
+              <span className={active ? 'text-blue-300' : 'text-zinc-500'}>{c.icon}</span>
+              <span>{c.label}</span>
+            </button>
+          );
+        })}
       </div>
 
-      {}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-zinc-900/70 p-1.5 rounded-xl border border-zinc-800">
-        <button
-          onClick={() => { setCategory('image'); setTargetFormat('png'); }}
-          className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium text-sm transition-all ${category === 'image' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'}`}
-        >
-          <ImageIcon size={16} />
-          <span>Imagens</span>
-        </button>
-        <button
-          onClick={() => { setCategory('audio'); setTargetFormat('mp3'); }}
-          className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium text-sm transition-all ${category === 'audio' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'}`}
-        >
-          <Music size={16} />
-          <span>Áudio</span>
-        </button>
-        <button
-          onClick={() => { setCategory('video'); setTargetFormat('mp4'); }}
-          className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium text-sm transition-all ${category === 'video' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'}`}
-        >
-          <Video size={16} />
-          <span>Vídeo & GIF</span>
-        </button>
-        <button
-          onClick={() => { setCategory('document'); setTargetFormat('txt'); }}
-          className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium text-sm transition-all ${category === 'document' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'}`}
-        >
-          <FileText size={16} />
-          <span>Documentos</span>
-        </button>
-        <button
-          onClick={() => { setCategory('archive'); setTargetFormat('zip'); }}
-          className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium text-sm transition-all ${category === 'archive' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'}`}
-        >
-          <Archive size={16} />
-          <span>Compactador</span>
-        </button>
-      </div>
-
-      {}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {}
+        {/* Input */}
         <div className="lg:col-span-7 space-y-4">
           <div
-            className="p-8 rounded-2xl border-2 border-dashed border-zinc-700/80 hover:border-blue-500/60 bg-zinc-900/40 hover:bg-zinc-900/80 transition-all flex flex-col items-center justify-center text-center cursor-pointer group"
+            role="button"
+            tabIndex={0}
+            className="px-6 py-8 rounded-xl border border-dashed border-zinc-800 hover:border-zinc-700 transition-colors flex flex-col items-center justify-center text-center gap-3 cursor-pointer"
             onClick={handlePickFiles}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePickFiles(); } }}
             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
             onDrop={async (e) => {
               e.preventDefault();
               e.stopPropagation();
-              const files = Array.from(e.dataTransfer.files ?? []);
-              const paths = files.map((f: any) => f?.path).filter(Boolean);
-              if (paths.length) {
-                await window.darkhub?.dialog?.grantDroppedFiles?.(paths);
-                applyFiles(paths);
-              }
+              const res = await window.darkhub?.dialog?.grantDroppedFiles?.(e.dataTransfer.files);
+              if (res?.granted?.length) applyFiles(res.granted);
             }}
           >
-            <div className="p-4 bg-zinc-800/80 group-hover:bg-blue-600/20 group-hover:scale-110 rounded-2xl mb-4 transition-all border border-zinc-700/50 group-hover:border-blue-500/40">
-              <FileCode size={36} className="text-zinc-400 group-hover:text-blue-400 transition-colors" />
-            </div>
-            <h3 className="text-lg font-semibold text-zinc-100 mb-1">
-              Arraste e solte arquivos aqui
-            </h3>
-            <p className="text-zinc-400 text-xs max-w-sm mb-4">
-              Suporta múltiplos arquivos simultâneos. Imagens, vídeos, áudios, documentos e arquivos compactados.
+            <p className="text-[12.5px] text-zinc-400">
+              Arraste e solte arquivos aqui: imagens, vídeos, áudios, documentos ou compactados.
             </p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold shadow transition-colors flex items-center gap-1.5"
-              >
-                <FolderOpen size={14} />
-                Selecionar Arquivos
-              </button>
-            </div>
+            <button type="button" className="dh-btn dh-btn-sm">
+              <FolderOpen size={14} />
+              Selecionar Arquivos
+            </button>
           </div>
 
-          {}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2">
-              <div className="flex items-center gap-2">
-                <Layers size={16} className="text-blue-400" />
-                <span className="text-sm font-semibold text-zinc-200">
-                  Fila de Arquivos ({inputFiles.length})
-                </span>
-              </div>
+          <section className="dh-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="dh-section-title">
+                Fila de Arquivos <span className="font-mono text-zinc-500 font-normal">{inputFiles.length}</span>
+              </h2>
               {inputFiles.length > 0 && (
-                <button
-                  onClick={clearQueue}
-                  className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 hover:underline"
-                >
-                  <Trash2 size={13} />
+                <button onClick={clearQueue} className="dh-btn dh-btn-ghost dh-btn-sm hover:!text-red-300">
+                  <Trash2 size={14} />
                   Limpar Fila
                 </button>
               )}
             </div>
 
             {inputFiles.length === 0 ? (
-              <div className="py-8 text-center text-xs text-zinc-500 font-mono">
+              <p className="py-6 text-center text-[12.5px] text-zinc-500">
                 Nenhum arquivo adicionado ainda.
-              </div>
+              </p>
             ) : (
-              <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+              <div className="max-h-56 overflow-y-auto custom-scrollbar divide-y divide-zinc-800/80 border-y border-zinc-800/80">
                 {inputFiles.map((file, idx) => {
                   const filename = file.split(/[\\/]/).pop();
-                  const ext = filename?.split('.').pop()?.toUpperCase();
+                  const ext = filename?.split('.').pop()?.toLowerCase();
                   return (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800/80 hover:border-zinc-700 transition-colors text-xs"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                        <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[10px] font-bold shrink-0">
-                          {ext}
-                        </span>
-                        <span className="text-zinc-200 truncate font-medium">{filename}</span>
+                    <div key={idx} className="flex items-center justify-between gap-3 py-2 text-xs">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="dh-tag w-10 shrink-0">{ext}</span>
+                        <span className="text-zinc-200 truncate select-text" title={file}>{filename}</span>
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); removeFile(idx); }}
-                        className="text-zinc-500 hover:text-rose-400 p-1 rounded-lg hover:bg-rose-500/10 transition-colors shrink-0"
+                        aria-label="Remover"
+                        title="Remover"
+                        className="dh-btn dh-btn-ghost dh-btn-sm !px-1.5 hover:!text-red-300 shrink-0"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -389,107 +345,84 @@ const FileConverter = () => {
               </div>
             )}
 
-            {}
-            <div className="pt-2 border-t border-zinc-800 flex items-center justify-between gap-3 text-xs">
+            <div className="pt-1 flex items-end justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <span className="text-zinc-500 block mb-0.5">Pasta de Destino:</span>
-                <span className="text-zinc-300 font-mono truncate block bg-zinc-950 px-2.5 py-1.5 rounded-lg border border-zinc-800/80">
+                <span className="dh-label block mb-1">Pasta de Destino:</span>
+                <span className={`font-mono text-xs truncate block select-text ${outputDir ? 'text-zinc-300' : 'text-zinc-500'}`} title={outputDir || undefined}>
                   {outputDir || 'Nenhuma pasta selecionada (clique ao lado)'}
                 </span>
               </div>
-              <button
-                onClick={handlePickOutputDir}
-                className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg font-medium text-xs border border-zinc-700 transition-colors shrink-0 mt-3"
-              >
+              <button onClick={handlePickOutputDir} className="dh-btn dh-btn-sm shrink-0">
+                <FolderOpen size={14} />
                 Alterar Pasta
               </button>
             </div>
-          </div>
+          </section>
         </div>
 
-        {}
-        <div className="lg:col-span-5 space-y-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
+        {/* Output */}
+        <div className="lg:col-span-5">
+          <section className="dh-card p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-zinc-200 flex items-center gap-2">
-                <Sparkles size={16} className="text-blue-400" />
-                Formato de Saída
-              </h3>
-              <span className="text-xs text-zinc-500 font-mono uppercase">
-                {category}
-              </span>
+              <h2 className="dh-section-title">Formato de Saída</h2>
+              <span className="dh-tag">{category}</span>
             </div>
 
-            {}
-            <div className="grid grid-cols-1 gap-2 max-h-72 overflow-y-auto pr-1 custom-scrollbar">
+            <div className="max-h-72 overflow-y-auto pr-1 custom-scrollbar space-y-1" role="radiogroup">
               {currentFormats.map((fmt) => {
                 const isSelected = targetFormat === fmt.ext;
                 return (
                   <button
                     key={fmt.ext}
+                    role="radio"
+                    aria-checked={isSelected}
                     onClick={() => setTargetFormat(fmt.ext)}
-                    className={`flex items-center justify-between p-3 rounded-xl border text-left transition-all ${
+                    className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border text-left transition-colors ${
                       isSelected
-                        ? 'bg-blue-600/15 border-blue-500 text-white shadow-sm'
-                        : 'bg-zinc-950/60 border-zinc-800/80 hover:border-zinc-700 text-zinc-300'
+                        ? 'border-blue-400/70 bg-zinc-800/60 text-zinc-50'
+                        : 'border-transparent hover:border-zinc-800 hover:bg-zinc-900 text-zinc-300'
                     }`}
                   >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm">{fmt.name}</span>
-                        {fmt.tag && (
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
-                            isSelected ? 'bg-blue-500/30 text-blue-200' : 'bg-zinc-800 text-zinc-400'
-                          }`}>
-                            {fmt.tag}
-                          </span>
-                        )}
+                    <div className="min-w-0">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-[13px] font-medium">{fmt.name}</span>
+                        {fmt.tag && <span className="dh-tag">{fmt.tag}</span>}
                       </div>
                       <p className="text-xs text-zinc-500 mt-0.5">{fmt.desc}</p>
                     </div>
-                    {isSelected && <CheckCircle2 size={18} className="text-blue-400 shrink-0 ml-2" />}
+                    {isSelected && <CheckCircle2 size={16} className="text-blue-300 shrink-0" />}
                   </button>
                 );
               })}
             </div>
 
-            {}
             {category === 'image' && ['jpg', 'webp', 'avif', 'tiff'].includes(targetFormat) && (
-              <div className="p-3 bg-zinc-950/80 rounded-xl border border-zinc-800/80 space-y-2">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-zinc-400 flex items-center gap-1.5 font-medium">
-                    <Sliders size={13} /> Qualidade de Imagem
-                  </span>
-                  <span className="font-mono text-blue-400 font-bold">{quality}%</span>
+              <div className="pt-4 border-t border-zinc-800/80 space-y-2">
+                <div className="flex justify-between items-center">
+                  <label htmlFor="fc-quality" className="dh-label">Qualidade de Imagem</label>
+                  <span className="font-mono text-xs text-zinc-100">{quality}<span className="text-zinc-500">%</span></span>
                 </div>
                 <input
+                  id="fc-quality"
                   type="range"
                   min="20"
                   max="100"
                   value={quality}
                   onChange={(e) => setQuality(Number(e.target.value))}
-                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                  className="w-full"
                 />
               </div>
             )}
 
             {category === 'audio' && ['mp3', 'aac', 'm4a', 'opus'].includes(targetFormat) && (
-              <div className="p-3 bg-zinc-950/80 rounded-xl border border-zinc-800/80 space-y-2">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-zinc-400 font-medium">Bitrate de Áudio</span>
-                  <span className="font-mono text-blue-400 font-bold">{audioBitrate}</span>
+              <div className="pt-4 border-t border-zinc-800/80 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="dh-label">Bitrate de Áudio</span>
+                  <span className="font-mono text-xs text-zinc-100">{audioBitrate.replace('k', '')}<span className="text-zinc-500">k</span></span>
                 </div>
                 <div className="grid grid-cols-4 gap-1.5">
                   {['128k', '192k', '256k', '320k'].map((br) => (
-                    <button
-                      key={br}
-                      onClick={() => setAudioBitrate(br)}
-                      className={`py-1 text-xs font-mono rounded-lg border transition-all ${
-                        audioBitrate === br
-                          ? 'bg-blue-600 text-white border-blue-500'
-                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                      }`}
-                    >
+                    <button key={br} onClick={() => setAudioBitrate(br)} aria-pressed={audioBitrate === br} className={chip(audioBitrate === br)}>
                       {br}
                     </button>
                   ))}
@@ -498,99 +431,106 @@ const FileConverter = () => {
             )}
 
             {category === 'video' && targetFormat === 'gif' && (
-              <div className="p-3 bg-zinc-950/80 rounded-xl border border-zinc-800/80 space-y-2">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-zinc-400 font-medium">Taxa de Quadros (GIF FPS)</span>
-                  <span className="font-mono text-blue-400 font-bold">{gifFps} FPS</span>
+              <div className="pt-4 border-t border-zinc-800/80 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="dh-label">Taxa de Quadros (GIF FPS)</span>
+                  <span className="font-mono text-xs text-zinc-100">{gifFps}<span className="text-zinc-500"> FPS</span></span>
                 </div>
                 <div className="grid grid-cols-4 gap-1.5">
                   {[10, 15, 20, 24].map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setGifFps(f)}
-                      className={`py-1 text-xs font-mono rounded-lg border transition-all ${
-                        gifFps === f
-                          ? 'bg-blue-600 text-white border-blue-500'
-                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                      }`}
-                    >
-                      {f} FPS
+                    <button key={f} onClick={() => setGifFps(f)} aria-pressed={gifFps === f} className={chip(gifFps === f)}>
+                      {f} <span className="text-zinc-500">FPS</span>
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            {}
             <button
               onClick={handleConvert}
               disabled={isConverting || !inputFiles.length}
-              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className="dh-btn dh-btn-primary w-full"
             >
               {isConverting ? (
                 <>
-                  <RefreshCw className="animate-spin" size={18} />
-                  <span>Convertendo {inputFiles.length} arquivo(s)...</span>
+                  <RefreshCw className="animate-spin" size={14} />
+                  <span>Convertendo <span className="font-mono">{inputFiles.length}</span> arquivo(s)...</span>
                 </>
               ) : (
                 <>
                   <span>Converter Agora</span>
-                  <ArrowRight size={18} />
+                  <ArrowRight size={14} />
                 </>
               )}
             </button>
-          </div>
+          </section>
         </div>
       </div>
 
-      {}
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm flex items-center gap-3">
-          <AlertCircle size={20} className="shrink-0 text-rose-400" />
-          <span>{error}</span>
+        <div role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-red-300">
+          <AlertCircle size={14} className="shrink-0" />
+          <span className="min-w-0">{error}</span>
+          {inputFiles.length > 0 && outputDir && !isConverting && (
+            <button onClick={handleConvert} className="dh-btn dh-btn-ghost dh-btn-sm">Tentar novamente</button>
+          )}
         </div>
       )}
 
+      {isConverting && (
+        <section className="space-y-3" aria-hidden>
+          <div className="h-3.5 w-48 rounded bg-zinc-900 animate-pulse" />
+          <div className="divide-y divide-zinc-800/80 border-y border-zinc-800/80">
+            {Array.from({ length: Math.min(Math.max(inputFiles.length, 1), 4) }).map((_, i) => (
+              <div key={i} className="py-3 flex items-center justify-between gap-4">
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 w-1/3 rounded bg-zinc-900 animate-pulse" />
+                  <div className="h-2.5 w-1/2 rounded bg-zinc-900 animate-pulse" />
+                </div>
+                <div className="h-3 w-14 rounded bg-zinc-900 animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {results && results.length > 0 && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-zinc-200 flex items-center gap-2">
-              <CheckCircle2 size={16} className="text-emerald-400" />
-              Resultado da Conversão ({results.filter(r => r.ok).length} de {results.length} concluídos)
-            </h3>
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="dh-section-title">
+              Resultado da Conversão{' '}
+              <span className="font-normal text-zinc-500">
+                (<span className="font-mono text-zinc-300">{results.filter(r => r.ok).length}</span> de <span className="font-mono text-zinc-300">{results.length}</span> concluídos)
+              </span>
+            </h2>
             {outputDir && (
-              <span className="text-xs text-zinc-500 font-mono">
-                Salvo em: {outputDir}
+              <span className="text-xs text-zinc-500 truncate max-w-full">
+                Salvo em: <span className="font-mono select-text">{outputDir}</span>
               </span>
             )}
           </div>
 
-          <div className="divide-y divide-zinc-800/60 max-h-60 overflow-y-auto custom-scrollbar border border-zinc-800/80 rounded-xl bg-zinc-950">
+          <div className="divide-y divide-zinc-800/80 max-h-60 overflow-y-auto custom-scrollbar border-y border-zinc-800/80">
             {results.map((r, i) => (
-              <div key={i} className="p-3 text-xs flex items-center justify-between gap-4">
+              <div key={i} className="py-2.5 text-xs flex items-center justify-between gap-4">
                 <div className="min-w-0 flex-1">
-                  <div className="text-zinc-200 font-medium truncate">{r.inputFile}</div>
-                  <div className="text-zinc-500 truncate font-mono text-[11px] mt-0.5">{r.outputFile}</div>
+                  <div className="text-zinc-200 truncate select-text">{r.inputFile}</div>
+                  <div className="text-zinc-500 truncate font-mono text-[11px] mt-0.5 select-text">{r.outputFile}</div>
                 </div>
-                <div className="shrink-0">
+                <div className="shrink-0 max-w-[45%] text-right">
                   {r.ok ? (
-                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold text-[11px]">
-                      Sucesso
-                    </span>
+                    <span className="text-emerald-300 text-[11px]">Sucesso</span>
                   ) : (
-                    <span className="px-2.5 py-1 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30 font-semibold text-[11px]">
-                      {r.error || 'Erro'}
-                    </span>
+                    <span className="text-red-300 text-[11px] break-words">{r.error || 'Erro'}</span>
                   )}
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
     </div>
   );
 };
 
 export default FileConverter;
-

@@ -46,6 +46,7 @@ class FramePacerEngine extends EventEmitter {
     this.isRunning = true
     this.targetFps = Number(targetFps) || 144
     this.pacingMode = pacingMode || 'flatline'
+    this._crashTimes = []
 
     Logger.info('FramePacerEngine', `Iniciando motor nativo C# - Alvo: ${this.targetFps} FPS, Modo: ${this.pacingMode}`)
 
@@ -143,6 +144,9 @@ class FramePacerEngine extends EventEmitter {
         stdio: ['pipe', 'pipe', 'pipe']
       })
       this._nativeProcess = proc
+      registerExitKill(this)
+      // EPIPE when the limiter dies between writes must not crash main.
+      proc.stdin?.on('error', () => {})
 
       let buffer = ''
 
@@ -176,6 +180,15 @@ class FramePacerEngine extends EventEmitter {
         if (this._nativeProcess === proc) this._nativeProcess = null
         if (proc._intentionalStop) return
         if (this.isRunning) {
+          // Back off on crash loops (missing runtime, AV quarantine) instead of
+          // respawning every 2 s forever.
+          const nowTs = Date.now()
+          this._crashTimes = (this._crashTimes || []).filter((t) => nowTs - t < 60_000)
+          this._crashTimes.push(nowTs)
+          if (this._crashTimes.length > 5) {
+            Logger.error('FramePacerEngine', 'Processo nativo caiu repetidamente; respawn suspenso.')
+            return
+          }
           setTimeout(() => {
             if (this.isRunning && !this._nativeProcess) this._spawnNativeProcess()
           }, 2000)
@@ -184,6 +197,7 @@ class FramePacerEngine extends EventEmitter {
 
       proc.on('error', (err) => {
         Logger.error('FramePacerEngine', `Falha ao iniciar processo nativo: ${err.message}`)
+        if (this._nativeProcess === proc) this._nativeProcess = null
       })
     } catch (err) {
       Logger.error('FramePacerEngine', `Exceção ao spawnar processo nativo: ${err.message}`)
@@ -205,6 +219,26 @@ class FramePacerEngine extends EventEmitter {
     }, 500)
     proc.once?.('exit', () => clearTimeout(timer))
   }
+
+  /** Synchronous hard kill for process 'exit' (no time for the STOP handshake). */
+  _killSync() {
+    const proc = this._nativeProcess
+    this._nativeProcess = null
+    this.isRunning = false
+    if (proc && proc.exitCode === null && !proc.killed) {
+      proc._intentionalStop = true
+      try { proc.kill() } catch {}
+    }
+  }
+}
+
+let exitKillRegistered = false
+function registerExitKill(engine) {
+  if (exitKillRegistered) return
+  exitKillRegistered = true
+  // Windows does not kill children with the parent; avoid an orphaned limiter
+  // that keeps capping FPS after DarkHub quits or crashes.
+  process.once('exit', () => engine._killSync())
 }
 
 export default new FramePacerEngine()

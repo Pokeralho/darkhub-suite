@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { APP_VERSION_LABEL } from '../appVersion';
 import { visibleInterval } from '../utils/visibleInterval';
-import { Bug, Loader2, ShieldCheck, Activity, Save, AppWindow, RefreshCw, Power, Globe, Download, Upload, CheckCircle2, AlertTriangle, FileCode } from 'lucide-react'
+import { Loader2, ShieldCheck, Save, RefreshCw, Download, CheckCircle2, AlertTriangle, FileCode } from '../components/icons'
+import PageHeader from '../components/ui/PageHeader'
 import { useI18n } from '../i18n/I18nProvider'
 import type { SupportedLang } from '../i18n/messages'
-import { HelpTip } from '../components/HelpTip'
 
 export default function SettingsPage() {
   const { lang, setLang, t, languages, customLanguages, importCustomTranslation } = useI18n()
@@ -151,391 +151,312 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-4 w-full max-w-6xl mx-auto p-1 md:p-2 animate-fadeIn">
-      <div className="pb-3 border-b border-zinc-800/80 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-zinc-100 tracking-tight">{t('settings.title')}</h1>
-          <p className="text-xs text-zinc-400">{t('settings.subtitle')}</p>
-        </div>
-      </div>
+    <div className="w-full max-w-4xl space-y-8">
+      <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
 
-      {}
-      <div className="p-4 rounded-lg border border-zinc-800 bg-zinc-900 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-blue-500/10 text-blue-400 rounded-md shrink-0">
-              <Globe size={16} />
-            </div>
-            <div>
-              <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">{t('settings.language')}</h2>
-              <p className="text-xs text-zinc-500">{t('settings.languageHint')}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <select
-              value={lang}
-              onChange={(e) => setLang(e.target.value)}
-              className="bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs rounded-md px-3 py-1.5 focus:outline-none focus:border-zinc-700 font-medium"
-            >
-              <optgroup label="Idiomas Oficiais">
-                {languages?.map((l) => (
-                  <option key={l.code} value={l.code}>
-                    {l.flag} {l.nativeName} ({l.code})
-                  </option>
-                ))}
-              </optgroup>
-              {customLanguages && customLanguages.length > 0 && (
-                <optgroup label="Traduções da Comunidade">
-                  {customLanguages.map((cl) => (
-                    <option key={cl.code} value={cl.code}>
-                      🌐 {cl.label} ({cl.code})
+      <SettingsGroup title={t('settings.general', 'Geral')}>
+        <SettingRow
+          label={t('settings.language')}
+          description={t('settings.languageHint')}
+          control={
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <select
+                value={lang}
+                onChange={(e) => setLang(e.target.value)}
+                className="dh-input w-56"
+                aria-label={t('settings.language')}
+              >
+                <optgroup label="Idiomas oficiais">
+                  {languages?.map((l) => (
+                    <option key={l.code} value={l.code}>
+                      {l.nativeName} ({l.code})
                     </option>
                   ))}
                 </optgroup>
-              )}
-            </select>
-
-            <button
-              type="button"
-              onClick={() => setShowTranslateModal(!showTranslateModal)}
-              className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors"
-            >
-              <FileCode size={13} /> {showTranslateModal ? 'Fechar Tradutor' : 'Colaborar / Importar'}
-            </button>
-          </div>
-        </div>
-
-        {}
-        {showTranslateModal && (
-          <div className="p-4 bg-zinc-950 rounded-lg border border-zinc-800 space-y-4 pt-3 mt-2 animate-fadeIn">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-850 pb-2">
-              <div>
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <Upload size={14} className="text-blue-400" />
-                  Importar ou Criar Tradução da Comunidade
-                </h3>
-                <p className="text-[11px] text-zinc-400">
-                  Contribua traduzindo o DarkHub Suite para qualquer idioma usando arquivos JSON padronizados.
-                </p>
-              </div>
-
+                {customLanguages && customLanguages.length > 0 && (
+                  <optgroup label="Traduções da comunidade">
+                    {customLanguages.map((cl) => (
+                      <option key={cl.code} value={cl.code}>
+                        {cl.label} ({cl.code})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
               <button
                 type="button"
-                onClick={() => {
-                  try {
-                    import('../i18n/messages').then((m) => {
-                      const template = m.getTranslationTemplate ? m.getTranslationTemplate() : '{}';
-                      const blob = new Blob([template], { type: 'application/json' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = 'darkhub-i18n-template.json';
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    });
-                  } catch {}
-                }}
-                className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded text-xs font-semibold flex items-center gap-1 self-start sm:self-auto"
+                onClick={() => setShowTranslateModal(!showTranslateModal)}
+                aria-expanded={showTranslateModal}
+                className="dh-btn dh-btn-ghost"
               >
-                <Download size={12} /> Baixar Modelo JSON Completo
+                <FileCode size={14} /> {showTranslateModal ? 'Fechar tradutor' : 'Colaborar / importar'}
               </button>
             </div>
-
-            {translateMsg && (
-              <div className={`p-2.5 rounded text-xs font-medium flex items-center gap-2 border ${
-                translateMsg.ok ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/10 text-rose-300 border-rose-500/30'
-              }`}>
-                {translateMsg.ok ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
-                <span>{translateMsg.msg}</span>
+          }
+        >
+          {showTranslateModal && (
+            <div className="mt-4 rounded-lg border border-zinc-800/80 bg-zinc-950/60 p-4 space-y-4 animate-in">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div>
+                  <h3 className="dh-section-title">Importar ou criar tradução da comunidade</h3>
+                  <p className="dh-help mt-0.5 max-w-[60ch]">
+                    Contribua traduzindo o DarkHub Suite para qualquer idioma usando arquivos JSON padronizados.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      import('../i18n/messages').then((m) => {
+                        const template = m.getTranslationTemplate ? m.getTranslationTemplate() : '{}';
+                        const blob = new Blob([template], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'darkhub-i18n-template.json';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      });
+                    } catch {}
+                  }}
+                  className="dh-btn dh-btn-sm shrink-0 self-start"
+                >
+                  <Download size={14} /> Baixar modelo JSON
+                </button>
               </div>
-            )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="custom-lang-code" className="dh-label block mb-1.5">{t('settings.langCodeLabel', 'Código do Idioma (ex: es-MX, it-IT, pl-PL):')}</label>
+                  <input
+                    id="custom-lang-code"
+                    type="text"
+                    value={customLangCode}
+                    onChange={(e) => setCustomLangCode(e.target.value)}
+                    placeholder="es-MX"
+                    className="dh-input w-full font-mono"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="custom-lang-label" className="dh-label block mb-1.5">{t('settings.langNameLabel', 'Nome de Exibição (ex: Español Mexicano):')}</label>
+                  <input
+                    id="custom-lang-label"
+                    type="text"
+                    value={customLangLabel}
+                    onChange={(e) => setCustomLangLabel(e.target.value)}
+                    placeholder="Español (México)"
+                    className="dh-input w-full"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="text-[11px] font-semibold text-zinc-400 block mb-1">{t('settings.langCodeLabel', 'Código do Idioma (ex: es-MX, it-IT, pl-PL):')}</label>
-                <input
-                  type="text"
-                  value={customLangCode}
-                  onChange={(e) => setCustomLangCode(e.target.value)}
-                  placeholder="Ex: es-MX"
-                  className="w-full px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-700 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-zinc-400 block mb-1">{t('settings.langNameLabel', 'Nome de Exibição (ex: Español Mexicano):')}</label>
-                <input
-                  type="text"
-                  value={customLangLabel}
-                  onChange={(e) => setCustomLangLabel(e.target.value)}
-                  placeholder="Ex: Español (México)"
-                  className="w-full px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-700"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[11px] font-semibold text-zinc-400 block mb-1">{t('settings.langDictLabel', 'Dicionário JSON de Tradução:')}</label>
-              <textarea
-                value={customLangJson}
-                onChange={(e) => setCustomLangJson(e.target.value)}
-                placeholder='{
+                <label htmlFor="custom-lang-json" className="dh-label block mb-1.5">{t('settings.langDictLabel', 'Dicionário JSON de Tradução:')}</label>
+                <textarea
+                  id="custom-lang-json"
+                  value={customLangJson}
+                  onChange={(e) => setCustomLangJson(e.target.value)}
+                  placeholder='{
   "app.title": "DarkHub",
   "nav.dashboard": "Panel de Control"
 }'
-                rows={5}
-                className="w-full p-2.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-white placeholder-zinc-600 font-mono focus:outline-none focus:border-zinc-700"
+                  rows={6}
+                  className="dh-input w-full h-auto py-2 font-mono text-[12px] leading-relaxed"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!customLangCode.trim() || !customLangJson.trim()) {
+                      setTranslateMsg({ ok: false, msg: 'Informe o código do idioma e o JSON de tradução.' });
+                      return;
+                    }
+                    try {
+                      const dict = JSON.parse(customLangJson.trim());
+                      const label = customLangLabel.trim() || customLangCode.trim();
+                      const ok = importCustomTranslation(customLangCode.trim(), label, dict);
+                      if (ok) {
+                        setTranslateMsg({ ok: true, msg: `Tradução "${label}" carregada e ativada.` });
+                        setCustomLangJson('');
+                      } else {
+                        setTranslateMsg({ ok: false, msg: 'Falha ao salvar tradução local.' });
+                      }
+                    } catch (e: any) {
+                      setTranslateMsg({ ok: false, msg: 'JSON inválido: ' + e.message });
+                    }
+                  }}
+                  className="dh-btn dh-btn-accent"
+                >
+                  <CheckCircle2 size={14} /> Aplicar tradução
+                </button>
+                <StatusLine status={translateMsg} />
+              </div>
+            </div>
+          )}
+        </SettingRow>
+
+        <SettingRow
+          label={t('settings.windowsStartup', 'Inicialização com o Windows')}
+          description="Inicie o DarkHub Suite automaticamente ao ligar o computador (inicia na bandeja)."
+          status={startupStatus}
+          control={
+            <label className="flex items-center gap-2 text-[12.5px] text-zinc-300 cursor-pointer">
+              {startupBusy ? <Loader2 size={14} className="animate-spin text-zinc-500" /> : null}
+              <input
+                type="checkbox"
+                checked={openAtLogin}
+                disabled={startupBusy}
+                onChange={(e) => saveStartupBehavior(e.target.checked)}
               />
-            </div>
+              <span>Iniciar com o Windows</span>
+            </label>
+          }
+        />
 
-            <button
-              type="button"
-              onClick={() => {
-                if (!customLangCode.trim() || !customLangJson.trim()) {
-                  setTranslateMsg({ ok: false, msg: 'Informe o código do idioma e o JSON de tradução.' });
-                  return;
-                }
-                try {
-                  const dict = JSON.parse(customLangJson.trim());
-                  const label = customLangLabel.trim() || customLangCode.trim();
-                  const ok = importCustomTranslation(customLangCode.trim(), label, dict);
-                  if (ok) {
-                    setTranslateMsg({ ok: true, msg: `Tradução "${label}" carregada e ativada com sucesso!` });
-                    setCustomLangJson('');
-                  } else {
-                    setTranslateMsg({ ok: false, msg: 'Falha ao salvar tradução local.' });
-                  }
-                } catch (e: any) {
-                  setTranslateMsg({ ok: false, msg: 'JSON inválido: ' + e.message });
-                }
-              }}
-              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/20"
-            >
-              <CheckCircle2 size={13} /> Aplicar Tradução Imediatamente
-            </button>
-          </div>
-        )}
-      </div>
+        <SettingRow
+          label="Comportamento da janela"
+          description={t('settings.closeActionDesc', 'Defina a ação ao fechar a janela do DarkHub.')}
+          status={windowBehaviorStatus}
+          control={
+            <label className="flex items-center gap-2 text-[12.5px] text-zinc-300 cursor-pointer">
+              {windowBehaviorBusy ? <Loader2 size={14} className="animate-spin text-zinc-500" /> : null}
+              <input
+                type="checkbox"
+                checked={closeToTray}
+                disabled={windowBehaviorBusy}
+                onChange={(e) => saveWindowBehavior(e.target.checked)}
+              />
+              <span>Minimizar para a bandeja ao fechar</span>
+            </label>
+          }
+        />
+      </SettingsGroup>
 
-      {}
-      <div className="p-4 rounded-lg border border-zinc-800 bg-zinc-900 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-amber-500/10 text-amber-400 rounded-md shrink-0">
-              <Bug size={16} />
-            </div>
-            <div>
-              <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">Telemetria de Erros & Bugs</h2>
-              <p className="text-xs text-zinc-500">{t('settings.crashLogsDesc', 'Envia logs anônimos de crashes e exceções para o canal de suporte.')}</p>
-            </div>
-          </div>
-
-          <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer shrink-0">
-            <input
-              type="checkbox"
-              checked={telemetry.bugReportsEnabled}
-              onChange={(e) => setTelemetry((prev) => ({ ...prev, bugReportsEnabled: e.target.checked }))}
-              className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-blue-600 focus:ring-0"
-            />
-            <span>Ativar Envio de Bugs</span>
-          </label>
-        </div>
-
-        <div className="flex items-center justify-between pt-1 border-t border-zinc-800/80">
-          <span className="text-[11px] text-zinc-500">{t('settings.redactionNote', 'Dados sensíveis e caminhos de usuário são redigidos automaticamente.')}</span>
-          <button
-            onClick={saveTelemetry}
-            disabled={telemetryBusy}
-            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-200 text-xs font-medium rounded-md transition-colors disabled:opacity-50 flex items-center gap-1.5 border border-zinc-700/60"
-          >
-            {telemetryBusy ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
-            <span>Salvar Telemetria</span>
-          </button>
-        </div>
-
-        {telemetryStatus && (
-          <div className={`text-xs rounded-md border p-2.5 font-mono ${
-            telemetryStatus.ok
-              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-              : 'border-red-500/30 bg-red-500/10 text-red-300'
-          }`}>
-            {telemetryStatus.msg}
-          </div>
-        )}
-      </div>
-
-      {}
-      <div className="p-4 rounded-lg border border-zinc-800 bg-zinc-900 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-md shrink-0">
-              <Activity size={16} />
-            </div>
-            <div>
-              <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">{t('settings.bgServices', 'Serviços em Segundo Plano')}</h2>
-              <p className="text-xs text-zinc-500">{t('settings.bgServicesDesc', 'Controle a execução de módulos residentes para economizar recursos.')}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          <label className="flex items-center gap-2.5 p-2.5 rounded-md border border-zinc-800 bg-zinc-950 hover:border-zinc-700 transition-colors cursor-pointer">
-            <input
-              type="checkbox"
-              checked={liveServices.latencyGuardian}
-              onChange={(e) => setLiveServices((prev) => ({ ...prev, latencyGuardian: e.target.checked }))}
-              className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900 text-blue-600 focus:ring-0"
-            />
-            <span className="text-xs text-zinc-300">Latency Guardian</span>
-          </label>
-          <label className="flex items-center gap-2.5 p-2.5 rounded-md border border-zinc-800 bg-zinc-950 hover:border-zinc-700 transition-colors cursor-pointer">
-            <input
-              type="checkbox"
-              checked={liveServices.autoClicker}
-              onChange={(e) => setLiveServices((prev) => ({ ...prev, autoClicker: e.target.checked }))}
-              className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900 text-blue-600 focus:ring-0"
-            />
-            <span className="text-xs text-zinc-300">Auto Clicker</span>
-          </label>
-          <label className="flex items-center gap-2.5 p-2.5 rounded-md border border-zinc-800 bg-zinc-950 hover:border-zinc-700 transition-colors cursor-pointer">
-            <input
-              type="checkbox"
-              checked={liveServices.overlay}
-              onChange={(e) => setLiveServices((prev) => ({ ...prev, overlay: e.target.checked }))}
-              className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900 text-blue-600 focus:ring-0"
-            />
-            <span className="text-xs text-zinc-300">Gaming Overlay HUD</span>
-          </label>
-        </div>
-
-        <div className="flex justify-end pt-1 border-t border-zinc-800/80">
-          <button
-            onClick={saveLiveServices}
-            disabled={liveServicesBusy}
-            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-200 text-xs font-medium rounded-md transition-colors disabled:opacity-50 flex items-center gap-1.5 border border-zinc-700/60"
-          >
-            {liveServicesBusy ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+      <SettingsGroup title={t('settings.bgServices', 'Serviços em Segundo Plano')} description={t('settings.bgServicesDesc', 'Controle a execução de módulos residentes para economizar recursos.')}>
+        {([
+          ['latencyGuardian', 'Latency Guardian'],
+          ['autoClicker', 'Auto Clicker'],
+          ['overlay', 'Gaming Overlay HUD'],
+        ] as const).map(([key, label]) => (
+          <SettingRow
+            key={key}
+            label={label}
+            control={
+              <input
+                type="checkbox"
+                aria-label={label}
+                checked={liveServices[key]}
+                onChange={(e) => setLiveServices((prev) => ({ ...prev, [key]: e.target.checked }))}
+              />
+            }
+          />
+        ))}
+        <div className="flex flex-wrap items-center justify-end gap-3 py-3">
+          <StatusLine status={liveServicesStatus} />
+          <button onClick={saveLiveServices} disabled={liveServicesBusy} className="dh-btn">
+            {liveServicesBusy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             <span>{t('settings.saveServices', 'Salvar Serviços')}</span>
           </button>
         </div>
+      </SettingsGroup>
 
-        {liveServicesStatus && (
-          <div className={`text-xs rounded-md border p-2.5 font-mono ${
-            liveServicesStatus.ok
-              ? 'border-indigo-500/30 bg-indigo-500/10 text-indigo-300'
-              : 'border-red-500/30 bg-red-500/10 text-red-300'
-          }`}>
-            {liveServicesStatus.msg}
-          </div>
-        )}
-      </div>
-
-      {}
-      <div className="p-4 rounded-lg border border-zinc-800 bg-zinc-900 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-md shrink-0">
-              <Power size={16} />
-            </div>
-            <div>
-              <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">{t('settings.windowsStartup', 'Inicialização com o Windows')}</h2>
-              <p className="text-xs text-zinc-500">Inicie o DarkHub Suite automaticamente ao ligar o computador (inicia na bandeja).</p>
-            </div>
-          </div>
-
-          <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
-            {startupBusy ? <Loader2 size={13} className="animate-spin text-zinc-400" /> : null}
-            <input
-              type="checkbox"
-              checked={openAtLogin}
-              disabled={startupBusy}
-              onChange={(e) => saveStartupBehavior(e.target.checked)}
-              className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-blue-600 focus:ring-0"
-            />
-            <span>Iniciar com o Windows</span>
-          </label>
-        </div>
-
-        {startupStatus && (
-          <div className={`text-xs rounded-md border p-2.5 font-mono ${
-            startupStatus.ok
-              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-              : 'border-red-500/30 bg-red-500/10 text-red-300'
-          }`}>
-            {startupStatus.msg}
-          </div>
-        )}
-      </div>
-
-      {}
-      <div className="p-4 rounded-lg border border-zinc-800 bg-zinc-900 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-sky-500/10 text-sky-400 rounded-md shrink-0">
-              <AppWindow size={16} />
-            </div>
-            <div>
-              <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">Comportamento da Janela</h2>
-              <p className="text-xs text-zinc-500">{t('settings.closeActionDesc', 'Defina a ação ao fechar a janela do DarkHub.')}</p>
+      <SettingsGroup title={t('settings.security')}>
+        <SettingRow
+          label="Telemetria de erros e bugs"
+          description={t('settings.crashLogsDesc', 'Envia logs anônimos de crashes e exceções para o canal de suporte.')}
+          control={
+            <label className="flex items-center gap-2 text-[12.5px] text-zinc-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={telemetry.bugReportsEnabled}
+                onChange={(e) => setTelemetry((prev) => ({ ...prev, bugReportsEnabled: e.target.checked }))}
+              />
+              <span>Ativar envio de bugs</span>
+            </label>
+          }
+        >
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <span className="dh-help">{t('settings.redactionNote', 'Dados sensíveis e caminhos de usuário são redigidos automaticamente.')}</span>
+            <div className="flex items-center gap-3">
+              <StatusLine status={telemetryStatus} />
+              <button onClick={saveTelemetry} disabled={telemetryBusy} className="dh-btn dh-btn-sm">
+                {telemetryBusy ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                <span>Salvar telemetria</span>
+              </button>
             </div>
           </div>
+        </SettingRow>
 
-          <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
-            {windowBehaviorBusy ? <Loader2 size={13} className="animate-spin text-zinc-400" /> : null}
-            <input
-              type="checkbox"
-              checked={closeToTray}
-              disabled={windowBehaviorBusy}
-              onChange={(e) => saveWindowBehavior(e.target.checked)}
-              className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-blue-600 focus:ring-0"
-            />
-            <span>Minimizar para a Bandeja ao Fechar</span>
-          </label>
-        </div>
-
-        {windowBehaviorStatus && (
-          <div className={`text-xs rounded-md border p-2.5 font-mono ${
-            windowBehaviorStatus.ok
-              ? 'border-sky-500/30 bg-sky-500/10 text-sky-300'
-              : 'border-red-500/30 bg-red-500/10 text-red-300'
-          }`}>
-            {windowBehaviorStatus.msg}
-          </div>
-        )}
-      </div>
-
-      {}
-      <div className="p-4 rounded-lg border border-zinc-800 bg-zinc-900 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-md shrink-0">
-              <ShieldCheck size={16} />
+        <SettingRow
+          label={t('settings.vaultAutoLock')}
+          description={t('settings.securityHint')}
+          control={
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                max={240}
+                aria-label={t('settings.vaultAutoLock')}
+                value={vaultAutoLockMinutes}
+                onChange={(e) => setVaultAutoLockMinutes(Math.max(0, Math.min(240, Math.trunc(Number(e.target.value) || 0))))}
+                className="dh-input w-20 text-center font-mono"
+              />
+              <span className="text-[12px] text-zinc-500">min</span>
             </div>
-            <div>
-              <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">{t('settings.security')}</h2>
-              <p className="text-xs text-zinc-500">{t('settings.securityHint')}</p>
-            </div>
-          </div>
+          }
+        />
+      </SettingsGroup>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-400">{t('settings.vaultAutoLock')}:</span>
-            <input
-              type="number"
-              min={0}
-              max={240}
-              value={vaultAutoLockMinutes}
-              onChange={(e) => setVaultAutoLockMinutes(Math.max(0, Math.min(240, Math.trunc(Number(e.target.value) || 0))))}
-              className="w-20 bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs rounded-md px-2.5 py-1 text-center font-mono focus:outline-none focus:border-zinc-700"
-            />
-            <span className="text-xs text-zinc-500">min</span>
-          </div>
-        </div>
-      </div>
-
-      {}
       <UpdateManagerSection />
       <ResourceUsageSection />
+    </div>
+  )
+}
+
+type Status = { ok: boolean; msg: string } | null
+
+function StatusLine({ status }: { status: Status }) {
+  if (!status) return null
+  return (
+    <span role="status" className={`inline-flex items-center gap-1.5 text-[12px] ${status.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+      {status.ok ? <CheckCircle2 size={14} className="shrink-0" /> : <AlertTriangle size={14} className="shrink-0" />}
+      <span className="break-words">{status.msg}</span>
+    </span>
+  )
+}
+
+function SettingsGroup({ title, description, children }: { title: React.ReactNode; description?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section>
+      <div className="mb-2">
+        <h2 className="dh-section-title">{title}</h2>
+        {description ? <p className="dh-help mt-0.5 max-w-[75ch]">{description}</p> : null}
+      </div>
+      <div className="divide-y divide-zinc-800/80 border-y border-zinc-800/80">{children}</div>
+    </section>
+  )
+}
+
+function SettingRow({ label, description, control, status, children }: {
+  label: React.ReactNode
+  description?: React.ReactNode
+  control?: React.ReactNode
+  status?: Status
+  children?: React.ReactNode
+}) {
+  return (
+    <div className="py-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-x-8 gap-y-2 items-center">
+        <div className="min-w-0">
+          <div className="text-[13px] font-medium text-zinc-100">{label}</div>
+          {description ? <div className="dh-help mt-0.5 max-w-[60ch]">{description}</div> : null}
+          {status ? <div className="mt-1.5"><StatusLine status={status} /></div> : null}
+        </div>
+        {control ? <div className="sm:justify-self-end">{control}</div> : null}
+      </div>
+      {children}
     </div>
   )
 }
@@ -552,25 +473,44 @@ function ResourceUsageSection() {
   }, [])
 
   return (
-    <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">{t('settings.resourceUsage', 'Consumo de recursos do DarkHub')}</h2>
-        <span className="text-xs font-mono text-zinc-400">
-          {usage ? `${usage.totalCpuPercent}% CPU · ${usage.totalWorkingSetMb} MB` : '—'}
-        </span>
+    <SettingsGroup title={t('settings.resourceUsage', 'Consumo de recursos do DarkHub')} description={t('settings.resourceUsageDesc', 'Medido em tempo real pelo Electron (todos os processos do app). Use para comparar o consumo antes e depois de abrir as janelas de monitoramento.')}>
+      <div className="flex items-baseline justify-between py-3">
+        <span className="text-[12.5px] text-zinc-400">Total</span>
+        {usage ? (
+          <span className="font-mono text-[12.5px] text-zinc-100">
+            {usage.totalCpuPercent}<span className="text-zinc-500">% CPU</span> · {usage.totalWorkingSetMb}<span className="text-zinc-500"> MB</span>
+          </span>
+        ) : (
+          <span className="inline-block h-3 w-32 rounded bg-zinc-900 animate-pulse" />
+        )}
       </div>
-      <p className="text-xs text-zinc-500">{t('settings.resourceUsageDesc', 'Medido em tempo real pelo Electron (todos os processos do app). Use para comparar o consumo antes e depois de abrir as janelas de monitoramento.')}</p>
-      {usage && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] font-mono text-zinc-400">
-          {usage.processes.map((p) => (
-            <div key={p.pid} className="flex justify-between border-b border-zinc-800/60 py-0.5">
-              <span>{p.type}{p.name ? ` · ${p.name}` : ''}</span>
-              <span>{p.cpuPercent}% · {p.workingSetMb} MB</span>
-            </div>
-          ))}
+      {usage ? (
+        usage.processes.length > 0 && (
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="text-[11px] text-zinc-500 text-left">
+                <th className="font-normal py-2">Processo</th>
+                <th className="font-normal py-2 text-right">CPU</th>
+                <th className="font-normal py-2 text-right">Memória</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-800/60">
+              {usage.processes.map((p) => (
+                <tr key={p.pid}>
+                  <td className="py-1.5 text-zinc-300">{p.type}{p.name ? <span className="text-zinc-500"> · {p.name}</span> : ''}</td>
+                  <td className="py-1.5 text-right font-mono text-zinc-300">{p.cpuPercent}<span className="text-zinc-500">%</span></td>
+                  <td className="py-1.5 text-right font-mono text-zinc-300">{p.workingSetMb}<span className="text-zinc-500"> MB</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      ) : (
+        <div className="py-3 space-y-2">
+          {[0, 1, 2].map((i) => <div key={i} className="h-3 rounded bg-zinc-900 animate-pulse" />)}
         </div>
       )}
-    </div>
+    </SettingsGroup>
   )
 }
 
@@ -635,41 +575,18 @@ function UpdateManagerSection() {
   }
 
   return (
-    <div className="p-4 rounded-lg border border-zinc-800 bg-zinc-900 space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-start gap-3">
-          <div className="p-2 bg-blue-500/10 text-blue-400 rounded-md shrink-0">
-            <RefreshCw size={16} className={checking ? 'animate-spin' : ''} />
-          </div>
-          <div>
-            <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">{t('settings.updates', 'Atualizações do DarkHub')}</h2>
-            <p className="text-xs text-zinc-500">
-              Versão em execução: <span className="font-mono text-blue-400 font-semibold">{status?.currentVersion || APP_VERSION_LABEL}</span>
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={handleCheck}
-          disabled={checking}
-          className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-200 text-xs font-medium rounded-md transition-colors disabled:opacity-50 flex items-center gap-1.5 border border-zinc-700/60"
-        >
-          {checking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-          <span>{t('settings.checkUpdates', 'Verificar Atualizações')}</span>
-        </button>
-      </div>
-
-      {feedback && (
-        <div
-          className={`text-xs rounded-md border p-2.5 font-mono ${
-            feedback.ok
-              ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-              : 'border-red-500/30 bg-red-500/10 text-red-300'
-          }`}
-        >
-          {feedback.msg}
-        </div>
-      )}
-    </div>
+    <SettingsGroup title={t('settings.updates', 'Atualizações do DarkHub')}>
+      <SettingRow
+        label="Versão em execução"
+        description={<span className="font-mono text-zinc-300">{status?.currentVersion || APP_VERSION_LABEL}</span>}
+        status={feedback}
+        control={
+          <button onClick={handleCheck} disabled={checking} className="dh-btn">
+            {checking ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            <span>{t('settings.checkUpdates', 'Verificar Atualizações')}</span>
+          </button>
+        }
+      />
+    </SettingsGroup>
   )
 }

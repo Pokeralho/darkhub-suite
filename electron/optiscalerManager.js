@@ -99,23 +99,6 @@ async function runPowerShellJson(script, args = [], timeout = 8000) {
   }
 }
 
-async function getFileVersionInfo(filePath) {
-  const script = `
-    $ErrorActionPreference = 'Stop'
-    $p = $args[0]
-    if (!(Test-Path -LiteralPath $p -PathType Leaf)) { return }
-    $v = (Get-Item -LiteralPath $p).VersionInfo
-    [PSCustomObject]@{
-      originalFilename = [string]$v.OriginalFilename
-      fileVersion = [string]$v.FileVersion
-      productVersion = [string]$v.ProductVersion
-      productName = [string]$v.ProductName
-      companyName = [string]$v.CompanyName
-    } | ConvertTo-Json -Compress
-  `
-  return runPowerShellJson(script, [filePath])
-}
-
 let cachedGpuInfo = null
 function classifyAmdArchitecture(name) {
   const text = String(name || '').toLowerCase()
@@ -576,6 +559,11 @@ async function buildAnalysis(app, payload = {}) {
 
 async function backupPathIfExists(targetPath, backupDir, manifest) {
   if (!(await exists(targetPath))) return false
+  // A path may be touched twice in one apply (e.g. a root DLL later replaced by
+  // the FSR4 RDNA2 build). Backing it up again would overwrite the pristine
+  // original with the file we just installed, so the first backup wins.
+  const key = path.resolve(targetPath).toLowerCase()
+  if (manifest.backedUp.some((b) => path.resolve(String(b?.path ?? '')).toLowerCase() === key)) return true
   const name = path.basename(targetPath)
   const dest = path.join(backupDir, name)
   const stat = await fs.lstat(targetPath)
@@ -595,8 +583,11 @@ async function copySourceRootFiles(releaseDir, targetDir, backupDir, manifest) {
     const src = path.join(releaseDir, entry.name)
     const dest = path.join(targetDir, entry.name)
     await backupPathIfExists(dest, backupDir, manifest)
+    const entryInfo = { source: src, path: dest }
+    // Record before copying so a failure mid-loop can still be rolled back.
+    manifest.copied.push(entryInfo)
     await fs.copyFile(src, dest)
-    copied.push({ source: src, path: dest })
+    copied.push(entryInfo)
   }
   return copied
 }
@@ -608,6 +599,48 @@ async function copySourceDirectory(releaseDir, targetDir, name, backupDir, manif
   await backupPathIfExists(dest, backupDir, manifest)
   await fs.cp(src, dest, { recursive: true, force: true })
   return { source: src, path: dest }
+}
+
+// nowStamp() has 1 s resolution; two applies in the same second would share a
+// backup folder and the second would overwrite the first one's originals.
+async function makeUniqueBackupDir(backupRoot, prefix = '') {
+  const base = prefix + nowStamp()
+  let dir = path.join(backupRoot, base)
+  for (let i = 1; await exists(dir); i += 1) dir = path.join(backupRoot, `${base}-${i}`)
+  await fs.mkdir(dir, { recursive: true })
+  return dir
+}
+
+// Undo a partially applied install: put every backed-up original back and
+// delete files we created that did not exist before. Best effort, reverse order.
+async function rollbackApply(targetDir, manifest) {
+  const backedUpKeys = new Set(manifest.backedUp.map((b) => path.resolve(String(b.path)).toLowerCase()))
+  const root = path.resolve(targetDir).toLowerCase()
+  for (const item of [...manifest.copied].reverse()) {
+    const p = path.resolve(String(item?.path ?? ''))
+    if (backedUpKeys.has(p.toLowerCase()) || !isInsideDir(p.toLowerCase(), root)) continue
+    await fs.rm(p, { recursive: true, force: true }).catch(() => {})
+  }
+  for (const item of [...manifest.backedUp].reverse()) {
+    try {
+      if (item.type === 'directory') {
+        await fs.rm(item.path, { recursive: true, force: true }).catch(() => {})
+        await fs.cp(item.backupPath, item.path, { recursive: true, force: true })
+      } else {
+        await fs.copyFile(item.backupPath, item.path)
+      }
+    } catch {}
+  }
+}
+
+// Serialize mutating operations (double-clicks, apply racing a restore) so
+// backups and file swaps never interleave. The apply target folder is only
+// known after analysis (Unreal redirect), so a single global queue is used.
+let mutationChain = Promise.resolve()
+function withMutationLock(fn) {
+  const run = mutationChain.then(fn, fn)
+  mutationChain = run.catch(() => {})
+  return run
 }
 
 function isSameInstall(analysis, payload) {
@@ -686,8 +719,7 @@ async function applyOptiScaler(app, getLibraryStore, payload = {}) {
   }
 
   const backupRoot = path.join(targetDir, 'OptiScaler_Backups')
-  const backupDir = path.join(backupRoot, nowStamp())
-  await fs.mkdir(backupDir, { recursive: true })
+  const backupDir = await makeUniqueBackupDir(backupRoot)
 
   const manifest = {
     createdAt: new Date().toISOString(),
@@ -740,13 +772,12 @@ async function applyOptiScaler(app, getLibraryStore, payload = {}) {
       }
     }
 
-    const copiedRoot = await copySourceRootFiles(analysis.source.path, targetDir, backupDir, manifest)
-    manifest.copied.push(...copiedRoot)
+    await copySourceRootFiles(analysis.source.path, targetDir, backupDir, manifest)
 
     const loaderDest = path.join(targetDir, analysis.choices.loader)
     await backupPathIfExists(loaderDest, backupDir, manifest)
-    await fs.copyFile(path.join(analysis.source.path, 'OptiScaler.dll'), loaderDest)
     manifest.copied.push({ source: path.join(analysis.source.path, 'OptiScaler.dll'), path: loaderDest, renamedTo: analysis.choices.loader })
+    await fs.copyFile(path.join(analysis.source.path, 'OptiScaler.dll'), loaderDest)
 
     const licenses = await copySourceDirectory(analysis.source.path, targetDir, 'Licenses', backupDir, manifest)
     if (licenses) manifest.copied.push(licenses)
@@ -761,8 +792,8 @@ async function applyOptiScaler(app, getLibraryStore, payload = {}) {
       if (fsr4Rdna2Src && fsRaw.existsSync(fsr4Rdna2Src)) {
         const dest = path.join(targetDir, 'amd_fidelityfx_upscaler_dx12.dll')
         await backupPathIfExists(dest, backupDir, manifest)
-        await fs.copyFile(fsr4Rdna2Src, dest)
         manifest.copied.push({ source: fsr4Rdna2Src, path: dest, note: 'FSR 4.1.1b INT8 (the3rdparty1917)' })
+        await fs.copyFile(fsr4Rdna2Src, dest)
       }
     }
 
@@ -780,7 +811,9 @@ async function applyOptiScaler(app, getLibraryStore, payload = {}) {
 
     const gameId = analysis.game.id
     const applyOnLaunch = Boolean(payload?.applyOnLaunch)
-    if (gameId && getLibraryStore) {
+    // Files are fully installed at this point: a library-store failure must not
+    // trigger the rollback below.
+    if (gameId && getLibraryStore) try {
       const { loadLibrary, upsertGame } = await getLibraryStore()
       const lib = await loadLibrary(app)
       let game = lib.games.find((g) => g.id === gameId || normalizeWinPath(g.exePath || '').toLowerCase() === normalizeWinPath(analysis.game.targetExePath || '').toLowerCase())
@@ -808,6 +841,8 @@ async function applyOptiScaler(app, getLibraryStore, payload = {}) {
           lastInstalledAt: Date.now()
         }
       })
+    } catch (libErr) {
+      console.warn('[OptiScaler] Falha ao atualizar biblioteca:', libErr?.message ?? libErr)
     }
 
     return { ok: true, analysis, backupDir, manifest }
@@ -816,7 +851,10 @@ async function applyOptiScaler(app, getLibraryStore, payload = {}) {
     try {
       await fs.writeFile(path.join(backupDir, 'manifest.failed.json'), JSON.stringify(manifest, null, 2), 'utf8')
     } catch {}
-    return { ok: false, error: manifest.error, analysis, backupDir, manifest }
+    // Leave the game exactly as it was instead of half-patched.
+    await rollbackApply(targetDir, manifest).catch(() => {})
+    manifest.rolledBack = true
+    return { ok: false, error: manifest.error, analysis, backupDir, manifest, rolledBack: true }
   }
 }
 
@@ -942,14 +980,31 @@ async function restoreBackup(app, getLibraryStore, payload = {}) {
       const p = path.join(targetDir, loader)
       if (await exists(p)) {
         const wasRestored = restored.some(r => normalizeWinPath(r).toLowerCase() === normalizeWinPath(p).toLowerCase())
-        if (!wasRestored) {
-          const isOpti = await isOptiScalerLoader(p, releaseDir)
-          if (isOpti) {
+        const isOpti = await isOptiScalerLoader(p, releaseDir)
+        if (isOpti && wasRestored) {
+          // A snapshot taken after an earlier install holds OptiScaler's own
+          // proxy as the "original". Prefer the oldest non-OptiScaler copy.
+          const key = path.resolve(p).toLowerCase()
+          let replaced = false
+          for (const b of [...allBackups].reverse()) {
+            const item = (Array.isArray(b.manifest?.backedUp) ? b.manifest.backedUp : [])
+              .find((it) => path.resolve(String(it?.path ?? '')).toLowerCase() === key)
+            const src = item ? path.resolve(String(item.backupPath ?? '')) : null
+            if (!src || !isInsideDir(src.toLowerCase(), path.resolve(b.path).toLowerCase())) continue
+            if (!(await exists(src)) || (await isOptiScalerLoader(src, releaseDir))) continue
             try {
-              await fs.unlink(p)
-              removed.push(p)
+              await fs.copyFile(src, p)
+              replaced = true
             } catch {}
+            break
           }
+          if (replaced) continue
+        }
+        if (isOpti) {
+          try {
+            await fs.unlink(p)
+            removed.push(p)
+          } catch {}
         }
       }
     }
@@ -970,6 +1025,39 @@ async function restoreBackup(app, getLibraryStore, payload = {}) {
           } catch {}
         }
       }
+    }
+
+    // 3b. Remove every other file an apply injected (libxess.dll, amd_fidelityfx_*.dll,
+    // fakenvapi, ...) that was not an original we just restored. Use the union of
+    // all manifests so files added by later re-applies are also cleaned up.
+    const restoredKeys = new Set(restored.map((r) => path.resolve(r).toLowerCase()))
+    const targetRoot = path.resolve(targetDir).toLowerCase()
+    const injectedFiles = new Set()
+    const manifests = [usedManifest, ...allBackups.map((b) => b.manifest)]
+    // Never delete a path that pre-existed before the first install (it is in the
+    // oldest apply backup's backedUp list) even if its backup copy went missing.
+    // Later backups would list our own injected files, so they don't count.
+    const oldestApply = [...allBackups].reverse().find((b) => !b.isManual)
+    for (const m of [usedManifest, oldestApply?.manifest]) {
+      for (const b of Array.isArray(m?.backedUp) ? m.backedUp : []) {
+        restoredKeys.add(path.resolve(String(b?.path ?? '')).toLowerCase())
+      }
+    }
+    for (const m of manifests) {
+      for (const c of Array.isArray(m?.copied) ? m.copied : []) {
+        const p = path.resolve(String(c?.path ?? ''))
+        // Only direct children of the game folder; directories are handled below.
+        if (path.dirname(p).toLowerCase() === targetRoot) injectedFiles.add(p)
+      }
+    }
+    for (const p of injectedFiles) {
+      if (restoredKeys.has(p.toLowerCase())) continue
+      try {
+        const st = await fs.lstat(p)
+        if (!st.isFile()) continue
+        await fs.unlink(p)
+        removed.push(p)
+      } catch {}
     }
 
     // Purge D3D12_Optiscaler & Licenses only when OptiScaler put them there
@@ -1046,8 +1134,7 @@ async function createManualBackup(payload = {}) {
   if (!targetDir || !(await exists(targetDir))) return { ok: false, error: 'Pasta alvo nao encontrada.' }
 
   const backupRoot = path.join(targetDir, 'OptiScaler_Backups')
-  const backupDir = path.join(backupRoot, 'manual_' + nowStamp())
-  await fs.mkdir(backupDir, { recursive: true })
+  const backupDir = await makeUniqueBackupDir(backupRoot, 'manual_')
 
   const manifest = {
     createdAt: new Date().toISOString(),
@@ -1089,7 +1176,7 @@ export function registerOptiScalerIPC({ app, ipcMain, getLibraryStore }) {
 
   ipcMain.handle('optiscaler:apply', async (_event, payload) => {
     try {
-      return await applyOptiScaler(app, getLibraryStore, payload)
+      return await withMutationLock(() => applyOptiScaler(app, getLibraryStore, payload))
     } catch (err) {
       return { ok: false, error: err?.message ?? String(err) }
     }
@@ -1105,7 +1192,7 @@ export function registerOptiScalerIPC({ app, ipcMain, getLibraryStore }) {
 
   ipcMain.handle('optiscaler:restoreBackup', async (_event, payload) => {
     try {
-      return await restoreBackup(app, getLibraryStore, payload)
+      return await withMutationLock(() => restoreBackup(app, getLibraryStore, payload))
     } catch (err) {
       return { ok: false, error: err?.message ?? String(err) }
     }
@@ -1113,7 +1200,7 @@ export function registerOptiScalerIPC({ app, ipcMain, getLibraryStore }) {
 
   ipcMain.handle('optiscaler:deleteBackup', async (_event, payload) => {
     try {
-      return await deleteBackup(payload)
+      return await withMutationLock(() => deleteBackup(payload))
     } catch (err) {
       return { ok: false, error: err?.message ?? String(err) }
     }
@@ -1121,7 +1208,7 @@ export function registerOptiScalerIPC({ app, ipcMain, getLibraryStore }) {
 
   ipcMain.handle('optiscaler:createManualBackup', async (_event, payload) => {
     try {
-      return await createManualBackup(payload)
+      return await withMutationLock(() => createManualBackup(payload))
     } catch (err) {
       return { ok: false, error: err?.message ?? String(err) }
     }

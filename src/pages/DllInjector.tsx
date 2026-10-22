@@ -1,6 +1,7 @@
 import { useI18n } from '../i18n/I18nProvider';
 import React, { useState } from 'react'
-import { Activity, ShieldCheck, Crosshair, CheckCircle2, XCircle, Loader2, FolderOpen } from 'lucide-react'
+import { Activity, ShieldCheck, Crosshair, CheckCircle2, XCircle, Loader2, FolderOpen } from '../components/icons'
+import PageHeader from '../components/ui/PageHeader'
 
 export default function DllInjector() {
   const { t } = useI18n();
@@ -17,8 +18,8 @@ export default function DllInjector() {
         filters: [{ name: 'Dynamic Link Library', extensions: ['dll'] }]
       })
 
-      if (res?.ok && res.files?.length > 0) {
-        setDllPath(res.files[0])
+      if (!res?.canceled && res?.filePaths?.length) {
+        setDllPath(res.filePaths[0])
       }
     } catch (err) {
       console.error(err)
@@ -58,94 +59,71 @@ export default function DllInjector() {
   }
 
   return (
-    <div className="space-y-6 w-full">
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Activity className="text-indigo-500" /> {t('dllinjector.title', 'DLL Injector')}
-          </h1>
-        </div>
-        <p className="text-zinc-400">{t('dllinjector.desc', 'Injete bibliotecas dinâmicas em processos em execução com acesso de baixo nível via Thread Remota.')}</p>
-      </div>
+    <div className="w-full max-w-3xl">
+      <PageHeader
+        title={t('dllinjector.title', 'DLL Injector')}
+        subtitle={t('dllinjector.desc', 'Injete bibliotecas dinâmicas em processos em execução com acesso de baixo nível via Thread Remota.')}
+      />
 
-      <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900 space-y-6 relative overflow-hidden">
-        {}
-        <div className="absolute top-0 right-0 p-32 bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none" />
+      <section className="dh-card p-5 space-y-5">
+        <p className="flex items-start gap-2.5 dh-help max-w-[75ch]">
+          <ShieldCheck className="shrink-0 mt-[1px] text-zinc-500" size={14} />
+          <span>{t('dllinjector.warning', 'O motor de injeção utiliza a técnica robusta de CreateRemoteThread e LoadLibraryA. Lembre-se de rodar o processo alvo na mesma arquitetura do injetor (32/64 bits).')}</span>
+        </p>
 
-        <div className="flex items-start gap-4 p-4 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-sm">
-          <ShieldCheck className="shrink-0 mt-0.5" size={18} />
-          <p>
-            {t('dllinjector.warning', 'O motor de injeção utiliza a técnica robusta de CreateRemoteThread e LoadLibraryA. Lembre-se de rodar o processo alvo na mesma arquitetura do injetor (32/64 bits).')}
-          </p>
-        </div>
-
-        <div className="space-y-4 relative z-10">
+        <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1">
-              {t('dllinjector.targetProcess', 'Processo Alvo')} <span className="text-zinc-500 font-normal">{t('dllinjector.noExtension', '(sem a extensão)')}</span>
+            <label htmlFor="dll-proc" className="dh-label block mb-1.5">
+              {t('dllinjector.targetProcess', 'Processo Alvo')} <span className="text-zinc-600 font-normal">{t('dllinjector.noExtension', '(sem a extensão)')}</span>
             </label>
             <div className="relative">
-              <Crosshair className="absolute left-3 top-1/2 -tranzinc-y-1/2 text-zinc-500" size={18} />
+              <Crosshair className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" size={14} />
               <input
+                id="dll-proc"
                 type="text"
                 placeholder="csgo, hl2, gta5..."
                 value={processName}
                 onChange={(e) => setProcessName(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-4 py-2.5 text-zinc-200 focus:outline-none focus:border-indigo-500 transition-colors"
+                className="dh-input w-full pl-8 font-mono"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1">
+            <label htmlFor="dll-path" className="dh-label block mb-1.5">
               {t('dllinjector.dllPath', 'Caminho da DLL')}
             </label>
             <div className="flex gap-2">
               <input
+                id="dll-path"
                 type="text"
                 placeholder="C:\Cheats\minhadll.dll"
                 value={dllPath}
                 onChange={(e) => setDllPath(e.target.value)}
-                className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2.5 text-zinc-200 focus:outline-none focus:border-indigo-500 transition-colors"
+                className="dh-input flex-1 min-w-0 font-mono"
               />
-              <button
-                onClick={handleSelectDll}
-                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg transition-colors flex items-center gap-2 border border-zinc-700"
-              >
-                <FolderOpen size={18} />
+              <button type="button" onClick={handleSelectDll} className="dh-btn">
+                <FolderOpen size={14} />
                 {t('dllinjector.browse', 'Procurar')}
               </button>
             </div>
           </div>
-
-          <div className="pt-2">
-            <button
-              onClick={handleInject}
-              disabled={isInjecting}
-              className="w-full md:w-auto px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {isInjecting ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" /> {t('dllinjector.injecting', 'Injetando...')}
-                </>
-              ) : (
-                <>
-                  <Activity size={18} /> {t('dllinjector.inject', 'INJETAR DLL')}
-                </>
-              )}
-            </button>
-          </div>
         </div>
 
-        {status && (
-          <div className={`p-4 rounded-lg flex items-start gap-3 mt-4 animate-in fade-in slide-in-from-bottom-2 ${
-            status.ok ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-300' : 'bg-red-500/10 border border-red-500/20 text-red-300'
-          }`}>
-            {status.ok ? <CheckCircle2 className="shrink-0 mt-0.5" size={18} /> : <XCircle className="shrink-0 mt-0.5" size={18} />}
-            <p className="text-sm">{status.msg}</p>
-          </div>
-        )}
-      </div>
+        <div className="flex flex-wrap items-center gap-4 pt-4 border-t border-zinc-800/80">
+          <button type="button" onClick={handleInject} disabled={isInjecting} className="dh-btn dh-btn-primary">
+            {isInjecting ? <Loader2 size={14} className="animate-spin" /> : <Activity size={14} />}
+            {isInjecting ? t('dllinjector.injecting', 'Injetando...') : t('dllinjector.inject', 'INJETAR DLL')}
+          </button>
+
+          {status && (
+            <p role="status" className={`flex items-start gap-2 text-[12.5px] animate-in ${status.ok ? 'text-emerald-300' : 'text-red-300'}`}>
+              {status.ok ? <CheckCircle2 className="shrink-0 mt-[1px]" size={14} /> : <XCircle className="shrink-0 mt-[1px]" size={14} />}
+              <span>{status.msg}</span>
+            </p>
+          )}
+        </div>
+      </section>
     </div>
   )
 }

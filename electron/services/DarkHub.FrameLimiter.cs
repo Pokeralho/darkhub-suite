@@ -131,7 +131,8 @@ class DarkHubFrameLimiter
                 {
                     try
                     {
-                        Process p = Process.GetProcessById((int)pid);
+                        using (Process p = Process.GetProcessById((int)pid))
+                        {
                         string name = p.ProcessName.ToLower();
                         bool blacklisted = false;
                         foreach (string b in Blacklist)
@@ -148,6 +149,7 @@ class DarkHubFrameLimiter
                                 return (int)pid;
                             }
                         }
+                        }
                     }
                     catch { }
                 }
@@ -161,6 +163,8 @@ class DarkHubFrameLimiter
             Process best = null;
             long maxMemory = 0;
 
+            try
+            {
             foreach (Process p in procs)
             {
                 try
@@ -201,6 +205,12 @@ class DarkHubFrameLimiter
                 gameName = best.ProcessName + ".exe";
                 return best.Id;
             }
+            }
+            finally
+            {
+                // Scanned every 1.5-4 s: release the Process objects (and any handles they opened).
+                foreach (Process p in procs) { try { p.Dispose(); } catch { } }
+            }
         }
         catch { }
 
@@ -236,9 +246,11 @@ class DarkHubFrameLimiter
             IntPtr hThread = CreateRemoteThread(hProcess, IntPtr.Zero, 0, loadLibraryAddr, allocMemAddress, 0, IntPtr.Zero);
             if (hThread != IntPtr.Zero)
             {
-                WaitForSingleObject(hThread, 2000);
+                uint wait = WaitForSingleObject(hThread, 2000);
                 CloseHandle(hThread);
-                VirtualFreeEx(hProcess, allocMemAddress, 0, MEM_RELEASE);
+                // Only free the path buffer once LoadLibraryW has returned (WAIT_OBJECT_0). On a
+                // timeout the remote thread may still read it: leak 1 small page instead of crashing the game.
+                if (wait == 0) VirtualFreeEx(hProcess, allocMemAddress, 0, MEM_RELEASE);
                 CloseHandle(hProcess);
                 return true;
             }
@@ -252,8 +264,33 @@ class DarkHubFrameLimiter
         }
     }
 
+    static int capReset = 0;
+
+    /// <summary>Removes the in-game cap (hook sees enabled=0 / uncapped). Idempotent; runs on STOP,
+    /// stdin EOF, Ctrl+C, ProcessExit and fatal errors so no cap survives this process.</summary>
+    static void ResetCap()
+    {
+        if (Interlocked.Exchange(ref capReset, 1) == 1) return;
+        try { UpdateSharedConfig(0, 2, 0); } catch { }
+    }
+
+    static int ClampFps(int v)
+    {
+        if (v < 0) return 0;
+        if (v > 1000) return 1000;
+        return v;
+    }
+
     static void UpdateSharedConfig(uint fps, uint mode)
     {
+        UpdateSharedConfig(fps, mode, 1);
+    }
+
+    static void UpdateSharedConfig(uint fps, uint mode, uint enabled)
+    {
+        // After STOP/EOF the main loop may still be finishing an iteration (e.g. a fresh injection);
+        // never re-enable the cap once it was reset.
+        if (enabled != 0 && Volatile.Read(ref capReset) == 1) return;
         string[] names = { "DarkHub_Pacer_Config", "Local\\DarkHub_Pacer_Config", "Global\\DarkHub_Pacer_Config" };
         foreach (string name in names)
         {
@@ -268,7 +305,7 @@ class DarkHubFrameLimiter
                             magic = 0x4441524B,
                             target_fps = fps,
                             pacing_mode = mode,
-                            enabled = 1
+                            enabled = enabled
                         };
                         acc.Write(0, ref cfg);
                         return;
@@ -421,39 +458,51 @@ class DarkHubFrameLimiter
             while ((line = Console.ReadLine()) != null)
             {
                 line = line.Trim();
-                if (line == "STOP" || line == "EXIT") { running = false; return; }
+                if (line == "STOP" || line == "EXIT") { running = false; ResetCap(); return; }
                 if (!line.StartsWith("{")) continue;
 
-                int i = line.IndexOf("\"targetFps\":");
-                if (i >= 0)
+                // A malformed line must never kill the reader thread (that would orphan the limiter).
+                try
                 {
-                    string r = line.Substring(i + 12);
-                    int e = r.IndexOfAny(new char[] { ',', '}', ' ' });
-                    if (e >= 0)
+                    int i = line.IndexOf("\"targetFps\":");
+                    if (i >= 0)
                     {
-                        int v;
-                        if (int.TryParse(r.Substring(0, e).Trim(), out v))
+                        string r = line.Substring(i + 12).TrimStart();
+                        int e = r.IndexOfAny(new char[] { ',', '}', ' ' });
+                        if (e >= 0)
                         {
-                            targetFps = v;
-                            UpdateSharedConfig((uint)v, pacingMode == "uncapped" ? 2u : 0u);
+                            int v;
+                            if (int.TryParse(r.Substring(0, e).Trim(), NumberStyles.Integer, INV, out v))
+                            {
+                                v = ClampFps(v);
+                                targetFps = v;
+                                UpdateSharedConfig((uint)v, pacingMode == "uncapped" ? 2u : 0u);
+                            }
+                        }
+                    }
+
+                    i = line.IndexOf("\"pacingMode\":\"");
+                    if (i >= 0)
+                    {
+                        string r = line.Substring(i + 14);
+                        int e = r.IndexOf("\"");
+                        if (e >= 0)
+                        {
+                            pacingMode = r.Substring(0, e);
+                            UpdateSharedConfig((uint)targetFps, pacingMode == "uncapped" ? 2u : 0u);
                         }
                     }
                 }
-
-                i = line.IndexOf("\"pacingMode\":\"");
-                if (i >= 0)
-                {
-                    string r = line.Substring(i + 14);
-                    int e = r.IndexOf("\"");
-                    if (e >= 0)
-                    {
-                        pacingMode = r.Substring(0, e);
-                        UpdateSharedConfig((uint)targetFps, pacingMode == "uncapped" ? 2u : 0u);
-                    }
-                }
+                catch { }
             }
         }
         catch { }
+        finally
+        {
+            // EOF (Electron closed the pipe / died) or a broken stdin: stop and drop the cap.
+            running = false;
+            ResetCap();
+        }
     }
 
     static void Main(string[] args)
@@ -461,8 +510,12 @@ class DarkHubFrameLimiter
         Thread.CurrentThread.CurrentCulture = INV;
         Thread.CurrentThread.CurrentUICulture = INV;
 
-        if (args.Length > 0) int.TryParse(args[0], out targetFps);
+        int argFps;
+        if (args.Length > 0 && int.TryParse(args[0], NumberStyles.Integer, INV, out argFps)) targetFps = ClampFps(argFps);
         if (args.Length > 1) pacingMode = args[1];
+
+        AppDomain.CurrentDomain.ProcessExit += (s, e) => ResetCap();
+        Console.CancelKeyPress += (s, e) => { running = false; ResetCap(); };
 
         Thread stdinThread = new Thread(ReadStdin);
         stdinThread.IsBackground = true;
@@ -472,6 +525,8 @@ class DarkHubFrameLimiter
         int currentGamePid = 0;
         DateTime lastScanTime = DateTime.MinValue;
 
+        try
+        {
         while (running)
         {
             DateTime now = DateTime.UtcNow;
@@ -517,7 +572,12 @@ class DarkHubFrameLimiter
 
             Thread.Sleep(80);
         }
-
-        UpdateSharedConfig(0, 2);
+        }
+        catch (IOException) { /* stdout pipe closed: parent is gone */ }
+        finally
+        {
+            running = false;
+            ResetCap();
+        }
     }
 }

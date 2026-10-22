@@ -1,4 +1,8 @@
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer, webUtils } = require('electron')
+
+// Real on-disk paths of File objects the user dropped/picked (File.path was removed in Electron 32). Taking File
+// objects, not strings, means the page cannot grant itself access to an arbitrary path.
+const pathsOf = (files) => Array.from(files || []).map((f) => { try { return webUtils.getPathForFile(f) } catch { return '' } }).filter(Boolean)
 
 const darkhubApi = {
   hardware: { 
@@ -27,7 +31,8 @@ const darkhubApi = {
     getDeepCategory: (category, forceRefresh = false) => ipcRenderer.invoke('system:getDeepCategory', category, forceRefresh),
     enableProcessTracking: (enabled) => ipcRenderer.invoke('system:enableProcessTracking', enabled),
     runBenchmark: () => ipcRenderer.invoke('system:runBenchmark'),
-    getLiveStats: () => ipcRenderer.invoke('system:getLiveStats')
+    getLiveStats: () => ipcRenderer.invoke('system:getLiveStats'),
+    getMemory: () => ipcRenderer.invoke('system:getMemory')
   },
   app: {
     getAbout: () => ipcRenderer.invoke('app:getAbout'),
@@ -157,7 +162,8 @@ const darkhubApi = {
     selectFiles: (options) => ipcRenderer.invoke('dialog:selectFiles', options),
     selectFolder: (options) => ipcRenderer.invoke('dialog:selectFolder', options),
     saveFile: (options) => ipcRenderer.invoke('dialog:saveFile', options),
-    grantDroppedFiles: (filePaths) => ipcRenderer.invoke('dialog:grantDroppedFiles', filePaths)
+    grantDroppedFiles: (files) => ipcRenderer.invoke('dialog:grantDroppedFiles', pathsOf(files)),
+    pathsForDroppedFiles: (files) => pathsOf(files)
   },
   files: {
     convertImages: (payload) => ipcRenderer.invoke('files:convertImages', payload),
@@ -352,9 +358,40 @@ const darkhubApi = {
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url)
   },
+  hwsensors: {
+    status: () => ipcRenderer.invoke('hwsensors:status'),
+    setEnabled: (payload) => ipcRenderer.invoke('hwsensors:setEnabled', payload)
+  },
+  diskscan: {
+    drives: () => ipcRenderer.invoke('diskscan:drives'),
+    pickFolder: () => ipcRenderer.invoke('diskscan:pickFolder'),
+    start: (payload) => ipcRenderer.invoke('diskscan:start', payload),
+    cancel: () => ipcRenderer.invoke('diskscan:cancel'),
+    status: () => ipcRenderer.invoke('diskscan:status'),
+    view: (payload) => ipcRenderer.invoke('diskscan:view', payload),
+    info: (payload) => ipcRenderer.invoke('diskscan:info', payload),
+    tag: (payload) => ipcRenderer.invoke('diskscan:tag', payload),
+    open: (payload) => ipcRenderer.invoke('diskscan:open', payload),
+    reveal: (payload) => ipcRenderer.invoke('diskscan:reveal', payload),
+    trash: (payload) => ipcRenderer.invoke('diskscan:trash', payload),
+    exportReport: (payload) => ipcRenderer.invoke('diskscan:export', payload),
+    onProgress: (callback) => {
+      const listener = (_e, st) => callback(st)
+      ipcRenderer.on('diskscan:progress', listener)
+      return () => ipcRenderer.removeListener('diskscan:progress', listener)
+    }
+  },
+  wintools: {
+    listFeatures: () => ipcRenderer.invoke('wintools:listFeatures'),
+    setFeature: (payload) => ipcRenderer.invoke('wintools:setFeature', payload),
+    run: (payload) => ipcRenderer.invoke('wintools:run', payload),
+    openPanel: (payload) => ipcRenderer.invoke('wintools:openPanel', payload)
+  },
   driver: {
     detect: () => ipcRenderer.invoke('driver:detect'),
-    openOfficial: (payload) => ipcRenderer.invoke('driver:openOfficial', payload)
+    openOfficial: (payload) => ipcRenderer.invoke('driver:openOfficial', payload),
+    cameraStatus: () => ipcRenderer.invoke('driver:cameraStatus'),
+    repairCamera: () => ipcRenderer.invoke('driver:repairCamera')
   },
   powershell: {
     getPolicies: () => ipcRenderer.invoke('powershell:getPolicies'),
@@ -386,5 +423,16 @@ const darkhubApi = {
 }
 
 darkhubApi.framepacer = darkhubApi.darkpacer
+
+// Dev-only IPC trace (main registers these channels only when not packaged).
+darkhubApi.dev = {
+  getTrace: () => ipcRenderer.invoke('dev:getTrace'),
+  clearTrace: () => ipcRenderer.invoke('dev:clearTrace'),
+  onIpcTrace: (callback) => {
+    const handler = (_, entry) => callback(entry)
+    ipcRenderer.on('dev:ipcTrace', handler)
+    return () => ipcRenderer.removeListener('dev:ipcTrace', handler)
+  }
+}
 
 contextBridge.exposeInMainWorld('darkhub', darkhubApi)

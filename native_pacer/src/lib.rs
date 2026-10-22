@@ -99,7 +99,13 @@ extern "system" {
     fn LoadLibraryA(lpLibFileName: *const i8) -> *mut c_void;
     fn GetProcAddress(hModule: *mut c_void, lpProcName: *const i8) -> *mut c_void;
     fn CreateThread(lpThreadAttributes: *mut c_void, dwStackSize: SIZE_T, lpStartAddress: extern "system" fn(*mut c_void) -> u32, lpParameter: *mut c_void, dwCreationFlags: DWORD, lpThreadId: *mut DWORD) -> HANDLE;
+    fn CreateWaitableTimerExW(lpTimerAttributes: *mut c_void, lpTimerName: *const u16, dwFlags: DWORD, dwDesiredAccess: DWORD) -> HANDLE;
+    fn SetWaitableTimer(hTimer: HANDLE, lpDueTime: *const i64, lPeriod: i32, pfnCompletionRoutine: *mut c_void, lpArgToCompletionRoutine: *mut c_void, fResume: BOOL) -> BOOL;
+    fn WaitForSingleObject(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD;
 }
+
+const CREATE_WAITABLE_TIMER_HIGH_RESOLUTION: DWORD = 0x0000_0002;
+const TIMER_ALL_ACCESS: DWORD = 0x001F_0003;
 
 type FnPresent = unsafe extern "system" fn(p_swap_chain: *mut c_void, sync_interval: u32, flags: u32) -> HRESULT;
 type FnPresent1 = unsafe extern "system" fn(p_swap_chain: *mut c_void, sync_interval: u32, present_flags: u32, p_present_parameters: *const c_void) -> HRESULT;
@@ -167,8 +173,13 @@ static mut LAST_PRESENT_QPC: i64 = 0;
 static mut TELEMETRY_PTR: *mut PacerTelemetryV2 = ptr::null_mut();
 static mut CONFIG_PTR: *mut PacerConfig = ptr::null_mut();
 
+// High-resolution waitable timer used by the limiter. Only touched while BUSY is held, so one
+// shared handle is enough. Null => fall back to Sleep() (Windows < 10 1803).
+static mut WAIT_TIMER: HANDLE = ptr::null_mut();
+
 static FRAME_COUNT: AtomicU64 = AtomicU64::new(0);
 static HOOK_INSTALLED: AtomicBool = AtomicBool::new(false);
+static TIMER_PERIOD_SET: AtomicBool = AtomicBool::new(false);
 static BUSY: AtomicBool = AtomicBool::new(false);
 
 const HIST_CAP: usize = 2048;
@@ -221,8 +232,16 @@ unsafe fn precision_wait(target_ms: f64, start_ms: f64) {
         if remaining <= 0.0 {
             break;
         }
-        // Coarse OS sleep while far from the deadline, short spin for the last stretch.
-        if remaining > 1.5 {
+        // Block on a high-resolution waitable timer while far from the deadline (no core burned),
+        // then spin only for the last ~0.5 ms. Without the timer, coarse Sleep + ~1.5 ms spin.
+        if !WAIT_TIMER.is_null() && remaining > 0.75 {
+            let due_100ns: i64 = -(((remaining - 0.5) * 10_000.0) as i64).max(1); // relative
+            if SetWaitableTimer(WAIT_TIMER, &due_100ns, 0, ptr::null_mut(), ptr::null_mut(), 0) != 0 {
+                WaitForSingleObject(WAIT_TIMER, (remaining as u32).saturating_add(20));
+            } else {
+                Sleep((remaining - 1.0).max(0.0) as u32);
+            }
+        } else if WAIT_TIMER.is_null() && remaining > 1.5 {
             Sleep((remaining - 1.0) as u32);
         } else {
             std::hint::spin_loop();
@@ -486,6 +505,9 @@ unsafe fn map_named(names: &[&str], size: usize) -> *mut c_void {
         let h = CreateFileMappingW(ptr::null_mut(), ptr::null_mut(), 0x04, 0, size as u32, name_u16.as_ptr());
         if !h.is_null() {
             let p = MapViewOfFile(h, 0x0006, 0, 0, size);
+            // The view holds its own reference to the section (the name stays valid while it is
+            // mapped), so the handle is never needed again: close it on success and on failure.
+            CloseHandle(h);
             if !p.is_null() {
                 return p;
             }
@@ -522,11 +544,26 @@ unsafe fn setup_shared_memory() {
     }
 }
 
-unsafe fn patch_slot(slot: usize, new_value: usize) {
+unsafe fn patch_slot(slot: usize, new_value: usize) -> bool {
     let mut old_protect = 0u32;
-    VirtualProtect(slot as LPVOID, std::mem::size_of::<usize>(), 0x04, &mut old_protect); // PAGE_READWRITE
+    // PAGE_READWRITE. Never write when the protection change failed: the vtable lives in a
+    // read-only section and the write would crash the game.
+    if VirtualProtect(slot as LPVOID, std::mem::size_of::<usize>(), 0x04, &mut old_protect) == 0 {
+        return false;
+    }
     *(slot as *mut usize) = new_value;
     VirtualProtect(slot as LPVOID, std::mem::size_of::<usize>(), old_protect, &mut old_protect);
+    true
+}
+
+/// IUnknown::Release (vtable index 2) for the throw-away COM objects.
+unsafe fn com_release(obj: *mut c_void) {
+    if obj.is_null() {
+        return;
+    }
+    let vtbl = *(obj as *const *const usize);
+    let release: unsafe extern "system" fn(*mut c_void) -> u32 = std::mem::transmute(*vtbl.add(2));
+    release(obj);
 }
 
 // Hook IDXGISwapChain::Present (index 8) and Present1 (index 22) through a throw-away swap chain.
@@ -590,20 +627,29 @@ unsafe fn install_vtable_hooks() -> bool {
         PRESENT_SLOT = present_slot;
         PRESENT_ORIG_ADDR = *(present_slot as *const usize);
         ORIGINAL_PRESENT = Some(std::mem::transmute(PRESENT_ORIG_ADDR));
-        patch_slot(present_slot, hooked_present as *const () as usize);
+        if patch_slot(present_slot, hooked_present as *const () as usize) {
+            // Present1 (index 22), only when the implementation exposes it
+            let present1_slot = vtable.add(22) as usize;
+            let orig1 = *(present1_slot as *const usize);
+            if orig1 != 0 {
+                PRESENT1_ORIG_ADDR = orig1;
+                ORIGINAL_PRESENT1 = Some(std::mem::transmute(orig1));
+                if patch_slot(present1_slot, hooked_present1 as *const () as usize) {
+                    PRESENT1_SLOT = present1_slot;
+                }
+            }
 
-        // Present1 (index 22), only when the implementation exposes it
-        let present1_slot = vtable.add(22) as usize;
-        let orig1 = *(present1_slot as *const usize);
-        if orig1 != 0 {
-            PRESENT1_SLOT = present1_slot;
-            PRESENT1_ORIG_ADDR = orig1;
-            ORIGINAL_PRESENT1 = Some(std::mem::transmute(orig1));
-            patch_slot(present1_slot, hooked_present1 as *const () as usize);
+            HOOK_INSTALLED.store(true, Ordering::Relaxed);
+        } else {
+            PRESENT_SLOT = 0;
         }
-
-        HOOK_INSTALLED.store(true, Ordering::Relaxed);
     }
+
+    // The dummy device / context / swap chain were only needed to find the vtable (which lives in
+    // dxgi.dll and stays valid). Release them so no D3D device + GPU memory leaks into the game.
+    com_release(p_context);
+    com_release(p_swap_chain as *mut c_void);
+    com_release(p_device);
 
     DestroyWindow(hwnd);
     HOOK_INSTALLED.load(Ordering::Relaxed)
@@ -624,7 +670,11 @@ unsafe fn remove_vtable_hooks() {
 
 extern "system" fn init_thread(_param: *mut c_void) -> u32 {
     unsafe {
-        timeBeginPeriod(1); // 1 ms kernel timer resolution for the limiter's coarse sleep
+        // 1 ms kernel timer resolution for the limiter's coarse sleep (fallback path).
+        if timeBeginPeriod(1) == 0 {
+            TIMER_PERIOD_SET.store(true, Ordering::Release);
+        }
+        WAIT_TIMER = CreateWaitableTimerExW(ptr::null_mut(), ptr::null(), CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
         setup_shared_memory();
         // Give the game time to create its graphics device before hooking.
         Sleep(500);
@@ -642,7 +692,10 @@ pub extern "system" fn DllMain(
     match reason {
         1 => { // DLL_PROCESS_ATTACH
             unsafe {
-                CreateThread(ptr::null_mut(), 0, init_thread, ptr::null_mut(), 0, ptr::null_mut());
+                let h = CreateThread(ptr::null_mut(), 0, init_thread, ptr::null_mut(), 0, ptr::null_mut());
+                if !h.is_null() {
+                    CloseHandle(h); // the thread keeps running; we never wait on it
+                }
             }
         }
         0 => { // DLL_PROCESS_DETACH
@@ -650,8 +703,18 @@ pub extern "system" fn DllMain(
                 // `reserved` is non-null when the process is terminating: nothing to restore then.
                 if reserved.is_null() {
                     remove_vtable_hooks();
+                    // Hooks are gone, but a Present may still be inside perform_pacing on another
+                    // thread; only free the timer when nobody holds BUSY.
+                    if !WAIT_TIMER.is_null() && BUSY.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+                        CloseHandle(WAIT_TIMER);
+                        WAIT_TIMER = ptr::null_mut();
+                        BUSY.store(false, Ordering::Release);
+                    }
                 }
-                timeEndPeriod(1);
+                // Only undo a period this DLL actually requested (init_thread may never have run).
+                if TIMER_PERIOD_SET.swap(false, Ordering::AcqRel) {
+                    timeEndPeriod(1);
+                }
             }
         }
         _ => {}
@@ -726,4 +789,7 @@ mod win_stubs {
     #[no_mangle] pub extern "system" fn LoadLibraryA(_: *const i8) -> *mut c_void { ptr::null_mut() }
     #[no_mangle] pub extern "system" fn GetProcAddress(_: *mut c_void, _: *const i8) -> *mut c_void { ptr::null_mut() }
     #[no_mangle] pub extern "system" fn CreateThread(_: *mut c_void, _: SIZE_T, _: extern "system" fn(*mut c_void) -> u32, _: *mut c_void, _: DWORD, _: *mut DWORD) -> HANDLE { ptr::null_mut() }
+    #[no_mangle] pub extern "system" fn CreateWaitableTimerExW(_: *mut c_void, _: *const u16, _: DWORD, _: DWORD) -> HANDLE { ptr::null_mut() }
+    #[no_mangle] pub extern "system" fn SetWaitableTimer(_: HANDLE, _: *const i64, _: i32, _: *mut c_void, _: *mut c_void, _: BOOL) -> BOOL { 0 }
+    #[no_mangle] pub extern "system" fn WaitForSingleObject(_: HANDLE, _: DWORD) -> DWORD { 0 }
 }

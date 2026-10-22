@@ -41,13 +41,25 @@ class NativeLatencyClient extends EventEmitter {
     }
 
     try {
-      this.process = spawn(exePath, [], {
+      const proc = spawn(exePath, [], {
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe']
       })
+      this.process = proc
+      registerExitKill()
+
+      // Without these listeners a spawn failure (EACCES/ENOENT) or a write to a
+      // dead daemon (EPIPE) surfaces as an unhandled 'error' event.
+      proc.on('error', () => {
+        if (this.process !== proc) return
+        this.process = null
+        this.isReady = false
+        this._rejectAllPending(new Error('LatencyEngine process error'))
+      })
+      proc.stdin.on('error', () => {})
 
       let buffer = ''
-      this.process.stdout.on('data', (chunk) => {
+      proc.stdout.on('data', (chunk) => {
         buffer += chunk.toString('utf8')
         const lines = buffer.split('\n')
         buffer = lines.pop() || ''
@@ -71,22 +83,29 @@ class NativeLatencyClient extends EventEmitter {
         }
       })
 
-      this.process.stderr.on('data', () => {})
+      proc.stderr.on('data', () => {})
 
-      this.process.on('exit', () => {
+      proc.on('exit', () => {
+        // A newer daemon may already exist (dispose + ensureRunning); only
+        // clear state owned by this process.
+        if (this.process !== proc) return
         this.process = null
         this.isReady = false
-        while (this.pendingCallbacks.length > 0) {
-          const cb = this.pendingCallbacks.shift()
-          clearTimeout(cb.timer)
-          if (!cb.abandoned) cb.reject(new Error('LatencyEngine process exited'))
-        }
+        this._rejectAllPending(new Error('LatencyEngine process exited'))
       })
 
       return true
     } catch (err) {
       this.process = null
       return false
+    }
+  }
+
+  _rejectAllPending(err) {
+    while (this.pendingCallbacks.length > 0) {
+      const cb = this.pendingCallbacks.shift()
+      clearTimeout(cb.timer)
+      if (!cb.abandoned) cb.reject(err)
     }
   }
 
@@ -187,20 +206,45 @@ class NativeLatencyClient extends EventEmitter {
   }
 
   dispose() {
-    if (this.process && !this.process.killed) {
+    const proc = this.process
+    if (proc && !proc.killed) {
       try {
-        this.process.stdin.write(JSON.stringify({ cmd: 'exit' }) + '\n')
-        setTimeout(() => {
-          if (this.process && !this.process.killed) this.process.kill()
+        proc.stdin.write(JSON.stringify({ cmd: 'exit' }) + '\n')
+        // Capture the instance: this.process is nulled below, so checking
+        // `this.process` in the timer never killed a daemon that ignored 'exit'.
+        const t = setTimeout(() => {
+          if (proc.exitCode === null && !proc.killed) {
+            try { proc.kill() } catch {}
+          }
         }, 500)
+        t.unref?.()
       } catch {
-        try { this.process.kill() } catch {}
+        try { proc.kill() } catch {}
       }
     }
     this.process = null
     this.isReady = false
   }
+
+  /** Synchronous hard kill, safe to call from process 'exit'. */
+  killSync() {
+    const proc = this.process
+    this.process = null
+    this.isReady = false
+    if (proc && proc.exitCode === null && !proc.killed) {
+      try { proc.kill() } catch {}
+    }
+  }
 }
 
 export const nativeLatencyClient = new NativeLatencyClient()
+
+// Windows does not terminate children with the parent; make sure the daemon
+// (which may hold a 0.5 ms timer-resolution lock) never outlives the app.
+let exitKillRegistered = false
+function registerExitKill() {
+  if (exitKillRegistered) return
+  exitKillRegistered = true
+  process.once('exit', () => nativeLatencyClient.killSync())
+}
 export default nativeLatencyClient

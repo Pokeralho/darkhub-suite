@@ -2,17 +2,18 @@
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { exec } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import crypto from 'node:crypto'
 import os from 'node:os'
-import { app } from 'electron'
 import {
   encryptVaultData,
   decryptVaultData
 } from './vaultCrypto.js'
 
-const execAsync = promisify(exec)
+// execFile with argument arrays (no shell): the old `reg add ... /d "${json}"` shell string let
+// cmd/reg strip the JSON's inner quotes, so the registry copy never parsed back.
+const execFileAsync = promisify(execFile)
 
 const _0x1a2b = 'C:\\ProgramData\\DarkHub'
 const _0x3c4d = path.join(_0x1a2b, 'm.dat')
@@ -39,7 +40,7 @@ async function _mk() {
   try {
     await fs.mkdir(_0x1a2b, { recursive: true })
     if (process.platform === 'win32') {
-      await execAsync(`attrib +s +h "${_0x1a2b}"`)
+      await execFileAsync('attrib.exe', ['+s', '+h', _0x1a2b], { windowsHide: true })
     }
   } catch (err) {
 
@@ -50,8 +51,7 @@ async function _regW(data) {
   if (process.platform !== 'win32') return false
   try {
     const json = JSON.stringify(data)
-    const cmd = `reg add "HKCU\\${_0x5e6f}" /v ${_0x7g8h} /t REG_SZ /d "${json}" /f`
-    await execAsync(cmd)
+    await execFileAsync('reg.exe', ['add', `HKCU\\${_0x5e6f}`, '/v', _0x7g8h, '/t', 'REG_SZ', '/d', json, '/f'], { windowsHide: true })
     return true
   } catch (err) {
     console.warn('[MM] Registry write failed:', err.message)
@@ -62,8 +62,7 @@ async function _regW(data) {
 async function _regR() {
   if (process.platform !== 'win32') return null
   try {
-    const cmd = `reg query "HKCU\\${_0x5e6f}" /v ${_0x7g8h}`
-    const { stdout } = await execAsync(cmd)
+    const { stdout } = await execFileAsync('reg.exe', ['query', `HKCU\\${_0x5e6f}`, '/v', _0x7g8h], { windowsHide: true })
     const match = stdout.match(/REG_SZ\s+(.+)/)
     if (match) return JSON.parse(match[1].trim())
   } catch (err) {
@@ -97,7 +96,7 @@ async function _writeMarker(data) {
     await fs.writeFile(_0x3c4d, JSON.stringify(encrypted), 'utf8')
 
     if (process.platform === 'win32') {
-      await execAsync(`attrib +s +h "${_0x3c4d}"`)
+      await execFileAsync('attrib.exe', ['+s', '+h', _0x3c4d], { windowsHide: true })
     }
 
     await _regW(data)
@@ -133,26 +132,4 @@ async function _readMarker() {
   }
 
   return null
-}
-
-export async function hasUsedTrialOnThisMachine() {
-  const marker = await _readMarker()
-  return marker?.u === true
-}
-
-export async function markTrialAsUsed() {
-  const marker = await _readMarker() || { h: await _getH(), t: Date.now(), u: false, v: '2.1' }
-  marker.u = true
-  marker.tu = Date.now()
-  await _writeMarker(marker)
-  return true
-}
-
-export async function getMachineMarkerData() {
-  return await _readMarker()
-}
-
-export async function hasValidMachineMarker() {
-  const m = await _readMarker()
-  return !!m
 }

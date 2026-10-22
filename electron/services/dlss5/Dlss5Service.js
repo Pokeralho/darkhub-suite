@@ -1,8 +1,6 @@
 import path from 'node:path';
 import fsRaw from 'node:fs';
 import os from 'node:os';
-import https from 'node:https';
-import http from 'node:http';
 import crypto from 'node:crypto';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -102,10 +100,6 @@ function inspectPeExecutable(filePath) {
   }
 }
 
-function parsePeImports(filePath) {
-  return inspectPeExecutable(filePath).importedDlls;
-}
-
 /**
  * Calculates SHA-256 hash of a file for cryptographic authenticity verification
  */
@@ -171,8 +165,10 @@ class Dlss5Service {
 
     for (const q of queries) {
       try {
-        const { stdout } = execSync(q, { windowsHide: true, encoding: 'utf8' });
-        for (const line of stdout.split(/\r?\n/)) {
+        // execSync returns the stdout string itself (destructuring it yielded
+        // undefined, so the registry lookup never worked).
+        const stdout = execSync(q, { windowsHide: true, encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] });
+        for (const line of String(stdout || '').split(/\r?\n/)) {
           const match = line.match(/(?:SteamPath|InstallPath)\s+REG_SZ\s+(.+)$/i);
           if (match && match[1]) {
             const p = match[1].trim().replace(/\//g, '\\');
@@ -205,7 +201,9 @@ class Dlss5Service {
       const matches = [...vdf.matchAll(/"path"\s+"([^"]+)"/g)];
       for (const m of matches) {
         const libPath = path.normalize(m[1].replace(/\\\\/g, '\\'));
-        if (!paths.includes(libPath) && fsRaw.existsSync(libPath)) {
+        // Windows paths are case-insensitive: the registry path and the vdf entry for the same library differ in case.
+        const key = libPath.toLowerCase().replace(/\\+$/, '');
+        if (!paths.some((p) => path.normalize(p).toLowerCase().replace(/\\+$/, '') === key) && fsRaw.existsSync(libPath)) {
           paths.push(libPath);
         }
       }
@@ -236,7 +234,7 @@ class Dlss5Service {
               const dirMatch = acf.match(/"installdir"\s+"([^"]+)"/);
               if (idMatch && nameMatch && dirMatch) {
                 const appId = idMatch[1];
-                if (ignoredApps.has(appId)) continue;
+                if (ignoredApps.has(appId) || games.some((g) => g.appId === appId)) continue;
                 const gameDir = path.join(appsDir, 'common', dirMatch[1]);
                 if (fsRaw.existsSync(gameDir)) {
                   const manifestPath = path.join(gameDir, MANIFEST_NAME);
@@ -1196,6 +1194,8 @@ if ($null -eq $prev) { 'PREV=none' } else { "PREV=$prev" }
     let backupDir = prev?.backupDir && fsRaw.existsSync(prev.backupDir) ? prev.backupDir : path.join(backupRoot, `backup_${Date.now()}`);
     await fs.mkdir(backupDir, { recursive: true });
     const backedUp = new Set(Array.isArray(prev?.backedUp) ? prev.backedUp : []);
+    // Originals backed up during *this* run; only these are rolled back on failure.
+    const newlyBackedUp = new Set();
     const ownedBefore = new Set((prev?.injectedFiles || []).map((f) => String(f.file).toLowerCase()));
     const injected = new Map();
     const createdDirs = new Set(prev?.createdDirs || []);
@@ -1214,6 +1214,7 @@ if ($null -eq $prev) { 'PREV=none' } else { "PREV=$prev" }
         await fs.mkdir(path.dirname(bak), { recursive: true });
         await fs.copyFile(dst, bak);
         backedUp.add(rel);
+        newlyBackedUp.add(rel);
       }
     };
 
@@ -1351,14 +1352,42 @@ if ($null -eq $prev) { 'PREV=none' } else { "PREV=$prev" }
       for (const [rel] of injected) {
         if (!ownedBefore.has(rel.toLowerCase())) await fs.unlink(path.join(targetDir, rel)).catch(() => {});
       }
-      for (const rel of backedUp) {
+      // Restoring originals backed up by a *previous* install would break that
+      // install (its manifest still lists the loader as injected).
+      for (const rel of newlyBackedUp) {
         const bak = path.join(backupDir, rel);
         if (fsRaw.existsSync(bak)) await fs.copyFile(bak, path.join(targetDir, rel)).catch(() => {});
       }
+      if (!prev) await fs.rm(backupDir, { recursive: true, force: true }).catch(() => {});
       return { ok: false, error: err?.message || String(err) };
     }
 
-    const injectedFiles = [...injected.values(), ...(prev?.injectedFiles || []).filter((f) => !injected.has(f.file))];
+    // Re-apply with a different proxy loader: drop the previous one, otherwise two
+    // OptiScaler proxies get loaded (0xc0000142 / double hooks).
+    const staleLoaders = new Set();
+    const prevLoader = typeof prev?.loader === 'string' ? prev.loader : null;
+    if (prevLoader && prevLoader.toLowerCase() !== loader.toLowerCase() && !injected.has(prevLoader) &&
+        ownedBefore.has(prevLoader.toLowerCase()) && insideTarget(path.join(targetDir, prevLoader))) {
+      const dst = path.join(targetDir, prevLoader);
+      const bak = path.join(backupDir, prevLoader);
+      try {
+        if (backedUp.has(prevLoader) && fsRaw.existsSync(bak)) {
+          await fs.copyFile(bak, dst);
+          backedUp.delete(prevLoader);
+        } else {
+          await fs.unlink(dst);
+        }
+        staleLoaders.add(prevLoader.toLowerCase());
+        onLog(`[DLSS 5] Loader anterior removido: ${prevLoader}`);
+      } catch (e) {
+        warnings.push(`Não foi possível remover o loader anterior ${prevLoader}: ${e.message}`);
+      }
+    }
+
+    const injectedFiles = [
+      ...injected.values(),
+      ...(prev?.injectedFiles || []).filter((f) => !injected.has(f.file) && !staleLoaders.has(String(f.file).toLowerCase()))
+    ];
     const manifest = {
       appliedAt: Date.now(),
       gameName: scanRes.gameName,
@@ -1410,13 +1439,19 @@ if ($null -eq $prev) { 'PREV=none' } else { "PREV=$prev" }
       return rel && !rel.startsWith('..') && !path.isAbsolute(rel);
     };
 
+    const stillInjected = [];
     // 1) Remove only what we injected
     for (const entry of manifest.injectedFiles || []) {
       const rel = typeof entry === 'string' ? entry : entry.file;
       if (!rel) continue;
       const p = path.join(targetDir, rel);
       if (!inside(p)) continue;
-      await fs.unlink(p).catch(() => {});
+      try {
+        await fs.unlink(p);
+      } catch (e) {
+        // ENOENT is fine; EBUSY/EPERM (game running) means the mod is still there.
+        if (e?.code !== 'ENOENT') stillInjected.push(entry);
+      }
     }
 
     // 2) Restore originals recorded at install time
@@ -1448,8 +1483,23 @@ if ($null -eq $prev) { 'PREV=none' } else { "PREV=$prev" }
       await this.restoreSignatureCheckBypass(manifest.signatureBypass.previous);
     }
 
-    // 5) Cleanup
-    if (failed.length === 0 && backupDir && inside(backupDir)) {
+    // 5) Cleanup. If anything could not be undone (e.g. the game is running and
+    // holds the DLLs), keep a manifest of what is left so revert can be retried
+    // instead of losing track of the injected files and the backups.
+    if (failed.length > 0 || stillInjected.length > 0) {
+      const remaining = { ...manifest, injectedFiles: stillInjected, backedUp: failed, signatureBypass: null, partialRevertAt: Date.now() };
+      await fs.writeFile(path.join(targetDir, MANIFEST_NAME), JSON.stringify(remaining, null, 2), 'utf8').catch(() => {});
+      onLog(`[AVISO] Reversão parcial: ${stillInjected.length + failed.length} arquivo(s) em uso. Feche o jogo e reverta novamente.`);
+      return {
+        ok: false,
+        partial: true,
+        error: `Reversão parcial: ${stillInjected.length + failed.length} arquivo(s) não puderam ser alterados (o jogo está aberto?). Feche o jogo e tente novamente.`,
+        restoredCount,
+        failed,
+        stillInjected: stillInjected.map((e) => (typeof e === 'string' ? e : e.file))
+      };
+    }
+    if (backupDir && inside(backupDir)) {
       await fs.rm(backupDir, { recursive: true, force: true }).catch(() => {});
       await fs.rmdir(path.join(targetDir, BACKUP_DIR_NAME)).catch(() => {});
     }
@@ -1467,6 +1517,14 @@ if ($null -eq $prev) { 'PREV=none' } else { "PREV=$prev" }
 
 export function registerDlss5IPC({ app, ipcMain, shell }) {
   const service = new Dlss5Service(app);
+  // apply/revert back up and swap game DLLs; never let two of them interleave
+  // (double click, apply racing revert) or the backups capture modded files.
+  let mutationChain = Promise.resolve();
+  const serialized = (fn) => {
+    const run = mutationChain.then(fn, fn);
+    mutationChain = run.catch(() => {});
+    return run;
+  };
 
   ipcMain.handle('dlss5:getSteamGames', async () => {
     try {
@@ -1501,7 +1559,7 @@ export function registerDlss5IPC({ app, ipcMain, shell }) {
           event.sender.send('dlss5:log', msg);
         } catch {}
       };
-      return await service.apply(payload, onLog);
+      return await serialized(() => service.apply(payload, onLog));
     } catch (err) {
       return { ok: false, error: err?.message || String(err) };
     }
@@ -1515,7 +1573,7 @@ export function registerDlss5IPC({ app, ipcMain, shell }) {
         } catch {}
       };
       const p = typeof payload === 'string' ? { targetDir: payload } : payload;
-      return await service.revert(p, onLog);
+      return await serialized(() => service.revert(p, onLog));
     } catch (err) {
       return { ok: false, error: err?.message || String(err) };
     }

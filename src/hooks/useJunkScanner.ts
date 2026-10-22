@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const STORAGE_KEY = 'darkhub.dashboard.junkEstimate'
 const TTL_MS = 30 * 60 * 1000
@@ -32,9 +32,20 @@ function saveCache(data: Omit<CachedJunk, 'cachedAt'>) {
 export const useJunkScanner = () => {
   const [junk, setJunk] = useState<any>(() => loadCached())
   const [loading, setLoading] = useState(() => loadCached() === null)
+  const mountedRef = useRef(true)
+  const inFlightRef = useRef(false)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   const fetchJunk = async (forceFetch = false) => {
-    if (!window.darkhub) return
+    if (!window.darkhub) {
+      // no preload bridge: never leave the card spinning forever
+      setLoading(false)
+      return
+    }
 
     if (!forceFetch) {
       const cached = loadCached()
@@ -45,20 +56,23 @@ export const useJunkScanner = () => {
       }
     }
 
+    if (inFlightRef.current) return // repeated refresh clicks would spawn parallel scans
+    inFlightRef.current = true
     setLoading(true)
     try {
       const res = await window.darkhub.system.getJunkEstimate({ timeoutMs: 900, cacheTtlMs: 60_000 })
       if (res?.ok && typeof res?.bytes === 'number') {
         saveCache({ bytes: res.bytes, ok: true, truncated: res.truncated })
       }
-      setJunk(res)
+      if (mountedRef.current) setJunk(res)
     } catch (e) {
-      setJunk(null)
+      if (mountedRef.current) setJunk(null)
       if (import.meta.env.DEV) {
         console.warn('[Dashboard] Falha ao buscar Lixo Residual:', e)
       }
     } finally {
-      setLoading(false)
+      inFlightRef.current = false
+      if (mountedRef.current) setLoading(false)
     }
   }
 

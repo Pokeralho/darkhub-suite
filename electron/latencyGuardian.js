@@ -28,12 +28,13 @@ function stablePolicyName(prefix, exePath) {
   return `${prefix}-${h}`
 }
 
-function parsePingMs(output) {
-  const s = String(output ?? '')
-  const m = s.match(/time[=<]\s*(\d+)\s*ms/i)
-  if (m) return Number(m[1])
-  if (/time[=<]\s*<\s*1ms/i.test(s)) return 1
-  return null
+function safeJsonParse(text, fallback) {
+  try {
+    const v = JSON.parse(String(text ?? '').trim() || 'null')
+    return v ?? fallback
+  } catch {
+    return fallback
+  }
 }
 
 function psSingleQuote(value) {
@@ -123,6 +124,11 @@ export function registerLatencyGuardian(deps) {
 
   let timerResolutionProc = null
   let launchedGame = null
+
+  // The fallback timer-lock PowerShell loops forever; never let it outlive the app.
+  process.once('exit', () => {
+    try { timerResolutionProc?.kill() } catch {}
+  })
 
   async function loadConfig() {
     try {
@@ -256,10 +262,14 @@ public static class NtTimer {
       [void][NtTimer]::NtSetTimerResolution(5000, $true, [ref]$cur)
       while($true){ Start-Sleep -Milliseconds 2000 }
     `
-    timerResolutionProc = spawn('powershell.exe', encodedPowerShellArgs(ps), { windowsHide: true })
-    timerResolutionProc.on('exit', () => {
-      timerResolutionProc = null
-    })
+    const proc = spawn('powershell.exe', encodedPowerShellArgs(ps), { windowsHide: true, stdio: 'ignore' })
+    timerResolutionProc = proc
+    const clear = () => {
+      if (timerResolutionProc === proc) timerResolutionProc = null
+    }
+    proc.on('exit', clear)
+    // Unhandled 'error' (spawn failure) would otherwise crash the main process.
+    proc.on('error', clear)
   }
 
   async function stopTimerResolution() {
@@ -346,7 +356,7 @@ public static class NtTimer {
       } | ConvertTo-Json -Compress
     `
     const { code: c1, stdout: o1 } = await runPowerShell(psRead, { timeoutMs: 8000 })
-    const prev = c1 === 0 ? JSON.parse(stripBom(o1).trim() || '{}') : {}
+    const prev = c1 === 0 ? safeJsonParse(stripBom(o1), {}) : {}
 
     const psWrite = `
       $ErrorActionPreference='Stop'
@@ -430,7 +440,7 @@ public static class NtTimer {
     `
     const { code: c1, stdout: o1, stderr: e1 } = await runPowerShell(psRead, { timeoutMs: 12000 })
     if (c1 !== 0) throw new Error(e1 || 'Failed to read DNS servers')
-    const before = JSON.parse(stripBom(o1).trim() || '{}')
+    const before = safeJsonParse(stripBom(o1), {})
     const prev = Array.isArray(before?.servers) ? before.servers : []
 
     const psApply = `
@@ -523,7 +533,7 @@ public static class NtTimer {
     `
     const readRes = await runPowerShell(psRead, { timeoutMs: 12000 })
     if (readRes.code !== 0) throw new Error(readRes.stderr || 'Falha ao localizar adaptador de rede ativo')
-    const prev = JSON.parse(stripBom(readRes.stdout).trim() || '{}')
+    const prev = safeJsonParse(stripBom(readRes.stdout), {})
     const key = prev?.key
     if (!key) throw new Error('Falha ao localizar chave de registro do adaptador')
 
@@ -547,7 +557,7 @@ public static class NtTimer {
       } | ConvertTo-Json -Compress
     `
     const verifyRes = await runPowerShell(psVerify, { timeoutMs: 8000 })
-    const after = verifyRes.code === 0 ? JSON.parse(stripBom(verifyRes.stdout).trim() || '{}') : {}
+    const after = verifyRes.code === 0 ? safeJsonParse(stripBom(verifyRes.stdout), {}) : {}
     const verified = Number(after?.TcpAckFrequency) === 1 && Number(after?.TCPNoDelay) === 1
 
     return { ...prev, verified }
@@ -605,11 +615,31 @@ public static class NtTimer {
     `
     const { code, stdout } = await runPowerShell(ps, { timeoutMs: 12000 })
     if (code !== 0) return { killed: [] }
-    const parsed = JSON.parse(stripBom(stdout).trim() || '[]')
-    return { killed: Array.isArray(parsed) ? parsed : [] }
+    // ConvertTo-Json emits a bare string (not an array) for a single item.
+    const parsed = safeJsonParse(stripBom(stdout), [])
+    return { killed: Array.isArray(parsed) ? parsed : typeof parsed === 'string' ? [parsed] : [] }
   }
 
-  async function ultraEnable(manual = false) {
+  // ultraEnable/ultraDisable run many slow PowerShell steps. The 1.5 s auto loop,
+  // the hotkey and IPC could interleave them, so a second enable would snapshot
+  // already-tweaked values as "prev" and the restore would never return the
+  // original power plan / registry values. Serialize every transition.
+  let transitionChain = Promise.resolve()
+  function serializeTransition(fn) {
+    const run = transitionChain.then(fn, fn)
+    transitionChain = run.catch(() => {})
+    return run
+  }
+
+  function ultraEnable(...args) {
+    return serializeTransition(() => ultraEnableImpl(...args))
+  }
+
+  function ultraDisable() {
+    return serializeTransition(() => ultraDisableImpl())
+  }
+
+  async function ultraEnableImpl(manual = false) {
 
     if (process.platform !== 'win32') throw new Error('Only supported on Windows')
     if (state.ultraEnabled) return { ok: true, status: state }
@@ -772,7 +802,7 @@ public static class NtTimer {
     return { ok: true, status: state, applied }
   }
 
-  async function ultraDisable() {
+  async function ultraDisableImpl() {
 
     if (!state.ultraEnabled) return { ok: true, status: state }
     const exePath = String(config.gameExePath || '').trim()
@@ -944,7 +974,19 @@ public static class Psapi {
     await runPowerShell(ps, { timeoutMs: 45000 })
   }
 
+  let loopBusy = false
   async function loop() {
+    // ultraEnable can take far longer than the 1.5 s tick; don't stack ticks.
+    if (loopBusy) return
+    loopBusy = true
+    try {
+      await loopTick()
+    } finally {
+      loopBusy = false
+    }
+  }
+
+  async function loopTick() {
     try {
       await updateMetricsFast()
     } catch {}
@@ -994,14 +1036,19 @@ public static class Psapi {
       timers[k] = null
     }
     unregisterHotkey()
-    stopTimerResolution()
+    await stopTimerResolution().catch(() => {})
+    try { nativeLatencyClient.dispose() } catch {}
   }
 
   ipcMain.handle('latency:getConfig', async () => {
+    // Polled every 1.5 s by the page and the global GuardianWidget: don't spawn
+    // the native daemon just to read the timer; only ask it when it is alive.
     let timerRes = null
-    try {
-      timerRes = await nativeLatencyClient.queryTimer()
-    } catch {}
+    if (nativeLatencyClient.process) {
+      try {
+        timerRes = await nativeLatencyClient.queryTimer()
+      } catch {}
+    }
     return { ok: true, config, status: { ...state, timerResolutionInfo: timerRes || state.timerResolutionInfo }, metrics }
   })
 
@@ -1208,6 +1255,16 @@ public static class Psapi {
         windowsHide: false,
         detached: false
       })
+
+      // spawn() reports ENOENT/EACCES asynchronously via 'error'; without a
+      // listener it is an uncaught exception and launchedGame stays stuck,
+      // blocking every future launch.
+      const spawnError = await new Promise((resolve) => {
+        proc.once('error', resolve)
+        proc.once('spawn', () => resolve(null))
+      })
+      if (spawnError) throw spawnError
+      proc.on('error', () => {})
 
       launchedGame = { proc, exePath, startedAt: now(), prevConfig, prevUltra, gameId: payload?.gameId, gameName: payload?.gameName ?? '' }
 

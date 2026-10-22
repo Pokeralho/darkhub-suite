@@ -1,3 +1,6 @@
+﻿# Stdout is decoded as UTF-8 by the Electron side (PowerShell 5.1 defaults to the OEM code page).
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
+
 $script:CSharpCode = @"
 using System;
 using System.Diagnostics;
@@ -35,6 +38,19 @@ namespace DarkHub.Injector
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool CloseHandle(IntPtr hObject);
 
+        [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
+        private static extern bool VirtualFreeEx(IntPtr hProcess, IntPtr lpAddress, UIntPtr dwSize, uint dwFreeType);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetExitCodeThread(IntPtr hThread, out uint lpExitCode);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsWow64Process(IntPtr hProcess, [MarshalAs(UnmanagedType.Bool)] out bool wow64Process);
+
+        const uint MEM_RELEASE = 0x00008000;
+        const uint WAIT_OBJECT_0 = 0;
+
         const uint PROCESS_CREATE_THREAD = 0x0002;
         const uint PROCESS_QUERY_INFORMATION = 0x0400;
         const uint PROCESS_VM_OPERATION = 0x0008;
@@ -49,6 +65,7 @@ namespace DarkHub.Injector
         {
             try
             {
+                dllPath = Path.GetFullPath(dllPath);
                 if (!File.Exists(dllPath))
                     return "ERROR: DLL não encontrada no caminho especificado.";
 
@@ -62,6 +79,14 @@ namespace DarkHub.Injector
 
                 if (hProcess == IntPtr.Zero)
                     return "ERROR: Falha ao abrir o processo. Execute o DarkHub como Administrador.";
+
+                // LoadLibraryW is resolved in *this* process: it is only valid in a target of the same bitness.
+                bool targetWow64, selfWow64;
+                if (IsWow64Process(hProcess, out targetWow64) && IsWow64Process(Process.GetCurrentProcess().Handle, out selfWow64) && targetWow64 != selfWow64)
+                {
+                    CloseHandle(hProcess);
+                    return "ERROR: Arquitetura incompatível (processo alvo 32-bit vs injetor 64-bit ou vice-versa).";
+                }
 
                 byte[] dllBytes = Encoding.Unicode.GetBytes(dllPath + "\0");
                 IntPtr allocMemAddress = VirtualAllocEx(hProcess, IntPtr.Zero, (uint)dllBytes.Length, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
@@ -77,6 +102,7 @@ namespace DarkHub.Injector
 
                 if (!writeResult)
                 {
+                    VirtualFreeEx(hProcess, allocMemAddress, UIntPtr.Zero, MEM_RELEASE);
                     CloseHandle(hProcess);
                     return "ERROR: Falha ao gravar a DLL na memória alvo (WriteProcessMemory).";
                 }
@@ -85,6 +111,7 @@ namespace DarkHub.Injector
 
                 if (loadLibraryAddr == IntPtr.Zero)
                 {
+                    VirtualFreeEx(hProcess, allocMemAddress, UIntPtr.Zero, MEM_RELEASE);
                     CloseHandle(hProcess);
                     return "ERROR: Falha ao encontrar o endereço de LoadLibraryW na kernel32.";
                 }
@@ -93,15 +120,27 @@ namespace DarkHub.Injector
 
                 if (hThread == IntPtr.Zero)
                 {
+                    VirtualFreeEx(hProcess, allocMemAddress, UIntPtr.Zero, MEM_RELEASE);
                     CloseHandle(hProcess);
                     return "ERROR: Falha ao criar a Thread Remota para execução da DLL (CreateRemoteThread).";
                 }
 
-                WaitForSingleObject(hThread, 5000);
+                uint waitResult = WaitForSingleObject(hThread, 5000);
+                uint exitCode = 0;
+                bool gotExit = waitResult == WAIT_OBJECT_0 && GetExitCodeThread(hThread, out exitCode);
                 CloseHandle(hThread);
+                // Only free the path buffer once LoadLibraryW has returned; freeing it earlier could crash the target.
+                if (waitResult == WAIT_OBJECT_0)
+                    VirtualFreeEx(hProcess, allocMemAddress, UIntPtr.Zero, MEM_RELEASE);
                 CloseHandle(hProcess);
 
-                return "SUCCESS: DLL injetada perfeitamente no processo " + processName;
+                if (waitResult != WAIT_OBJECT_0)
+                    return "ERROR: Tempo esgotado aguardando LoadLibraryW no processo alvo.";
+                // The thread exit code is the (truncated) HMODULE returned by LoadLibraryW: 0 means it failed.
+                if (gotExit && exitCode == 0)
+                    return "ERROR: LoadLibraryW falhou no processo alvo (dependências ausentes ou DLL inválida).";
+
+                return "SUCCESS: DLL injetada no processo " + processName;
             }
             catch (Exception ex)
             {

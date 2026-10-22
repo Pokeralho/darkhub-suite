@@ -29,6 +29,7 @@ function assertAllowedUrl(rawUrl, allowedHosts) {
 /**
  * Downloads an HTTPS resource to disk with host allow-listing on every redirect hop,
  * a size cap, an inactivity timeout and optional SHA-256 verification.
+ * `onProgress({ transferred, total })` is called as data arrives (total is 0 when unknown).
  * Resolves with { sha256, bytes }. Partial files are removed on any failure.
  */
 export function downloadToFile(url, dest, {
@@ -37,12 +38,24 @@ export function downloadToFile(url, dest, {
   maxRedirects = 5,
   timeoutMs = 60000,
   expectedSha256 = null,
-  userAgent = 'DarkHubSuite'
+  userAgent = 'DarkHubSuite',
+  onProgress = null
 } = {}) {
   return new Promise((resolve, reject) => {
+    let settled = false
+    let out = null
+
     const cleanupAndReject = (err) => {
-      fs.unlink(dest, () => {})
-      reject(err)
+      if (settled) return
+      settled = true
+      // On Windows an open handle blocks unlink: close the stream first, then remove the partial file.
+      const unlink = () => fs.unlink(dest, () => reject(err))
+      if (out && !out.closed) {
+        out.once('close', unlink)
+        out.destroy()
+      } else {
+        unlink()
+      }
     }
 
     const attempt = (currentUrl, redirectsLeft) => {
@@ -57,7 +70,12 @@ export function downloadToFile(url, dest, {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume()
           if (redirectsLeft <= 0) return cleanupAndReject(new Error('Muitos redirecionamentos.'))
-          const next = new URL(res.headers.location, parsed).toString()
+          let next
+          try {
+            next = new URL(res.headers.location, parsed).toString()
+          } catch {
+            return cleanupAndReject(new Error('Redirecionamento invalido.'))
+          }
           return attempt(next, redirectsLeft - 1)
         }
         if (res.statusCode !== 200) {
@@ -65,8 +83,14 @@ export function downloadToFile(url, dest, {
           return cleanupAndReject(new Error(`Servidor respondeu com status ${res.statusCode}`))
         }
 
+        const total = Number(res.headers['content-length']) || 0
+        if (total > maxBytes) {
+          res.resume()
+          return cleanupAndReject(new Error('Arquivo excede o tamanho maximo permitido.'))
+        }
+
         const hash = crypto.createHash('sha256')
-        const out = fs.createWriteStream(dest)
+        out = fs.createWriteStream(dest)
         let bytes = 0
 
         res.on('data', (chunk) => {
@@ -76,19 +100,24 @@ export function downloadToFile(url, dest, {
             return
           }
           hash.update(chunk)
+          if (onProgress) {
+            try { onProgress({ transferred: bytes, total }) } catch { /* listener errors must not break the download */ }
+          }
         })
-        res.on('error', (err) => {
-          out.destroy()
-          cleanupAndReject(err)
-        })
+        res.on('error', cleanupAndReject)
         res.pipe(out)
         out.on('error', cleanupAndReject)
         out.on('finish', () => {
           out.close(() => {
+            if (settled) return
+            if (total && bytes !== total) {
+              return cleanupAndReject(new Error('Download incompleto.'))
+            }
             const sha256 = hash.digest('hex')
             if (expectedSha256 && sha256 !== String(expectedSha256).toLowerCase()) {
               return cleanupAndReject(new Error('Hash SHA-256 do download nao confere com o publicado.'))
             }
+            settled = true
             resolve({ sha256, bytes })
           })
         })

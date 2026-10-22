@@ -45,6 +45,14 @@ describe('DriverCenter official source handling', () => {
     expect(D.isOfficialDriverUrl('https://nvidia.com.evil.com/x')).toBe(false); // host spoof
     expect(D.isOfficialDriverUrl('https://drivers.example.com')).toBe(false);
     expect(D.isOfficialDriverUrl('not a url')).toBe(false);
+    expect(D.isOfficialDriverUrl('https://www.nvidia.com:8443/x')).toBe(false); // non-default port
+    expect(D.isOfficialDriverUrl('https://user:pw@www.amd.com/x')).toBe(false); // embedded credentials
+    expect(D.isOfficialDriverUrl('https://www.nvidia.com@evil.com/x')).toBe(false); // userinfo spoof
+  });
+  it('every bundled official URL passes the whitelist', () => {
+    for (const src of Object.values(D.OFFICIAL_SOURCES) as Record<string, string>[]) {
+      for (const url of Object.values(src)) expect(D.isOfficialDriverUrl(url)).toBe(true);
+    }
   });
 });
 
@@ -93,5 +101,78 @@ describe('DriverCenter detectAdapters (injected runner)', () => {
     } else {
       expect(res.ok).toBe(false); // non-Windows guard
     }
+  });
+  it('reports runner timeouts and non-JSON output instead of throwing', async () => {
+    const timeout = new D.DriverCenterService({ runner: async () => { throw new Error('Command timed out after 20000ms'); } });
+    const garbage = new D.DriverCenterService({ runner: async () => ({ stdout: 'not json at all', stderr: '', code: 0 }) });
+    const a = await timeout.detectAdapters();
+    const b = await garbage.detectAdapters();
+    expect(a.ok).toBe(false);
+    expect(b.ok).toBe(false);
+    expect(a.adapters).toEqual([]);
+  });
+});
+
+describe('DriverCenter generic display driver (DarkOS fresh install)', () => {
+  it('reads the vendor from the PCI id', () => {
+    expect(D.vendorFromPnpId('PCI\\VEN_10DE&DEV_2504&SUBSYS_1')).toBe('nvidia');
+    expect(D.vendorFromPnpId('PCI\\VEN_1002&DEV_73EF')).toBe('amd');
+    expect(D.vendorFromPnpId('PCI\\VEN_8086&DEV_A780')).toBe('intel');
+    expect(D.vendorFromPnpId('PCI\\VEN_1234&DEV_1111')).toBe('virtual');
+    expect(D.vendorFromPnpId('ROOT\\BasicDisplay\\0000')).toBe(null);
+  });
+
+  it('flags a real GPU running on Microsoft Basic Display (pt-BR and en-US) and names the vendor', () => {
+    const pt = D.normalizeAdapter({ name: 'Adaptador de Vídeo Básico da Microsoft', provider: '(Adaptadores de vídeo padrão)', pnpId: 'PCI\\VEN_10DE&DEV_2504&SUBSYS_1' });
+    expect(pt.vendor).toBe('nvidia');
+    expect(pt.genericDriver).toBe(true);
+    expect(pt.model).toContain('NVIDIA');
+    expect(pt.officialSources).toBeTruthy();
+    expect(pt.deviceId).toBe('VEN_10DE&DEV_2504');
+    const en = D.normalizeAdapter({ name: 'Microsoft Basic Display Adapter', provider: 'Microsoft', pnpId: 'PCI\\VEN_1002&DEV_73EF' });
+    expect(en.vendor).toBe('amd');
+    expect(en.genericDriver).toBe(true);
+  });
+
+  it('does not flag a GPU with its vendor driver, nor a VM display', () => {
+    expect(D.normalizeAdapter({ name: 'AMD Radeon RX 6650 XT', provider: 'Advanced Micro Devices, Inc.', pnpId: 'PCI\\VEN_1002&DEV_73EF' }).genericDriver).toBe(false);
+    const vm = D.normalizeAdapter({ name: 'Microsoft Basic Display Adapter', provider: 'Microsoft', pnpId: 'PCI\\VEN_1234&DEV_1111' });
+    expect(vm.genericDriver).toBe(false);
+    expect(vm.officialSources).toBe(null);
+  });
+});
+
+describe('DriverCenter camera', () => {
+  it('turns the raw snapshot into plain-language issues', () => {
+    expect(D.cameraIssues({ devices: [{ name: 'Logi C270', status: 'OK' }], services: [], consent: {} })).toEqual([]);
+    const issues = D.cameraIssues({
+      devices: [{ name: 'Cam', status: 'Error', problem: 'CM_PROB_FAILED_INSTALL' }],
+      services: [{ name: 'FrameServer', start: 'Disabled' }],
+      captureServices: [{ name: 'CaptureService_1a2b', start: 4 }],
+      consent: { machine: 'Allow', user: 'Deny', desktopApps: 'Deny' },
+      policyDeny: true, cameraPolicyOff: true, ghostUsb: 1
+    });
+    expect(issues.length).toBe(8);
+    expect(D.cameraIssues({ devices: [] })[0]).toMatch(/Nenhuma/);
+  });
+
+  it('repair: reverts the DarkOS items first, runs the elevated script and reports the steps', async () => {
+    const order: string[] = [];
+    const svc = new D.DriverCenterService({
+      runner: async () => ({ code: 0, stdout: JSON.stringify({ devices: [{ name: 'Logi C270', status: 'OK' }], services: [], consent: {} }) }),
+      elevatedRunner: async () => { order.push('elevated'); return { code: 0, stdout: 'DHSTEP|Servicos\r\nDHSTEP|Permissoes\r\nDHDONE\r\n', stderr: '' }; }
+    });
+    const r = await svc.repairCamera({ darkosRevert: async (ids: string[]) => { order.push(`darkos:${ids.length}`); return { ok: true }; } });
+    expect(order).toEqual([`darkos:${D.DARKOS_CAMERA_ITEMS.length}`, 'elevated']);
+    expect(r.ok).toBe(true);
+    expect(r.steps).toEqual(['DarkOS: bloqueios de câmera e captura desfeitos', 'Servicos', 'Permissoes']);
+    expect(r.issues).toEqual([]);
+  });
+
+  it('repair: reports failure when elevation is refused (no DHDONE)', async () => {
+    const svc = new D.DriverCenterService({ runner: async () => ({ code: 0, stdout: '{}' }), elevatedRunner: async () => ({ code: 1, stdout: '', stderr: '' }) });
+    const r = await svc.repairCamera();
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/administrador/);
   });
 });

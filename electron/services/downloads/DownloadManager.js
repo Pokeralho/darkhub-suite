@@ -42,8 +42,10 @@ function request(url, { headers = {}, signal, timeoutMs = 30000 } = {}, redirect
         res.resume()
         if (redirectsLeft <= 0) return reject(new Error('too-many-redirects'))
         let next
-        try { next = new URL(res.headers.location, parsed).toString() } catch { return reject(new Error('bad-redirect')) }
-        return resolve(request(next, { headers, signal, timeoutMs }, redirectsLeft - 1))
+        try { next = new URL(res.headers.location, parsed) } catch { return reject(new Error('bad-redirect')) }
+        // Never silently downgrade an HTTPS download to plain HTTP.
+        if (parsed.protocol === 'https:' && next.protocol !== 'https:') return reject(new Error('insecure-redirect'))
+        return resolve(request(next.toString(), { headers, signal, timeoutMs }, redirectsLeft - 1))
       }
       resolve({ res, finalUrl: parsed.toString() })
     })
@@ -51,7 +53,11 @@ function request(url, { headers = {}, signal, timeoutMs = 30000 } = {}, redirect
     req.on('error', reject)
     if (signal) {
       if (signal.aborted) { req.destroy(new Error('aborted')); return }
-      signal.addEventListener('abort', () => req.destroy(new Error('aborted')), { once: true })
+      // One listener per request on a long-lived signal: drop it when the request closes,
+      // otherwise pieces/retries accumulate listeners (MaxListenersExceededWarning + leaks).
+      const onAbort = () => req.destroy(new Error('aborted'))
+      signal.addEventListener('abort', onAbort, { once: true })
+      req.once('close', () => signal.removeEventListener('abort', onAbort))
     }
   })
 }

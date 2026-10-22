@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Code, ArrowRightLeft, Hash, Brackets, Scale, FileDiff, Calculator } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ArrowRight, ArrowRightLeft, Hash, Brackets, Scale, FileDiff, Calculator } from '../components/icons';
+import PageHeader from '../components/ui/PageHeader';
 import CryptoJS from 'crypto-js';
 import * as Diff from 'diff';
 
@@ -47,154 +48,184 @@ const DevTools = () => {
     });
   };
 
-  const diffResult = Diff.diffLines(diffOld, diffNew);
+  // diffLines is O(n*m): only compute it for the diff tab and when its inputs change
+  const diffResult = useMemo(
+    () => (activeTab === 'diff' ? Diff.diffLines(diffOld, diffNew) : []),
+    [activeTab, diffOld, diffNew]
+  );
 
   const rule3Result = r3Inverse
     ? (r3C === 0 ? 0 : (r3A * r3B) / r3C)
     : (r3A === 0 ? 0 : (r3B * r3C) / r3A);
 
-  return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center space-x-3 mb-8">
-        <div className="p-3 bg-purple-500/10 rounded-xl">
-          <Code className="text-purple-400" size={28} />
-        </div>
-        <div>
-          <h2 className="text-3xl font-bold text-zinc-100">Ferramentas de Desenvolvedor</h2>
-          <p className="text-zinc-400 mt-1">Utilitários em tempo real para código, hashes e conversões</p>
-        </div>
-      </div>
 
-      <div className="flex space-x-2 border-b border-zinc-800 pb-2">
-        <button onClick={() => setActiveTab('json')} className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 ${activeTab === 'json' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}><Brackets size={16}/><span>JSON Formatter</span></button>
-        <button onClick={() => setActiveTab('hash')} className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 ${activeTab === 'hash' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}><Hash size={16}/><span>Gerador de Hash</span></button>
-        <button onClick={() => setActiveTab('unit')} className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 ${activeTab === 'unit' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}><Scale size={16}/><span>Conversor & Calc</span></button>
-        <button onClick={() => setActiveTab('diff')} className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 ${activeTab === 'diff' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}><FileDiff size={16}/><span>Comparador (Diff)</span></button>
-      </div>
+  const tabs = [
+    { id: 'json' as const, icon: Brackets, label: 'JSON Formatter' },
+    { id: 'hash' as const, icon: Hash, label: 'Gerador de hash' },
+    { id: 'unit' as const, icon: Scale, label: 'Conversor e calculadora' },
+    { id: 'diff' as const, icon: FileDiff, label: 'Comparador (diff)' },
+  ];
+
+  const textareaCls = 'dh-input w-full py-3 font-mono text-[12.5px] leading-relaxed resize-none';
+
+  return (
+    <div className="w-full max-w-6xl mx-auto">
+      <PageHeader title="Ferramentas de desenvolvedor" subtitle="Utilitários em tempo real para código, hashes e conversões">
+        <div role="tablist" aria-label="Ferramentas" className="flex gap-5 -mb-5 overflow-x-auto overflow-y-hidden">
+          {tabs.map(({ id, icon: Icon, label }) => {
+            const active = activeTab === id;
+            return (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setActiveTab(id)}
+                className={`relative h-9 inline-flex items-center gap-2 text-[13px] whitespace-nowrap border-b-2 transition-colors ${active ? 'border-blue-400 text-zinc-50' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+              >
+                <Icon size={16} className={active ? 'text-blue-300' : 'text-zinc-500'} />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </PageHeader>
 
       {activeTab === 'json' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in">
           <div className="space-y-2">
-            <div className="flex justify-between">
-              <label className="text-sm font-medium text-zinc-300">Minificado / Original</label>
-              <button onClick={formatJson} className="text-sm text-purple-400 hover:text-purple-300">Formatar &rarr;</button>
+            <div className="flex items-center justify-between h-7">
+              <label htmlFor="json-in" className="dh-label">Minificado / original</label>
+              <button onClick={formatJson} disabled={!jsonInput.trim()} className="dh-btn dh-btn-primary dh-btn-sm">
+                Formatar <ArrowRight size={14} />
+              </button>
             </div>
-            <textarea value={jsonInput} onChange={e => setJsonInput(e.target.value)} className="w-full h-[500px] bg-zinc-900 border border-zinc-700 rounded-lg p-4 font-mono text-sm text-zinc-200 focus:outline-none focus:border-purple-500 resize-none" placeholder='{"exemplo": "cole aqui"}' />
+            <textarea id="json-in" value={jsonInput} onChange={e => setJsonInput(e.target.value)} spellCheck={false} className={`${textareaCls} h-[460px]`} placeholder='{"exemplo": "cole aqui"}' />
           </div>
           <div className="space-y-2">
-             <label className="text-sm font-medium text-zinc-300">Formatado / Resultado</label>
-             {jsonError ? (
-               <div className="w-full h-[500px] bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400 font-mono text-sm">{jsonError}</div>
-             ) : (
-               <textarea value={jsonOutput} readOnly className="w-full h-[500px] bg-zinc-900/50 border border-zinc-700 rounded-lg p-4 font-mono text-sm text-emerald-400 focus:outline-none resize-none" placeholder='Resultado aparecerá aqui' />
-             )}
+            <div className="flex items-center h-7">
+              <label htmlFor="json-out" className="dh-label">Formatado / resultado</label>
+            </div>
+            {jsonError ? (
+              <div role="alert" className="w-full h-[460px] rounded-md border border-red-500/30 bg-red-500/[0.06] p-4 font-mono text-[12.5px] text-red-300">{jsonError}</div>
+            ) : (
+              <textarea id="json-out" value={jsonOutput} readOnly spellCheck={false} className={`${textareaCls} h-[460px] bg-zinc-900/40 text-zinc-200`} placeholder='Resultado aparecerá aqui' />
+            )}
           </div>
         </div>
       )}
 
       {activeTab === 'hash' && (
-        <div className="max-w-3xl space-y-6 animate-in fade-in slide-in-from-bottom-2">
-          <div className="bg-zinc-800/50 rounded-xl p-5 border border-zinc-700/50">
-            <label className="block text-sm font-medium text-zinc-300 mb-2">Texto de Entrada</label>
-            <textarea value={hashInput} onChange={e => generateHashes(e.target.value)} className="w-full h-32 bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-zinc-200 focus:outline-none focus:border-purple-500 resize-none" placeholder="Digite o texto para gerar os hashes..." />
+        <div className="max-w-3xl space-y-5 animate-in">
+          <div>
+            <label htmlFor="hash-in" className="dh-label block mb-1.5">Texto de entrada</label>
+            <textarea id="hash-in" value={hashInput} onChange={e => generateHashes(e.target.value)} className={`${textareaCls} h-32`} placeholder="Digite o texto para gerar os hashes..." />
           </div>
 
-          <div className="space-y-3">
+          <dl className="dh-card divide-y divide-zinc-800/80">
             {Object.entries(hashes).map(([alg, val]) => (
-              <div key={alg} className="bg-zinc-900 rounded-lg p-4 border border-zinc-800 flex items-center justify-between">
-                <span className="font-bold text-zinc-400 uppercase w-20">{alg}</span>
-                <span className="font-mono text-sm text-purple-400 break-all select-all">{val || '...'}</span>
+              <div key={alg} className="grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-4 px-4 py-3">
+                <dt className="dh-tag text-[11.5px] text-zinc-400">{alg}</dt>
+                <dd className={`font-mono text-[12.5px] break-all select-all ${val ? 'text-zinc-100' : 'text-zinc-600'}`}>{val || 'aguardando entrada'}</dd>
               </div>
             ))}
-          </div>
+          </dl>
         </div>
       )}
 
       {activeTab === 'unit' && (
-        <div className="animate-in fade-in slide-in-from-bottom-2 grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="bg-zinc-800/50 rounded-xl p-6 border border-zinc-700/50 space-y-6">
-             <div className="flex justify-between items-center mb-4">
-               <h3 className="text-lg font-medium text-zinc-200 flex items-center space-x-2"><Scale size={20}/> <span>Temperatura</span></h3>
-             </div>
-             <div>
-                <label className="text-sm text-zinc-400">Celsius (°C)</label>
-                <input type="number" value={tempVal} onChange={e => setTempVal(parseFloat(e.target.value) || 0)} className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-zinc-200" />
-             </div>
-             <div className="flex items-center justify-center text-zinc-600"><ArrowRightLeft size={20} className="rotate-90 md:rotate-0" /></div>
-             <div>
-                <label className="text-sm text-zinc-400">Fahrenheit (°F)</label>
-                <div className="w-full mt-1 bg-zinc-900/50 border border-zinc-800 rounded-lg px-4 py-2 text-purple-400 font-bold">
-                  {((tempVal * 9/5) + 32).toFixed(2)} °F
-                </div>
-             </div>
-          </div>
+        <div className="animate-in grid grid-cols-1 md:grid-cols-2 gap-4">
+          <section className="dh-card p-5 space-y-4">
+            <h2 className="dh-section-title">Temperatura</h2>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-3">
+              <div>
+                <label htmlFor="temp-c" className="dh-label block mb-1.5">Celsius (°C)</label>
+                <input id="temp-c" type="number" value={tempVal} onChange={e => setTempVal(parseFloat(e.target.value) || 0)} className="dh-input w-full font-mono" />
+              </div>
+              <ArrowRightLeft size={16} className="mb-2 text-zinc-600" />
+              <div>
+                <span className="dh-label block mb-1.5">Fahrenheit (°F)</span>
+                <output className="flex h-8 items-center font-mono text-[14px] text-zinc-50">
+                  {((tempVal * 9/5) + 32).toFixed(2)}<span className="ml-1 text-zinc-500 text-[12px]">°F</span>
+                </output>
+              </div>
+            </div>
+          </section>
 
-          <div className="bg-zinc-800/50 rounded-xl p-6 border border-zinc-700/50 space-y-6">
-             <div className="flex justify-between items-center mb-4">
-               <h3 className="text-lg font-medium text-zinc-200 flex items-center space-x-2"><Scale size={20}/> <span>Armazenamento</span></h3>
-             </div>
-             <div>
-                <label className="text-sm text-zinc-400">Megabytes (MB)</label>
-                <input type="number" value={storageVal} onChange={e => setStorageVal(parseFloat(e.target.value) || 0)} className="w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-zinc-200" />
-             </div>
-             <div className="flex items-center justify-center text-zinc-600"><ArrowRightLeft size={20} className="rotate-90 md:rotate-0" /></div>
-             <div>
-                <label className="text-sm text-zinc-400">Gigabytes (GB)</label>
-                <div className="w-full mt-1 bg-zinc-900/50 border border-zinc-800 rounded-lg px-4 py-2 text-purple-400 font-bold">
-                  {(storageVal / 1024).toFixed(6)} GB
-                </div>
-             </div>
-          </div>
+          <section className="dh-card p-5 space-y-4">
+            <h2 className="dh-section-title">Armazenamento</h2>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-3">
+              <div>
+                <label htmlFor="stor-mb" className="dh-label block mb-1.5">Megabytes (MB)</label>
+                <input id="stor-mb" type="number" value={storageVal} onChange={e => setStorageVal(parseFloat(e.target.value) || 0)} className="dh-input w-full font-mono" />
+              </div>
+              <ArrowRightLeft size={16} className="mb-2 text-zinc-600" />
+              <div>
+                <span className="dh-label block mb-1.5">Gigabytes (GB)</span>
+                <output className="flex h-8 items-center font-mono text-[14px] text-zinc-50">
+                  {(storageVal / 1024).toFixed(6)}<span className="ml-1 text-zinc-500 text-[12px]">GB</span>
+                </output>
+              </div>
+            </div>
+          </section>
 
-          <div className="bg-zinc-800/50 rounded-xl p-6 border border-zinc-700/50 space-y-6 md:col-span-2">
-             <div className="flex justify-between items-center mb-4">
-               <h3 className="text-lg font-medium text-zinc-200 flex items-center space-x-2"><Calculator size={20}/> <span>Regra de 3</span></h3>
-               <button
-                 onClick={() => setR3Inverse(!r3Inverse)}
-                 className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors border ${r3Inverse ? 'bg-orange-500/20 border-orange-500/40 text-orange-300' : 'bg-zinc-700 border-zinc-600 text-zinc-300 hover:bg-zinc-600'}`}
-               >
-                 {r3Inverse ? '⇄ Inversamente proporcional' : '→ Diretamente proporcional'}
-               </button>
-             </div>
-             {r3Inverse ? (
-               <p className="text-xs text-orange-400/80">Fórmula: A × B = C × X → X = (A × B) / C</p>
-             ) : (
-               <p className="text-xs text-zinc-500">Fórmula: A → B / C → X = (B × C) / A</p>
-             )}
-             <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-center">
-                <input type="number" value={r3A} onChange={e => setR3A(parseFloat(e.target.value) || 0)} className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-zinc-200" placeholder="A" />
-                <span className="text-zinc-400">&rarr;</span>
-                <input type="number" value={r3B} onChange={e => setR3B(parseFloat(e.target.value) || 0)} className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-zinc-200" placeholder="B" />
+          <section className="dh-card p-5 space-y-4 md:col-span-2">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="dh-section-title flex items-center gap-2"><Calculator size={16} className="text-zinc-400" /> Regra de 3</h2>
+                <p className="dh-help mt-0.5 font-mono">
+                  {r3Inverse ? 'A × B = C × X  ·  X = (A × B) / C' : 'A → B, C → X  ·  X = (B × C) / A'}
+                </p>
+              </div>
+              <div role="radiogroup" aria-label="Proporção" className="inline-flex rounded-md border border-zinc-800 p-0.5">
+                {[false, true].map((inv) => (
+                  <button
+                    key={String(inv)}
+                    role="radio"
+                    aria-checked={r3Inverse === inv}
+                    onClick={() => setR3Inverse(inv)}
+                    className={`h-7 px-3 rounded text-[12px] transition-colors ${r3Inverse === inv ? 'bg-zinc-800 text-zinc-50' : 'text-zinc-400 hover:text-zinc-200'}`}
+                  >
+                    {inv ? 'Inversamente proporcional' : 'Diretamente proporcional'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-3 items-center max-w-xl">
+              <input type="number" aria-label="A" value={r3A} onChange={e => setR3A(parseFloat(e.target.value) || 0)} className="dh-input w-full font-mono" placeholder="A" />
+              <ArrowRight size={14} className="text-zinc-600" />
+              <input type="number" aria-label="B" value={r3B} onChange={e => setR3B(parseFloat(e.target.value) || 0)} className="dh-input w-full font-mono" placeholder="B" />
 
-                <input type="number" value={r3C} onChange={e => setR3C(parseFloat(e.target.value) || 0)} className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-zinc-200" placeholder="C" />
-                <span className="text-zinc-400">&rarr;</span>
-                <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-lg px-4 py-2 text-purple-400 font-bold">
-                  {rule3Result.toFixed(4)}
-                </div>
-             </div>
-          </div>
+              <input type="number" aria-label="C" value={r3C} onChange={e => setR3C(parseFloat(e.target.value) || 0)} className="dh-input w-full font-mono" placeholder="C" />
+              <ArrowRight size={14} className="text-zinc-600" />
+              <output className="flex h-8 items-center gap-2 px-2.5 rounded-md border border-zinc-800/80 bg-zinc-900/60 font-mono text-[13px] text-zinc-50">
+                <span className="text-zinc-500">X =</span> {rule3Result.toFixed(4)}
+              </output>
+            </div>
+          </section>
         </div>
       )}
 
       {activeTab === 'diff' && (
-        <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-zinc-300">Texto Original (Antigo)</label>
-              <textarea value={diffOld} onChange={e => setDiffOld(e.target.value)} className="w-full h-64 bg-zinc-900 border border-zinc-700 rounded-lg p-4 font-mono text-sm text-zinc-200 focus:outline-none focus:border-purple-500 resize-none" placeholder="Cole o texto original..." />
+        <div className="animate-in space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="diff-old" className="dh-label block mb-1.5">Texto original (antigo)</label>
+              <textarea id="diff-old" value={diffOld} onChange={e => setDiffOld(e.target.value)} spellCheck={false} className={`${textareaCls} h-64`} placeholder="Cole o texto original..." />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-zinc-300">Texto Novo</label>
-              <textarea value={diffNew} onChange={e => setDiffNew(e.target.value)} className="w-full h-64 bg-zinc-900 border border-zinc-700 rounded-lg p-4 font-mono text-sm text-zinc-200 focus:outline-none focus:border-purple-500 resize-none" placeholder="Cole o texto modificado..." />
+            <div>
+              <label htmlFor="diff-new" className="dh-label block mb-1.5">Texto novo</label>
+              <textarea id="diff-new" value={diffNew} onChange={e => setDiffNew(e.target.value)} spellCheck={false} className={`${textareaCls} h-64`} placeholder="Cole o texto modificado..." />
             </div>
           </div>
 
-          <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 font-mono text-sm overflow-auto min-h-32">
-            {diffResult.length === 1 && !diffResult[0].added && !diffResult[0].removed ? (
-              <span className="text-zinc-500">Sem diferenças detectadas.</span>
+          <div className="dh-card p-4 font-mono text-[12.5px] leading-relaxed overflow-auto min-h-32">
+            {!diffOld && !diffNew ? (
+              <span className="text-zinc-500 font-sans text-[12.5px]">Cole os dois textos acima para ver as diferenças linha a linha.</span>
+            ) : diffResult.length === 1 && !diffResult[0].added && !diffResult[0].removed ? (
+              <span className="text-zinc-500 font-sans text-[12.5px]">Sem diferenças detectadas.</span>
             ) : (
               diffResult.map((part, i) => {
-                const colorClass = part.added ? 'text-emerald-400 bg-emerald-400/10' : part.removed ? 'text-red-400 bg-red-400/10 line-through' : 'text-zinc-400';
+                const colorClass = part.added ? 'text-emerald-300 bg-emerald-400/10' : part.removed ? 'text-red-300 bg-red-400/10 line-through decoration-red-400/50' : 'text-zinc-400';
                 return (
                   <span key={i} className={`whitespace-pre-wrap ${colorClass}`}>
                     {part.value}
@@ -205,7 +236,6 @@ const DevTools = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };

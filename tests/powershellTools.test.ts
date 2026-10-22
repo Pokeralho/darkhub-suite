@@ -23,6 +23,53 @@ describe('PowerShellTools path validation', () => {
     expect(P.isUnderDarkOS('C:\\ProgramData\\DarkOSEvil\\x.ps1', root)).toBe(false); // sibling prefix spoof
     expect(P.isUnderDarkOS('', root)).toBe(false);
   });
+  it('refuses UNC/device paths and alternate data streams', () => {
+    const root = 'C:\\ProgramData\\DarkOS';
+    expect(P.isUnderDarkOS('\\\\?\\C:\\ProgramData\\DarkOS\\x.ps1', root)).toBe(false);
+    expect(P.isUnderDarkOS('\\\\server\\share\\x.ps1', root)).toBe(false);
+    expect(P.isUnderDarkOS('C:\\ProgramData\\DarkOS\\notes.txt:evil.ps1', root)).toBe(false);
+  });
+});
+
+describe('PowerShellTools runScript', () => {
+  const root = 'C:\\ProgramData\\DarkOS';
+  const script = `${root}\\fix.ps1`;
+  const make = (status: string, realpath?: (p: string) => string) => {
+    const cmd = vi.fn(async () => ({ code: 0, stdout: 'done', stderr: '' }));
+    const fsImpl: any = { existsSync: () => true };
+    if (realpath) fsImpl.realpathSync = realpath;
+    const svc = new P.PowerShellToolsService({
+      root,
+      fsImpl,
+      runner: async () => ({ code: 0, stdout: JSON.stringify({ status, signer: '' }), stderr: '' }),
+      cmdRunner: cmd
+    });
+    return { svc, cmd };
+  };
+
+  it('refuses an unsigned script until the user explicitly confirms', async () => {
+    const { svc, cmd } = make('NotSigned');
+    const refused = await svc.runScript({ path: script });
+    expect(refused.ok).toBe(false);
+    expect(refused.needsConfirmation).toBe(true);
+    expect(cmd).not.toHaveBeenCalled();
+    const ran = await svc.runScript({ path: script, confirmUnsigned: true });
+    expect(ran.ok).toBe(true);
+    expect(cmd).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs a validly signed script without the extra confirmation', async () => {
+    const { svc, cmd } = make('Valid');
+    expect((await svc.runScript({ path: script })).ok).toBe(true);
+    expect(cmd).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a path that resolves (junction/symlink) outside the DarkOS root', async () => {
+    const { svc, cmd } = make('Valid', (p) => (p === script ? 'C:\\Users\\Public\\evil.ps1' : p));
+    const r = await svc.runScript({ path: script, confirmUnsigned: true });
+    expect(r.ok).toBe(false);
+    expect(cmd).not.toHaveBeenCalled();
+  });
 });
 
 describe('PowerShellTools execution-policy parsing', () => {

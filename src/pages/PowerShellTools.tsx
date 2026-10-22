@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  AlertTriangle, CheckCircle, FileCode, Loader2, Lock, Play, RefreshCw,
+  CheckCircle, FileCode, Loader2, Lock, Play, RefreshCw,
   ShieldAlert, ShieldCheck, Terminal, XCircle
-} from 'lucide-react';
+} from '../components/icons';
 import { useI18n } from '../i18n/I18nProvider';
+import { DarkOSConfirmDialog } from '../components/darkos/DarkOSConfirmDialog';
+import PageHeader from '../components/ui/PageHeader';
 
 type PolicyResult = Awaited<ReturnType<Window['darkhub']['powershell']['getPolicies']>>;
 type ScriptItem = NonNullable<Awaited<ReturnType<Window['darkhub']['powershell']['listScripts']>>['scripts']>[number];
@@ -11,21 +13,12 @@ type RunResult = Awaited<ReturnType<Window['darkhub']['powershell']['runScript']
 
 const api = () => window.darkhub?.powershell;
 
-const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`bg-zinc-900 border border-zinc-800 rounded-xl p-4 ${className}`}>{children}</div>
-);
-
-const btn = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition disabled:opacity-40 disabled:cursor-not-allowed';
-const btnGhost = `${btn} bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 border-zinc-700/60`;
-const btnPrimary = `${btn} bg-[#3b82f6] hover:bg-blue-500 text-white border-blue-500/50`;
-const btnAmber = `${btn} bg-amber-600/90 hover:bg-amber-500 text-white border-amber-500/50`;
-
-const SIG_STYLE: Record<string, string> = {
-  Valid: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
-  NotSigned: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
-  HashMismatch: 'bg-red-500/10 text-red-300 border-red-500/30',
-  UnknownError: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
-  Unknown: 'bg-zinc-800 text-zinc-400 border-zinc-700'
+const SIG_TONE: Record<string, string> = {
+  Valid: 'text-emerald-400',
+  NotSigned: 'text-amber-300',
+  HashMismatch: 'text-red-400',
+  UnknownError: 'text-amber-300',
+  Unknown: 'text-zinc-500'
 };
 
 export default function PowerShellTools() {
@@ -40,52 +33,77 @@ export default function PowerShellTools() {
   const [output, setOutput] = useState<RunResult | null>(null);
   const [elevated, setElevated] = useState<{ ok: boolean; message: string } | null>(null);
   const [elevating, setElevating] = useState(false);
+  // Script awaiting the user's explicit confirmation before it runs.
+  const [pending, setPending] = useState<ScriptItem | null>(null);
+  const mounted = useRef(true);
+  const elevatedTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      if (elevatedTimer.current !== null) window.clearTimeout(elevatedTimer.current);
+    };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const [pol, scr] = await Promise.all([api()?.getPolicies(), api()?.listScripts()]);
+      if (!mounted.current) return;
       if (pol) setPolicy(pol);
-      if (!pol?.ok) setError(pol?.error || t('pstools.error', 'Failed to read the execution policy.'));
+      const errors: string[] = [];
+      if (!pol?.ok) errors.push(pol?.error || t('pstools.error', 'Failed to read the execution policy.'));
       if (scr?.ok) {
         setScripts(scr.scripts ?? []);
         setRootExists(scr.rootExists !== false);
         if (scr.root) setRoot(scr.root);
+      } else {
+        setScripts([]);
+        errors.push((scr as { error?: string } | undefined)?.error || t('pstools.scripts.error', 'Failed to list the maintenance scripts.'));
       }
+      setError(errors.length ? errors.join(' ') : null);
     } catch (e: any) {
-      setError(e?.message ?? String(e));
+      if (mounted.current) setError(e?.message ?? String(e));
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
   }, [t]);
 
   useEffect(() => { load(); }, [load]);
 
-  const runScript = async (path: string) => {
-    setRunningPath(path);
+  const runScript = async (item: ScriptItem) => {
+    setPending(null);
+    setRunningPath(item.path);
     setOutput(null);
     try {
-      const r = await api()?.runScript({ path });
-      setOutput(r ?? { ok: false, error: t('pstools.runFail', 'Failed to run the script.') });
+      // The user confirmed in the dialog; the main process still refuses unsigned scripts without this flag.
+      const payload = { path: item.path, confirmUnsigned: item.signature?.status !== 'Valid' };
+      const r = await api()?.runScript(payload);
+      if (mounted.current) setOutput(r ?? { ok: false, error: t('pstools.runFail', 'Failed to run the script.') });
     } catch (e: any) {
-      setOutput({ ok: false, error: e?.message ?? String(e) });
+      if (mounted.current) setOutput({ ok: false, error: e?.message ?? String(e) });
     } finally {
-      setRunningPath(null);
+      if (mounted.current) setRunningPath(null);
     }
   };
 
   const openElevated = async () => {
     setElevating(true);
     setElevated(null);
+    if (elevatedTimer.current !== null) window.clearTimeout(elevatedTimer.current);
     try {
       const r = await api()?.openElevatedTerminal({});
+      if (!mounted.current) return;
       setElevated(r?.ok ? { ok: true, message: t('pstools.elevated.ok', 'Elevated terminal opened.') } : { ok: false, message: r?.error || t('pstools.elevated.error', '') });
     } catch (e: any) {
-      setElevated({ ok: false, message: e?.message ?? String(e) });
+      if (mounted.current) setElevated({ ok: false, message: e?.message ?? String(e) });
     } finally {
-      setElevating(false);
-      window.setTimeout(() => setElevated(null), 5000);
+      if (mounted.current) {
+        setElevating(false);
+        elevatedTimer.current = window.setTimeout(() => { elevatedTimer.current = null; setElevated(null); }, 5000);
+      }
     }
   };
 
@@ -102,131 +120,190 @@ export default function PowerShellTools() {
   };
 
   const header = (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80">
-      <div className="min-w-0">
-        <h1 className="text-lg font-bold text-zinc-100 tracking-tight flex items-center gap-2">
-          <Terminal className="w-5 h-5 text-[#3b82f6]" />
-          {t('pstools.title', 'PowerShell Tools')}
-        </h1>
-        <p className="text-xs text-zinc-400 mt-0.5">{t('pstools.subtitle', '')}</p>
-      </div>
-      <button onClick={load} disabled={loading} className={btnGhost}>
-        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-        {t('pstools.refresh', 'Refresh')}
-      </button>
+    <PageHeader
+      title={t('pstools.title', 'PowerShell Tools')}
+      subtitle={t('pstools.subtitle', '')}
+      actions={(
+        <button onClick={load} disabled={loading} className="dh-btn">
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          {t('pstools.refresh', 'Refresh')}
+        </button>
+      )}
+    />
+  );
+
+  const skeletonRows = (n: number) => (
+    <div role="status" aria-label={t('pstools.loading', 'Loading...')} className="divide-y divide-zinc-800/80">
+      {Array.from({ length: n }).map((_, i) => (
+        <div key={i} className="px-4 py-3 flex items-center gap-3">
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3.5 w-48 max-w-full rounded bg-zinc-800/80 animate-pulse" />
+            <div className="h-3 w-72 max-w-full rounded bg-zinc-800/80 animate-pulse" />
+          </div>
+          <div className="h-7 w-16 rounded-md bg-zinc-800/80 animate-pulse" />
+        </div>
+      ))}
     </div>
   );
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-4 p-1 md:p-2 text-zinc-100 pb-16">
+    <div className="w-full max-w-5xl pb-16 space-y-8">
       {header}
 
-      {error ? <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300 break-words">{error}</div> : null}
-
-      {loading ? (
-        <div className="flex items-center gap-2 text-xs text-zinc-400"><Loader2 className="w-4 h-4 animate-spin" />...</div>
+      {error ? (
+        <div role="alert" className="-mt-2 flex items-start gap-2 border-l-2 border-red-400 pl-3 py-1 text-[12.5px] text-red-300 break-words">
+          <XCircle size={14} className="shrink-0 mt-0.5" />
+          <span className="min-w-0">{error}</span>
+          <button onClick={load} disabled={loading} className="ml-1 underline underline-offset-2 text-red-200 hover:text-red-100 shrink-0">{t('pstools.refresh', 'Refresh')}</button>
+        </div>
       ) : null}
 
       {/* Execution policy */}
-      <Card>
-        <h2 className="text-sm font-semibold text-zinc-100 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-zinc-400" />{t('pstools.policy.title', 'Execution policy')}</h2>
-        {policy?.effective ? (
-          <div className="mt-2 flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] uppercase tracking-wider text-zinc-500">{t('pstools.policy.effective', 'Effective policy')}</span>
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-[#3b82f6]/10 text-blue-300 border border-blue-500/30">{policy.effective.policy}</span>
-            <span className="text-[10.5px] font-mono text-zinc-500">({policy.effective.scope})</span>
+      <section>
+        <div className="flex items-end justify-between gap-3 mb-3">
+          <div className="min-w-0 max-w-[75ch]">
+            <h2 className="dh-section-title">{t('pstools.policy.title', 'Execution policy')}</h2>
+            {policyNote(policy?.effective?.policy) ? <p className="mt-1 dh-help">{policyNote(policy?.effective?.policy)}</p> : null}
           </div>
-        ) : null}
-        {policyNote(policy?.effective?.policy) ? <p className="mt-2 text-[11px] text-zinc-400">{policyNote(policy?.effective?.policy)}</p> : null}
-        {policy?.scopes?.length ? (
-          <div className="mt-3 overflow-hidden rounded-lg border border-zinc-800">
-            <table className="w-full text-xs">
-              <thead className="bg-zinc-950/60 text-zinc-500">
-                <tr><th className="text-left px-3 py-1.5 font-medium">{t('pstools.policy.scope', 'Scope')}</th><th className="text-left px-3 py-1.5 font-medium">{t('pstools.policy.value', 'Policy')}</th></tr>
+          {policy?.effective ? (
+            <div className="shrink-0 text-right">
+              <div className="text-[11.5px] text-zinc-500">{t('pstools.policy.effective', 'Effective policy')}</div>
+              <div className="mt-0.5 font-mono text-[13px] text-blue-300">
+                {policy.effective.policy} <span className="text-[11.5px] text-zinc-500">{policy.effective.scope}</span>
+              </div>
+            </div>
+          ) : null}
+        </div>
+        {loading && !policy ? <div className="dh-card overflow-hidden">{skeletonRows(3)}</div> : policy?.scopes?.length ? (
+        <div className="dh-card overflow-hidden">
+            <table className="w-full text-[12.5px]">
+              <thead>
+                <tr className="border-b border-zinc-800/80 text-[11px] text-zinc-500">
+                  <th className="text-left px-4 py-2 font-medium">{t('pstools.policy.scope', 'Scope')}</th>
+                  <th className="text-left px-4 py-2 font-medium">{t('pstools.policy.value', 'Policy')}</th>
+                </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/70">
+              <tbody className="divide-y divide-zinc-800/80">
                 {policy.scopes.map((s) => (
-                  <tr key={s.scope}><td className="px-3 py-1.5 font-mono text-zinc-300">{s.scope}</td><td className="px-3 py-1.5 font-mono text-zinc-400">{s.policy}</td></tr>
+                  <tr key={s.scope} className={policy.effective?.scope === s.scope ? 'text-zinc-100' : ''}>
+                    <td className="px-4 py-2 font-mono text-zinc-300">{s.scope}</td>
+                    <td className="px-4 py-2 font-mono text-zinc-400">{s.policy}</td>
+                  </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+        </div>
         ) : null}
-        <p className="mt-3 text-[11px] text-zinc-500 leading-relaxed">{t('pstools.policy.explain', '')}</p>
-      </Card>
+        <p className="mt-2 dh-help max-w-[75ch]">{t('pstools.policy.explain', '')}</p>
+      </section>
 
       {/* Trusted maintenance scripts */}
-      <Card>
-        <h2 className="text-sm font-semibold text-zinc-100 flex items-center gap-2"><FileCode className="w-4 h-4 text-zinc-400" />{t('pstools.scripts.title', 'DarkOS maintenance scripts')}</h2>
-        <p className="mt-1 text-[11px] text-zinc-500 font-mono">{root}</p>
-        <p className="mt-1 text-[11px] text-zinc-500">{t('pstools.scripts.hint', '')}</p>
-        {!rootExists ? (
-          <p className="mt-3 text-xs text-zinc-500">{t('pstools.scripts.noRoot', '')}</p>
-        ) : scripts.length === 0 ? (
-          <p className="mt-3 text-xs text-zinc-500">{t('pstools.scripts.none', 'No maintenance script found.')}</p>
-        ) : (
-          <ul className="mt-3 divide-y divide-zinc-800/70">
-            {scripts.map((s) => {
-              const st = s.signature?.status || 'Unknown';
-              const unsigned = st !== 'Valid';
-              return (
-                <li key={s.path} className="py-2.5 flex items-start gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-zinc-200 truncate">{s.name}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded border font-mono ${SIG_STYLE[st] || SIG_STYLE.Unknown}`}>{sigLabel(st)}</span>
+      <section>
+        <div className="mb-3 min-w-0 max-w-[75ch]">
+          <h2 className="dh-section-title">
+            {t('pstools.scripts.title', 'DarkOS maintenance scripts')}
+            {!loading && scripts.length ? <span className="ml-1.5 font-mono text-[11.5px] font-normal text-zinc-500">{scripts.length}</span> : null}
+          </h2>
+          <p className="mt-1 dh-help">{t('pstools.scripts.hint', '')}</p>
+          <p className="mt-1 font-mono text-[11.5px] text-zinc-500 break-all">{root}</p>
+        </div>
+        <div className="dh-card">
+          {loading && scripts.length === 0 ? skeletonRows(3) : !rootExists ? (
+            <p className="px-4 py-6 text-[12.5px] text-zinc-500">{t('pstools.scripts.noRoot', '')}</p>
+          ) : scripts.length === 0 ? (
+            <p className="px-4 py-6 text-[12.5px] text-zinc-500">{t('pstools.scripts.none', 'No maintenance script found.')}</p>
+          ) : (
+            <ul className="divide-y divide-zinc-800/80">
+              {scripts.map((s) => {
+                const st = s.signature?.status || 'Unknown';
+                const unsigned = st !== 'Valid';
+                return (
+                  <li key={s.path} className="px-4 py-3 flex items-start gap-3">
+                    <FileCode size={16} className="text-zinc-500 shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="text-[13px] text-zinc-200 truncate">{s.name}</span>
+                        <span className={`inline-flex items-center gap-1 text-[11.5px] ${SIG_TONE[st] || SIG_TONE.Unknown}`}>
+                          {st === 'Valid' ? <ShieldCheck size={12} /> : <ShieldAlert size={12} />}{sigLabel(st)}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-[11.5px] font-mono text-zinc-600 truncate">{s.path}</div>
+                      {s.signature?.signer ? <div className="mt-0.5 text-[11.5px] text-zinc-500 truncate">{s.signature.signer}</div> : null}
+                      {unsigned ? <div className="mt-1 text-[12px] text-amber-300/90">{t('pstools.sig.unsignedWarn', '')}</div> : null}
                     </div>
-                    <div className="mt-0.5 text-[10.5px] font-mono text-zinc-600 truncate">{s.path}</div>
-                    {s.signature?.signer ? <div className="mt-0.5 text-[10.5px] text-zinc-500 truncate">{s.signature.signer}</div> : null}
-                    {unsigned ? <div className="mt-0.5 text-[11px] text-amber-300/90 flex items-center gap-1"><ShieldAlert className="w-3 h-3" />{t('pstools.sig.unsignedWarn', '')}</div> : null}
-                  </div>
-                  <button
-                    disabled={runningPath !== null}
-                    onClick={() => runScript(s.path)}
-                    className={`${unsigned ? btnAmber : btnPrimary} shrink-0`}
-                  >
-                    {runningPath === s.path ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                    {runningPath === s.path ? t('pstools.scripts.running', 'Running...') : t('pstools.scripts.run', 'Run')}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
+                    <button
+                      disabled={runningPath !== null || loading}
+                      onClick={() => setPending(s)}
+                      aria-label={`${t('pstools.scripts.run', 'Run')} ${s.name}`}
+                      aria-busy={runningPath === s.path}
+                      className="dh-btn dh-btn-sm shrink-0"
+                    >
+                      {runningPath === s.path ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+                      {runningPath === s.path ? t('pstools.scripts.running', 'Running...') : t('pstools.scripts.run', 'Run')}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </section>
 
       {/* Output */}
       {output ? (
-        <Card>
-          <div className="flex items-center gap-2">
-            {output.ok ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <XCircle className="w-4 h-4 text-red-400" />}
-            <h2 className="text-sm font-semibold text-zinc-100">{t('pstools.output.title', 'Output')}</h2>
-            {typeof output.code === 'number' ? <span className="text-[10.5px] font-mono text-zinc-500">{t('pstools.output.exit', 'Exit code')}: {output.code}</span> : null}
+        <section className="dh-card overflow-hidden animate-in">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-zinc-800/80" aria-live="polite">
+            {output.ok ? <CheckCircle size={14} className="text-emerald-400" /> : <XCircle size={14} className="text-red-400" />}
+            <h2 className="dh-section-title">{t('pstools.output.title', 'Output')}</h2>
+            {typeof output.code === 'number' ? (
+              <span className="ml-auto text-[11.5px] text-zinc-500">{t('pstools.output.exit', 'Exit code')} <span className={`font-mono ${output.code === 0 ? 'text-zinc-300' : 'text-red-300'}`}>{output.code}</span></span>
+            ) : null}
           </div>
-          {output.error ? <div className="mt-2 text-xs text-red-300 break-words">{output.error}</div> : null}
-          <pre className="mt-2 max-h-72 overflow-auto rounded-lg bg-zinc-950 border border-zinc-800 p-3 text-[11px] font-mono text-zinc-300 whitespace-pre-wrap break-words">
-            {(output.stdout || '').trim() || (output.stderr || '').trim() || t('pstools.output.empty', 'No output yet.')}
+          {output.error ? <div className="px-4 pt-3 text-[12.5px] text-red-300 break-words">{output.error}</div> : null}
+          <pre className="max-h-72 overflow-auto bg-zinc-950 px-4 py-3 text-[11.5px] leading-[1.65] font-mono text-zinc-400 whitespace-pre-wrap break-words">
+            {[(output.stdout || '').trim(), (output.stderr || '').trim()].filter(Boolean).join('\n\n') || t('pstools.output.empty', 'No output yet.')}
           </pre>
-        </Card>
+        </section>
       ) : null}
 
-      {/* Elevated terminal */}
-      <Card>
-        <h2 className="text-sm font-semibold text-zinc-100 flex items-center gap-2"><Lock className="w-4 h-4 text-amber-400" />{t('pstools.elevated.title', 'Administrator terminal')}</h2>
-        <p className="mt-1 text-xs text-zinc-400 leading-relaxed">{t('pstools.elevated.desc', '')}</p>
-        <div className="mt-3 flex items-center gap-2 flex-wrap">
-          <button disabled={elevating} onClick={openElevated} className={btnAmber}>
-            {elevating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Terminal className="w-3.5 h-3.5" />}
-            {elevating ? t('pstools.elevated.opening', 'Waiting for UAC...') : t('pstools.elevated.open', 'Open elevated terminal')}
-          </button>
-          <span className="text-[10px] inline-flex items-center gap-1 text-amber-300/90"><ShieldAlert className="w-3 h-3" />{t('pstools.adminNote', 'Requires administrator')}</span>
-        </div>
-        {elevated ? (
-          <div className={`mt-2 text-xs flex items-center gap-1.5 ${elevated.ok ? 'text-emerald-300' : 'text-red-300'}`}>
-            {elevated.ok ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}{elevated.message}
-          </div>
+      <DarkOSConfirmDialog
+        open={pending !== null}
+        danger={pending ? pending.signature?.status !== 'Valid' : false}
+        title={t('pstools.confirm.title', 'Run this script?')}
+        body={pending ? (
+          <>
+            <span className="block font-mono text-zinc-300 break-all">{pending.path}</span>
+            <span className="block mt-2">
+              {pending.signature?.status === 'Valid'
+                ? t('pstools.confirm.signed', 'The script has a valid digital signature and will run with this app\'s privileges.')
+                : t('pstools.confirm.unsigned', 'This script has no valid digital signature. Only run it if you reviewed its content and trust its origin.')}
+            </span>
+          </>
         ) : null}
-      </Card>
+        confirmLabel={t('pstools.scripts.run', 'Run')}
+        onCancel={() => setPending(null)}
+        onConfirm={() => { if (pending) runScript(pending); }}
+      />
+
+      {/* Elevated terminal */}
+      <section className="border-t border-zinc-800/80 pt-6 flex flex-col md:flex-row md:items-start justify-between gap-4">
+        <div className="min-w-0 max-w-[75ch]">
+          <h2 className="dh-section-title flex items-center gap-2">
+            {t('pstools.elevated.title', 'Administrator terminal')}
+            <span className="inline-flex items-center gap-1 text-[11.5px] font-normal text-amber-300/90"><Lock size={12} />{t('pstools.adminNote', 'Requires administrator')}</span>
+          </h2>
+          <p className="mt-1 dh-help">{t('pstools.elevated.desc', '')}</p>
+          {elevated ? (
+            <p role="status" className={`mt-2 text-[12.5px] flex items-center gap-1.5 ${elevated.ok ? 'text-emerald-400' : 'text-red-300'}`}>
+              {elevated.ok ? <CheckCircle size={14} /> : <XCircle size={14} />}{elevated.message}
+            </p>
+          ) : null}
+        </div>
+        <button disabled={elevating} onClick={openElevated} className="dh-btn shrink-0">
+          {elevating ? <Loader2 size={14} className="animate-spin" /> : <Terminal size={14} />}
+          {elevating ? t('pstools.elevated.opening', 'Waiting for UAC...') : t('pstools.elevated.open', 'Open elevated terminal')}
+        </button>
+      </section>
     </div>
   );
 }

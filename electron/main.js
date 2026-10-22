@@ -1,3 +1,5 @@
+// Must stay the first import: dev profile + IPC trace (no-op when packaged).
+import { devStartPage } from './devBootstrap.js'
 import { app, BrowserWindow, dialog, ipcMain, shell, protocol, clipboard, globalShortcut, Menu, Tray, screen, session } from 'electron'
 import log from 'electron-log'
 import path from 'node:path'
@@ -10,9 +12,7 @@ try {
   }
 } catch {}
 import fsRaw from 'node:fs'
-import dgram from 'node:dgram'
 import cp, { spawn } from 'node:child_process'
-import { EventEmitter } from 'node:events'
 import crypto from 'crypto'
 import {
   buildKdf,
@@ -28,10 +28,14 @@ import { registerOptiScalerIPC } from './optiscalerManager.js'
 import { registerDlss5IPC } from './services/dlss5/Dlss5Service.js'
 import { registerDownloadsIPC } from './services/downloads/registerDownloadsIPC.js'
 import { registerDarkOSIPC } from './ipc/darkosIpc.js'
+import { registerWinToolsIPC } from './ipc/winToolsIpc.js'
+import { registerDiskScanIPC } from './ipc/diskScanIpc.js'
+import { registerHwSensorsIPC } from './ipc/hwSensorsIpc.js'
 import { registerDriverIPC } from './ipc/driverIpc.js'
 import { registerPowerShellIPC } from './ipc/powershellIpc.js'
 import Logger from './services/LoggerService.js'
 import { runCommand, runPowerShell, runPowerShellJson, stripBom, encodePowerShellScript, powerShellArgsForEncodedScript } from './services/PowerShellRunner.js'
+import { CpuLoadTracker } from './services/CpuLoadTracker.js'
 import HardwareService from './services/HardwareService.js'
 import HardwareHAL from './hal/HardwareHAL.js'
 import SecurityService from './services/SecurityService.js'
@@ -86,7 +90,6 @@ if (!gotTheLock) {
 
 let systemInformationPromise = null
 let sharpPromise = null
-let ytdlPromise = null
 let tesseractPromise = null
 let exiftoolPromise = null
 let exiftoolInstance = null
@@ -112,11 +115,6 @@ const si = new Proxy({}, {
 async function getSharp() {
   sharpPromise ||= import('sharp').then((mod) => mod.default ?? mod)
   return sharpPromise
-}
-
-async function getYtdl() {
-  ytdlPromise ||= import('ytdl-core').then((mod) => mod.default ?? mod)
-  return ytdlPromise
 }
 
 async function createOcrWorker(lang) {
@@ -146,7 +144,8 @@ async function getFfmpegPath() {
     } catch {}
 
     try {
-      const whereOut = cp.execSync('where.exe ffmpeg', { windowsHide: true, encoding: 'utf8' }).trim().split(/\r?\n/)[0]
+      const { code, stdout } = await runCommand('where.exe', ['ffmpeg'], { timeoutMs: 5000 })
+      const whereOut = code === 0 ? String(stdout ?? '').trim().split(/\r?\n/)[0] : ''
       if (whereOut && fsRaw.existsSync(whereOut)) return whereOut
     } catch {}
 
@@ -172,9 +171,15 @@ async function getLibraryStore() {
 registerOptiScalerIPC({ app, ipcMain, getLibraryStore })
 registerDlss5IPC({ app, ipcMain, shell })
 const downloadsService = registerDownloadsIPC({ app, ipcMain, dialog, shell, BrowserWindow, logger: Logger })
-registerDarkOSIPC({ app, ipcMain, dialog, BrowserWindow, logger: Logger })
-registerDriverIPC({ ipcMain, shell, logger: Logger })
+const darkosService = registerDarkOSIPC({ app, ipcMain, dialog, BrowserWindow, logger: Logger })
+registerDriverIPC({
+  ipcMain, shell, logger: Logger, darkos: darkosService,
+  elevatedRunner: async (script, opts) => (await import('./services/optimizer/ElevationHelper.js')).default.runElevatedPowerShell(script, opts)
+})
 registerPowerShellIPC({ ipcMain, logger: Logger })
+registerWinToolsIPC({ ipcMain, logger: Logger })
+registerDiskScanIPC({ ipcMain, dialog, shell, BrowserWindow, logger: Logger })
+registerHwSensorsIPC({ ipcMain, logger: Logger })
 
 async function getYtDlpTools() {
   ytdlpToolsPromise ||= import('./ytdlp.js')
@@ -252,6 +257,14 @@ function hasFileAccessGrant(filePath) {
   return false
 }
 
+// The converter defaults its output to the folder of the files the user picked: writing next to a file the user
+// chose is the same intent as the pick itself, so that folder is allowed without a second folder dialog.
+function assertOutputDirGranted(outputDir, inputFiles) {
+  const out = normalizeAccessPath(outputDir)
+  const besideInput = (inputFiles || []).some((f) => hasFileAccessGrant(f) && normalizeAccessPath(path.dirname(String(f))) === out)
+  if (!besideInput) assertFileAccessGranted(outputDir, 'pasta de saída')
+}
+
 function assertFileAccessGranted(filePath, label = 'arquivo') {
   if (typeof filePath !== 'string' || !filePath.trim()) {
     throw new Error(`Caminho de ${label} inválido`)
@@ -270,12 +283,6 @@ function assertFileAccessGrantedMany(filePaths, label = 'arquivo') {
 function psSingleQuote(value) {
   return `'${String(value ?? '').replace(/'/g, "''")}'`
 }
-
-function normalizeRegistryPath(value) {
-  return String(value ?? '').trim().replace(/\//g, '\\').toUpperCase()
-}
-
-
 
 function normalizeWebhookUrl(value) {
   if (typeof value !== 'string') return null
@@ -433,13 +440,6 @@ function getAllowedExternalUrl(url) {
   }
 }
 
-async function openAllowedExternalUrl(url) {
-  const externalUrl = getAllowedExternalUrl(url)
-  if (!externalUrl) return false
-  await shell.openExternal(externalUrl)
-  return true
-}
-
 function openAllowedExternalUrlDetached(url, source) {
   const externalUrl = getAllowedExternalUrl(url)
   if (!externalUrl) return false
@@ -535,18 +535,6 @@ function ensureTray() {
 function hideWindowToBackground(win) {
   ensureTray()
   win.hide()
-}
-
-function getStartupFolderRoots() {
-  const roots = []
-  if (process.platform !== 'win32') return roots
-  if (process.env.APPDATA) {
-    roots.push(path.join(process.env.APPDATA, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup'))
-  }
-  if (process.env.ProgramData) {
-    roots.push(path.join(process.env.ProgramData, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup'))
-  }
-  return roots.map(normalizeAccessPath).filter(Boolean)
 }
 
 async function estimateDirectoryBytes(root, opts, state, depth) {
@@ -763,7 +751,17 @@ function createMainWindow() {
     openAllowedExternalUrlDetached(url, 'main-window-navigation')
   })
 
-  win.webContents.on('will-attach-webview', (_event, webPreferences) => {
+  win.webContents.on('will-attach-webview', (event, webPreferences, params) => {
+    // Embedded pages (Juuzou/LuluFlix) are remote https sites; refuse anything else.
+    try {
+      if (new URL(params?.src ?? '').protocol !== 'https:') {
+        event.preventDefault()
+        return
+      }
+    } catch {
+      event.preventDefault()
+      return
+    }
     delete webPreferences.preload
     webPreferences.nodeIntegration = false
     webPreferences.contextIsolation = true
@@ -833,8 +831,11 @@ function createMainWindow() {
   win.on('show', () => setTimeout(kickWindowsPaint, 150))
   win.on('focus', () => setTimeout(kickWindowsPaint, 100))
 
-  if (isDev()) {
-    win.loadURL('http://localhost:5173')
+  if (isDev() && process.env.DARKHUB_RENDERER === 'dist') {
+    // Unpackaged run without Vite (e.g. the VM acceptance run): use the built renderer.
+    win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
+  } else if (isDev()) {
+    win.loadURL(`http://localhost:5173/${devStartPage ? `#${devStartPage}` : ''}`)
     win.webContents.openDevTools({ mode: 'detach' })
   } else {
     win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
@@ -952,127 +953,6 @@ async function getActiveAdapterName() {
   return String(stripBom(stdout)).trim()
 }
 
-const dnsPresets = [
-  { name: 'Cloudflare', primary: '1.1.1.1', secondary: '1.0.0.1' },
-  { name: 'Google DNS', primary: '8.8.8.8', secondary: '8.8.4.4' },
-  { name: 'OpenDNS', primary: '208.67.222.222', secondary: '208.67.220.220' },
-  { name: 'Quad9', primary: '9.9.9.9', secondary: '149.112.112.112' },
-  { name: 'Level3', primary: '209.244.0.3', secondary: '209.244.0.4' },
-  { name: 'Verisign', primary: '64.6.64.6', secondary: '64.6.65.6' },
-  { name: 'DNS.Watch', primary: '84.200.69.80', secondary: '84.200.70.40' },
-  { name: 'Comodo Secure DNS', primary: '8.26.56.26', secondary: '8.20.247.20' },
-  { name: 'Dyn', primary: '216.146.35.35', secondary: '216.146.36.36' },
-  { name: 'UncensoredDNS', primary: '91.239.100.100', secondary: '89.233.43.71' },
-  { name: 'Hurricane Electric', primary: '74.82.42.42', secondary: '204.9.214.118' },
-  { name: 'DNS Brasil 1', primary: '177.128.247.77', secondary: '189.2.9.181' },
-  { name: 'DNS Brasil 2', primary: '181.217.154.102', secondary: '186.209.180.156' },
-  { name: 'DNS Brasil 3', primary: '45.65.173.61', secondary: '177.99.206.131' },
-  { name: 'DNS Brasil 4', primary: '187.102.222.46', secondary: '168.195.243.35' },
-  { name: 'DNS EUA 1', primary: '205.171.3.66', secondary: '204.9.214.118' },
-  { name: 'DNS EUA 2', primary: '172.64.36.143', secondary: '75.85.76.64' },
-  { name: 'DNS EUA 3', primary: '172.64.37.210', secondary: '76.72.180.231' },
-  { name: 'DNS EUA 4', primary: '66.92.224.2', secondary: '8.20.247.148' },
-  { name: 'DNS EUA 5', primary: '73.99.97.167', secondary: '65.220.16.3' }
-]
-
-const dnsUndoStore = new Map()
-
-function buildDnsQuery() {
-  const query = Buffer.from([
-    0x00, 0x00, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x77, 0x77, 0x77,
-    0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01, 0x00, 0x01
-  ])
-  query[0] = Math.floor(Math.random() * 256)
-  query[1] = Math.floor(Math.random() * 256)
-  return query
-}
-
-function dnsLatencyUdp(serverIp, timeoutMs = 1500) {
-  const query = buildDnsQuery()
-  return new Promise((resolve) => {
-    const sock = dgram.createSocket('udp4')
-    const start = Date.now()
-    const done = (ms) => {
-      try {
-        sock.close()
-      } catch {}
-      resolve(ms)
-    }
-    const timer = setTimeout(() => done(Number.POSITIVE_INFINITY), timeoutMs)
-    sock.once('error', () => {
-      clearTimeout(timer)
-      done(Number.POSITIVE_INFINITY)
-    })
-    sock.once('message', () => {
-      clearTimeout(timer)
-      done(Date.now() - start)
-    })
-    sock.send(query, 53, serverIp, (err) => {
-      if (err) {
-        clearTimeout(timer)
-        done(Number.POSITIVE_INFINITY)
-      }
-    })
-  })
-}
-
-function clampInt(v, min, max, fallback = min) {
-  const n = Number(v)
-  if (!Number.isFinite(n)) return fallback
-  return Math.max(min, Math.min(max, Math.trunc(n)))
-}
-
-async function runWithConcurrency(tasks, limit = 4) {
-  const results = []
-  const executing = new Set()
-  for (const task of tasks) {
-    const p = Promise.resolve().then(() => task())
-    results.push(p)
-    executing.add(p)
-    const clean = () => executing.delete(p)
-    p.then(clean, clean)
-    if (executing.size >= limit) {
-      await Promise.race(executing)
-    }
-  }
-  return Promise.all(results)
-}
-
-function median(values) {
-  const nums = values.filter((v) => Number.isFinite(v) && v !== Number.POSITIVE_INFINITY).sort((a, b) => a - b)
-  if (nums.length === 0) return Number.POSITIVE_INFINITY
-  const mid = Math.floor(nums.length / 2)
-  return nums.length % 2 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2
-}
-
-async function dnsBenchmark(servers, { timeoutMs = 1500, attempts = 2, concurrency = 8 } = {}) {
-  const results = Array.from({ length: servers.length })
-  const tries = clampInt(attempts, 1, 5, 2)
-  const limit = clampInt(concurrency, 1, 16, 8)
-
-  const taskFactories = servers.map((s, idx) => async () => {
-    const samples = []
-    for (let i = 0; i < tries; i += 1) {
-      samples.push(await dnsLatencyUdp(s.primary, timeoutMs))
-    }
-    results[idx] = { ...s, latencyMs: median(samples), samples }
-  })
-
-  await runWithConcurrency(taskFactories, limit)
-
-  const ok = results
-    .filter((r) => r && Number.isFinite(r.latencyMs) && r.latencyMs !== Number.POSITIVE_INFINITY)
-    .sort((a, b) => a.latencyMs - b.latencyMs)
-  const failed = results.length - ok.length
-  return { ok: true, results: ok, failed }
-}
-
-let cachedSysInfo = null;
-
-let metricsNetLastByIface = new Map()
-let snapshotDiskIoLast = null
-let snapshotNetLastByIface = new Map()
-
 let cachedHardwareSnapshot = null;
 let cachedPhysicalCores = null;
 ipcMain.handle('system:getInfo', async () => {
@@ -1086,8 +966,8 @@ ipcMain.handle('system:getInfo', async () => {
   if (process.platform === 'win32' && (!cpuModel || cpuModel === 'Processor' || cpuModel.includes('Generic'))) {
     try {
       if (!cachedHardwareSnapshot) {
-        const regCpu = cp.execSync('reg query "HKLM\\HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0" /v "ProcessorNameString"', { encoding: 'utf8', windowsHide: true })
-        const match = regCpu.match(/ProcessorNameString\s+REG_SZ\s+(.+)/i)
+        const { stdout: regCpu } = await runCommand('reg.exe', ['query', 'HKLM\\HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0', '/v', 'ProcessorNameString'], { timeoutMs: 5000 })
+        const match = String(regCpu ?? '').match(/ProcessorNameString\s+REG_SZ\s+(.+)/i)
         if (match && match[1]) {
           cachedHardwareSnapshot = match[1].trim()
         }
@@ -1119,7 +999,7 @@ ipcMain.handle('system:getInfo', async () => {
       model: cpuModel,
       name: cpuModel,
       cores: cpus.length,
-      physicalCores: cachedPhysicalCores ?? Math.max(1, Math.floor(cpus.length / 2)),
+      physicalCores: cachedPhysicalCores ?? null, // unknown until systeminformation answers; never guessed
       speed: cpuSpeed
     },
     memory: {
@@ -1142,14 +1022,14 @@ ipcMain.handle('system:getDeepCategory', async (_, category, forceRefresh) => {
 })
 
 const PROCS_FLAG = path.join(os.tmpdir(), 'darkhub_procs_enabled.flag');
-try { if (fs.existsSync(PROCS_FLAG)) fs.unlinkSync(PROCS_FLAG); } catch {}
+try { if (fsRaw.existsSync(PROCS_FLAG)) fsRaw.unlinkSync(PROCS_FLAG); } catch {}
 
 ipcMain.handle('system:enableProcessTracking', (_, enabled) => {
   try {
     if (enabled) {
-      fs.writeFileSync(PROCS_FLAG, '1', 'utf8');
+      fsRaw.writeFileSync(PROCS_FLAG, '1', 'utf8');
     } else {
-      if (fs.existsSync(PROCS_FLAG)) fs.unlinkSync(PROCS_FLAG);
+      if (fsRaw.existsSync(PROCS_FLAG)) fsRaw.unlinkSync(PROCS_FLAG);
     }
     return { ok: true };
   } catch (e) {
@@ -1206,7 +1086,6 @@ ipcMain.handle('system:getAdvancedHardware', async () => {
 })
 
 ipcMain.handle('system:getGraphics', async () => {
-  if (cachedSysInfo?.graphics) return cachedSysInfo.graphics
   const graphics = await si.graphics()
   return (graphics.controllers ?? []).map((g) => ({
     model: g.model,
@@ -1218,9 +1097,6 @@ ipcMain.handle('system:getGraphics', async () => {
 })
 
 ipcMain.handle('system:getBios', async () => {
-  if (cachedSysInfo?.bios || cachedSysInfo?.baseboard) {
-    return { bios: cachedSysInfo?.bios ?? null, baseboard: cachedSysInfo?.baseboard ?? null }
-  }
   const [baseboard, bios] = await Promise.all([
     si.baseboard().catch(() => null),
     si.bios().catch(() => null)
@@ -1513,43 +1389,48 @@ ipcMain.handle('library:fetchCover', async (_event, payload) => {
   }
 })
 
-function scoreExecutable(exePath) {
+// Async (fs.promises) so a library scan of large Steam/WindowsApps trees no longer blocks the
+// main process. `siblings` is the directory listing the walker already read for the exe's folder.
+async function scoreExecutable(exePath, siblings, gameDir = '') {
   let score = 50;
   const name = path.basename(exePath).toLowerCase();
-  if (/setup|install|update|uninst|crash|reporter|helper|bootstrapper|launcher/i.test(name)) score -= 100;
+  if (/setup|install|update|uninst|crash|reporter|helper|bootstrapper|launcher|vconsole|editor|server|dedicated|redist|prereq|anticheat|battleye|easyanticheat|cefprocess|webhelper|benchmark|vc_?redist|dxsetup|^ndp\d/i.test(name)) score -= 100;
+  // Strongest signal: the exe is named after the game folder (Deadlock -> deadlock.exe).
+  const key = (v) => String(v).toLowerCase().replace(/\.exe$/, '').replace(/[^a-z0-9]/g, '');
+  const folder = key(path.basename(gameDir || ''));
+  const exeKey = key(name);
+  if (folder && exeKey.length >= 3 && (folder === exeKey || folder.startsWith(exeKey) || exeKey.startsWith(folder))) score += 80;
   try {
-    const stat = fsRaw.statSync(exePath);
+    const stat = await fs.stat(exePath);
     if (stat.size < 1024 * 1024 * 2) score -= 20;
     else if (stat.size > 1024 * 1024 * 10) score += 20;
   } catch (e) {}
-  const dir = path.dirname(exePath);
-  try {
-    const files = fsRaw.readdirSync(dir);
-    const hasUnity = files.some(f => f.toLowerCase().includes('unityplayer.dll') || f.toLowerCase().endsWith('_data'));
-    const hasUnreal = files.some(f => f.toLowerCase() === 'engine' || f.toLowerCase().includes('win64-shipping'));
-    const hasCry = files.some(f => f.toLowerCase() === 'crysystem.dll');
-    if (hasUnity) score += 50;
-    if (hasUnreal) score += 50;
-    if (hasCry) score += 50;
-    if (files.some(f => f.toLowerCase().includes('dxgi') || f.toLowerCase().includes('d3d'))) score += 10;
-    if (files.some(f => f.toLowerCase().includes('vulkan'))) score += 10;
-  } catch (e) {}
+  const files = siblings;
+  const hasUnity = files.some(f => f.toLowerCase().includes('unityplayer.dll') || f.toLowerCase().endsWith('_data'));
+  const hasUnreal = files.some(f => f.toLowerCase() === 'engine' || f.toLowerCase().includes('win64-shipping'));
+  const hasCry = files.some(f => f.toLowerCase() === 'crysystem.dll');
+  if (hasUnity) score += 50;
+  if (hasUnreal) score += 50;
+  if (hasCry) score += 50;
+  if (files.some(f => f.toLowerCase().includes('dxgi') || f.toLowerCase().includes('d3d'))) score += 10;
+  if (files.some(f => f.toLowerCase().includes('vulkan'))) score += 10;
   return score;
 }
 
-function scanDirectoryForBestExe(dir) {
+async function scanDirectoryForBestExe(dir) {
   let bestExe = '';
   let bestScore = -999;
-  function walk(currentDir, depth) {
+  async function walk(currentDir, depth) {
     if (depth > 3) return;
     try {
-      const files = fsRaw.readdirSync(currentDir, { withFileTypes: true });
+      const files = await fs.readdir(currentDir, { withFileTypes: true });
+      const names = files.map(f => f.name);
       for (const file of files) {
         const fullPath = path.join(currentDir, file.name);
         if (file.isDirectory()) {
-          walk(fullPath, depth + 1);
+          await walk(fullPath, depth + 1);
         } else if (file.name.toLowerCase().endsWith('.exe')) {
-          const score = scoreExecutable(fullPath);
+          const score = await scoreExecutable(fullPath, names, dir);
           if (score > bestScore && score > 0) {
             bestScore = score;
             bestExe = fullPath;
@@ -1558,7 +1439,7 @@ function scanDirectoryForBestExe(dir) {
       }
     } catch(e) {}
   }
-  walk(dir, 0);
+  await walk(dir, 0);
   return bestExe;
 }
 
@@ -1577,20 +1458,24 @@ ipcMain.handle('library:discover', async () => {
     ];
     for (const vdf of vdfPaths) {
       try {
-        const content = fsRaw.readFileSync(vdf, 'utf8');
+        const content = await fs.readFile(vdf, 'utf8');
         const matches = [...content.matchAll(/"path"\s+"([^"]+)"/g)];
         for (const m of matches) {
           steamPaths.push(path.join(m[1], 'steamapps', 'common'));
         }
       } catch {}
     }
-    for (const steamDir of steamPaths) {
+    // The vdf repeats the default library (and differs only in case), so scan each folder once.
+    const uniqueSteamDirs = [...new Map(steamPaths.map((p) => [path.normalize(p).toLowerCase(), p])).values()]
+    for (const steamDir of uniqueSteamDirs) {
       try {
-        const entries = fsRaw.readdirSync(steamDir, { withFileTypes: true });
+        const entries = await fs.readdir(steamDir, { withFileTypes: true });
         for (const entry of entries) {
           if (!entry.isDirectory()) continue;
+          // Steam runtime folders, not games.
+          if (/^(steamworks shared|steamvr|steam controller configs)$/i.test(entry.name)) continue;
           const gameDir = path.join(steamDir, entry.name);
-          const bestExe = scanDirectoryForBestExe(gameDir);
+          const bestExe = await scanDirectoryForBestExe(gameDir);
           if (bestExe) {
             discovered.push({ platform: 'Steam', name: entry.name, exePath: bestExe, workingDir: path.dirname(bestExe) });
           }
@@ -1602,10 +1487,10 @@ ipcMain.handle('library:discover', async () => {
   // ── 2. Epic Games ─────────────────────────────────────────────────────────
   try {
     const epicManifestDir = path.join(process.env['ProgramData'] || 'C:\\ProgramData', 'Epic', 'EpicGamesLauncher', 'Data', 'Manifests');
-    const manifests = fsRaw.readdirSync(epicManifestDir).filter(f => f.endsWith('.item'));
+    const manifests = (await fs.readdir(epicManifestDir)).filter(f => f.endsWith('.item'));
     for (const manifest of manifests) {
       try {
-        const data = JSON.parse(fsRaw.readFileSync(path.join(epicManifestDir, manifest), 'utf8'));
+        const data = JSON.parse(await fs.readFile(path.join(epicManifestDir, manifest), 'utf8'));
         if (data.InstallLocation && data.LaunchExecutable) {
           discovered.push({ platform: 'Epic Games', name: data.DisplayName || data.AppName, exePath: path.join(data.InstallLocation, data.LaunchExecutable), workingDir: data.InstallLocation });
         }
@@ -1618,11 +1503,11 @@ ipcMain.handle('library:discover', async () => {
     const gogDirs = ['C:\\Program Files (x86)\\GOG Galaxy\\Games', 'C:\\GOG Games'];
     for (const dir of gogDirs) {
       try {
-        const entries = fsRaw.readdirSync(dir, { withFileTypes: true });
+        const entries = await fs.readdir(dir, { withFileTypes: true });
         for (const entry of entries) {
           if (!entry.isDirectory()) continue;
           const gameDir = path.join(dir, entry.name);
-          const bestExe = scanDirectoryForBestExe(gameDir);
+          const bestExe = await scanDirectoryForBestExe(gameDir);
           if (bestExe) {
             discovered.push({ platform: 'GOG', name: entry.name, exePath: bestExe, workingDir: path.dirname(bestExe) });
           }
@@ -1634,7 +1519,7 @@ ipcMain.handle('library:discover', async () => {
   // ── 4. Xbox / Microsoft Store ─────────────────────────────────────────────
   try {
     const xboxDir = path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'WindowsApps');
-    const entries = fsRaw.readdirSync(xboxDir, { withFileTypes: true });
+    const entries = await fs.readdir(xboxDir, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       try {
@@ -1642,7 +1527,7 @@ ipcMain.handle('library:discover', async () => {
         const lowerName = entry.name.toLowerCase();
         const ignoredPrefixes = ['microsoft', 'windows', 'msteams', 'whatsapp', 'python', 'intel', 'nvidia', 'realtek', 'dolby', 'disney', 'spotify', 'netflix', 'appup', 'hewlettpackard', 'lenovo', 'dell'];
         if (!ignoredPrefixes.some(p => lowerName.startsWith(p))) {
-          const bestExe = scanDirectoryForBestExe(gameDir);
+          const bestExe = await scanDirectoryForBestExe(gameDir);
           if (bestExe) {
             discovered.push({ platform: 'Xbox', name: entry.name.split('_')[0], exePath: bestExe, workingDir: path.dirname(bestExe) });
           }
@@ -1654,10 +1539,25 @@ ipcMain.handle('library:discover', async () => {
   return { ok: true, discovered };
 })
 
+// The renderer may only open web pages (http/https) plus a fixed list of Windows system URIs.
+// ms-settings:/magnet: stay restricted to the window-open/navigation guards above.
+const RENDERER_SYSTEM_URIS = new Set(['windowsdefender:'])
+
 ipcMain.handle('shell:openExternal', async (_event, url) => {
-  const opened = await openAllowedExternalUrl(url)
-  if (!opened) {
-    throw new Error('Unsupported URL protocol')
+  try {
+    const raw = typeof url === 'string' ? url.trim() : ''
+    if (RENDERER_SYSTEM_URIS.has(raw.toLowerCase())) {
+      await shell.openExternal(raw)
+      return { ok: true }
+    }
+    const parsed = new URL(raw)
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return { ok: false, error: 'Unsupported URL protocol' }
+    }
+    await shell.openExternal(parsed.toString())
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err) }
   }
 })
 
@@ -1844,12 +1744,17 @@ ipcMain.handle('settings:updateLiveServices', async (_event, payload) => {
   try {
     const { loadConfig: loadPersistedConfig, saveConfig } = await import('./configManager.js')
     const current = await loadPersistedConfig()
+    // Only persist the known boolean toggles; never spread arbitrary renderer data into config.json.
+    const patch = {}
+    for (const key of ['latencyGuardian', 'overlay', 'autoClicker']) {
+      if (typeof payload?.[key] === 'boolean') patch[key] = payload[key]
+    }
 
     const next = await saveConfig({
       ...current,
       liveServices: {
         ...(current.liveServices ?? {}),
-        ...payload
+        ...patch
       }
     })
     await loadRuntimeConfig()
@@ -1898,44 +1803,50 @@ ipcMain.handle('settings:updateStartupBehavior', async (_event, payload) => {
   }
 })
 
-// Lightweight live host stats for the DarkOS Center (process/service counts + CPU/RAM). One cheap
-// PowerShell call per request; the renderer polls only while its page is visible (footprint rule).
+/// Live host stats for the DarkOS Center, polled every few seconds while the page is open.
+// CPU/RAM/uptime come from Node (instant); only the process/service counts need PowerShell (~1.5 s), so they
+// are cached for 30 s and refreshed in the background instead of spawning PowerShell on every poll.
+const liveCpu = new CpuLoadTracker()
+let liveCounts = null
+let liveCountsAt = 0
+let liveCountsPending = null
+
+function refreshLiveCounts() {
+  liveCountsPending ||= runPowerShell(
+    "$ErrorActionPreference='SilentlyContinue'; $s=Get-Service; '{0}|{1}|{2}' -f @(Get-Process).Count, @($s | Where-Object { $_.Status -eq 'Running' }).Count, @($s).Count",
+    { timeoutMs: 12000, trim: true }
+  ).then((res) => {
+    const m = /^(\d+)\|(\d+)\|(\d+)/.exec(stripBom(res.stdout || '').trim())
+    if (m) { liveCounts = { processes: +m[1], servicesRunning: +m[2], servicesTotal: +m[3] }; liveCountsAt = Date.now() }
+  }).catch(() => {}).finally(() => { liveCountsPending = null })
+  return liveCountsPending
+}
+
+// Memory only, straight from the OS (GlobalMemoryStatusEx: "available" = what Task Manager shows), cheap enough to poll.
+ipcMain.handle('system:getMemory', () => {
+  const total = os.totalmem(), free = os.freemem()
+  return { ok: true, total, used: Math.max(0, total - free), available: free }
+})
+
 ipcMain.handle('system:getLiveStats', async () => {
   if (process.platform !== 'win32') return { ok: false, error: 'Disponível apenas no Windows.' }
   try {
-    const script = `
-$ErrorActionPreference = 'SilentlyContinue'
-$procs = @(Get-Process).Count
-$svc = Get-Service
-$run = @($svc | Where-Object { $_.Status -eq 'Running' }).Count
-$all = @($svc).Count
-$os = Get-CimInstance Win32_OperatingSystem
-$cpuAvg = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average
-[pscustomobject]@{
-  processes = $procs
-  servicesRunning = $run
-  servicesTotal = $all
-  cpuPercent = if ($cpuAvg -ne $null) { [int][math]::Round([double]$cpuAvg, 0) } else { 0 }
-  memTotalMb = [int][math]::Round($os.TotalVisibleMemorySize / 1024, 0)
-  memFreeMb = [int][math]::Round($os.FreePhysicalMemory / 1024, 0)
-  uptimeSec = [int]((Get-Date) - $os.LastBootUpTime).TotalSeconds
-} | ConvertTo-Json -Compress`
-    const res = await runPowerShell(script, { timeoutMs: 12000, trim: true })
-    let d = null
-    try { d = JSON.parse(stripBom(res.stdout || '').trim()) } catch { d = null }
-    if (!d) return { ok: false, error: (res.stderr || '').trim() || 'Sem dados de telemetria do sistema.' }
-    const memTotalMb = Number(d.memTotalMb) || 0
-    const memUsedMb = Math.max(0, memTotalMb - (Number(d.memFreeMb) || 0))
+    if (!liveCounts) await refreshLiveCounts()
+    else if (Date.now() - liveCountsAt > 30000) void refreshLiveCounts()
+    let cpuPercent = liveCpu.sample()
+    if (cpuPercent === null) { await new Promise((r) => setTimeout(r, 250)); cpuPercent = liveCpu.sample() ?? 0 }
+    const memTotalMb = Math.round(os.totalmem() / 1048576)
+    const memUsedMb = Math.max(0, memTotalMb - Math.round(os.freemem() / 1048576))
     return {
       ok: true,
-      processes: Number(d.processes) || 0,
-      servicesRunning: Number(d.servicesRunning) || 0,
-      servicesTotal: Number(d.servicesTotal) || 0,
-      cpuPercent: Number(d.cpuPercent) || 0,
+      processes: liveCounts?.processes ?? 0,
+      servicesRunning: liveCounts?.servicesRunning ?? 0,
+      servicesTotal: liveCounts?.servicesTotal ?? 0,
+      cpuPercent,
       memUsedMb,
       memTotalMb,
       memPercent: memTotalMb ? Math.round((memUsedMb / memTotalMb) * 100) : 0,
-      uptimeSec: Number(d.uptimeSec) || 0
+      uptimeSec: Math.round(os.uptime())
     }
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) }
@@ -1958,7 +1869,8 @@ ipcMain.handle('injector:inject', async (_event, payload) => {
     // interpolação direta. Sem isso, um valor contendo uma aspa simples
     // (ex: processName = "x' ; Remove-Item C:\ -Recurse -Force #") quebrava
     // o quoting do PowerShell e permitia injetar comandos arbitrários.
-    const scriptPath = path.join(__dirname, 'DarkHub.Injector.ps1');
+    // PowerShell cannot read inside app.asar: the script is unpacked next to it (asarUnpack electron/*.ps1).
+    const scriptPath = path.join(__dirname.replace(/app\.asar(?![.\w])/, 'app.asar.unpacked'), 'DarkHub.Injector.ps1');
     const psCommand = `& ${psSingleQuote(scriptPath)} ${psSingleQuote(processName)} ${psSingleQuote(dllPath)}`;
     const { code, stdout, stderr } = await runPowerShell(psCommand, { timeoutMs: 15000 });
 
@@ -2065,7 +1977,8 @@ ipcMain.handle('dialog:selectFiles', async (_event, options) => {
     filters: options?.filters ?? []
   })
   for (const filePath of result.filePaths ?? []) grantFilePath(filePath)
-  return { canceled: result.canceled, filePaths: result.filePaths }
+  // `ok`/`files` are aliases kept for callers that expect that shape (DllInjector).
+  return { canceled: result.canceled, filePaths: result.filePaths, ok: !result.canceled, files: result.filePaths }
 })
 
 ipcMain.handle('dialog:selectFolder', async (_event, options) => {
@@ -2142,17 +2055,6 @@ ipcMain.handle('optimizer:globalRecommendedTweaks', async (event) => {
   }
 });
 
-function isValidIpv4(value) {
-  if (typeof value !== 'string') return false
-  const trimmed = value.trim()
-  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(trimmed)) return false
-  const parts = trimmed.split('.').map((p) => Number(p))
-  if (parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false
-  return true
-}
-
-ipcMain.handle('optimizer:dnsPresets', async () => ({ ok: true, presets: DnsEngine.getPresets() }));
-
 ipcMain.handle('optimizer:getDnsState', async () => {
   try { return await DnsEngine.getState(); } catch (err) { return { ok: false, error: err?.message ?? String(err) }; }
 });
@@ -2180,58 +2082,9 @@ ipcMain.handle('optimizer:dnsBenchmark', async (_event, payload) => {
   }
 });
 // ============================================================
-// HELPER: Criar Ponto de Restauração do Sistema
-// ============================================================
-function sendRoutineEvent(event, routineId, type, message, extra = {}) {
-  try {
-    event.sender.send('optimizer:runEvent', {
-      routineId,
-      type,
-      message,
-      timestamp: Date.now(),
-      ...extra
-    })
-  } catch {}
-}
-
-function sendRoutineProgress(event, routineId, progress, message, extra = {}) {
-  const safeProgress = Math.max(0, Math.min(100, Math.round(Number(progress) || 0)))
-  sendRoutineEvent(event, routineId, 'progress', message, { progress: safeProgress, ...extra })
-}
-
-function emitCommandOutput(event, routineId, prefix = '') {
-  return (chunk) => {
-    for (const line of String(chunk ?? '').split(/\r?\n/)) {
-      const message = line.trim()
-      if (message) sendRoutineEvent(event, routineId, 'log', prefix ? `${prefix}${message}` : message)
-    }
-  }
-}
-
-async function runRoutineCommand(event, routineId, command, args = [], {
-  timeoutMs = 30000,
-  allowCodes = [0],
-  label = null,
-  spawnOptions = {}
-} = {}) {
-  if (label) sendRoutineEvent(event, routineId, 'log', label)
-  const result = await runCommand(command, args, {
-    timeoutMs,
-    spawnOptions,
-    onStdout: emitCommandOutput(event, routineId),
-    onStderr: emitCommandOutput(event, routineId, '[ERRO] ')
-  })
-  if (!allowCodes.includes(result.code)) {
-    throw new Error(result.stderr || `${command} exited with code ${result.code}`)
-  }
-  return result
-}
-
-// ============================================================
 // RUN ROUTINE HANDLER
 // ============================================================
 ipcMain.handle('optimizer:runRoutine', async (_event, routineId) => {
-  let routineFailed = false;
   const startedAt = Date.now();
   const sendEvent = (type, message, extra = {}) => {
     try { _event.sender.send('optimizer:runEvent', { routineId, type, message, timestamp: Date.now(), ...extra }); } catch {}
@@ -2275,7 +2128,6 @@ ipcMain.handle('optimizer:runRoutine', async (_event, routineId) => {
         case 'disable-visual-effects': res = await VisualsEngine.disableVisualEffects(); break;
         case 'revert-visual-effects': res = await VisualsEngine.revertVisualEffects(); break;
         case 'open-antivirus': res = await ToolboxEngine.openAntivirus(); break;
-        case 'space-sniffer': res = await ToolboxEngine.openSpaceSniffer(); break;
         case 'change-priority': res = await ToolboxEngine.openTaskManager(); break;
         case 'disable-telemetry': res = await DeepTweaksEngine.applyTweaks(['tweak:disableTelemetry'], () => {}); break;
         case 'revert-telemetry': res = await DeepTweaksEngine.undoTweaks(['tweak:disableTelemetry']); break;
@@ -2315,7 +2167,6 @@ ipcMain.handle('optimizer:runRoutine', async (_event, routineId) => {
     sendEvent('complete', `Rotina encerrada: ${routineId} (${res.msg || 'Concluído'})`, { progress: 100, ok: true, elapsedMs: Date.now() - startedAt });
     return res;
   } catch (err) {
-    routineFailed = true;
     sendEvent('error', `Falha na rotina ${routineId}: ${err?.message ?? String(err)}`, { progress: 100, ok: false });
     return { ok: false, error: err.message };
   }
@@ -2358,7 +2209,7 @@ ipcMain.handle('files:convertImages', async (_event, payload) => {
   if (typeof outputDir !== 'string' || outputDir.trim().length === 0) throw new Error('No output directory')
   if (typeof outputFormat !== 'string') throw new Error('No output format')
   assertFileAccessGrantedMany(inputFiles, 'arquivo de entrada')
-  assertFileAccessGranted(outputDir, 'pasta de saída')
+  assertOutputDirGranted(outputDir, inputFiles)
 
   const format = outputFormat.toLowerCase().trim()
   const supported = new Set(['png', 'jpg', 'jpeg', 'webp', 'avif', 'tiff', 'tif', 'bmp', 'gif', 'ico'])
@@ -2410,7 +2261,7 @@ ipcMain.handle('files:convertMedia', async (_event, payload) => {
   if (typeof outputDir !== 'string' || outputDir.trim().length === 0) throw new Error('No output directory')
   if (typeof outputFormat !== 'string' || outputFormat.trim().length === 0) throw new Error('No output format')
   assertFileAccessGrantedMany(inputFiles, 'arquivo de entrada')
-  assertFileAccessGranted(outputDir, 'pasta de saída')
+  assertOutputDirGranted(outputDir, inputFiles)
 
   const ffmpegPath = await getFfmpegPath()
   if (typeof ffmpegPath !== 'string' || ffmpegPath.trim().length === 0) {
@@ -2501,7 +2352,7 @@ ipcMain.handle('files:convertDocuments', async (_event, payload) => {
   if (typeof outputDir !== 'string' || outputDir.trim().length === 0) throw new Error('No output directory')
   if (typeof outputFormat !== 'string' || outputFormat.trim().length === 0) throw new Error('No output format')
   assertFileAccessGrantedMany(inputFiles, 'arquivo de entrada')
-  assertFileAccessGranted(outputDir, 'pasta de saída')
+  assertOutputDirGranted(outputDir, inputFiles)
 
   const format = outputFormat.toLowerCase().trim()
   await fs.mkdir(outputDir, { recursive: true })
@@ -2609,7 +2460,7 @@ ipcMain.handle('files:archiveOperation', async (_event, payload) => {
   if (action === 'compress') {
     if (!Array.isArray(inputFiles) || inputFiles.length === 0 || !outputArchive) throw new Error('Invalid arguments')
     assertFileAccessGrantedMany(inputFiles, 'arquivo para compactar')
-    assertFileAccessGranted(path.dirname(outputArchive), 'pasta de destino')
+    assertOutputDirGranted(path.dirname(outputArchive), inputFiles)
     const args = ['-a', '-c', '-f', outputArchive, ...inputFiles.map(f => path.basename(f))]
     const cwd = path.dirname(inputFiles[0])
     const { code, stderr } = await runCommand('tar.exe', args, { cwd, timeoutMs: 10 * 60 * 1000 })
@@ -2618,7 +2469,7 @@ ipcMain.handle('files:archiveOperation', async (_event, payload) => {
   } else if (action === 'extract') {
     if (!Array.isArray(inputFiles) || inputFiles.length === 0 || !extractDir) throw new Error('Invalid arguments')
     assertFileAccessGranted(inputFiles[0], 'arquivo compactado')
-    assertFileAccessGranted(extractDir, 'pasta de extração')
+    assertOutputDirGranted(extractDir, inputFiles)
     await fs.mkdir(extractDir, { recursive: true })
     const args = ['-x', '-f', inputFiles[0], '-C', extractDir]
     const { code, stderr } = await runCommand('tar.exe', args, { timeoutMs: 10 * 60 * 1000 })
@@ -2636,6 +2487,10 @@ ipcMain.handle('youtube:getVideoInfo', async (_event, payload) => {
     const userAgentRaw = typeof payload === 'object' ? payload?.userAgent : null
     const clientRaw = typeof payload === 'object' ? payload?.client : null
     if (typeof url !== 'string' || url.trim().length === 0) throw new Error('Missing URL')
+    // yt-dlp also writes the cookie jar back on exit, so require a dialog grant as youtube:download does.
+    if (typeof cookiesPath === 'string' && cookiesPath.trim().length) {
+      assertFileAccessGranted(cookiesPath, 'arquivo de cookies')
+    }
 
     const toolsDir = path.join(app.getPath('userData'), 'tools')
     const ffmpegPath = await getFfmpegPath()
@@ -2722,35 +2577,7 @@ ipcMain.handle('youtube:getVideoInfo', async (_event, payload) => {
       ytDlpError = err?.message ?? String(err)
     }
 
-    try {
-      const ytdl = await getYtdl()
-      const info = await ytdl.getInfo(url)
-      return {
-        isPlaylist: false,
-        title: info.videoDetails.title,
-        author: info.videoDetails.author.name,
-        thumbnail: info.videoDetails.thumbnails[0]?.url,
-        duration: parseInt(info.videoDetails.lengthSeconds, 10) || 0,
-        viewCount: parseInt(info.videoDetails.viewCount, 10) || 0,
-        extractor: 'ytdl-core',
-        formats: info.formats.map((f) => ({
-          id: String(f.itag),
-          ext: f.container,
-          acodec: f.audioCodec,
-          vcodec: f.videoCodec,
-          resolution: f.qualityLabel ?? null,
-          fps: f.fps ?? null,
-          abr: f.audioBitrate ?? null,
-          vbr: null,
-          filesize: null,
-          formatNote: f.quality ?? null
-        }))
-      }
-    } catch (err) {
-      const ytdlError = err?.message ?? String(err)
-      const prefix = ytDlpError ? `yt-dlp falhou: ${ytDlpError} | ` : ''
-      throw new Error(prefix + ytdlError)
-    }
+    throw new Error(`yt-dlp falhou: ${ytDlpError}`)
   } catch (err) {
     try {
       await reportBugTelemetry({
@@ -3429,31 +3256,7 @@ ipcMain.handle('security:auditTracking', async () => {
       const content = await fs.readFile(hostsPath, 'utf8')
       const lines = content.split(/\r?\n/g).map((l) => l.trim())
 
-      const trackingDomains = [
-        'doubleclick.net',
-        'google-analytics.com',
-        'analytics.google.com',
-        'googletagmanager.com',
-        'facebook.com',
-        'connect.facebook.net',
-        'ads.twitter.com',
-        'scorecardresearch.com',
-        'quantserve.com',
-        'adnxs.com',
-        'mathtag.com',
-        'bluekai.com',
-        'krxd.net',
-        'demdex.net',
-        'omtrdc.net',
-        'everesttech.net',
-        'pixel.rubiconproject.com',
-        'pubmatic.com',
-        'openx.net',
-        'adroll.com',
-        'taboola.com',
-        'outbrain.com'
-      ]
-      const allDomains = Array.from(new Set([...trackingDomains, ...customDomains]))
+      const allDomains = Array.from(new Set([...DEFAULT_TRACKING_DOMAINS, ...customDomains]))
 
       const present = new Set()
       for (const line of lines) {
@@ -3881,6 +3684,14 @@ async function startAutoClicker(payload) {
   autoClickerProc = p
   autoClickerState = { button, intervalMs, startedAt: Date.now(), isNative: false }
 
+  p.on('error', (err) => {
+    log.warn('[AutoClicker] powershell fallback process error:', err)
+    if (autoClickerProc === p) {
+      autoClickerProc = null
+      autoClickerState = null
+    }
+  })
+
   p.on('exit', () => {
     if (autoClickerProc !== p) return
     autoClickerProc = null
@@ -3896,12 +3707,15 @@ async function startAutoClicker(payload) {
 
 async function stopAutoClicker() {
   if (autoClickerProc) {
+    // Capture the child: autoClickerProc is cleared below, so the delayed kill must not read it
+    // (previously it did and never killed anything — the PowerShell fallback kept clicking).
+    const proc = autoClickerProc
     try {
-      if (autoClickerProc.stdin?.writable) {
-        autoClickerProc.stdin.write('STOP\nEXIT\n')
+      if (proc.stdin?.writable) {
+        proc.stdin.write('STOP\nEXIT\n')
       }
       setTimeout(() => {
-        try { autoClickerProc?.kill() } catch {}
+        try { if (proc.exitCode === null) proc.kill() } catch {}
       }, 100)
     } catch {}
     autoClickerProc = null
@@ -3950,6 +3764,11 @@ ipcMain.handle('autoclicker:getHotkey', async () => {
 
 ipcMain.handle('autoclicker:setHotkey', async (_event, payload) => {
   const hotkey = typeof payload?.hotkey === 'string' ? payload.hotkey.trim() : ''
+  // The hotkey is forwarded verbatim to the native engine's line-based stdin protocol, so
+  // reject whitespace/control characters that could smuggle extra commands (e.g. "F6\nSTART ...").
+  if (hotkey.length > 0 && !/^[\x21-\x7E]{1,64}$/.test(hotkey)) {
+    return { ok: false, error: 'Atalho inválido.' }
+  }
   try {
     if (hotkey.length === 0) {
       unregisterAutoClickerHotkey()
@@ -4060,29 +3879,80 @@ function isValidWingetId(id) {
   return typeof id === 'string' && WINGET_ID_RE.test(id.trim());
 }
 
+// Open-source apps published only as GitHub releases (not on winget). Allow-listed repos only: the renderer sends
+// "gh:<owner>/<repo>" and nothing else is ever downloaded. The MSI must match the SHA-256 digest GitHub publishes.
+const GITHUB_RELEASE_APPS = new Set([
+  'storytold/photocraft', 'storytold/vectorcraft', 'storytold/filmcraft', 'storytold/lightcraft', 'storytold/effectcraft',
+  'storytold/designcraft', 'storytold/pdfcraft', 'storytold/wordcraft', 'storytold/gridcraft', 'storytold/deckcraft',
+  'storytold/cadcraft', 'storytold/figcraft', 'storytold/soundcraft'
+])
+
+async function installGithubReleaseMsi(repo, progress) {
+  const { fetchJson, downloadToFile, assetSha256 } = await import('./services/SecureDownload.js')
+  const rel = await fetchJson(`https://api.github.com/repos/${repo}/releases/latest`)
+  const arch = process.arch === 'arm64' ? 'arm64' : process.arch === 'ia32' ? 'x86' : 'x64'
+  const asset = (rel?.assets || []).find((a) => new RegExp(`-windows-${arch}\\.msi$`, 'i').test(String(a?.name)))
+  if (!asset) throw new Error(`a versão ${rel?.tag_name ?? '?'} não tem instalador .msi para Windows ${arch}`)
+  const sha256 = assetSha256(asset)
+  if (!sha256) throw new Error('o GitHub não publicou o hash SHA-256 do instalador; instalação recusada')
+  const dir = path.join(app.getPath('temp'), 'darkhub-setup')
+  await fs.mkdir(dir, { recursive: true })
+  const dest = path.join(dir, path.basename(String(asset.name)))
+  progress(`[GitHub] Baixando ${asset.name} (${rel.tag_name}, ${Math.round((asset.size || 0) / 1048576)} MB)...`)
+  await downloadToFile(asset.browser_download_url, dest, { expectedSha256: sha256, timeoutMs: 600000 })
+  progress(`[GitHub] Hash SHA-256 conferido. Instalando...`)
+  try {
+    const code = await new Promise((resolve) => {
+      const p = spawn('msiexec.exe', ['/i', dest, '/qn', '/norestart'], { windowsHide: true })
+      p.on('close', resolve)
+      p.on('error', () => resolve(-1))
+    })
+    if (code !== 0 && code !== 3010) throw new Error(`msiexec terminou com código ${code}`)
+  } finally {
+    await fs.rm(dest, { force: true }).catch(() => {})
+  }
+}
+
 ipcMain.handle('setup:installWinget', async (event, appIds) => {
   if (!Array.isArray(appIds) || appIds.length === 0) return { ok: false, error: 'Lista vazia' };
+  // The window may be closed mid-queue; a send on a destroyed webContents would reject the handler.
+  const progress = (msg) => {
+    try { if (!event.sender.isDestroyed()) event.sender.send('setup:installProgress', msg) } catch {}
+  };
 
+  const ghIds = appIds.map((id) => String(id ?? '').trim()).filter((id) => id.startsWith('gh:') && GITHUB_RELEASE_APPS.has(id.slice(3)));
   const validIds = appIds.map((id) => String(id ?? '').trim()).filter(isValidWingetId);
-  const rejectedCount = appIds.length - validIds.length;
-  if (validIds.length === 0) return { ok: false, error: 'Nenhum ID de aplicativo válido informado' };
+  const rejectedCount = appIds.length - validIds.length - ghIds.length;
+  if (validIds.length === 0 && ghIds.length === 0) return { ok: false, error: 'Nenhum ID de aplicativo válido informado' };
   if (rejectedCount > 0) {
-    event.sender.send('setup:installProgress', `[AppStore] ${rejectedCount} ID(s) inválido(s) foram ignorados.`);
+    progress(`[AppStore] ${rejectedCount} ID(s) inválido(s) foram ignorados.`);
   }
 
-  event.sender.send('setup:installProgress', `[AppStore] Iniciando fila de ${validIds.length} aplicativos...`);
+  progress(`[AppStore] Iniciando fila de ${validIds.length + ghIds.length} aplicativos...`);
+
+  for (const id of ghIds) {
+    const repo = id.slice(3)
+    progress(`[AppStore] Preparando: ${repo} (GitHub)...`)
+    try {
+      await installGithubReleaseMsi(repo, progress)
+      progress(`[AppStore] ${repo} instalado com sucesso!`)
+    } catch (err) {
+      progress(`[AppStore] FALHA: ${repo}: ${err?.message ?? err}`)
+    }
+  }
 
   for (const id of validIds) {
-    event.sender.send('setup:installProgress', `[AppStore] Preparando: ${id}...`);
+    progress(`[AppStore] Preparando: ${id}...`);
 
     const tryInstall = (provider, command, args) => {
       return new Promise((resolve) => {
-        event.sender.send('setup:installProgress', `[${provider}] Baixando/Instalando ${id}...`);
+        progress(`[${provider}] Baixando/Instalando ${id}...`);
         const p = spawn(command, args, { windowsHide: true });
         p.stdout.on('data', d => {
           const txt = d.toString().trim();
-          if (txt) event.sender.send('setup:installProgress', `[${provider}] ${txt}`);
+          if (txt) progress(`[${provider}] ${txt}`);
         });
+        p.stderr?.resume(); // drain stderr so a chatty installer can't stall on a full pipe
         p.on('close', (code) => resolve(code === 0));
         p.on('error', () => resolve(false));
       });
@@ -4091,7 +3961,7 @@ ipcMain.handle('setup:installWinget', async (event, appIds) => {
     let success = await tryInstall('Winget', 'winget', ['install', '-e', '--id', id, '--accept-package-agreements', '--accept-source-agreements', '--silent']);
 
     if (!success) {
-      event.sender.send('setup:installProgress', `[Winget] Falhou para ${id}. Tentando via Chocolatey...`);
+      progress(`[Winget] Falhou para ${id}. Tentando via Chocolatey...`);
 
       const chocoId = id.split('.').pop().toLowerCase();
       if (isValidWingetId(chocoId)) {
@@ -4100,13 +3970,13 @@ ipcMain.handle('setup:installWinget', async (event, appIds) => {
     }
 
     if (success) {
-      event.sender.send('setup:installProgress', `[AppStore] ${id} instalado com sucesso!`);
+      progress(`[AppStore] ${id} instalado com sucesso!`);
     } else {
-      event.sender.send('setup:installProgress', `[AppStore] FALHA TOTAL: Não foi possível instalar ${id} por nenhum provedor.`);
+      progress(`[AppStore] FALHA TOTAL: Não foi possível instalar ${id} por nenhum provedor.`);
     }
   }
 
-  event.sender.send('setup:installProgress', `[AppStore] Fila concluída!`);
+  progress(`[AppStore] Fila concluída!`);
   return { ok: true };
 })
 
@@ -4174,7 +4044,7 @@ app.whenReady().then(async () => {
         globalShortcut.register('F8', () => {
           import('./overlay.js').then(({ toggleGamingOverlay }) => {
             toggleGamingOverlay()
-          })
+          }).catch((err) => log.warn('[overlay] toggle failed:', err?.message ?? String(err)))
         })
       } catch (err) {
         log.warn('[startup-bg] overlay hotkey failed:', err?.message ?? String(err))
@@ -4278,7 +4148,11 @@ app.whenReady().then(async () => {
   })
   ipcMain.handle('window:close', (e) => {
     const win = BrowserWindow.fromWebContents(e.sender)
-    if (win) hideWindowToBackground(win)
+    if (!win) return
+    // Honour the "close to tray" setting for the custom title-bar button too; win.close() goes
+    // through the 'close' handler, which quits when the setting is off.
+    if (closeToTrayEnabled) hideWindowToBackground(win)
+    else win.close()
   })
 
   log.info('[startup] creating main window')
@@ -4311,8 +4185,10 @@ app.on('before-quit', (event) => {
   try {
     HardwareService.teardown()
   } catch {}
+  // Graceful STOP so the frame limiter resets its cap instead of being hard-killed.
+  try { void Promise.resolve(FramePacerEngine.stop()).catch(() => {}) } catch {}
   try {
-    if (fs.existsSync(PROCS_FLAG)) fs.unlinkSync(PROCS_FLAG)
+    if (fsRaw.existsSync(PROCS_FLAG)) fsRaw.unlinkSync(PROCS_FLAG)
   } catch {}
   if (!latencyGuardianStopHandled && latencyGuardianHandle?.stop) {
     latencyGuardianStopHandled = true

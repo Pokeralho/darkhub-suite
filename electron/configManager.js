@@ -98,23 +98,3 @@ export function getDefaultConfig() {
     }
   }
 }
-
-export async function getConfigValue(keyPath) {
-  const config = await loadConfig()
-  return keyPath.split('.').reduce((obj, key) => obj?.[key], config)
-}
-
-export async function setConfigValue(keyPath, value) {
-  const config = await loadConfig()
-  const keys = keyPath.split('.')
-  let current = config
-
-  for (let i = 0; i < keys.length - 1; i++) {
-    if (!current[keys[i]]) current[keys[i]] = {}
-    current = current[keys[i]]
-  }
-
-  current[keys[keys.length - 1]] = value
-  await saveConfig(config)
-  return config
-}

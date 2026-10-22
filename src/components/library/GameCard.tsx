@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Play, Settings, MoreVertical, Clock } from 'lucide-react'
+import { Play, Settings, Clock, Loader2, DarkHubMark } from '../icons'
 import { Game } from './types'
 import { useI18n } from '../../i18n/I18nProvider'
 
@@ -25,6 +25,11 @@ export function GameCard({
 
   useEffect(() => {
     let mounted = true
+    if (game.coverPath) {
+      // keep the local state in sync when the stored cover changes (edit, refresh)
+      setCoverUrl(game.coverPath)
+      setImageError(false)
+    }
     const fetchCover = async () => {
       if (game.coverPath || !window.darkhub?.library) return
       try {
@@ -53,73 +58,62 @@ export function GameCard({
   const playtimeText = formatTime(game.playtimeSeconds ?? 0)
 
   return (
-    <div
-      className="group relative aspect-[2/3] w-full rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800 transition-all hover:scale-[1.02] hover:shadow-2xl hover:shadow-indigo-500/20 hover:border-indigo-500/50 flex flex-col"
-    >
-      {}
-      <div className="absolute inset-0 w-full h-full">
+    <div className="group relative w-full min-w-0">
+      <div className="relative aspect-[2/3] w-full rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 transition-colors duration-200 group-hover:border-zinc-600 group-focus-within:border-zinc-600">
         {coverUrl && !imageError ? (
           <img
             src={coverUrl}
-            alt={game.name}
+            alt=""
+            loading="lazy"
+            decoding="async"
             onError={() => setImageError(true)}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-950 p-4 text-center">
-            <span className="text-xl font-black text-zinc-600 uppercase tracking-widest break-words w-full opacity-30 group-hover:opacity-60 transition-opacity">
-              {game.name}
-            </span>
+          <div className="absolute inset-0 flex flex-col justify-end p-3 bg-zinc-900">
+            <DarkHubMark size={72} strokeWidth={0.9} className="absolute right-2 top-2 text-zinc-800" aria-hidden="true" />
+            <span className="relative text-[13px] font-medium leading-snug text-zinc-500 line-clamp-3 break-words">{game.name}</span>
           </div>
         )}
-      </div>
 
-      {}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none" />
+        {/* Quiet until hover: scrim + actions */}
+        <div className={`absolute inset-0 bg-gradient-to-t from-zinc-950/90 via-zinc-950/30 to-transparent transition-opacity duration-200 ${isLaunching ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}`} />
 
-      {}
-      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 backdrop-blur-sm transition-all duration-300 flex flex-col items-center justify-center p-4">
+        {game.optiscaler?.enabled && (
+          <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-zinc-950/75 font-mono text-[10.5px] text-zinc-300">
+            dlss
+          </span>
+        )}
+
         <button
-          onClick={onLaunch}
-          disabled={isLaunching}
-          className="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.3)] transition-all transform hover:scale-110 disabled:opacity-50 disabled:hover:scale-100"
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onEdit(); }}
+          aria-label={t('library.editGame', 'Editar jogo')}
+          title={t('library.editGame', 'Editar jogo')}
+          className="absolute top-2 right-2 h-7 w-7 inline-flex items-center justify-center rounded-md bg-zinc-950/75 text-zinc-300 hover:text-zinc-50 hover:bg-zinc-950 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity duration-150"
         >
-          <Play size={28} className="ml-1" fill="currentColor" />
+          <Settings size={14} />
         </button>
 
-        {isLaunching && (
-          <div className="mt-4 text-xs font-bold text-emerald-400 animate-pulse uppercase tracking-wider">
-            {t('library.launching', 'Iniciando...')}
-          </div>
-        )}
+        <div className={`absolute inset-x-2 bottom-2 transition-all duration-200 ease-out ${isLaunching ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:translate-y-0'}`}>
+          <button
+            type="button"
+            onClick={onLaunch}
+            disabled={isLaunching}
+            className="dh-btn dh-btn-primary w-full"
+          >
+            {isLaunching ? <Loader2 size={14} className="animate-spin" /> : <Play size={13} />}
+            {isLaunching ? t('library.launching', 'Iniciando...') : t('library.play', 'Jogar')}
+          </button>
+        </div>
       </div>
 
-      {}
-      <button
-        onClick={(e) => { e.stopPropagation(); onEdit(); }}
-        className="absolute top-3 right-3 p-2 bg-black/50 hover:bg-black/80 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all hover:scale-110 backdrop-blur-md"
-      >
-        <Settings size={16} />
-      </button>
-
-      {}
-      {game.optiscaler?.enabled && (
-        <div className="absolute top-3 left-3 px-2 py-1 bg-indigo-600/80 backdrop-blur-md rounded text-[10px] font-bold text-white uppercase tracking-wider shadow-lg">
-          DLSS
+      <div className="mt-2 px-0.5 min-w-0">
+        <h3 className="text-[12.5px] font-medium leading-snug text-zinc-200 truncate" title={game.name}>{game.name}</h3>
+        <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] text-zinc-500">
+          <Clock size={11} className="text-zinc-600" />
+          <span>{playtimeText ?? '0 ' + t('library.time.min', 'min')}</span>
         </div>
-      )}
-
-      {}
-      <div className="absolute bottom-0 left-0 w-full p-4 flex flex-col gap-1 pointer-events-none">
-        <h3 className="text-white font-bold text-sm leading-tight drop-shadow-md line-clamp-2">
-          {game.name}
-        </h3>
-        {playtimeText && (
-          <div className="flex items-center gap-1.5 text-zinc-300 text-xs font-medium">
-            <Clock size={12} className="text-indigo-400" />
-            <span>{playtimeText}</span>
-          </div>
-        )}
       </div>
     </div>
   )

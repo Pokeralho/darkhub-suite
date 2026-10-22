@@ -13,7 +13,7 @@ export const OptimizationScoreCard: React.FC<OptimizationScoreCardProps> = ({
   return (
     <div
       onClick={onClick}
-      className="p-4 rounded-xl border border-zinc-800 bg-zinc-900 flex items-center space-x-4 min-w-[220px] cursor-pointer hover:bg-zinc-800 active:bg-zinc-950 transition-all duration-200"
+      className="dh-card p-4 flex items-center gap-4 min-w-[220px] cursor-pointer hover:border-zinc-700 transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:border-blue-400"
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -25,9 +25,8 @@ export const OptimizationScoreCard: React.FC<OptimizationScoreCardProps> = ({
     >
       <div className="flex-1">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-sm text-zinc-400">Pontuação de Otimização</span>
+          <span className="dh-label">Pontuação de Otimização</span>
 
-          {}
           <HelpTip
             title="Pontuação de Otimização"
             description="Mostra o quão otimizado está o seu sistema no momento."
@@ -44,8 +43,7 @@ export const OptimizationScoreCard: React.FC<OptimizationScoreCardProps> = ({
           />
         </div>
 
-        <div className="text-3xl font-bold text-white">{score}</div>
-        <div className="text-xs text-emerald-400 mt-0.5">+12 desde ontem</div>
+        <div className="text-[28px] leading-none font-mono font-semibold tabular-nums text-zinc-50">{score}</div>
       </div>
     </div>
   );

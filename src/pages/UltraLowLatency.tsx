@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { visibleInterval } from '../utils/visibleInterval'
 import { useI18n } from '../i18n/I18nProvider'
-import { Zap, Loader2 } from 'lucide-react'
+import { Zap, Loader2 } from '../components/icons'
 import { HelpTip } from '../components/HelpTip'
+import PageHeader from '../components/ui/PageHeader'
 
 type LatencyPayload = {
   ok: boolean
@@ -10,6 +11,22 @@ type LatencyPayload = {
   status?: any
   metrics?: any
 }
+
+const Skel = ({ w = 'w-12' }: { w?: string }) => (
+  <span aria-hidden="true" className={`inline-block h-4 ${w} rounded bg-zinc-800/80 animate-pulse align-middle`} />
+)
+
+const Check = ({ checked, onChange, children, disabled }: { checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode; disabled?: boolean }) => (
+  <label className={`flex items-center gap-2 text-[12.5px] ${disabled ? 'text-zinc-600' : 'text-zinc-300'} cursor-pointer`}>
+    <input
+      type="checkbox"
+      checked={checked}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.checked)}
+    />
+    {children}
+  </label>
+)
 
 export default function UltraLowLatency() {
   const { t } = useI18n()
@@ -266,7 +283,7 @@ export default function UltraLowLatency() {
     if (k === 'End') k = 'End'
 
     if (mods.length === 0) {
-      if (/^F\\d{1,2}$/.test(k)) return k
+      if (/^F\d{1,2}$/.test(k)) return k
       return null
     }
     return [...mods, k].join('+')
@@ -278,12 +295,51 @@ export default function UltraLowLatency() {
     uiMode === 'simple' &&
     (lastApplied?.processPriorityHigh?.status === 'skipped' || (!status?.game?.pid && Boolean(status?.ultraEnabled)))
 
+  const bridgeMissing = !window.darkhub?.latency
+  const waiting = !data && !bridgeMissing
+  const ultraOn = Boolean(status?.ultraEnabled)
+
+  const setMode = (m: 'simple' | 'advanced') => {
+    setUiMode(m)
+    try {
+      localStorage.setItem('darkhub.ullm.mode', m)
+    } catch {}
+  }
+
+  const num = (v: any, digits = 1) => (v != null && Number.isFinite(Number(v)) ? Number(v).toFixed(digits) : null)
+  const pct = (v: any) => {
+    const n = num(v)
+    if (n == null) return waiting ? <Skel /> : <span className="text-zinc-600">--</span>
+    return <>{n}<span className="text-[11px] text-zinc-500">%</span></>
+  }
+
+  const timerMs = status?.timerResolutionInfo?.current_ms
+  const pingTone = metrics?.pingMs != null && Number(metrics.pingMs) >= shieldMinMs ? 'text-amber-300' : 'text-zinc-50'
+
+  const dirtyThen = (fn: (v: boolean) => void) => (v: boolean) => {
+    markDirty()
+    fn(v)
+  }
+
+  const tweakList: Array<[string, string]> = [
+    ['powerPlanHigh', 'Power Plan High Performance'],
+    ['timerResolution05', 'Timer Resolution 0.5ms'],
+    ['processPriorityHigh', 'Prioridade High (jogo)'],
+    ['disableMouseAcceleration', 'Desativar Mouse Acceleration'],
+    ['disableFullscreenOptimizations', 'Disable Fullscreen Optimizations'],
+    ['gpuHighPerformance', 'GPU High Performance (por exe)'],
+    ['dnsCloudflare', 'DNS Cloudflare + Flush'],
+    ['disableNagle', 'Desativar Nagle (interface ativa)'],
+    ['qosForExe', 'QoS (DSCP) por exe'],
+    ['killBackground', 'Encerrar processos de fundo']
+  ]
+
   return (
-    <div className="space-y-6 w-full">
-      <div>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-white">Ultra Low Latency Mode</h1>
+    <div className="w-full max-w-6xl mx-auto space-y-6">
+      <PageHeader
+        title={
+          <span className="inline-flex items-center gap-2">
+            Ultra Low Latency Mode
             <HelpTip
               title="Ultra Low Latency Mode"
               description="Perfil para reduzir latência e melhorar responsividade em jogos. O modo Básico aplica um preset estável; o modo Avançado permite controle fino dos tweaks."
@@ -295,47 +351,91 @@ export default function UltraLowLatency() {
               example="Exemplo: selecione o executável do jogo, use “Básico” para aplicar o preset e, se necessário, ajuste no “Avançado”."
               buttonLabel="Ajuda"
             />
+          </span>
+        }
+        subtitle={<>Perfil de baixa latência para jogos (manual ou automático). Atalho padrão: <span className="font-mono text-zinc-300">Ctrl+F1</span>.</>}
+        actions={
+          <div role="tablist" aria-label="Modo" className="flex items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900/60 p-0.5">
+            {([['simple', 'Básico'], ['advanced', 'Avançado']] as const).map(([m, label]) => (
+              <button
+                key={m}
+                role="tab"
+                aria-selected={uiMode === m}
+                onClick={() => setMode(m)}
+                className={`h-7 px-3 rounded-[5px] text-[12.5px] transition-colors ${
+                  uiMode === m ? 'bg-zinc-800 text-zinc-50 font-medium' : 'text-zinc-400 hover:text-zinc-100'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-          <div className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-900 p-1">
-            <button
-              onClick={() => {
-                setUiMode('simple')
-                try {
-                  localStorage.setItem('darkhub.ullm.mode', 'simple')
-                } catch {}
-              }}
-              className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                uiMode === 'simple' ? 'bg-zinc-800 text-white' : 'text-zinc-300 hover:text-white'
-              }`}
-            >
-              Básico
-            </button>
-            <button
-              onClick={() => {
-                setUiMode('advanced')
-                try {
-                  localStorage.setItem('darkhub.ullm.mode', 'advanced')
-                } catch {}
-              }}
-              className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                uiMode === 'advanced' ? 'bg-zinc-800 text-white' : 'text-zinc-300 hover:text-white'
-              }`}
-            >
-              Avançado
-            </button>
-          </div>
+        }
+      />
+
+      {bridgeMissing ? (
+        <p role="alert" className="text-[12.5px] text-red-300">{t('ull.apiUnavailable', 'Backend de latência indisponível. Reinicie o DarkHub para reconectar.')}</p>
+      ) : null}
+      {error ? (
+        <div role="alert" className="flex items-start justify-between gap-3 rounded-lg border border-red-500/30 bg-red-500/[0.04] px-3.5 py-2.5">
+          <span className="text-[12.5px] text-red-300 break-words">{error}</span>
+          <button onClick={() => { setError(null); refresh() }} className="dh-btn dh-btn-ghost dh-btn-sm shrink-0">
+            {t('monitor.tabRetry', 'Tentar Novamente')}
+          </button>
         </div>
-        <p className="text-zinc-400">
-          Perfil de baixa latência para jogos (manual ou automático). Atalho padrão: <span className="font-mono">Ctrl+F1</span>.
-        </p>
-      </div>
+      ) : null}
 
-      {error ? <div className="text-sm text-amber-200 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">{error}</div> : null}
+      {/* Live status strip */}
+      <section aria-label="Status">
+        <dl className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-px rounded-xl border border-zinc-800/80 bg-zinc-800/70 overflow-hidden">
+          <div className="bg-zinc-950 px-4 py-3 min-w-0">
+            <dt className="text-[11.5px] text-zinc-500">Ultra Mode</dt>
+            <dd className="mt-1.5 flex items-center gap-2 text-[14px]">
+              {waiting ? <Skel w="w-16" /> : !data ? <span className="font-mono text-zinc-600">--</span> : (
+                <>
+                  <span className={`w-1.5 h-1.5 rounded-full ${ultraOn ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
+                  <span className={ultraOn ? 'text-zinc-50 font-medium' : 'text-zinc-400'}>{ultraOn ? 'Ativo' : 'Desligado'}</span>
+                </>
+              )}
+            </dd>
+          </div>
+          <div className="bg-zinc-950 px-4 py-3 min-w-0">
+            <dt className="text-[11.5px] text-zinc-500">Timer Kernel</dt>
+            <dd className="mt-1.5 font-mono text-[14px] text-zinc-50 tabular-nums">
+              {timerMs ? <>{timerMs}<span className="text-[11px] text-zinc-500"> ms</span></> : waiting ? <Skel w="w-16" /> : <span className="text-zinc-600">--</span>}
+            </dd>
+            <dd className="mt-0.5 text-[11px] text-zinc-500 truncate">{status?.timerResolutionInfo?.locked ? 'MMCSS Games Locked' : 'Default'}</dd>
+          </div>
+          <div className="bg-zinc-950 px-4 py-3 min-w-0 md:col-span-2 xl:col-span-1">
+            <dt className="text-[11.5px] text-zinc-500">Jogo</dt>
+            <dd className="mt-1.5 font-mono text-[13px] text-zinc-50 truncate" title={status?.game?.name ?? ''}>
+              {status?.game?.name ?? (waiting ? <Skel w="w-20" /> : <span className="text-zinc-600">--</span>)}
+            </dd>
+            <dd className="mt-0.5 text-[11px] text-zinc-500 font-mono">{status?.game?.pid ? `pid ${status.game.pid}` : ''}</dd>
+          </div>
+          <div className="bg-zinc-950 px-4 py-3 min-w-0">
+            <dt className="text-[11.5px] text-zinc-500">Ping</dt>
+            <dd className={`mt-1.5 font-mono text-[14px] tabular-nums ${pingTone}`}>
+              {metrics?.pingMs != null ? <>{metrics.pingMs}<span className="text-[11px] text-zinc-500">ms</span></> : waiting ? <Skel /> : <span className="text-zinc-600">--</span>}
+            </dd>
+            <dd className="mt-0.5 text-[11px] text-zinc-500 font-mono truncate">{pingHost}</dd>
+          </div>
+          <div className="bg-zinc-950 px-4 py-3"><dt className="text-[11.5px] text-zinc-500">CPU</dt><dd className="mt-1.5 font-mono text-[14px] text-zinc-50 tabular-nums">{pct(metrics?.cpuPct)}</dd></div>
+          <div className="bg-zinc-950 px-4 py-3"><dt className="text-[11.5px] text-zinc-500">RAM</dt><dd className="mt-1.5 font-mono text-[14px] text-zinc-50 tabular-nums">{pct(metrics?.ramPct)}</dd></div>
+          <div className="bg-zinc-950 px-4 py-3"><dt className="text-[11.5px] text-zinc-500">GPU</dt><dd className="mt-1.5 font-mono text-[14px] text-zinc-50 tabular-nums">{pct(metrics?.gpuPct)}</dd></div>
+        </dl>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-500">
+          <span>Guardian Telemetry (ICMP Realtime). Coleta em tempo real via socket ICMP e HAL de hardware nativo.</span>
+          <span className="dh-tag">native engine</span>
+        </div>
+        {status?.lastError ? <p className="mt-2 text-[12px] text-red-300 break-all">Erro: {status.lastError}</p> : null}
+      </section>
 
-      <div className="p-4 rounded-lg border border-zinc-800 bg-zinc-900 space-y-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Configuration */}
+      <section className="dh-card divide-y divide-zinc-800/80" aria-label="Configuração">
+        <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
           <div>
-            <div className="text-xs text-zinc-500 mb-1 flex items-center gap-2">
+            <div className="dh-label mb-1.5 flex items-center gap-2">
               <span>Executável do jogo</span>
               <HelpTip
                 title="Executável do jogo"
@@ -363,27 +463,17 @@ export default function UltraLowLatency() {
                   markDirty()
                   setGameExePath(e.target.value)
                 }}
-                placeholder="C:\\Games\\MeuJogo\\game.exe"
-                className="flex-1 bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+                placeholder={'C:\\Games\\MeuJogo\\game.exe'}
+                className="dh-input flex-1 min-w-0 font-mono"
               />
-              <button onClick={pickExe} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors">
+              <button onClick={pickExe} className="dh-btn shrink-0">
                 Selecionar
               </button>
             </div>
           </div>
 
-          <div className="flex items-end gap-3">
-            <label className="flex items-center gap-2 text-sm text-zinc-300">
-              <input
-                type="checkbox"
-                checked={auto}
-                onChange={(e) => {
-                  markDirty()
-                  setAuto(e.target.checked)
-                }}
-              />
-              Ativar automaticamente ao detectar o jogo
-            </label>
+          <div className="flex items-end gap-3 lg:pb-1.5">
+            <Check checked={auto} onChange={dirtyThen(setAuto)}>Ativar automaticamente ao detectar o jogo</Check>
             <HelpTip
               title="Ativação automática"
               description="Quando ativado, o Guardian tenta detectar o jogo pelo executável configurado e liga/desliga o Ultra Mode automaticamente."
@@ -394,11 +484,9 @@ export default function UltraLowLatency() {
               ]}
             />
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div>
-            <div className="text-xs text-zinc-500 mb-1 flex items-center gap-2">
+            <div className="dh-label mb-1.5 flex items-center gap-2">
               <span>Hotkey global (toggle)</span>
               <HelpTip
                 title="Hotkey global"
@@ -440,15 +528,15 @@ export default function UltraLowLatency() {
                 hotkeyEditingRef.current = false
                 setHotkeyEditing(false)
               }}
-              className="w-full bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+              className="dh-input w-full font-mono cursor-pointer"
             />
-            <div className="text-xs text-zinc-500 mt-2">
+            <p className="dh-help mt-1.5">
               Para aplicar QoS/Nagle/hosts e mexer em processos elevados, rode o DarkHub como Administrador.
-            </div>
+            </p>
           </div>
 
           <div>
-            <div className="text-xs text-zinc-500 mb-1 flex items-center gap-2">
+            <div className="dh-label mb-1.5 flex items-center gap-2">
               <span>Host de ping</span>
               <HelpTip
                 title="Host de ping"
@@ -467,373 +555,175 @@ export default function UltraLowLatency() {
                 setPingHost(e.target.value)
               }}
               placeholder="1.1.1.1"
-              className="w-full bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+              className="dh-input w-full font-mono"
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 text-sm text-zinc-300">
-              <input
-                type="checkbox"
-                checked={overlayEnabled}
-                onChange={(e) => {
-                  markDirty()
-                  setOverlayEnabled(e.target.checked)
-                }}
-              />
-              Widget discreto (canto da tela)
-            </label>
-            <HelpTip
-              title="Widget discreto"
-              description="Exibe um mini-widget com ping/cpu/ram/gpu e status do boost."
-              sections={[
-                { title: 'Estabilidade', content: 'O widget é leve; a medição de GPU (3D) é opcional e fica no modo Avançado.' }
-              ]}
-            />
-          </div>
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 text-sm text-zinc-300">
-              <input
-                type="checkbox"
-                checked={shieldEnabled}
-                onChange={(e) => {
-                  markDirty()
-                  setShieldEnabled(e.target.checked)
-                }}
-              />
-              Latency Shield (alerta de pico)
-            </label>
-            <HelpTip
-              title="Latency Shield"
-              description="Monitora o ping e alerta quando houver um pico repentino (Δms acima do normal)."
-              sections={[
-                { title: 'Parâmetros', content: 'Disparo (Δms) e Ping mínimo (ms) controlam quando o alerta dispara.' },
-                { title: 'Saída', content: 'Alerta visual no widget e opcionalmente beep.' }
-              ]}
-            />
-            <label className="flex items-center gap-2 text-sm text-zinc-300">
-              <input
-                type="checkbox"
-                checked={shieldBeep}
-                onChange={(e) => {
-                  markDirty()
-                  setShieldBeep(e.target.checked)
-                }}
-                disabled={!shieldEnabled}
-              />
-              Beep
-            </label>
-          </div>
-        </div>
-
-        {shieldEnabled ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div>
-              <div className="text-xs text-zinc-500 mb-1">Disparo (Δms)</div>
-              <input
-                type="number"
-                min={5}
-                max={300}
-                value={shieldDeltaMs}
-                onChange={(e) => {
-                  markDirty()
-                  setShieldDeltaMs(Math.max(5, Math.min(300, Math.trunc(Number(e.target.value) || 30))))
-                }}
-                className="w-full bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-3">
+            <div className="flex items-center gap-3">
+              <Check checked={overlayEnabled} onChange={dirtyThen(setOverlayEnabled)}>Widget discreto (canto da tela)</Check>
+              <HelpTip
+                title="Widget discreto"
+                description="Exibe um mini-widget com ping/cpu/ram/gpu e status do boost."
+                sections={[
+                  { title: 'Estabilidade', content: 'O widget é leve; a medição de GPU (3D) é opcional e fica no modo Avançado.' }
+                ]}
               />
             </div>
-            <div>
-              <div className="text-xs text-zinc-500 mb-1">Ping mínimo (ms)</div>
-              <input
-                type="number"
-                min={10}
-                max={500}
-                value={shieldMinMs}
-                onChange={(e) => {
-                  markDirty()
-                  setShieldMinMs(Math.max(10, Math.min(500, Math.trunc(Number(e.target.value) || 80))))
-                }}
-                className="w-full bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+            <div className="flex items-center gap-3">
+              <Check checked={shieldEnabled} onChange={dirtyThen(setShieldEnabled)}>Latency Shield (alerta de pico)</Check>
+              <HelpTip
+                title="Latency Shield"
+                description="Monitora o ping e alerta quando houver um pico repentino (Δms acima do normal)."
+                sections={[
+                  { title: 'Parâmetros', content: 'Disparo (Δms) e Ping mínimo (ms) controlam quando o alerta dispara.' },
+                  { title: 'Saída', content: 'Alerta visual no widget e opcionalmente beep.' }
+                ]}
               />
+              <Check checked={shieldBeep} onChange={dirtyThen(setShieldBeep)} disabled={!shieldEnabled}>Beep</Check>
             </div>
           </div>
-        ) : null}
 
-        {uiMode === 'advanced' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
-          <div>
-            <div className="text-xs text-zinc-500 mb-1">Smart Clean (min)</div>
-            <input
-              type="number"
-              min={0}
-              max={240}
-              value={smartCleanMinutes}
-              onChange={(e) => {
-                markDirty()
-                setSmartCleanMinutes(Math.max(0, Math.min(240, Math.trunc(Number(e.target.value) || 0))))
-              }}
-              className="w-full bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
-            />
-            <div className="text-xs text-zinc-500 mt-1">0 desativa. Recomendado: 10–30.</div>
-          </div>
-          <div className="flex items-end gap-3">
-            <label className="flex items-center gap-2 text-sm text-zinc-300">
-              <input
-                type="checkbox"
-                checked={smartCleanDuringGaming}
-                onChange={(e) => {
-                  markDirty()
-                  setSmartCleanDuringGaming(e.target.checked)
-                }}
-              />
-              Permitir durante o jogo
-            </label>
-            <label className="flex items-center gap-2 text-sm text-zinc-300">
-              <input
-                type="checkbox"
-                checked={gpuPollingEnabled}
-                onChange={(e) => {
-                  markDirty()
-                  setGpuPollingEnabled(e.target.checked)
-                }}
-              />
-              Medir GPU (3D)
-            </label>
-          </div>
-        </div>
-        ) : null}
-
-        {uiMode === 'advanced' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pt-2">
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <input
-              type="checkbox"
-              checked={Boolean(tweaks.powerPlanHigh)}
-              onChange={(e) => {
-                markDirty()
-                setTweaks({ ...tweaks, powerPlanHigh: e.target.checked })
-              }}
-            />
-            Power Plan High Performance
-          </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <input
-              type="checkbox"
-              checked={Boolean(tweaks.timerResolution05)}
-              onChange={(e) => {
-                markDirty()
-                setTweaks({ ...tweaks, timerResolution05: e.target.checked })
-              }}
-            />
-            Timer Resolution 0.5ms
-          </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <input
-              type="checkbox"
-              checked={Boolean(tweaks.processPriorityHigh)}
-              onChange={(e) => {
-                markDirty()
-                setTweaks({ ...tweaks, processPriorityHigh: e.target.checked })
-              }}
-            />
-            Prioridade High (jogo)
-          </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <input
-              type="checkbox"
-              checked={Boolean(tweaks.disableMouseAcceleration)}
-              onChange={(e) => {
-                markDirty()
-                setTweaks({ ...tweaks, disableMouseAcceleration: e.target.checked })
-              }}
-            />
-            Desativar Mouse Acceleration
-          </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <input
-              type="checkbox"
-              checked={Boolean(tweaks.disableFullscreenOptimizations)}
-              onChange={(e) => {
-                markDirty()
-                setTweaks({ ...tweaks, disableFullscreenOptimizations: e.target.checked })
-              }}
-            />
-            Disable Fullscreen Optimizations
-          </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <input
-              type="checkbox"
-              checked={Boolean(tweaks.gpuHighPerformance)}
-              onChange={(e) => {
-                markDirty()
-                setTweaks({ ...tweaks, gpuHighPerformance: e.target.checked })
-              }}
-            />
-            GPU High Performance (por exe)
-          </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <input
-              type="checkbox"
-              checked={Boolean(tweaks.dnsCloudflare)}
-              onChange={(e) => {
-                markDirty()
-                setTweaks({ ...tweaks, dnsCloudflare: e.target.checked })
-              }}
-            />
-            DNS Cloudflare + Flush
-          </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <input
-              type="checkbox"
-              checked={Boolean(tweaks.disableNagle)}
-              onChange={(e) => {
-                markDirty()
-                setTweaks({ ...tweaks, disableNagle: e.target.checked })
-              }}
-            />
-            Desativar Nagle (interface ativa)
-          </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <input
-              type="checkbox"
-              checked={Boolean(tweaks.qosForExe)}
-              onChange={(e) => {
-                markDirty()
-                setTweaks({ ...tweaks, qosForExe: e.target.checked })
-              }}
-            />
-            QoS (DSCP) por exe
-          </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <input
-              type="checkbox"
-              checked={Boolean(tweaks.killBackground)}
-              onChange={(e) => {
-                markDirty()
-                setTweaks({ ...tweaks, killBackground: e.target.checked })
-              }}
-            />
-            Encerrar processos de fundo
-          </label>
-        </div>
-        ) : null}
-
-        {uiMode === 'simple' ? (
-          <div className="space-y-3">
-            <button
-              onClick={toggleStable}
-              disabled={loading}
-              className={`w-full px-4 py-3 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${
-                status?.ultraEnabled ? 'bg-red-500/10 hover:bg-red-500/20 text-red-200' : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-              }`}
-            >
-              {loading ? <Loader2 size={20} className="animate-spin" /> : <Zap size={20} />}
-              <span className="font-semibold">{status?.ultraEnabled ? 'Desativar (Estável)' : 'Ativar (Estável)'}</span>
-            </button>
-            <div className="text-xs text-zinc-500">
-              Preset estável: Power Plan + Prioridade do jogo (quando detectado) + Mouse Acceleration OFF. Tweaks agressivos ficam no modo Avançado.
-            </div>
-            {prioSkipped ? (
-              <div className="text-xs text-amber-200 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-                Abra o jogo e clique Ativar novamente para aplicar prioridade High.
+          {shieldEnabled ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 max-w-xl">
+              <div>
+                <label className="dh-label block mb-1.5">Disparo (Δms)</label>
+                <input
+                  type="number"
+                  min={5}
+                  max={300}
+                  value={shieldDeltaMs}
+                  onChange={(e) => {
+                    markDirty()
+                    setShieldDeltaMs(Math.max(5, Math.min(300, Math.trunc(Number(e.target.value) || 30))))
+                  }}
+                  className="dh-input w-full font-mono"
+                />
               </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={save}
-              disabled={saving}
-              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition-colors disabled:opacity-50"
-            >
-              {saving ? 'Salvando…' : 'Salvar'}
-            </button>
-            <button
-              onClick={enable}
-              disabled={loading}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
-            >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
-              <span>Ativar</span>
-            </button>
-            <button
-              onClick={disable}
-              disabled={loading}
-              className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-200 rounded-lg transition-colors disabled:opacity-50"
-            >
-              Desativar
-            </button>
-            <button
-              onClick={boostNow}
-              disabled={loading}
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors disabled:opacity-50"
-            >
-              BOOST NOW
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="p-4 rounded-lg border border-zinc-800 bg-zinc-900 space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-zinc-400">Status</div>
-            <span className="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
-              Native Engine
-            </span>
-          </div>
-          <div className="text-sm text-zinc-200">
-            Ultra Mode: <span className="font-semibold">{status?.ultraEnabled ? 'ATIVO' : 'desligado'}</span>
-          </div>
-          <div className="text-sm text-zinc-200">
-            Timer Kernel: <span className="font-mono text-emerald-400">{status?.timerResolutionInfo?.current_ms ? `${status.timerResolutionInfo.current_ms} ms` : '0.5000 ms'}</span>{' '}
-            <span className="text-xs text-zinc-500">({status?.timerResolutionInfo?.locked ? 'MMCSS Games Locked' : 'Default'})</span>
-          </div>
-          <div className="text-sm text-zinc-200">
-            Jogo: <span className="font-mono">{status?.game?.name ?? '—'}</span> <span className="text-zinc-500">{status?.game?.pid ? `(${status.game.pid})` : ''}</span>
-          </div>
-          <div className="text-xs text-zinc-500 break-all">{status?.lastError ? `Erro: ${status.lastError}` : ''}</div>
+              <div>
+                <label className="dh-label block mb-1.5">Ping mínimo (ms)</label>
+                <input
+                  type="number"
+                  min={10}
+                  max={500}
+                  value={shieldMinMs}
+                  onChange={(e) => {
+                    markDirty()
+                    setShieldMinMs(Math.max(10, Math.min(500, Math.trunc(Number(e.target.value) || 80))))
+                  }}
+                  className="dh-input w-full font-mono"
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
 
-        <div className="p-4 rounded-lg border border-zinc-800 bg-zinc-900 space-y-2">
-          <div className="text-sm text-zinc-400">Guardian Telemetry (ICMP Realtime)</div>
-          <div className="text-sm text-zinc-200">Ping: {metrics?.pingMs != null ? `${metrics.pingMs}ms` : '—'}</div>
-          <div className="text-sm text-zinc-200">CPU: {metrics?.cpuPct != null ? `${Number(metrics.cpuPct).toFixed(1)}%` : '—'}</div>
-          <div className="text-sm text-zinc-200">RAM: {metrics?.ramPct != null ? `${Number(metrics.ramPct).toFixed(1)}%` : '—'}</div>
-          <div className="text-sm text-zinc-200">GPU: {metrics?.gpuPct != null ? `${Number(metrics.gpuPct).toFixed(1)}%` : '—'}</div>
-          <div className="text-xs text-zinc-500">
-            Coleta em tempo real via socket ICMP e HAL de hardware nativo.
+        {uiMode === 'advanced' ? (
+          <div className="p-5 space-y-5">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-3">
+              <div className="max-w-[16rem]">
+                <label className="dh-label block mb-1.5">Smart Clean (min)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={240}
+                  value={smartCleanMinutes}
+                  onChange={(e) => {
+                    markDirty()
+                    setSmartCleanMinutes(Math.max(0, Math.min(240, Math.trunc(Number(e.target.value) || 0))))
+                  }}
+                  className="dh-input w-full font-mono"
+                />
+                <p className="dh-help mt-1.5">0 desativa. Recomendado: 10 a 30.</p>
+              </div>
+              <div className="flex items-center gap-5 lg:pt-6">
+                <Check checked={smartCleanDuringGaming} onChange={dirtyThen(setSmartCleanDuringGaming)}>Permitir durante o jogo</Check>
+                <Check checked={gpuPollingEnabled} onChange={dirtyThen(setGpuPollingEnabled)}>Medir GPU (3D)</Check>
+              </div>
+            </div>
+
+            <div>
+              <h2 className="dh-section-title mb-2.5">Tweaks</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2.5">
+                {tweakList.map(([key, label]) => (
+                  <Check key={key} checked={Boolean(tweaks[key])} onChange={dirtyThen((v) => setTweaks({ ...tweaks, [key]: v }))}>
+                    {label}
+                  </Check>
+                ))}
+              </div>
+            </div>
           </div>
+        ) : null}
+
+        <div className="px-5 py-4">
+          {uiMode === 'simple' ? (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5">
+              <button
+                onClick={toggleStable}
+                disabled={loading}
+                className={`dh-btn ${ultraOn ? '' : 'dh-btn-primary'} min-w-[200px]`}
+              >
+                {loading ? <Loader2 size={15} className="animate-spin" /> : <Zap size={15} />}
+                <span>{ultraOn ? 'Desativar (Estável)' : 'Ativar (Estável)'}</span>
+              </button>
+              <p className="dh-help max-w-[75ch]">
+                Preset estável: Power Plan + Prioridade do jogo (quando detectado) + Mouse Acceleration OFF. Tweaks agressivos ficam no modo Avançado.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={enable} disabled={loading} className="dh-btn dh-btn-primary">
+                {loading ? <Loader2 size={15} className="animate-spin" /> : <Zap size={15} />}
+                <span>Ativar</span>
+              </button>
+              <button onClick={save} disabled={saving} className="dh-btn">
+                {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+                {saving ? 'Salvando…' : 'Salvar'}
+              </button>
+              <button onClick={disable} disabled={loading} className="dh-btn">
+                Desativar
+              </button>
+              <button onClick={boostNow} disabled={loading} className="dh-btn dh-btn-ghost">
+                Boost now
+              </button>
+              {dirty ? <span className="ml-auto text-[11.5px] text-amber-300">Alterações não salvas</span> : null}
+            </div>
+          )}
+          {prioSkipped ? (
+            <p role="status" className="mt-3 text-[12px] text-amber-300">
+              Abra o jogo e clique Ativar novamente para aplicar prioridade High.
+            </p>
+          ) : null}
         </div>
-      </div>
+      </section>
 
       {lastApplied && typeof lastApplied === 'object' ? (
-        <div className="p-4 rounded-lg border border-zinc-800 bg-zinc-900 space-y-2">
-          <div className="text-sm text-zinc-400">Resultado da aplicação</div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 text-sm">
+        <section className="dh-card p-4" aria-labelledby="ull-applied">
+          <h2 id="ull-applied" className="dh-section-title mb-2">Resultado da aplicação</h2>
+          <ul className="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
             {Object.keys(lastApplied).map((k) => {
               const v = lastApplied?.[k]
               const st = typeof v === 'string' ? v : v?.status
               const err = typeof v === 'object' ? v?.error : null
-              const color = st === 'ok' ? 'text-emerald-300' : st === 'failed' ? 'text-red-300' : 'text-zinc-300'
+              const color = st === 'ok' ? 'text-emerald-300' : st === 'failed' ? 'text-red-300' : 'text-zinc-400'
               return (
-                <div key={k} className="flex flex-col gap-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-zinc-200">{k}</span>
-                    <span className={`${color} whitespace-nowrap`}>{st}</span>
+                <li key={k} className="py-2 border-b border-zinc-800/80">
+                  <div className="flex items-center justify-between gap-3 text-[12.5px]">
+                    <span className="font-mono text-zinc-200 truncate">{k}</span>
+                    <span className={`${color} font-mono whitespace-nowrap`}>{st}</span>
                   </div>
-                  {err ? <div className="text-xs text-zinc-500 break-all">{err}</div> : null}
-                </div>
+                  {err ? <div className="mt-0.5 text-[11.5px] text-zinc-500 break-all">{err}</div> : null}
+                </li>
               )
             })}
-          </div>
-        </div>
+          </ul>
+        </section>
       ) : null}
 
-      <div className="text-xs text-zinc-500">
-        {t('dashboard.status')}: {data?.ok ? 'ok' : '—'}
+      <div className="dh-tag">
+        {t('dashboard.status')}: {data?.ok ? 'ok' : '--'}
       </div>
     </div>
   )

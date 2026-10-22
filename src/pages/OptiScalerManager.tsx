@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useI18n } from '../i18n/I18nProvider';
+import { DarkOSConfirmDialog } from '../components/darkos/DarkOSConfirmDialog';
 import {
   AlertTriangle,
   Archive,
@@ -21,8 +23,10 @@ import {
   Zap,
   Layers,
   Sliders,
-  Check
-} from 'lucide-react';
+  Check,
+  X
+} from '../components/icons';
+import PageHeader from '../components/ui/PageHeader';
 
 export interface OptiScalerConfig {
   enabled?: boolean;
@@ -120,6 +124,7 @@ interface OptiScalerManagerProps {
 }
 
 export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps = {}) {
+  const { t } = useI18n();
 
   // Games & Selection
   const [games, setGames] = useState<GameItem[]>([]);
@@ -143,6 +148,10 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
   const [restoring, setRestoring] = useState(false);
   const [status, setStatus] = useState<{ ok: boolean; message: string } | null>(null);
   const analysisCache = React.useRef<Record<string, any>>({});
+  // Guards against a slow analysis of a previously selected game overwriting the current one.
+  const analyzeSeq = React.useRef(0);
+  const [confirmAction, setConfirmAction] = useState<null | { kind: 'apply' } | { kind: 'deleteBackup'; backupId: string }>(null);
+  const busy = applying || restoring;
 
   // Selected game reference
   const selectedGame = useMemo(() => {
@@ -275,11 +284,9 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
       const res = await window.darkhub.optiscaler.listBackups(payload);
       const list = res?.ok && Array.isArray(res.backups) ? res.backups : [];
       setBackups(list);
-      if (list.length > 0) {
-        setSelectedBackupId((prev) => (list.some((b: any) => b.id === prev) ? prev : list[0].id));
-      } else {
-        setSelectedBackupId('');
-      }
+      // '' = automatic: the backend restores the oldest snapshot (true originals).
+      // Defaulting to list[0] (the newest) restored OptiScaler's own files after a re-apply.
+      setSelectedBackupId((prev) => (list.some((b: any) => b.id === prev) ? prev : ''));
     } catch {
       setBackups([]);
       setSelectedBackupId('');
@@ -307,6 +314,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
       } catch {}
     }
 
+    const seq = ++analyzeSeq.current;
     setAnalyzing(true);
     try {
       const payload = {
@@ -315,8 +323,9 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
         targetDir: gameItem.installDir || effectiveTargetDir
       };
       const res = await window.darkhub.optiscaler.analyze(payload);
-      setAnalysis(res);
       analysisCache.current[gameItem.id] = res;
+      if (seq !== analyzeSeq.current) return;
+      setAnalysis(res);
       await loadBackups(payload);
 
       // Auto-tune preset if RDNA 2 GPU is detected
@@ -326,7 +335,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
     } catch (err: any) {
       console.error('Error analyzing game:', err);
     } finally {
-      setAnalyzing(false);
+      if (seq === analyzeSeq.current) setAnalyzing(false);
     }
   };
 
@@ -424,7 +433,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
 
   // Apply OptiScaler
   const handleApply = async () => {
-    if (!window.darkhub?.optiscaler?.apply) return;
+    if (!window.darkhub?.optiscaler?.apply || busy) return;
     if (!selectedGame && !targetExePath) {
       setStatus({ ok: false, message: 'Selecione um jogo antes de aplicar.' });
       return;
@@ -456,7 +465,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
 
   // Clean Revert / Restore
   const handleRestore = async (backupId?: string) => {
-    if (!window.darkhub?.optiscaler?.restoreBackup) return;
+    if (!window.darkhub?.optiscaler?.restoreBackup || busy) return;
     setRestoring(true);
     setStatus(null);
     try {
@@ -487,139 +496,104 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
   }, [games, searchQuery]);
 
   return (
-    <div className="flex-1 h-full overflow-y-auto bg-zinc-950 text-zinc-100 p-6 space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-cyan-400">
-            <Cpu size={28} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-100">OptiScaler Manager</h1>
-              <span className="px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded-full">
-                FSR 4.1.1b RDNA 2 & XeSS
-              </span>
-            </div>
-            <p className="text-sm text-zinc-400 mt-1 max-w-2xl">
-              Aplicação simplificada de upscalers universais de última geração com preservação e reversão segura para o jogo original.
-            </p>
-          </div>
-        </div>
-
-        {/* Quick Nav Button for DLSS 5 */}
-        <div className="flex items-center gap-2 shrink-0">
+    <div className="w-full text-zinc-100">
+      <PageHeader
+        title="OptiScaler Manager"
+        subtitle={<>
+          Aplicação simplificada de upscalers universais de última geração com preservação e reversão segura para o jogo original.
+          <span className="dh-tag ml-2">fsr 4.1.1b · rdna 2 · xess</span>
+        </>}
+        actions={<>
           {onNavigate && (
             <button
+              type="button"
               onClick={() => onNavigate('dlss5')}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-purple-500/40 bg-purple-950/40 text-purple-200 hover:bg-purple-900/60 hover:text-white transition-all text-xs font-semibold shadow-sm cursor-pointer"
+              className="dh-btn dh-btn-ghost"
               title="Acessar o módulo experimental DLSS 5 & Universal Neural Upscaler"
             >
-              <Sparkles size={15} className="text-purple-400" />
+              <Sparkles size={14} />
               <span>DLSS 5 Manager</span>
-              <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                EXP
-              </span>
+              <span className="dh-tag">exp</span>
             </button>
           )}
           <button
+            type="button"
             onClick={refreshLibraryAndSteam}
             disabled={loadingGames}
-            className="flex items-center gap-1.5 px-3 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-zinc-300 text-xs font-medium transition-colors cursor-pointer"
+            className="dh-btn"
             title="Recarregar biblioteca de jogos"
           >
-            <RefreshCw size={14} className={loadingGames ? 'animate-spin text-cyan-400' : ''} />
+            <RefreshCw size={14} className={loadingGames ? 'animate-spin' : ''} />
             <span>Atualizar</span>
           </button>
-        </div>
-      </div>
+        </>}
+      />
 
-      {/* Status Feedback Banner */}
+      <div className="space-y-5">
       {status && (
         <div
-          className={`rounded-xl border p-4 text-sm flex items-start gap-3 shadow-md ${
-            status.ok
-              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
-              : 'border-red-500/30 bg-red-500/10 text-red-200'
-          }`}
+          role={status.ok ? 'status' : 'alert'}
+          className={`flex items-start gap-2.5 text-[12.5px] animate-in ${status.ok ? 'text-emerald-300' : 'text-red-300'}`}
         >
-          {status.ok ? (
-            <CheckCircle2 size={20} className="text-emerald-400 shrink-0 mt-0.5" />
-          ) : (
-            <AlertTriangle size={20} className="text-red-400 shrink-0 mt-0.5" />
-          )}
-          <div className="flex-1 font-medium">{status.message}</div>
-          <button
-            onClick={() => setStatus(null)}
-            className="text-xs opacity-70 hover:opacity-100 transition-opacity ml-2 cursor-pointer"
-          >
-            ✕
+          {status.ok ? <CheckCircle2 size={14} className="shrink-0 mt-[1px]" /> : <AlertTriangle size={14} className="shrink-0 mt-[1px]" />}
+          <div className="flex-1 min-w-0 break-words">{status.message}</div>
+          <button type="button" onClick={() => setStatus(null)} className="text-zinc-500 hover:text-zinc-200 shrink-0" aria-label="Fechar">
+            <X size={14} />
           </button>
         </div>
       )}
 
-      {/* SECTION 1: Integrated Game Library Card Carousel / Grid */}
-      <div className="bg-zinc-900/70 border border-zinc-800/80 rounded-2xl p-5 space-y-4 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-cyan-400">
-              <Gamepad2 size={20} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-semibold text-zinc-100">Biblioteca de Jogos</h2>
-                {games.length > 0 && (
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
-                    {games.length} jogos
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Selecione o jogo desejado ou adicione outro executável para aplicar o mod.
-              </p>
-            </div>
+      {/* Game library */}
+      <section className="space-y-3" aria-labelledby="opti-library">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+          <div>
+            <h2 id="opti-library" className="dh-section-title">
+              Biblioteca de Jogos
+              {games.length > 0 && <span className="ml-2 font-mono text-[11.5px] font-normal text-zinc-500">{games.length}</span>}
+            </h2>
+            <p className="dh-help mt-0.5">Selecione o jogo desejado ou adicione outro executável para aplicar o mod.</p>
           </div>
-
-          {/* Search bar & Add Custom Game */}
           <div className="flex items-center gap-2">
             <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
               <input
-                type="text"
+                type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Filtrar jogos..."
-                className="pl-8 pr-3 py-1.5 bg-zinc-950/80 border border-zinc-700/80 focus:border-cyan-500 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 outline-none w-44 transition-colors"
+                aria-label="Filtrar jogos"
+                className="dh-input pl-8 w-48"
               />
             </div>
-            <button
-              onClick={handleSelectExe}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/40 text-cyan-300 rounded-lg text-xs font-medium transition-colors cursor-pointer"
-            >
+            <button type="button" onClick={handleSelectExe} className="dh-btn">
               <Plus size={14} />
               <span>Outro Executável (.exe)</span>
             </button>
           </div>
         </div>
 
-        {/* Games Grid */}
         {loadingGames ? (
-          <div className="flex items-center justify-center py-10 text-zinc-400 text-xs gap-2 border border-dashed border-zinc-800 rounded-xl bg-zinc-950/40">
-            <RefreshCw size={16} className="animate-spin text-cyan-400" />
-            <span>Carregando lista de jogos instalados...</span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3" aria-busy="true" aria-label="Carregando lista de jogos instalados...">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-lg border border-zinc-800/80 overflow-hidden">
+                <div className="h-24 bg-zinc-900 animate-pulse" />
+                <div className="p-2.5 space-y-1.5">
+                  <div className="h-3 w-3/4 rounded bg-zinc-900 animate-pulse" />
+                  <div className="h-2.5 w-1/3 rounded bg-zinc-900 animate-pulse" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredGames.length === 0 ? (
-          <div className="text-center py-8 border border-dashed border-zinc-800 rounded-xl bg-zinc-950/30 text-xs text-zinc-400 space-y-2">
-            <p>Nenhum jogo encontrado com o filtro atual.</p>
-            <button
-              onClick={handleSelectExe}
-              className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs text-zinc-200 font-medium cursor-pointer"
-            >
+          <div className="py-10 rounded-xl border border-dashed border-zinc-800 flex flex-col items-center gap-3 text-center">
+            <p className="text-[12.5px] text-zinc-400">{games.length === 0 ? t('optiscaler.noGames', 'Nenhum jogo instalado foi detectado.') : 'Nenhum jogo encontrado com o filtro atual.'}</p>
+            <button type="button" onClick={handleSelectExe} className="dh-btn dh-btn-sm">
+              <FolderOpen size={13} />
               Selecionar Executável Manualmente
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 max-h-[280px] overflow-y-auto pr-1">
+          <div role="listbox" aria-label="Biblioteca de Jogos" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 max-h-[300px] overflow-y-auto pr-1">
             {filteredGames.map((game) => {
               const isSelected = game.id === selectedGameId;
               const hasModActive = Boolean(game.optiscaler?.enabled || game.isApplied);
@@ -627,70 +601,69 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
               return (
                 <div
                   key={game.id}
+                  role="option"
+                  aria-selected={isSelected}
+                  tabIndex={0}
                   onClick={() => setSelectedGameId(game.id)}
-                  className={`group relative flex flex-col rounded-xl overflow-hidden border transition-all cursor-pointer bg-zinc-950/60 hover:bg-zinc-900 ${
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedGameId(game.id); } }}
+                  className={`group relative flex flex-col rounded-lg overflow-hidden border cursor-pointer transition-colors duration-150 outline-none focus-visible:border-blue-400 ${
                     isSelected
-                      ? 'border-cyan-500 shadow-md shadow-cyan-500/10 ring-1 ring-cyan-500'
-                      : 'border-zinc-800/80 hover:border-zinc-700'
+                      ? 'border-blue-300 bg-zinc-900'
+                      : 'border-zinc-800/80 hover:border-zinc-600'
                   }`}
                 >
-                  {/* Game Art / Banner */}
-                  <div className="relative w-full h-24 bg-zinc-900 overflow-hidden flex items-center justify-center text-zinc-700">
+                  <div className="relative w-full h-24 bg-zinc-900 overflow-hidden flex items-center justify-center">
                     {game.headerUrl ? (
                       <img
                         src={game.headerUrl}
-                        alt={game.name}
+                        alt=""
                         loading="lazy"
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        decoding="async"
+                        className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
                       />
                     ) : (
-                      <Gamepad2 size={32} />
+                      <Gamepad2 size={20} className="text-zinc-700" />
                     )}
-
-                    {/* Status Badge */}
-                    {hasModActive ? (
-                      <div className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded-md bg-emerald-950/90 border border-emerald-500/50 text-[10px] font-semibold text-emerald-300 flex items-center gap-1 shadow-sm backdrop-blur-sm z-10">
-                        <CheckCircle2 size={11} className="text-emerald-400" />
-                        <span>Ativo</span>
-                      </div>
-                    ) : (
-                      <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-zinc-900/80 border border-zinc-700/60 text-[9px] text-zinc-400 backdrop-blur-sm z-10">
-                        Original
-                      </div>
-                    )}
-
                     {isSelected && (
-                      <div className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-md bg-cyan-600 text-[10px] font-bold text-white shadow-sm z-10">
-                        Selecionado
-                      </div>
+                      <span className="absolute top-1.5 left-1.5 h-5 w-5 rounded-md bg-zinc-100 text-zinc-950 flex items-center justify-center" aria-hidden="true">
+                        <Check size={12} />
+                      </span>
                     )}
                   </div>
 
-                  {/* Title & Platform */}
-                  <div className="p-2.5 flex flex-col justify-between flex-1">
-                    <span
-                      className="text-xs font-semibold text-zinc-200 line-clamp-1 group-hover:text-cyan-400 transition-colors"
-                      title={game.name}
-                    >
+                  <div className="px-2.5 py-2 min-w-0">
+                    <span className="block text-[12px] font-medium text-zinc-200 truncate" title={game.name}>
                       {game.name}
                     </span>
-                    <div className="flex items-center justify-between text-[10px] text-zinc-500 mt-1">
-                      <span>{game.platform || 'PC Game'}</span>
-                      {game.platform === 'Manual' && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveManualGame(game.id);
-                          }}
-                          className="text-zinc-500 hover:text-red-400 p-0.5 rounded transition-colors"
-                          title="Remover jogo da biblioteca"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      )}
+                    <div className="mt-0.5 flex items-center justify-between gap-2 text-[10.5px] font-mono">
+                      <span className="text-zinc-500 truncate">{game.platform || 'PC Game'}</span>
+                      <span className="flex items-center gap-1.5 shrink-0">
+                        {hasModActive ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-300">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                            Ativo
+                          </span>
+                        ) : (
+                          <span className="text-zinc-600">Original</span>
+                        )}
+                        {game.platform === 'Manual' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveManualGame(game.id);
+                            }}
+                            className="text-zinc-500 hover:text-red-300 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                            title="Remover jogo da biblioteca"
+                            aria-label="Remover jogo da biblioteca"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -698,307 +671,292 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
             })}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* SECTION 2: Selected Game Hero Card & Control Center */}
+      {/* Selected game control panel */}
       {selectedGame ? (
-        <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-6 space-y-6 shadow-sm">
-          {/* Header Info */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-zinc-800/80 pb-5">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h2 className="text-xl font-bold text-white tracking-tight">{selectedGame.name}</h2>
+        <section className="dh-card p-5 space-y-6" aria-label={selectedGame.name}>
+          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 pb-5 border-b border-zinc-800/80">
+            <div className="min-w-0">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h2 className="text-[17px] font-semibold tracking-[-0.015em] text-zinc-50">{selectedGame.name}</h2>
                 {isInstalledOnGame ? (
-                  <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 flex items-center gap-1.5">
-                    <CheckCircle2 size={13} className="text-emerald-400" />
-                    <span>OptiScaler Ativo</span>
+                  <span className="inline-flex items-center gap-1.5 text-[12px] text-emerald-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    OptiScaler Ativo
                   </span>
                 ) : (
-                  <span className="px-2.5 py-0.5 text-xs font-medium rounded-full border border-zinc-700 bg-zinc-950 text-zinc-400 flex items-center gap-1.5">
-                    <ShieldCheck size={13} className="text-zinc-500" />
-                    <span>Jogo Original (Limpo)</span>
+                  <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-500">
+                    <ShieldCheck size={13} />
+                    Jogo Original (Limpo)
                   </span>
                 )}
               </div>
-              <p className="text-xs font-mono text-zinc-400 mt-1 truncate max-w-3xl" title={effectiveTargetDir}>
-                Pasta: {effectiveTargetDir || 'Aguardando seleção do executável...'}
+              <p className="mt-1 text-[11.5px] font-mono text-zinc-500 truncate max-w-3xl" title={effectiveTargetDir}>
+                {effectiveTargetDir || 'Aguardando seleção do executável...'}
               </p>
             </div>
 
-            {/* GPU Hardware Info Pill */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-zinc-800 bg-zinc-950/70 text-xs text-zinc-300 self-start lg:self-center shrink-0">
-              <Cpu size={15} className="text-cyan-400" />
-              <span>
-                GPU: <strong className="text-white">{analysis?.gpu?.model || analysis?.gpu?.vendor || 'AMD Radeon'}</strong>
-                {analysis?.gpu?.amdArchitecture ? ` (${analysis.gpu.amdArchitecture.toUpperCase()})` : ''}
-              </span>
-            </div>
+            <dl className="shrink-0 text-right">
+              <dt className="text-[11px] text-zinc-500">GPU</dt>
+              <dd className="mt-0.5 text-[12.5px] text-zinc-100">
+                {analysis?.gpu?.model || analysis?.gpu?.vendor || <span className="text-zinc-500">{analyzing ? 'detectando...' : 'n/d'}</span>}
+                {analysis?.gpu?.amdArchitecture ? <span className="ml-1.5 font-mono text-zinc-500">{analysis.gpu.amdArchitecture}</span> : null}
+              </dd>
+            </dl>
           </div>
 
-          {/* Preset Selection Cards */}
+          {/* Presets */}
           <div>
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
               <div>
-                <h3 className="text-sm font-semibold text-zinc-200">Escolha o Modo de Upscaling</h3>
-                <p className="text-xs text-zinc-400">
-                  Selecione o perfil ideal para a sua placa de vídeo e resolução:
-                </p>
+                <h3 className="dh-section-title">Escolha o Modo de Upscaling</h3>
+                <p className="dh-help mt-0.5">Selecione o perfil ideal para a sua placa de vídeo e resolução:</p>
               </div>
               {analysis?.gpu?.amdArchitecture === 'rdna2' && (
-                <span className="px-2 py-0.5 text-[11px] font-semibold text-red-300 bg-red-950/40 border border-red-500/30 rounded-md">
-                  RDNA 2 Detectada: FSR 4.1.1b Recomendado
-                </span>
+                <span className="text-[11.5px] text-blue-200">RDNA 2 Detectada: FSR 4.1.1b Recomendado</span>
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div role="radiogroup" aria-label="Escolha o Modo de Upscaling" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {PRESETS.map((preset) => {
                 const isSelected = selectedPreset === preset.id;
                 const IconComponent = preset.icon;
 
                 return (
-                  <div
+                  <button
                     key={preset.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
                     onClick={() => setSelectedPreset(preset.id)}
-                    className={`rounded-xl border p-4 transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                    className={`text-left rounded-lg border p-4 flex flex-col justify-between gap-3 transition-colors duration-150 ${
                       isSelected
-                        ? 'border-cyan-500 bg-cyan-950/20 shadow-lg shadow-cyan-500/5 ring-1 ring-cyan-500'
-                        : 'border-zinc-800 bg-zinc-950/50 hover:border-zinc-700 hover:bg-zinc-900/50'
+                        ? 'border-blue-300/70 bg-blue-500/[0.05]'
+                        : 'border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/60'
                     }`}
                   >
                     <div>
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md border ${preset.badgeColor}`}>
-                          {preset.badge}
+                      <div className="flex items-center justify-between gap-2">
+                        <IconComponent size={16} className={isSelected ? 'text-blue-300' : 'text-zinc-500'} />
+                        <span className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${isSelected ? 'border-blue-300' : 'border-zinc-700'}`}>
+                          {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-blue-300" />}
                         </span>
-                        {isSelected && (
-                          <div className="h-5 w-5 rounded-full bg-cyan-500 text-zinc-950 flex items-center justify-center">
-                            <Check size={13} strokeWidth={3} />
-                          </div>
-                        )}
                       </div>
-
-                      <div className="flex items-center gap-2 font-semibold text-sm text-zinc-100">
-                        <IconComponent size={16} className={isSelected ? 'text-cyan-400' : 'text-zinc-400'} />
-                        <span>{preset.name}</span>
-                      </div>
-
-                      <p className="text-xs text-zinc-400 mt-2 leading-relaxed">{preset.description}</p>
+                      <div className="mt-3 text-[13px] font-medium text-zinc-100">{preset.name}</div>
+                      <div className="mt-0.5 dh-tag">{preset.badge}</div>
+                      <p className="mt-2 text-[12px] leading-relaxed text-zinc-400">{preset.description}</p>
                     </div>
-
-                    <div className="text-[11px] text-zinc-500 font-medium pt-2 border-t border-zinc-800/60">
-                      Ideal para: <strong className="text-zinc-300">{preset.recommendedFor}</strong>
+                    <div className="text-[11px] text-zinc-500 pt-2 border-t border-zinc-800/80">
+                      Ideal para: <span className="text-zinc-300">{preset.recommendedFor}</span>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
           </div>
 
-          {/* SECTION 3: Prominent Backup & Revert Card (Always visible and unmistakable) */}
+          {/* Backup & revert */}
           {backups.length > 0 ? (
-            <div className="rounded-xl border border-amber-500/40 bg-amber-950/20 p-4.5 space-y-3.5 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-amber-500/20 border border-amber-500/40 rounded-xl text-amber-300">
-                    <Archive size={22} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-sm font-bold text-amber-200">
-                        Backup de Segurança do Jogo Original
-                      </h4>
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/30 border border-amber-500/50 text-amber-200">
-                        {backups.length} snapshot{backups.length > 1 ? 's' : ''} disponível
+            <div className="rounded-lg border border-zinc-800 p-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
+                  <Archive size={16} className="text-zinc-400 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <h4 className="dh-section-title">
+                      Backup de Segurança do Jogo Original
+                      <span className="ml-2 font-mono text-[11.5px] font-normal text-zinc-500">
+                        {backups.length} snapshot{backups.length > 1 ? 's' : ''}
                       </span>
-                    </div>
-                    <p className="text-xs text-amber-200/80 mt-0.5">
+                    </h4>
+                    <p className="dh-help mt-0.5">
                       Arquivos originais protegidos. Você pode reverter o jogo ao estado 100% original a qualquer momento.
                     </p>
                   </div>
                 </div>
-
-                {/* Big Direct Restore Button */}
                 <button
-                  onClick={() => handleRestore(selectedBackupId || backups[0]?.id)}
-                  disabled={restoring}
-                  className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer shrink-0"
+                  type="button"
+                  onClick={() => handleRestore(selectedBackupId || undefined)}
+                  disabled={busy}
+                  className="dh-btn shrink-0"
                   title="Restaura os arquivos originais salvos e limpa todos os loaders do OptiScaler"
                 >
-                  <RotateCcw size={15} className={restoring ? 'animate-spin' : ''} />
+                  <RotateCcw size={14} className={restoring ? 'animate-spin' : ''} />
                   <span>Restaurar Estado Original</span>
                 </button>
               </div>
 
-              {/* Snapshot selector & management */}
-              <div className="pt-2.5 border-t border-amber-500/20 flex flex-wrap items-center justify-between gap-2.5 text-xs">
-                <div className="flex items-center gap-2 text-zinc-300">
-                  <span className="text-amber-200/70 font-medium">Ponto de Backup:</span>
+              <div className="pt-3 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-2.5">
+                <label className="flex items-center gap-2 min-w-0">
+                  <span className="dh-label shrink-0">Ponto de Backup:</span>
                   <select
-                    value={selectedBackupId || backups[0]?.id || ''}
+                    value={selectedBackupId}
                     onChange={(e) => setSelectedBackupId(e.target.value)}
-                    className="px-2.5 py-1 bg-zinc-900 border border-amber-500/40 rounded-lg text-amber-200 font-mono text-xs outline-none cursor-pointer"
+                    className="dh-input font-mono min-w-0 max-w-[420px]"
                   >
+                    <option value="">{t('optiscaler.backupAuto', 'Automático (originais mais antigos)')}</option>
                     {backups.map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.id} ({b.filesCount || 0} arquivos salvos)
                       </option>
                     ))}
                   </select>
-                </div>
+                </label>
 
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={handleCreateManualBackup}
-                    className="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 rounded-lg text-xs font-medium transition-colors cursor-pointer"
+                    disabled={busy}
+                    className="dh-btn dh-btn-sm"
                     title="Criar um novo snapshot de backup deste jogo agora"
                   >
-                    + Novo Snapshot
+                    <Plus size={13} />
+                    Novo Snapshot
                   </button>
                   {selectedBackupId && (
                     <button
-                      onClick={() => handleDeleteBackup(selectedBackupId)}
-                      className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-zinc-900 rounded-lg transition-colors cursor-pointer"
+                      type="button"
+                      onClick={() => setConfirmAction({ kind: 'deleteBackup', backupId: selectedBackupId })}
+                      disabled={busy}
+                      className="dh-btn dh-btn-danger dh-btn-sm"
                       title="Excluir este snapshot de backup"
                     >
                       <Trash2 size={13} />
+                      {t('optiscaler.deleteBackupBtn', 'Excluir snapshot')}
                     </button>
                   )}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-400">
-                  <ShieldCheck size={20} />
-                </div>
-                <div>
-                  <h4 className="text-xs font-semibold text-zinc-200">
-                    Proteção Automática de Backup Ativa
-                  </h4>
-                  <p className="text-[11px] text-zinc-400 mt-0.5">
+            <div className="rounded-lg border border-zinc-800/80 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0">
+                <ShieldCheck size={16} className="text-zinc-500 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <h4 className="text-[12.5px] font-medium text-zinc-200">Proteção Automática de Backup Ativa</h4>
+                  <p className="dh-help mt-0.5">
                     O DarkHub cria um backup completo dos seus arquivos originais assim que você clica em Ativar, garantindo reversão 100% segura.
                   </p>
                 </div>
               </div>
-              <button
-                onClick={handleCreateManualBackup}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs font-medium transition-colors shrink-0 cursor-pointer"
-              >
-                <Archive size={14} className="text-amber-400" />
+              <button type="button" onClick={handleCreateManualBackup} disabled={busy} className="dh-btn dh-btn-sm shrink-0">
+                <Archive size={13} />
                 <span>Criar Snapshot Manual</span>
               </button>
             </div>
           )}
 
-          {/* Action Buttons: Apply & Revert */}
-          <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
-            {/* Apply Button */}
+          {/* Primary actions */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <button
-              onClick={handleApply}
-              disabled={applying || analyzing || !effectiveTargetDir}
-              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-sm shadow-md shadow-emerald-950/50 transition-all cursor-pointer"
+              type="button"
+              onClick={() => setConfirmAction({ kind: 'apply' })}
+              disabled={busy || analyzing || !effectiveTargetDir}
+              className="dh-btn dh-btn-primary h-9 px-4"
             >
-              {applying ? (
-                <>
-                  <RefreshCw size={18} className="animate-spin" />
-                  <span>Aplicando Mod com Backup Seguro...</span>
-                </>
-              ) : (
-                <>
-                  <Rocket size={18} />
-                  <span>Ativar OptiScaler & Upscaling</span>
-                </>
-              )}
+              {applying ? <RefreshCw size={14} className="animate-spin" /> : <Rocket size={14} />}
+              <span>{applying ? 'Aplicando Mod com Backup Seguro...' : 'Ativar OptiScaler & Upscaling'}</span>
             </button>
-
-            {/* Revert Button - Always Visible and Clickable */}
             <button
-              onClick={() => handleRestore(selectedBackupId || backups[0]?.id)}
-              disabled={restoring || (!isInstalledOnGame && backups.length === 0)}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              type="button"
+              onClick={() => handleRestore(selectedBackupId || undefined)}
+              disabled={busy || (!isInstalledOnGame && backups.length === 0)}
+              className="dh-btn h-9 px-4"
               title="Restaura os arquivos originais e remove todos os arquivos e loaders do OptiScaler"
             >
-              {restoring ? (
-                <>
-                  <RotateCcw size={18} className="animate-spin" />
-                  <span>Revertendo Arquivos...</span>
-                </>
-              ) : (
-                <>
-                  <RotateCcw size={18} />
-                  <span>Reverter Jogo para Original</span>
-                </>
-              )}
+              <RotateCcw size={14} className={restoring ? 'animate-spin' : ''} />
+              <span>{restoring ? 'Revertendo Arquivos...' : 'Reverter Jogo para Original'}</span>
             </button>
           </div>
 
-          {/* SECTION 4: Collapsible Advanced Settings (Simplified & Uncluttered) */}
-          <div className="border border-zinc-800 rounded-xl overflow-hidden bg-zinc-950/40">
+          {/* Advanced */}
+          <div className="border-t border-zinc-800/80 pt-1">
             <button
+              type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+              aria-expanded={showAdvanced}
+              className="w-full flex items-center justify-between py-2.5 text-[12.5px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors"
             >
-              <div className="flex items-center gap-2">
-                <Settings2 size={16} className="text-zinc-500" />
-                <span>Configurações Avançadas (Loader DLL & Agility SDK)</span>
-              </div>
-              {showAdvanced ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              <span className="flex items-center gap-2">
+                <Settings2 size={14} className="text-zinc-500" />
+                Configurações Avançadas (Loader DLL & Agility SDK)
+              </span>
+              {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
 
             {showAdvanced && (
-              <div className="p-4 border-t border-zinc-800 space-y-4 text-xs">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Custom Loader Selection */}
-                  <div>
-                    <label className="block text-zinc-400 font-medium mb-1.5">Loader DLL de Injeção:</label>
-                    <select
-                      value={selectedLoader}
-                      onChange={(e) => setSelectedLoader(e.target.value)}
-                      className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-200 outline-none focus:border-cyan-500"
-                    >
-                      {LOADER_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-[11px] text-zinc-500 mt-1">
-                      {LOADER_OPTIONS.find((o) => o.value === selectedLoader)?.hint || 'Loader hook para o jogo.'}
-                    </p>
-                  </div>
+              <div className="pt-2 pb-1 grid grid-cols-1 md:grid-cols-2 gap-5 animate-in">
+                <div>
+                  <label htmlFor="opti-loader" className="dh-label block mb-1.5">Loader DLL de Injeção:</label>
+                  <select
+                    id="opti-loader"
+                    value={selectedLoader}
+                    onChange={(e) => setSelectedLoader(e.target.value)}
+                    className="dh-input w-full font-mono"
+                  >
+                    {LOADER_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="dh-help mt-1.5">
+                    {LOADER_OPTIONS.find((o) => o.value === selectedLoader)?.hint || 'Loader hook para o jogo.'}
+                  </p>
+                </div>
 
-                  {/* Agility SDK toggle */}
-                  <div>
-                    <label className="block text-zinc-400 font-medium mb-1.5">DirectX 12 Agility SDK:</label>
-                    <label className="flex items-center gap-2 p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300">
-                      <input
-                        type="checkbox"
-                        checked={includeAgilitySdk}
-                        onChange={(e) => setIncludeAgilitySdk(e.target.checked)}
-                        className="rounded bg-zinc-800 border-zinc-700"
-                      />
-                      <span>Injetar D3D12_Optiscaler (Apenas para jogos sem D3D12Core nativo)</span>
-                    </label>
-                    <p className="text-[11px] text-zinc-500 mt-1">
-                      Jogos modernos que já contêm D3D12 nativo mantêm sua própria SDK para evitar o erro 0xc0000142.
-                    </p>
-                  </div>
+                <div>
+                  <span className="dh-label block mb-1.5">DirectX 12 Agility SDK:</span>
+                  <label className="flex items-start gap-2 text-[12.5px] text-zinc-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeAgilitySdk}
+                      onChange={(e) => setIncludeAgilitySdk(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span>Injetar D3D12_Optiscaler (Apenas para jogos sem D3D12Core nativo)</span>
+                  </label>
+                  <p className="dh-help mt-1.5">
+                    Jogos modernos que já contêm D3D12 nativo mantêm sua própria SDK para evitar o erro <span className="font-mono">0xc0000142</span>.
+                  </p>
                 </div>
               </div>
             )}
           </div>
-        </div>
+        </section>
       ) : (
-        <div className="bg-zinc-900/40 border border-dashed border-zinc-800 rounded-2xl p-12 text-center text-zinc-500 space-y-3">
-          <Gamepad2 size={36} className="mx-auto text-zinc-600" />
-          <h3 className="text-base font-semibold text-zinc-300">Nenhum jogo selecionado</h3>
-          <p className="text-xs max-w-md mx-auto">
+        <div className="py-12 rounded-xl border border-dashed border-zinc-800 flex flex-col items-center text-center gap-3">
+          <h3 className="dh-section-title">Nenhum jogo selecionado</h3>
+          <p className="dh-help max-w-md">
             Clique em qualquer jogo na lista acima ou use o botão &quot;Outro Executável&quot; para escolher a pasta do jogo.
           </p>
+          <button type="button" onClick={handleSelectExe} className="dh-btn dh-btn-sm mt-1">
+            <FolderOpen size={13} />
+            Outro Executável (.exe)
+          </button>
         </div>
       )}
+      </div>
+
+      <DarkOSConfirmDialog
+        open={confirmAction !== null}
+        danger={confirmAction?.kind === 'deleteBackup'}
+        title={confirmAction?.kind === 'deleteBackup'
+          ? t('optiscaler.confirmDeleteBackupTitle', 'Excluir este snapshot de backup?')
+          : t('optiscaler.confirmApplyTitle', 'Substituir DLLs do jogo?')}
+        body={confirmAction?.kind === 'deleteBackup'
+          ? t('optiscaler.confirmDeleteBackupBody', 'Os arquivos originais guardados neste snapshot serão apagados permanentemente. Se for o único backup, não será possível restaurar o jogo ao estado original.')
+          : t('optiscaler.confirmApplyBody', 'O OptiScaler vai copiar DLLs proxy para a pasta do jogo. Os arquivos originais são salvos em OptiScaler_Backups e podem ser restaurados a qualquer momento. Feche o jogo antes de continuar.')}
+        confirmLabel={confirmAction?.kind === 'deleteBackup' ? t('optiscaler.deleteBackupBtn', 'Excluir snapshot') : t('optiscaler.applyBtn', 'Ativar OptiScaler')}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          const action = confirmAction;
+          setConfirmAction(null);
+          if (action?.kind === 'apply') void handleApply();
+          else if (action?.kind === 'deleteBackup') void handleDeleteBackup(action.backupId);
+        }}
+      />
     </div>
   );
 }

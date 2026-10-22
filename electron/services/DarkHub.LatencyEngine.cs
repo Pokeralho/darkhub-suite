@@ -24,8 +24,9 @@ public struct PROCESS_POWER_THROTTLING_STATE
 public class DarkHubLatencyEngine
 {
 
+    // SetResolution is an NT BOOLEAN (1 byte), not a Win32 BOOL.
     [DllImport("ntdll.dll", SetLastError = false)]
-    public static extern int NtSetTimerResolution(uint DesiredResolution, bool SetResolution, out uint CurrentResolution);
+    public static extern int NtSetTimerResolution(uint DesiredResolution, [MarshalAs(UnmanagedType.U1)] bool SetResolution, out uint CurrentResolution);
 
     [DllImport("ntdll.dll", SetLastError = false)]
     public static extern int NtQueryTimerResolution(out uint MinimumResolution, out uint MaximumResolution, out uint CurrentResolution);
@@ -118,6 +119,10 @@ public class DarkHubLatencyEngine
     static IntPtr mmcssHandle = IntPtr.Zero;
     static Thread timerWorkerThread = null;
     static readonly object lockObj = new object();
+    // Wakes the timer worker (resolution changed / unlock / exit) and signals that it applied the lock.
+    static readonly AutoResetEvent timerWake = new AutoResetEvent(false);
+    static readonly ManualResetEvent timerApplied = new ManualResetEvent(false);
+    static int lastSetStatus = 0;
 
     public static void Main(string[] args)
     {
@@ -150,18 +155,29 @@ public class DarkHubLatencyEngine
         pipeThread.IsBackground = true;
         pipeThread.Start();
 
-        string line;
-        while (isRunning && (line = Console.ReadLine()) != null)
+        AppDomain.CurrentDomain.ProcessExit += (s, e) => { isRunning = false; UnlockTimerResolution(); };
+        Console.CancelKeyPress += (s, e) => { isRunning = false; UnlockTimerResolution(); };
+
+        // Exactly one response line per non-empty request line (NativeLatencyClient matches FIFO).
+        // EOF (parent died / closed stdin) ends the loop so the daemon never lingers as an orphan.
+        try
         {
-            if (string.IsNullOrWhiteSpace(line)) continue;
-            string response = HandleCommand(line.Trim());
-            if (!string.IsNullOrEmpty(response))
+            string line;
+            while (isRunning && (line = Console.ReadLine()) != null)
             {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                string response = HandleCommand(line.Trim());
+                if (string.IsNullOrEmpty(response)) response = FormatResponse(false, "empty_response", null);
                 Console.WriteLine(response);
+                Console.Out.Flush();
             }
         }
-
-        UnlockTimerResolution();
+        catch (IOException) { /* stdin/stdout pipe broken: parent is gone */ }
+        finally
+        {
+            isRunning = false;
+            UnlockTimerResolution();
+        }
     }
 
     private static void NamedPipeServerWorker()
@@ -213,13 +229,19 @@ public class DarkHubLatencyEngine
                     string host = GetJsonStringValue(json, "host");
                     if (string.IsNullOrEmpty(host)) host = "1.1.1.1";
                     int timeout = GetJsonIntValue(json, "timeout_ms", 2000);
+                    // Keep below the client's 4 s FIFO timeout; negative would become ~49 days as uint.
+                    if (timeout < 100) timeout = 100;
+                    if (timeout > 3500) timeout = 3500;
                     return HandlePingNative(host, timeout);
                 }
 
                 case "lock_timer":
                 {
-                    uint res = (uint)GetJsonIntValue(json, "resolution_100ns", 5000);
-                    if (res < 5000) res = 5000;
+                    // Clamp in int space first: a negative value cast to uint would become ~429 s.
+                    int resRaw = GetJsonIntValue(json, "resolution_100ns", 5000);
+                    if (resRaw < 5000) resRaw = 5000;
+                    if (resRaw > 156250) resRaw = 156250;
+                    uint res = (uint)resRaw;
                     LockTimerResolution(res);
                     return FormatResponse(true, "timer_locked", QueryTimerResolutionInternal());
                 }
@@ -278,12 +300,15 @@ public class DarkHubLatencyEngine
         }
     }
 
+    // The worker thread owns every acquire/release (timeBeginPeriod, NtSetTimerResolution, MMCSS) so
+    // each acquire has exactly one matching release on the same thread, even on repeated lock/unlock.
     private static void LockTimerResolution(uint desired100ns)
     {
         lock (lockObj)
         {
             lockedResolution100ns = desired100ns;
             isTimerLocked = true;
+            timerApplied.Reset();
 
             if (timerWorkerThread == null || !timerWorkerThread.IsAlive)
             {
@@ -292,56 +317,85 @@ public class DarkHubLatencyEngine
                 timerWorkerThread.IsBackground = true;
                 timerWorkerThread.Start();
             }
+            else
+            {
+                timerWake.Set(); // re-apply the new resolution
+            }
         }
+        // So the response reflects the applied state instead of racing the worker.
+        timerApplied.WaitOne(1000);
     }
 
     private static void UnlockTimerResolution()
     {
+        Thread t;
         lock (lockObj)
         {
             isTimerLocked = false;
-            try
-            {
-                TimeEndPeriod(1);
-                uint cur;
-                NtSetTimerResolution(lockedResolution100ns, false, out cur);
-                if (mmcssHandle != IntPtr.Zero)
-                {
-                    AvRevertMmThreadCharacteristics(mmcssHandle);
-                    mmcssHandle = IntPtr.Zero;
-                }
-            }
-            catch {}
+            t = timerWorkerThread;
+            timerWorkerThread = null;
+            timerWake.Set();
         }
+        // Wait for the worker to release everything so the reply / process exit sees the real state.
+        try { if (t != null && t.IsAlive && t != Thread.CurrentThread) t.Join(2000); } catch {}
     }
 
     private static void TimerWorkerLoop()
     {
-
+        bool periodSet = false;
+        bool ntSet = false;
+        IntPtr mm = IntPtr.Zero;
         try
         {
-            uint taskIndex = 0;
-            mmcssHandle = AvSetMmThreadCharacteristicsW("Games", ref taskIndex);
-            if (mmcssHandle == IntPtr.Zero)
+            try
             {
-                taskIndex = 0;
-                mmcssHandle = AvSetMmThreadCharacteristicsW("Pro Audio", ref taskIndex);
+                uint taskIndex = 0;
+                mm = AvSetMmThreadCharacteristicsW("Games", ref taskIndex);
+                if (mm == IntPtr.Zero)
+                {
+                    taskIndex = 0;
+                    mm = AvSetMmThreadCharacteristicsW("Pro Audio", ref taskIndex);
+                }
+                mmcssHandle = mm;
+            }
+            catch {}
+
+            try { periodSet = TimeBeginPeriod(1) == 0; } catch {}
+
+            uint applied = 0;
+            while (isTimerLocked && isRunning)
+            {
+                uint want = lockedResolution100ns;
+                if (!ntSet || want != applied)
+                {
+                    try
+                    {
+                        uint cur;
+                        // Undo the previous request first: requests from one process are not stacked.
+                        if (ntSet) { NtSetTimerResolution(applied, false, out cur); ntSet = false; }
+                        int st = NtSetTimerResolution(want, true, out cur);
+                        lastSetStatus = st;
+                        ntSet = st >= 0;
+                        applied = want;
+                    }
+                    catch {}
+                    timerApplied.Set();
+                }
+                timerWake.WaitOne(1000);
             }
         }
-        catch {}
-
-        try { TimeBeginPeriod(1); } catch {}
-
-        try
+        finally
         {
-            uint cur;
-            NtSetTimerResolution(lockedResolution100ns, true, out cur);
-        }
-        catch {}
-
-        while (isTimerLocked && isRunning)
-        {
-            Thread.Sleep(1000);
+            try
+            {
+                uint cur;
+                if (ntSet) NtSetTimerResolution(lockedResolution100ns, false, out cur);
+            }
+            catch {}
+            try { if (periodSet) TimeEndPeriod(1); } catch {}
+            try { if (mm != IntPtr.Zero) AvRevertMmThreadCharacteristics(mm); } catch {}
+            mmcssHandle = IntPtr.Zero;
+            timerApplied.Set();
         }
     }
 
@@ -361,6 +415,7 @@ public class DarkHubLatencyEngine
         return new Dictionary<string, object>
         {
             { "locked", isTimerLocked },
+            { "set_status", lastSetStatus },
             { "current_100ns", current },
             { "min_100ns", min },
             { "max_100ns", max },
@@ -559,7 +614,9 @@ public class DarkHubLatencyEngine
                 try
                 {
                     ICMP_ECHO_REPLY echoReply = (ICMP_ECHO_REPLY)Marshal.PtrToStructure(handle.AddrOfPinnedObject(), typeof(ICMP_ECHO_REPLY));
-                    return FormatResponse(true, "success", new Dictionary<string, object>
+                    // A reply can be an ICMP error (e.g. 11003 dest unreachable); only IP_SUCCESS is a ping.
+                    bool okReply = echoReply.Status == 0;
+                    return FormatResponse(okReply, okReply ? "success" : ("Status_" + echoReply.Status), new Dictionary<string, object>
                     {
                         { "host", host },
                         { "ip", ip.ToString() },
@@ -652,7 +709,7 @@ public class DarkHubLatencyEngine
     {
         if (obj == null) return "null";
         if (obj is bool) return (bool)obj ? "true" : "false";
-        if (obj is int || obj is long || obj is uint || obj is ulong || obj is double || obj is float)
+        if (obj is int || obj is long || obj is uint || obj is ulong || obj is double || obj is float || obj is byte || obj is ushort)
             return Convert.ToString(obj, System.Globalization.CultureInfo.InvariantCulture);
         if (obj is string)
             return "\"" + ((string)obj).Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "") + "\"";

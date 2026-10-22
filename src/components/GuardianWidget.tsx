@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { visibleInterval } from '../utils/visibleInterval'
-import { Zap, X } from 'lucide-react'
+import { Zap, X } from './icons'
 
 export default function GuardianWidget() {
   const [enabled, setEnabled] = useState(false)
@@ -105,37 +105,50 @@ export default function GuardianWidget() {
 
   if (!enabled) return null
 
-  const fmt = (n: number | null) => (n == null || !Number.isFinite(n) ? '—' : n.toFixed(0))
+  const fmt = (n: number | null) => (n == null || !Number.isFinite(n) ? null : n.toFixed(0))
+
+  const rows: Array<{ label: string; value: string | null; unit: string; hot?: boolean }> = [
+    { label: 'Ping', value: fmt(ping), unit: 'ms', hot: alert },
+    { label: 'CPU', value: fmt(cpu), unit: '%' },
+    { label: 'RAM', value: fmt(ram), unit: '%' },
+    { label: 'GPU', value: fmt(gpu), unit: '%' }
+  ]
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
+    <div className="fixed bottom-4 right-4 z-50 animate-in">
       <div
-        className={`w-64 rounded-xl border bg-zinc-950/90 backdrop-blur px-4 py-3 ${
-          alert ? 'border-red-500/40 shadow-[0_0_0_1px_rgba(239,68,68,0.25)]' : 'border-zinc-800'
+        role="status"
+        className={`w-60 rounded-xl border bg-zinc-950/95 dh-raised transition-colors ${
+          alert ? 'border-red-500/50' : 'border-zinc-800'
         }`}
       >
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2 text-sm text-zinc-200">
-            <Zap size={16} className={ultraOn ? 'text-emerald-400' : 'text-zinc-500'} />
-            <span className="font-semibold">{ultraOn ? 'BOOST ON' : 'Boost off'}</span>
+        <div className="flex items-center justify-between pl-3.5 pr-1.5 py-2 border-b border-zinc-800/80">
+          <div className="flex items-center gap-2 text-[12px]">
+            <span className={`w-1.5 h-1.5 rounded-full ${ultraOn ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
+            <Zap size={13} className={ultraOn ? 'text-zinc-200' : 'text-zinc-500'} />
+            <span className={ultraOn ? 'font-medium text-zinc-100' : 'text-zinc-400'}>{ultraOn ? 'Boost on' : 'Boost off'}</span>
           </div>
-          <button onClick={disableOverlay} className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors">
-            <X size={14} />
+          <button
+            onClick={disableOverlay}
+            aria-label="Fechar widget"
+            className="p-1 rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+          >
+            <X size={13} />
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-          <div className="text-zinc-500">Ping</div>
-          <div className={`text-right tabular-nums ${alert ? 'text-red-300 font-semibold' : 'text-zinc-200'}`}>{ping != null ? `${fmt(ping)}ms` : '—'}</div>
-          <div className="text-zinc-500">CPU</div>
-          <div className="text-right tabular-nums text-zinc-200">{cpu != null ? `${fmt(cpu)}%` : '—'}</div>
-          <div className="text-zinc-500">RAM</div>
-          <div className="text-right tabular-nums text-zinc-200">{ram != null ? `${fmt(ram)}%` : '—'}</div>
-          <div className="text-zinc-500">GPU</div>
-          <div className="text-right tabular-nums text-zinc-200">{gpu != null ? `${fmt(gpu)}%` : '—'}</div>
-        </div>
+        <dl className="grid grid-cols-4 divide-x divide-zinc-800/80">
+          {rows.map((r) => (
+            <div key={r.label} className="px-2.5 py-2 min-w-0">
+              <dt className="text-[10.5px] text-zinc-500">{r.label}</dt>
+              <dd className={`mt-0.5 font-mono text-[13px] tabular-nums ${r.hot ? 'text-red-300' : 'text-zinc-50'}`}>
+                {r.value != null ? <>{r.value}<span className="text-[10.5px] text-zinc-500">{r.unit}</span></> : <span className="text-zinc-600">--</span>}
+              </dd>
+            </div>
+          ))}
+        </dl>
 
-        {alert ? <div className="mt-2 text-xs text-red-200">Latency Shield: pico de ping detectado</div> : null}
+        {alert ? <div className="px-3.5 py-1.5 border-t border-zinc-800/80 text-[11px] text-red-300">Latency Shield: pico de ping detectado</div> : null}
       </div>
     </div>
   )

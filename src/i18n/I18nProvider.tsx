@@ -1,5 +1,4 @@
 import React, { createContext, useCallback, useContext, useMemo, useState, useEffect } from 'react'
-import type { SupportedLang } from './messages'
 import { messages, availableLanguages } from './messages'
 
 type I18nContextValue = {
@@ -33,6 +32,13 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {}
   }, [])
+
+  // Keep <html lang> in sync so screen readers / spell-check use the UI language.
+  useEffect(() => {
+    try {
+      document.documentElement.lang = lang
+    } catch {}
+  }, [lang])
 
   const setLang = useCallback((next: string) => {
     setLangState(next)

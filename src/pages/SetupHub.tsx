@@ -3,6 +3,8 @@ import { useI18n } from '../i18n/I18nProvider';
 import {
   Package,
   Cpu,
+  ChevronDown,
+  ChevronRight,
   CheckSquare,
   Square,
   Play,
@@ -17,26 +19,31 @@ import {
   Layers,
   ShieldCheck,
   CheckCheck,
-  XSquare
-} from 'lucide-react';
+  XSquare,
+  RefreshCw,
+  Network,
+  Headphones,
+  MemoryStick
+} from '../components/icons';
+import PageHeader from '../components/ui/PageHeader';
 
 const appCatalog: Record<string, { id: string, name: string, desc?: string }[]> = {
   'Drivers & Desinstaladores Limpos': [
     { id: 'Wagnardsoft.DisplayDriverUninstaller', name: 'Display Driver Uninstaller (DDU)', desc: 'Remove completamente drivers GPU sem sobras' },
-    { id: 'TechPowerUp.NVCleaner', name: 'NVCleanstall', desc: 'Instalação customizada de drivers NVIDIA sem bloatware' },
-    { id: 'BCUninstaller.BulkCrapUninstaller', name: 'Bulk Crap Uninstaller (BCU)', desc: 'Desinstalador em lote avançado' },
+    { id: 'TechPowerUp.NVCleanstall', name: 'NVCleanstall', desc: 'Instalação customizada de drivers NVIDIA sem bloatware' },
+    { id: 'Klocman.BulkCrapUninstaller', name: 'Bulk Crap Uninstaller (BCU)', desc: 'Desinstalador em lote avançado' },
     { id: 'GeekUninstaller.GeekUninstaller', name: 'Geek Uninstaller', desc: 'Desinstalador rápido e limpo' },
     { id: 'RevoUninstaller.RevoUninstaller', name: 'Revo Uninstaller Free', desc: 'Remove registros e arquivos órfãos' },
     { id: 'BleachBit.BleachBit', name: 'BleachBit', desc: 'Limpeza de privacidade open-source' },
-    { id: 'IObit.Unlocker', name: 'IObit Unlocker', desc: 'Destrava arquivos bloqueados pelo Windows' }
+    { id: 'OO-Software.ShutUp10', name: 'O&O ShutUp10++', desc: 'Painel de privacidade com centenas de chaves do Windows' },
+    { id: 'IObit.IObitUnlocker', name: 'IObit Unlocker', desc: 'Destrava arquivos bloqueados pelo Windows' }
   ],
   'Discos, Partições & Backup': [
-    { id: 'ParamountSoftware.MacriumReflect.Free', name: 'Macrium Reflect Free', desc: 'Backup de imagem e clonagem de disco' },
     { id: 'AOMEI.Backupper.Standard', name: 'AOMEI Backupper Standard', desc: 'Backup e sincronização de arquivos e partições' },
-    { id: 'AOMEI.PartitionAssistant.Standard', name: 'AOMEI Partition Assistant', desc: 'Gerenciador de partições e MBR/GPT' },
+    { id: 'AOMEI.PartitionAssistant', name: 'AOMEI Partition Assistant', desc: 'Gerenciador de partições e MBR/GPT' },
     { id: 'MiniTool.PartitionWizard.Free', name: 'MiniTool Partition Wizard', desc: 'Redimensionar, formatar e recuperar partições' },
-    { id: 'EaseUS.PartitionMaster.Free', name: 'EaseUS Partition Master', desc: 'Gerenciamento de partições e discos' },
-    { id: 'EaseUS.TodoBackup.Free', name: 'EaseUS Todo Backup', desc: 'Software de backup e clonagem de sistema' },
+    { id: 'EaseUS.PartitionMaster', name: 'EaseUS Partition Master', desc: 'Gerenciamento de partições e discos' },
+    { id: 'EaseUS.TodoBackup', name: 'EaseUS Todo Backup', desc: 'Software de backup e clonagem de sistema' },
     { id: 'Rufus.Rufus', name: 'Rufus', desc: 'Criador de pendrive bootável Windows e Linux' },
     { id: 'Ventoy.Ventoy', name: 'Ventoy', desc: 'Pendrive multi-ISO de inicialização direta' },
     { id: 'Balena.Etcher', name: 'Balena Etcher', desc: 'Gravação de imagens ISO/IMG em cartões e USB' },
@@ -48,13 +55,13 @@ const appCatalog: Record<string, { id: string, name: string, desc?: string }[]> 
   'Diagnóstico, Benchmarks & Sysinternals': [
     { id: 'CPUID.CPU-Z', name: 'CPU-Z', desc: 'Identificação de processador, placa mãe e memória' },
     { id: 'TechPowerUp.GPU-Z', name: 'GPU-Z', desc: 'Informações detalhadas de placa de vídeo' },
-    { id: 'HWiNFO.HWiNFO', name: 'HWiNFO64', desc: 'Monitoramento global de hardware e sensores' },
+    { id: 'REALiX.HWiNFO', name: 'HWiNFO64', desc: 'Monitoramento global de hardware e sensores' },
     { id: 'CPUID.HWMonitor', name: 'HWMonitor', desc: 'Voltagens, temperaturas e rotações de fans' },
-    { id: 'OCCT.OCCT', name: 'OCCT', desc: 'Teste de estabilidade de CPU, GPU, RAM e fonte' },
-    { id: 'Geeks3D.FurMark', name: 'FurMark', desc: 'Teste de estresse térmico para GPU' },
-    { id: 'GIMPS.Prime95', name: 'Prime95', desc: 'Teste de estresse pesado para CPU e memória' },
+    { id: 'OCBase.OCCT.Personal', name: 'OCCT', desc: 'Teste de estabilidade de CPU, GPU, RAM e fonte' },
+    { id: 'Geeks3D.FurMark.2', name: 'FurMark', desc: 'Teste de estresse térmico para GPU' },
+    { id: 'mersenne.prime95', name: 'Prime95', desc: 'Teste de estresse pesado para CPU e memória' },
     { id: 'Maxon.CinebenchR23', name: 'Cinebench R23', desc: 'Benchmark clássico de renderização para CPU' },
-    { id: 'SystemInformer.SystemInformer', name: 'System Informer (Process Hacker 3)', desc: 'Gerenciador avançado de tarefas e processos' },
+    { id: 'WinsiderSS.SystemInformer', name: 'System Informer (Process Hacker 3)', desc: 'Gerenciador avançado de tarefas e processos' },
     { id: 'Microsoft.Sysinternals.Autoruns', name: 'Sysinternals Autoruns', desc: 'Gerencia tudo que inicializa com o Windows' },
     { id: 'Microsoft.Sysinternals.ProcessExplorer', name: 'Sysinternals Process Explorer', desc: 'Explorador avançado de DLLs e handles' },
     { id: 'Microsoft.Sysinternals.TCPView', name: 'Sysinternals TCPView', desc: 'Monitor de conexões de rede em tempo real' }
@@ -73,21 +80,27 @@ const appCatalog: Record<string, { id: string, name: string, desc?: string }[]> 
     { id: 'Microsoft.Edge', name: 'Microsoft Edge', desc: 'Navegador baseado em Chromium da Microsoft' },
     { id: 'Opera.Opera', name: 'Opera', desc: 'Navegador com recursos integrados' },
     { id: 'Opera.OperaGX', name: 'Opera GX', desc: 'Navegador gamer com limitador de recursos' },
-    { id: 'VivaldiTechnologies.Vivaldi', name: 'Vivaldi', desc: 'Navegador altamente personalizável' },
-    { id: 'Floorp.Floorp', name: 'Floorp', desc: 'Navegador Firefox super veloz e customizável' }
+    { id: 'Vivaldi.Vivaldi', name: 'Vivaldi', desc: 'Navegador altamente personalizável' },
+    { id: 'Ablaze.Floorp', name: 'Floorp', desc: 'Navegador Firefox super veloz e customizável' }
   ],
   Compactadores: [
     { id: '7zip.7zip', name: '7-Zip', desc: 'Compactador rápido e open-source' },
     { id: 'RARLab.WinRAR', name: 'WinRAR', desc: 'Clássico descompactador de arquivos RAR e ZIP' },
     { id: 'M2Team.NanaZip', name: 'NanaZip', desc: 'Fork moderno do 7-Zip integrado ao menu do Win11' },
-    { id: 'GiorgioTani.PeaZip', name: 'PeaZip', desc: 'Gerenciador de arquivos compactados completo' }
+    { id: 'Giorgiotani.Peazip', name: 'PeaZip', desc: 'Gerenciador de arquivos compactados completo' }
   ],
   'Utilidades & Produtividade': [
     { id: 'voidtools.Everything', name: 'Everything', desc: 'Busca instantânea de arquivos no disco' },
     { id: 'Microsoft.PowerToys', name: 'Microsoft PowerToys', desc: 'Suíte de produtividade oficial da Microsoft' },
     { id: 'Notepad++.Notepad++', name: 'Notepad++', desc: 'Editor de texto leve e avançado' },
     { id: 'ShareX.ShareX', name: 'ShareX', desc: 'Captura de tela, gravação e OCR' },
-    { id: 'OBSProject.OBSStudio', name: 'OBS Studio', desc: 'Gravação de tela e streaming profissional' }
+    { id: 'OBSProject.OBSStudio', name: 'OBS Studio', desc: 'Gravação de tela e streaming profissional' },
+    { id: 'Flameshot.Flameshot', name: 'Flameshot', desc: 'Prints com setas, texto e destaque' },
+    { id: 'KeePassXCTeam.KeePassXC', name: 'KeePassXC', desc: 'Cofre de senhas offline' },
+    { id: 'Bitwarden.Bitwarden', name: 'Bitwarden', desc: 'Gerenciador de senhas com sincronização' },
+    { id: 'LocalSend.LocalSend', name: 'LocalSend', desc: 'Enviar arquivos entre PC e celular na rede local' },
+    { id: 'Syncthing.Syncthing', name: 'Syncthing', desc: 'Sincroniza pastas entre dispositivos sem nuvem' },
+    { id: 'qBittorrent.qBittorrent', name: 'qBittorrent', desc: 'Cliente BitTorrent sem anúncios' }
   ],
   'Gamer & Launchers': [
     { id: 'Valve.Steam', name: 'Steam', desc: 'Maior plataforma de jogos para PC' },
@@ -96,31 +109,95 @@ const appCatalog: Record<string, { id: string, name: string, desc?: string }[]> 
     { id: 'Ubisoft.Connect', name: 'Ubisoft Connect', desc: 'Plataforma oficial de jogos Ubisoft' },
     { id: 'Blizzard.BattleNet', name: 'Battle.net', desc: 'Launcher da Blizzard Entertainment' },
     { id: 'GOG.Galaxy', name: 'GOG Galaxy', desc: 'Launcher livre de DRM da CD Projekt' },
-    { id: 'RiotGames.RiotClient', name: 'Riot Client', desc: 'Launcher para League of Legends e Valorant' },
-    { id: 'Micro-StarInternational.Afterburner', name: 'MSI Afterburner', desc: 'Overclocking e monitoramento de GPU' },
+    { id: 'RiotGames.LeagueOfLegends.BR', name: 'League of Legends', desc: 'Instala o Riot Client com o LoL (servidor BR)' },
+    { id: 'Guru3D.Afterburner', name: 'MSI Afterburner', desc: 'Overclocking e monitoramento de GPU' },
     { id: 'Guru3D.RTSS', name: 'RivaTuner Statistics Server (RTSS)', desc: 'Estatísticas e medição de quadros' }
   ],
   'Players & Multimídia': [
     { id: 'VideoLAN.VLC', name: 'VLC Media Player', desc: 'Player multimídia universal' },
     { id: 'clsid2.mpc-hc', name: 'MPC-HC', desc: 'Media Player Classic Home Cinema' },
-    { id: 'mpv.net.mpv.net', name: 'MPV Player', desc: 'Player minimalista e veloz' },
+    { id: 'mpv.net', name: 'MPV Player', desc: 'Player minimalista e veloz' },
     { id: 'Spotify.Spotify', name: 'Spotify', desc: 'Streaming de música e podcasts' },
     { id: 'HandBrake.HandBrake', name: 'HandBrake', desc: 'Conversor de formatos de vídeo' },
-    { id: 'Gyan.FFmpeg', name: 'FFmpeg', desc: 'Suíte de processamento audiovisual' },
-    { id: 'Audacity.Audacity', name: 'Audacity', desc: 'Editor e gravador de áudio' },
-    { id: 'GIMP.GIMP', name: 'GIMP', desc: 'Editor de imagens avançado open-source' },
-    { id: 'KDE.Krita', name: 'Krita', desc: 'Pintura e ilustração digital' },
-    { id: 'BlenderFoundation.Blender', name: 'Blender', desc: 'Criação e animação 3D profissional' }
+    { id: 'Gyan.FFmpeg', name: 'FFmpeg', desc: 'Suíte de processamento audiovisual' }
+  ],
+  // Open-source alternatives. IDs verified with `winget show` (2026-10-21); "gh:" entries are GitHub releases
+  // (allow-listed in main.js, MSI checked against GitHub's SHA-256). The Craft apps are recent clean-room
+  // reimplementations still in alpha: listed next to the mature option of each category.
+  'Escritório, PDF & Estudos': [
+    { id: 'TheDocumentFoundation.LibreOffice', name: 'LibreOffice', desc: 'Word, Excel e PowerPoint livres; abre e salva .docx, .xlsx e .pptx' },
+    { id: 'ONLYOFFICE.DesktopEditors', name: 'ONLYOFFICE', desc: 'Documentos, planilhas e apresentações com visual do Office' },
+    { id: 'gh:storytold/wordcraft', name: 'WordCraft (alfa)', desc: 'Recriação open-source do Microsoft Word, em Rust' },
+    { id: 'gh:storytold/gridcraft', name: 'GridCraft (alfa)', desc: 'Planilhas no estilo Excel, open-source em Rust' },
+    { id: 'gh:storytold/deckcraft', name: 'DeckCraft (alfa)', desc: 'Apresentações no estilo PowerPoint, open-source' },
+    { id: 'gh:storytold/pdfcraft', name: 'PdfCraft (alfa)', desc: 'Leitor e editor de PDF no estilo Acrobat' },
+    { id: 'SumatraPDF.SumatraPDF', name: 'SumatraPDF', desc: 'Leitor de PDF, EPUB e quadrinhos leve e rápido' },
+    { id: 'PDFsam.PDFsam', name: 'PDFsam Basic', desc: 'Juntar, dividir e reorganizar PDFs' },
+    { id: 'KDE.Okular', name: 'Okular', desc: 'Leitor de documentos com anotações' },
+    { id: 'Xournal++.Xournal++', name: 'Xournal++', desc: 'Anotações à mão e assinatura em PDF' },
+    { id: 'Cyanfish.NAPS2', name: 'NAPS2', desc: 'Digitalizar documentos para PDF com OCR' },
+    { id: 'Joplin.Joplin', name: 'Joplin', desc: 'Notas e listas com sincronização' },
+    { id: 'Logseq.Logseq', name: 'Logseq', desc: 'Notas conectadas e diário' },
+    { id: 'DigitalScholar.Zotero', name: 'Zotero', desc: 'Referências e citações para trabalhos acadêmicos' },
+    { id: 'Anki.Anki', name: 'Anki', desc: 'Flashcards com repetição espaçada' },
+    { id: 'calibre.calibre', name: 'calibre', desc: 'Biblioteca e conversor de e-books' },
+    { id: 'Mozilla.Thunderbird', name: 'Thunderbird', desc: 'E-mail, agenda e contatos' }
+  ],
+  'Imagem, Foto & Design': [
+    { id: 'GIMP.GIMP.3', name: 'GIMP 3', desc: 'Alternativa ao Photoshop: edição e retoque de imagens' },
+    { id: 'gh:storytold/photocraft', name: 'PhotoCraft (alfa)', desc: 'Recriação do Photoshop em Rust; abre e salva PSD com camadas' },
+    { id: 'KDE.Krita', name: 'Krita', desc: 'Pintura digital e ilustração profissional' },
+    { id: 'Inkscape.Inkscape', name: 'Inkscape', desc: 'Alternativa ao Illustrator: vetores e SVG' },
+    { id: 'gh:storytold/vectorcraft', name: 'VectorCraft (alfa)', desc: 'Recriação do Illustrator, open-source' },
+    { id: 'darktable.darktable', name: 'darktable', desc: 'Alternativa ao Lightroom: revelação de RAW e catálogo' },
+    { id: 'gh:storytold/lightcraft', name: 'LightCraft (alfa)', desc: 'Recriação do Lightroom, edição não destrutiva' },
+    { id: 'RawTherapee.RawTherapee', name: 'RawTherapee', desc: 'Processamento avançado de fotos RAW' },
+    { id: 'KDE.digiKam', name: 'digiKam', desc: 'Organizar e editar grandes coleções de fotos' },
+    { id: 'Scribus.Scribus', name: 'Scribus', desc: 'Alternativa ao InDesign: diagramação para impressão' },
+    { id: 'gh:storytold/designcraft', name: 'DesignCraft (alfa)', desc: 'Recriação do InDesign, layout de páginas' },
+    { id: 'gh:storytold/figcraft', name: 'FigCraft (alfa)', desc: 'Design de interfaces e protótipos no estilo Figma' },
+    { id: 'Upscayl.Upscayl', name: 'Upscayl', desc: 'Aumenta a resolução de imagens com IA local' },
+    { id: 'Pinta.Pinta', name: 'Pinta', desc: 'Editor simples no estilo Paint.NET' },
+    { id: 'OramaInteractive.Pixelorama', name: 'Pixelorama', desc: 'Pixel art e sprites animados' }
+  ],
+  'Vídeo, Animação & Efeitos': [
+    { id: 'KDE.Kdenlive', name: 'Kdenlive', desc: 'Alternativa ao Premiere: edição de vídeo multipista' },
+    { id: 'Meltytech.Shotcut', name: 'Shotcut', desc: 'Editor de vídeo leve com muitos formatos' },
+    { id: 'gh:storytold/filmcraft', name: 'FilmCraft (alfa)', desc: 'Recriação do Premiere, edição não linear' },
+    { id: 'OpenShot.OpenShot', name: 'OpenShot', desc: 'Editor de vídeo simples para iniciantes' },
+    { id: 'Natron.Natron', name: 'Natron', desc: 'Alternativa ao After Effects: composição por nós' },
+    { id: 'gh:storytold/effectcraft', name: 'EffectCraft (alfa)', desc: 'Recriação do After Effects, motion graphics' },
+    { id: 'KDE.Glaxnimate', name: 'Glaxnimate', desc: 'Animação vetorial e Lottie' },
+    { id: 'ch.LosslessCut', name: 'LosslessCut', desc: 'Cortar vídeos sem perder qualidade, em segundos' },
+    { id: 'Avidemux.Avidemux', name: 'Avidemux', desc: 'Cortes, filtros e conversão rápida' }
+  ],
+  'Áudio & Música': [
+    { id: 'Audacity.Audacity', name: 'Audacity', desc: 'Gravação e edição de áudio' },
+    { id: 'TenacityTeam.Tenacity', name: 'Tenacity', desc: 'Editor de áudio derivado do Audacity' },
+    { id: 'gh:storytold/soundcraft', name: 'SoundCraft (alfa)', desc: 'Recriação do Pro Tools, estação de áudio' },
+    { id: 'LMMS.LMMS', name: 'LMMS', desc: 'Produção musical: sequenciador e sintetizadores' },
+    { id: 'Musescore.Musescore', name: 'MuseScore', desc: 'Escrita de partituras' }
+  ],
+  '3D, CAD & Engenharia': [
+    { id: 'BlenderFoundation.Blender', name: 'Blender', desc: 'Modelagem, animação e renderização 3D' },
+    { id: 'FreeCAD.FreeCAD', name: 'FreeCAD', desc: 'Alternativa ao AutoCAD/SolidWorks: CAD paramétrico' },
+    { id: 'gh:storytold/cadcraft', name: 'CADCraft (alfa)', desc: 'Recriação de CAD 2D/3D no estilo AutoCAD' },
+    { id: 'KiCad.KiCad', name: 'KiCad', desc: 'Projeto de circuitos e placas eletrônicas' },
+    { id: 'OpenSCAD.OpenSCAD', name: 'OpenSCAD', desc: 'Modelagem 3D por código' },
+    { id: 'Ultimaker.Cura', name: 'UltiMaker Cura', desc: 'Fatiador para impressão 3D' },
+    { id: 'Prusa3D.PrusaSlicer', name: 'PrusaSlicer', desc: 'Fatiador para impressoras 3D' },
+    { id: 'GodotEngine.GodotEngine', name: 'Godot Engine', desc: 'Motor para criar jogos 2D e 3D' }
   ],
   Comunicação: [
     { id: 'Discord.Discord', name: 'Discord', desc: 'Chat de voz, texto e comunidades' },
     { id: 'Telegram.TelegramDesktop', name: 'Telegram', desc: 'Mensageiro rápido e seguro para desktop' },
-    { id: 'WhatsApp.WhatsApp', name: 'WhatsApp', desc: 'Aplicativo oficial WhatsApp para Windows' },
+    { id: '9NKSQGP7F2NH', name: 'WhatsApp', desc: 'Aplicativo oficial WhatsApp para Windows' },
     { id: 'Zoom.Zoom', name: 'Zoom', desc: 'Videoconferências e reuniões online' },
     { id: 'SlackTechnologies.Slack', name: 'Slack', desc: 'Comunicação e colaboração em equipe' }
   ],
   Desenvolvimento: [
     { id: 'Microsoft.VisualStudioCode', name: 'VS Code', desc: 'Editor de código mais popular do mundo' },
+    { id: 'VSCodium.VSCodium', name: 'VSCodium', desc: 'VS Code 100% open-source, sem telemetria' },
     { id: 'Microsoft.VisualStudio.2022.Community', name: 'Visual Studio 2022 Community', desc: 'IDE completa para C++, C# e .NET' },
     { id: 'Git.Git', name: 'Git', desc: 'Controle de versão distribuído' },
     { id: 'GitHub.GitHubDesktop', name: 'GitHub Desktop', desc: 'Interface gráfica para repositórios Git' },
@@ -143,6 +220,11 @@ const CATEGORY_KEYS: Record<string, string> = {
   'Utilidades & Produtividade': 'setuphub.cat.utilities',
   'Gamer & Launchers': 'setuphub.cat.gaming',
   'Players & Multimídia': 'setuphub.cat.media',
+  'Escritório, PDF & Estudos': 'setuphub.cat.office',
+  'Imagem, Foto & Design': 'setuphub.cat.design',
+  'Vídeo, Animação & Efeitos': 'setuphub.cat.video',
+  'Áudio & Música': 'setuphub.cat.audio',
+  '3D, CAD & Engenharia': 'setuphub.cat.cad',
   'Comunicação': 'setuphub.cat.communication',
   'Desenvolvimento': 'setuphub.cat.dev'
 };
@@ -155,6 +237,8 @@ const SetupHub = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [installing, setInstalling] = useState(false);
   const [installLogs, setInstallLogs] = useState<string[]>([]);
+  // Categories start collapsed: the catalog is a list of headings until the user opens one (or searches).
+  const [openCats, setOpenCats] = useState<string[]>([]);
 
   const [hardware, setHardware] = useState<any>(null);
   const [detecting, setDetecting] = useState(false);
@@ -197,19 +281,18 @@ const SetupHub = () => {
       ],
       maintenance: [
         'Wagnardsoft.DisplayDriverUninstaller',
-        'ParamountSoftware.MacriumReflect.Free',
-        'AOMEI.PartitionAssistant.Standard',
-        'BCUninstaller.BulkCrapUninstaller',
+        'AOMEI.PartitionAssistant',
+        'Klocman.BulkCrapUninstaller',
         'JAMSoftware.TreeSize.Free',
         'CrystalDewWorld.CrystalDiskInfo',
         'Rufus.Rufus',
-        'SystemInformer.SystemInformer'
+        'WinsiderSS.SystemInformer'
       ],
       gaming: [
         'Valve.Steam',
         'EpicGames.EpicGamesLauncher',
         'Discord.Discord',
-        'Micro-StarInternational.Afterburner',
+        'Guru3D.Afterburner',
         'Guru3D.RTSS',
         'abbodi1406.vcredist',
         'Microsoft.DirectX'
@@ -291,269 +374,300 @@ const SetupHub = () => {
     setDetecting(false);
   };
 
-  return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center space-x-3 mb-8">
-        <div className="p-3 bg-indigo-500/10 rounded-xl">
-          <Package className="text-indigo-400" size={28} />
-        </div>
-        <div>
-          <h2 className="text-3xl font-bold text-zinc-100">Setup Hub</h2>
-          <p className="text-zinc-400 mt-1">Pós-formatação, instalação em lote de ferramentas essenciais e identificação de hardware.</p>
-        </div>
-      </div>
+  const presetButtons: { id: 'essentials' | 'maintenance' | 'gaming' | 'dev'; label: string }[] = [
+    { id: 'essentials', label: t('setuphub.preset.essentials', '+ Essentials') },
+    { id: 'maintenance', label: t('setuphub.preset.maintenance', '+ Maintenance & DDU') },
+    { id: 'gaming', label: t('setuphub.preset.gaming', '+ Gaming') },
+    { id: 'dev', label: t('setuphub.preset.dev', '+ Dev') },
+  ];
+  const catalogEmpty = Object.keys(filteredCatalog).length === 0;
 
-      <div className="flex space-x-2 border-b border-zinc-800 pb-2">
-        <button
-          onClick={() => setActiveTab('apps')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 ${activeTab === 'apps' ? 'bg-indigo-500 text-white' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
-        >
-          <Package size={16}/><span>{t('setuphub.tab.winget', 'Post-Install (Winget)')}</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('drivers')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 ${activeTab === 'drivers' ? 'bg-indigo-500 text-white' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
-        >
-          <Cpu size={16}/><span>{t('setuphub.tab.drivers', 'Drivers & Hardware')}</span>
-        </button>
-      </div>
+  return (
+    <div className="w-full max-w-6xl mx-auto">
+      <PageHeader
+        title={t('setuphub.title', 'Pós-Formatação & Instalação em Massa')}
+        subtitle={t('setuphub.subtitle', 'Instale softwares essenciais, utilitários de sistema e runtimes via Winget com 1 clique.')}
+      >
+        <div role="tablist" className="flex gap-5 -mb-5 overflow-x-auto overflow-y-hidden">
+          {([
+            ['apps', Package, t('setuphub.tab.winget', 'Post-Install (Winget)')],
+            ['drivers', Cpu, t('setuphub.tab.drivers', 'Drivers & Hardware')],
+          ] as const).map(([id, Icon, label]) => {
+            const active = activeTab === id;
+            return (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setActiveTab(id)}
+                className={`relative h-9 inline-flex items-center gap-2 text-[13px] whitespace-nowrap border-b-2 transition-colors ${active ? 'border-blue-400 text-zinc-50' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+              >
+                <Icon size={16} className={active ? 'text-blue-300' : 'text-zinc-500'} />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </PageHeader>
 
       {activeTab === 'apps' && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-          {}
-          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mr-1">{t('setuphub.presets', 'Presets:')}</span>
-              <button
-                onClick={() => applyPreset('essentials')}
-                className="rounded-lg bg-indigo-500/10 border border-indigo-500/30 px-3 py-1.5 text-xs font-medium text-indigo-300 hover:bg-indigo-500/20 transition-colors"
-              >
-                {t('setuphub.preset.essentials', '+ Essentials')}
-              </button>
-              <button
-                onClick={() => applyPreset('maintenance')}
-                className="rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/20 transition-colors"
-              >
-                {t('setuphub.preset.maintenance', '+ Maintenance & DDU')}
-              </button>
-              <button
-                onClick={() => applyPreset('gaming')}
-                className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20 transition-colors"
-              >
-                {t('setuphub.preset.gaming', '+ Gaming')}
-              </button>
-              <button
-                onClick={() => applyPreset('dev')}
-                className="rounded-lg bg-cyan-500/10 border border-cyan-500/30 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 transition-colors"
-              >
-                {t('setuphub.preset.dev', '+ Dev')}
-              </button>
+        <div className="space-y-5 animate-in">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="dh-label mr-1">{t('setuphub.presets', 'Presets:')}</span>
+              {presetButtons.map(p => (
+                <button key={p.id} onClick={() => applyPreset(p.id)} disabled={installing} className="dh-btn dh-btn-sm">
+                  {p.label}
+                </button>
+              ))}
               {selectedApps.length > 0 && (
-                <button
-                  onClick={() => applyPreset('clear')}
-                  className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/20 transition-colors"
-                >
-                  {t('common.clear', 'Clear')} ({selectedApps.length})
+                <button onClick={() => applyPreset('clear')} disabled={installing} className="dh-btn dh-btn-ghost dh-btn-sm">
+                  <XSquare size={14} />
+                  {t('common.clear', 'Clear')} <span className="font-mono">({selectedApps.length})</span>
                 </button>
               )}
             </div>
 
-            <div className="relative min-w-[240px]">
-              <Search size={16} className="absolute left-3 top-1/2 -tranzinc-y-1/2 text-zinc-400" />
+            <div className="relative md:w-72">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
               <input
-                type="text"
+                type="search"
                 placeholder={t('setuphub.searchPlaceholder', 'Search tool, app...')}
+                aria-label={t('setuphub.searchPlaceholder', 'Search tool, app...')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-zinc-800 bg-zinc-950 pl-9 pr-3 py-1.5 text-sm text-zinc-200 outline-none transition-colors focus:border-indigo-500"
+                className="dh-input w-full pl-8"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {Object.entries(filteredCatalog).map(([category, apps]) => {
-                  const allCategorySelected = apps.every(a => selectedApps.includes(a.id));
-                  return (
-                    <div key={category} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-                      <div className="flex items-center justify-between mb-3 border-b border-zinc-800 pb-2">
-                        <h3 className="text-base font-semibold text-zinc-200">{t(CATEGORY_KEYS[category] || category, category)}</h3>
-                        <button
-                          onClick={() => toggleCategory(apps)}
-                          className="text-[11px] font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
-                        >
-                          {allCategorySelected ? t('common.deselect', 'Deselect') : t('common.all', 'All')}
-                        </button>
-                      </div>
-                      <div className="space-y-2">
-                        {apps.map(app => {
-                          const isSelected = selectedApps.includes(app.id);
-                          return (
-                            <div
-                              key={app.id}
-                              onClick={() => !installing && toggleApp(app.id)}
-                              className={`flex items-start space-x-3 p-2 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-indigo-500/10' : 'hover:bg-zinc-800'} ${installing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                              <div className="mt-0.5 shrink-0">
-                                {isSelected ? (
-                                  <CheckSquare size={18} className="text-indigo-400" />
-                                ) : (
-                                  <Square size={18} className="text-zinc-500" />
-                                )}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className={`text-sm ${isSelected ? 'text-indigo-300 font-semibold' : 'text-zinc-200 font-medium'}`}>{app.name}</div>
-                                {app.desc ? <div className="text-xs text-zinc-500 truncate">{t(`app.desc.${app.id}`, app.desc)}</div> : null}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 sticky top-4">
-                <h3 className="text-xl font-bold text-zinc-200 mb-2">{t('setuphub.installation', 'Installation')}</h3>
-                <p className="text-zinc-400 text-sm mb-4">
-                  {selectedApps.length} {t('setuphub.appsSelected', 'app(s) selected').replace('{n} ', '')}
-                </p>
-
-                <button
-                  onClick={handleInstallApps}
-                  disabled={installing || selectedApps.length === 0}
-                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:bg-zinc-800 text-white rounded-lg font-bold flex items-center justify-center space-x-2 transition-colors"
-                >
-                  {installing ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
-                  <span>{installing ? t('setuphub.installing', 'Installing...') : t('setuphub.installSelected', 'Install Selected')}</span>
-                </button>
-
-                <div className="mt-4 bg-zinc-950 border border-zinc-800 rounded-lg p-3 h-64 overflow-y-auto font-mono text-xs text-zinc-400 flex flex-col space-y-1">
-                  {installLogs.length === 0 ? (
-                    <span className="opacity-50 text-center my-auto">{t('setuphub.readyToInstall', 'Ready to install.')}</span>
-                  ) : (
-                    installLogs.map((log, i) => (
-                      <span key={i} className="whitespace-pre-wrap">{log}</span>
-                    ))
-                  )}
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
+            <div className="min-w-0">
+              {catalogEmpty ? (
+                <div className="py-16 text-center">
+                  <p className="text-[13px] text-zinc-400">Nada encontrado para <span className="font-mono text-zinc-200">"{searchQuery}"</span>.</p>
+                  <button onClick={() => setSearchQuery('')} className="dh-btn dh-btn-sm mt-3">{t('common.clear', 'Clear')}</button>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setOpenCats(openCats.length ? [] : Object.keys(filteredCatalog))}
+                      className="text-[12px] text-zinc-400 hover:text-blue-300 transition-colors"
+                    >
+                      {openCats.length ? t('setuphub.collapseAll', 'Recolher tudo') : t('setuphub.expandAll', 'Expandir tudo')}
+                    </button>
+                  </div>
+                  {Object.entries(filteredCatalog).map(([category, apps]) => {
+                    const allCategorySelected = apps.every(a => selectedApps.includes(a.id));
+                    const selCount = apps.filter(a => selectedApps.includes(a.id)).length;
+                    const open = Boolean(searchQuery.trim()) || openCats.includes(category);
+                    const toggleOpen = () => setOpenCats(prev => prev.includes(category) ? prev.filter(c => c !== category) : [...prev, category]);
+                    return (
+                      <section key={category} className={`dh-card overflow-hidden ${selCount > 0 ? 'border-blue-400/25' : ''}`}>
+                        <div className="flex items-center gap-2 pr-3">
+                          <button
+                            type="button"
+                            onClick={toggleOpen}
+                            aria-expanded={open}
+                            className="flex-1 min-w-0 flex items-center gap-2.5 px-4 py-3 text-left hover:bg-zinc-900/50 transition-colors"
+                          >
+                            {open ? <ChevronDown size={14} className="text-zinc-500 shrink-0" /> : <ChevronRight size={14} className="text-zinc-500 shrink-0" />}
+                            <span className="min-w-0 flex-1">
+                              <span className="flex items-baseline gap-2">
+                                <span className="text-[13.5px] font-medium text-zinc-100">{t(CATEGORY_KEYS[category] || category, category)}</span>
+                                <span className={`font-mono text-[11px] ${selCount > 0 ? 'text-blue-300' : 'text-zinc-500'}`}>{selCount > 0 ? `${selCount}/` : ''}{apps.length}</span>
+                              </span>
+                              {!open ? (
+                                <span className="block text-[12px] text-zinc-500 truncate mt-0.5">
+                                  {apps.slice(0, 5).map(a => a.name).join(', ')}{apps.length > 5 ? ` +${apps.length - 5}` : ''}
+                                </span>
+                              ) : null}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => toggleCategory(apps)}
+                            disabled={installing}
+                            className="dh-btn dh-btn-ghost dh-btn-sm shrink-0 disabled:opacity-50"
+                          >
+                            {allCategorySelected ? t('common.deselect', 'Deselect') : t('common.all', 'All')}
+                          </button>
+                        </div>
+                        {open ? (
+                        <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-4 px-4 pb-3 pt-1 border-t border-zinc-800/80">
+                          {apps.map(app => {
+                            const isSelected = selectedApps.includes(app.id);
+                            return (
+                              <li key={app.id} className="min-w-0">
+                                <button
+                                  type="button"
+                                  role="checkbox"
+                                  aria-checked={isSelected}
+                                  disabled={installing}
+                                  onClick={() => toggleApp(app.id)}
+                                  className={`w-full text-left flex items-start gap-2.5 px-2 py-1.5 mt-1 rounded-md transition-colors ${isSelected ? 'bg-blue-500/[0.07]' : 'hover:bg-zinc-900'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                                >
+                                  <span className="mt-0.5 shrink-0">
+                                    {isSelected ? <CheckSquare size={16} className="text-blue-300" /> : <Square size={16} className="text-zinc-600" />}
+                                  </span>
+                                  <span className="min-w-0 flex-1">
+                                    <span className={`block text-[13px] ${isSelected ? 'text-zinc-50 font-medium' : 'text-zinc-200'}`}>
+                                      {app.name}
+                                      {app.id.startsWith('gh:') ? <span className="dh-tag ml-1.5" title={t('setuphub.githubSource', 'Instalado da release oficial no GitHub, com hash SHA-256 conferido')}>github</span> : null}
+                                    </span>
+                                    {app.desc ? <span className="block text-[12px] text-zinc-500 truncate" title={t(`app.desc.${app.id}`, app.desc)}>{t(`app.desc.${app.id}`, app.desc)}</span> : null}
+                                  </span>
+                                </button>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                        ) : null}
+                      </section>
+                    );
+                  })}
+                </div>
+              )}
             </div>
+
+            <aside className="dh-card p-4 lg:sticky lg:top-4">
+              <h2 className="dh-section-title">{t('setuphub.installation', 'Installation')}</h2>
+              <p className="dh-help mt-0.5">
+                <span className="font-mono text-zinc-200">{selectedApps.length}</span> {t('setuphub.appsSelected', 'app(s) selected').replace('{n} ', '')}
+              </p>
+
+              <button
+                onClick={handleInstallApps}
+                disabled={installing || selectedApps.length === 0}
+                className="dh-btn dh-btn-primary w-full mt-4"
+              >
+                {installing ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+                <span>{installing ? t('setuphub.installing', 'Installing...') : t('setuphub.installSelected', 'Install Selected')}</span>
+              </button>
+
+              <div className="mt-4 rounded-md border border-zinc-800/80 bg-zinc-950 p-3 h-64 overflow-y-auto font-mono text-[11.5px] leading-relaxed text-zinc-400 flex flex-col gap-0.5" aria-live="polite">
+                {installLogs.length === 0 ? (
+                  <span className="font-sans text-[12px] text-zinc-600 text-center my-auto">{t('setuphub.readyToInstall', 'Ready to install.')}</span>
+                ) : (
+                  installLogs.map((log, i) => (
+                    <span key={i} className={`whitespace-pre-wrap ${/^\[(ERRO|EXCEÇÃO)\]/.test(log) ? 'text-red-400' : ''}`}>{log}</span>
+                  ))
+                )}
+              </div>
+            </aside>
           </div>
         </div>
       )}
 
       {activeTab === 'drivers' && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+        <div className="space-y-8 animate-in">
           {detecting ? (
-            <div className="flex flex-col items-center justify-center py-12 text-zinc-400">
-              <Loader2 size={40} className="animate-spin mb-4 text-indigo-500" />
-              <p>{t('setuphub.readingSensors', 'Reading sensors and hardware specs via WMI...')}</p>
+            <div aria-busy="true" aria-label={t('setuphub.readingSensors', 'Reading sensors and hardware specs via WMI...')}>
+              <p className="dh-help mb-4 flex items-center gap-2"><Loader2 size={14} className="animate-spin text-blue-300" />{t('setuphub.readingSensors', 'Reading sensors and hardware specs via WMI...')}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {[0, 1, 2, 3, 4, 5].map(i => (
+                  <div key={i} className="dh-card p-4 space-y-3">
+                    <div className="h-3 w-24 rounded bg-zinc-900 animate-pulse" />
+                    <div className="h-4 w-3/4 rounded bg-zinc-900 animate-pulse" />
+                    <div className="h-3 w-1/2 rounded bg-zinc-900 animate-pulse" />
+                  </div>
+                ))}
+              </div>
             </div>
           ) : !hardware ? (
-            <div className="text-center py-12 text-zinc-500">{t('setuphub.failedHardware', 'Failed to read hardware specifications.')}</div>
+            <div className="py-12">
+              <p role="alert" className="text-[13px] text-red-400">{t('setuphub.failedHardware', 'Failed to read hardware specifications.')}</p>
+              <button onClick={detectHardware} className="dh-btn mt-3"><RefreshCw size={14} /> {t('common.retry', 'Tentar novamente')}</button>
+            </div>
           ) : (
             <>
-              {}
-              <div className="bg-gradient-to-r from-indigo-950/60 to-purple-950/40 border border-indigo-500/30 rounded-2xl p-6 relative overflow-hidden">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-bold uppercase tracking-wider">
-                        Reconhecimento Automático
-                      </span>
-                      <span className="text-xs text-zinc-400">
-                        {hardware.cpu?.name} + {hardware.gpus?.[0]?.name || 'GPU'}
-                      </span>
-                    </div>
-                    <h3 className="text-xl font-bold text-zinc-100">
-                      Smart Driver Hub & Diagnóstico Pós-Formatação
-                    </h3>
-                    <p className="text-sm text-zinc-400 max-w-2xl">
-                      Identificamos o seu hardware com precisão. Baixe os drivers oficiais diretamente dos fabricantes para obter máxima taxa de quadros, estabilidade e suporte a recursos avançados.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => {
-                        const recs: string[] = ['abbodi1406.vcredist', 'Microsoft.DirectX', 'Wagnardsoft.DisplayDriverUninstaller'];
-                        const text = `${hardware.gpus?.[0]?.name || ''} ${hardware.gpus?.[0]?.vendor || ''}`.toLowerCase();
-                        if (text.includes('nvidia')) recs.push('Nvidia.NvidiaApp', 'TechPowerUp.NVCleaner');
-                        else if (text.includes('amd') || text.includes('radeon')) recs.push('AdvancedMicroDevicesInc.AMDSoftwareAdrenalinEdition', 'AdvancedMicroDevicesInc.AMDChipsetDrivers');
-                        else if (text.includes('intel')) recs.push('Intel.IntelArcControl', 'Intel.DriverAndSupportAssistant');
-
-                        setSelectedApps(prev => Array.from(new Set([...prev, ...recs])));
-                        setActiveTab('apps');
-                      }}
-                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
-                    >
-                      <Download size={15} />
-                      Instalar Pacote de Drivers Recomendados
-                    </button>
-                  </div>
+              <section className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-zinc-800/80">
+                <div className="min-w-0 space-y-1.5">
+                  <p className="dh-tag truncate">
+                    {[hardware.cpu?.name, hardware.gpus?.[0]?.name].filter(Boolean).join(' + ')}
+                  </p>
+                  <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-zinc-50">
+                    Smart Driver Hub e diagnóstico pós-formatação
+                  </h2>
+                  <p className="text-[12.5px] leading-relaxed text-zinc-400 max-w-[70ch]">
+                    Identificamos o seu hardware com precisão. Baixe os drivers oficiais diretamente dos fabricantes para obter máxima taxa de quadros, estabilidade e suporte a recursos avançados.
+                  </p>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <button
+                  onClick={() => {
+                    const recs: string[] = ['abbodi1406.vcredist', 'Microsoft.DirectX', 'Wagnardsoft.DisplayDriverUninstaller'];
+                    const text = `${hardware.gpus?.[0]?.name || ''} ${hardware.gpus?.[0]?.vendor || ''}`.toLowerCase();
+                    if (text.includes('nvidia')) recs.push('Nvidia.NvidiaApp', 'TechPowerUp.NVCleanstall');
+                    else if (text.includes('amd') || text.includes('radeon')) recs.push('AdvancedMicroDevicesInc.AMDSoftwareAdrenalinEdition', 'AdvancedMicroDevicesInc.AMDChipsetDrivers');
+                    else if (text.includes('intel')) recs.push('Intel.IntelArcControl', 'Intel.DriverAndSupportAssistant');
+
+                    setSelectedApps(prev => Array.from(new Set([...prev, ...recs])));
+                    setActiveTab('apps');
+                  }}
+                  className="dh-btn dh-btn-primary shrink-0"
+                >
+                  <Download size={14} />
+                  Selecionar drivers recomendados
+                </button>
+              </section>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 <HardwareCard
                   title="Processador (CPU)"
-                  icon={<Cpu className="text-blue-400" size={24} />}
+                  icon={Cpu}
                   name={hardware.cpu?.name}
-                  manufacturer={`${hardware.cpu?.manufacturer || 'AMD/Intel'} • ${hardware.cpu?.cores || 6} Cores • ${hardware.cpu?.speed || ''}GHz`}
+                  manufacturer={joinParts(hardware.cpu?.manufacturer, hardware.cpu?.cores ? `${hardware.cpu.cores} cores` : '', hardware.cpu?.speed ? `${hardware.cpu.speed} GHz` : '')}
                   driverLinks={getCpuChipsetLinks(hardware.cpu?.name, hardware.baseboard?.product)}
                 />
 
                 {hardware.gpus?.map((g: any, i: number) => (
                   <HardwareCard
                     key={`gpu-${i}`}
-                    title={`Placa de Vídeo (GPU ${i+1})`}
-                    icon={<Monitor className="text-emerald-400" size={24} />}
-                    name={`${g.name} ${g.vram ? `(${Math.round(g.vram / 1024)}GB VRAM)` : ''}`}
-                    manufacturer={g.vendor || 'Fabricante'}
+                    title={`Placa de vídeo (GPU ${i+1})`}
+                    icon={Monitor}
+                    name={`${g.name}${g.vram ? ` (${Math.round(g.vram / 1024)} GB VRAM)` : ''}`}
+                    manufacturer={g.vendor}
                     driverLinks={getGpuDriverLinks(g.name, g.vendor)}
                   />
                 ))}
 
                 <HardwareCard
-                  title="Placa Mãe (Motherboard)"
-                  icon={<HardDrive className="text-orange-400" size={24} />}
-                  name={hardware.baseboard?.product || 'Motherboard'}
-                  manufacturer={hardware.baseboard?.manufacturer || 'Fabricante'}
+                  title="Placa-mãe"
+                  icon={Layers}
+                  name={hardware.baseboard?.product}
+                  manufacturer={hardware.baseboard?.manufacturer}
                   driverLinks={getMoboDriverLinks(hardware.baseboard?.manufacturer, hardware.baseboard?.product)}
                 />
 
                 {hardware.ram?.map((r: any, i: number) => (
                   <HardwareCard
                     key={`ram-${i}`}
-                    title={`Módulo de Memória RAM (${i+1})`}
-                    icon={<HardDrive className="text-indigo-400" size={24} />}
-                    name={`${r.type || 'DDR4/DDR5'} • ${Math.round(r.size / 1024 / 1024 / 1024)}GB`}
-                    manufacturer={`${r.manufacturer || 'Memória'} • ${r.clock || '3200'}MHz`}
+                    title={`Memória RAM (${i+1})`}
+                    icon={MemoryStick}
+                    name={joinParts(r.type, r.size ? `${Math.round(r.size / 1024 / 1024 / 1024)} GB` : '')}
+                    manufacturer={joinParts(r.manufacturer, r.clock ? `${r.clock} MHz` : '')}
                   />
                 ))}
 
                 {hardware.disks?.map((d: any, i: number) => (
                   <HardwareCard
                     key={`disk-${i}`}
-                    title={`Armazenamento (${d.type || 'SSD/HDD'})`}
-                    icon={<HardDrive className="text-zinc-400" size={24} />}
+                    title={`Armazenamento${d.type ? ` (${d.type})` : ''}`}
+                    icon={HardDrive}
                     name={d.name}
-                    manufacturer={`${d.interface || 'NVMe/SATA'} • ${Math.round(d.size / 1024 / 1024 / 1024)}GB`}
+                    manufacturer={joinParts(d.interface, d.size ? `${Math.round(d.size / 1024 / 1024 / 1024)} GB` : '')}
                   />
                 ))}
 
                 {hardware.network?.slice(0,2).map((n: any, i: number) => (
                   <HardwareCard
                     key={`net-${i}`}
-                    title="Controlador de Rede / Wi-Fi"
-                    icon={<ExternalLink className="text-cyan-400" size={24} />}
-                    name={n.model || 'Gigabit Controller'}
-                    manufacturer={n.type || 'Ethernet / Wireless'}
+                    title="Controlador de rede / Wi-Fi"
+                    icon={Network}
+                    name={n.model}
+                    manufacturer={n.type}
                     driverLinks={[
                       { label: 'Drivers Intel Wi-Fi & LAN', url: 'https://www.intel.com.br/content/www/br/pt/download/19351/windows-10-and-windows-11-wi-fi-drivers-for-intel-wireless-adapters.html' },
                       { label: 'Drivers Realtek PCIe GbE LAN', url: 'https://www.realtek.com/Download/List?cate_id=584' }
@@ -564,10 +678,10 @@ const SetupHub = () => {
                 {hardware.audio?.slice(0,2).map((a: any, i: number) => (
                   <HardwareCard
                     key={`audio-${i}`}
-                    title="Controlador de Áudio"
-                    icon={<ExternalLink className="text-pink-400" size={24} />}
-                    name={a.name || 'High Definition Audio'}
-                    manufacturer={a.manufacturer || 'Realtek / AMD / NVIDIA'}
+                    title="Controlador de áudio"
+                    icon={Headphones}
+                    name={a.name}
+                    manufacturer={a.manufacturer}
                     driverLinks={[
                       { label: 'Realtek High Definition Audio Driver', url: 'https://www.realtek.com/Download/List?cate_id=585' }
                     ]}
@@ -575,32 +689,25 @@ const SetupHub = () => {
                 ))}
               </div>
 
-              {}
-              <div className="mt-8 bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="p-2 bg-indigo-500/20 rounded-lg">
-                    <Download className="text-indigo-400" size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-zinc-200">Runtimes Universais & Essenciais</h3>
-                    <p className="text-zinc-400 text-sm">Instale todas as bibliotecas necessárias para rodar jogos e programas pesados sem erros de DLL.</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                  <a href="https://aka.ms/vs/17/release/vc_redist.x64.exe" target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center p-4 bg-zinc-950 border border-zinc-800 hover:border-indigo-500 rounded-xl transition-colors group">
-                    <span className="font-bold text-zinc-300 group-hover:text-indigo-400">Visual C++ (AIO)</span>
-                  </a>
-                  <a href="https://dotnet.microsoft.com/en-us/download/dotnet/8.0" target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center p-4 bg-zinc-950 border border-zinc-800 hover:border-indigo-500 rounded-xl transition-colors group">
-                    <span className="font-bold text-zinc-300 group-hover:text-indigo-400">.NET Desktop 8.0</span>
-                  </a>
-                  <a href="https://www.microsoft.com/pt-br/download/details.aspx?id=35" target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center p-4 bg-zinc-950 border border-zinc-800 hover:border-indigo-500 rounded-xl transition-colors group">
-                    <span className="font-bold text-zinc-300 group-hover:text-indigo-400">DirectX (End-User)</span>
-                  </a>
-                  <a href="https://vulkan.lunarg.com/sdk/home" target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center p-4 bg-zinc-950 border border-zinc-800 hover:border-indigo-500 rounded-xl transition-colors group">
-                    <span className="font-bold text-zinc-300 group-hover:text-indigo-400">Vulkan SDK</span>
-                  </a>
-                </div>
-              </div>
+              <section>
+                <h2 className="dh-section-title">Runtimes universais e essenciais</h2>
+                <p className="dh-help mt-0.5">Instale todas as bibliotecas necessárias para rodar jogos e programas pesados sem erros de DLL.</p>
+                <ul className="mt-3 grid grid-cols-2 md:grid-cols-4 rounded-xl border border-zinc-800/80 divide-x divide-zinc-800/80 overflow-hidden">
+                  {[
+                    ['Visual C++ (AIO)', 'https://aka.ms/vs/17/release/vc_redist.x64.exe'],
+                    ['.NET Desktop 8.0', 'https://dotnet.microsoft.com/en-us/download/dotnet/8.0'],
+                    ['DirectX (End-User)', 'https://www.microsoft.com/pt-br/download/details.aspx?id=35'],
+                    ['Vulkan SDK', 'https://vulkan.lunarg.com/sdk/home'],
+                  ].map(([label, url]) => (
+                    <li key={url}>
+                      <a href={url} target="_blank" rel="noreferrer" className="group flex items-center justify-between gap-2 px-4 py-3 text-[13px] text-zinc-200 hover:bg-zinc-900 hover:text-zinc-50 transition-colors">
+                        <span className="truncate">{label}</span>
+                        <ExternalLink size={14} className="shrink-0 text-zinc-500 group-hover:text-blue-300" />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             </>
           )}
         </div>
@@ -609,36 +716,44 @@ const SetupHub = () => {
   );
 };
 
-const HardwareCard = ({ title, icon, name, manufacturer, driverLinks }: any) => {
+const joinParts = (...parts: Array<string | number | undefined | null>) => parts.filter(p => p !== undefined && p !== null && String(p).trim() !== '').join(' · ');
+
+const HardwareCard = ({ title, icon: Icon, name, manufacturer, driverLinks }: {
+  title: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  name?: string;
+  manufacturer?: string;
+  driverLinks?: { label: string; url: string }[];
+}) => {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 flex flex-col h-full">
-      <div className="flex items-center space-x-3 mb-4">
-        <div className="p-2 bg-zinc-800 rounded-lg">{icon}</div>
-        <h3 className="text-lg font-semibold text-zinc-200">{title}</h3>
+    <div className="dh-card p-4 flex flex-col h-full">
+      <div className="flex items-center gap-2 text-[12px] text-zinc-500">
+        <Icon size={16} className="text-zinc-500" />
+        <span>{title}</span>
       </div>
-      <div className="flex-1 mb-4">
-        <p className="text-zinc-400 text-sm">Fabricante</p>
-        <p className="text-zinc-200 font-medium mb-2">{manufacturer || 'Desconhecido'}</p>
-        <p className="text-zinc-400 text-sm">Modelo</p>
-        <p className="text-zinc-200 font-medium">{name || 'Desconhecido'}</p>
-      </div>
+      <dl className="flex-1 mt-3 space-y-0.5">
+        <dt className="sr-only">Modelo</dt>
+        <dd className="text-[13.5px] font-medium text-zinc-100 leading-snug">{name || 'Desconhecido'}</dd>
+        <dt className="sr-only">Fabricante</dt>
+        <dd className="font-mono text-[11.5px] text-zinc-500">{manufacturer || 'Fabricante desconhecido'}</dd>
+      </dl>
       {driverLinks && driverLinks.length > 0 && (
-        <div className="space-y-2 mt-auto pt-4 border-t border-zinc-800">
-          <p className="text-xs text-zinc-500 mb-2 font-medium uppercase tracking-wider">Downloads & Drivers Oficiais:</p>
-          {driverLinks.map((link: any, i: number) => (
-            <a
-              key={i}
-              href={link.url}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-center space-x-2 w-full py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg transition-colors text-xs font-semibold"
-            >
-              <Download size={13} />
-              <span className="truncate">{link.label}</span>
-              <ExternalLink size={13} className="ml-1 opacity-60 shrink-0" />
-            </a>
+        <ul className="mt-4 pt-3 border-t border-zinc-800/80 space-y-0.5">
+          {driverLinks.map((link, i) => (
+            <li key={i}>
+              <a
+                href={link.url}
+                target="_blank"
+                rel="noreferrer"
+                className="group flex items-center gap-2 -mx-1.5 px-1.5 py-1 rounded-md text-[12.5px] text-zinc-300 hover:bg-zinc-900 hover:text-blue-300 transition-colors"
+              >
+                <Download size={14} className="shrink-0 text-zinc-500 group-hover:text-blue-300" />
+                <span className="truncate flex-1">{link.label}</span>
+                <ExternalLink size={14} className="shrink-0 text-zinc-600 group-hover:text-blue-300" />
+              </a>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

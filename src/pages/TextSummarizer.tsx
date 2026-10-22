@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react'
-import { Copy, FileText, Loader2, Sparkles } from 'lucide-react'
+import { Copy, FileText, Loader2, Sparkles } from '../components/icons'
 import { HelpTip } from '../components/HelpTip'
 import { useI18n } from '../i18n/I18nProvider'
+import PageHeader from '../components/ui/PageHeader'
 
 const stopwords = new Set([
   'a',
@@ -134,6 +135,8 @@ export default function TextSummarizer() {
       } else {
         setStatus(res?.error ?? 'Falha ao abrir arquivo')
       }
+    } catch (e: any) {
+      setStatus(e?.message ?? String(e))
     } finally {
       setBusy(false)
     }
@@ -152,12 +155,13 @@ export default function TextSummarizer() {
     }
   }
 
+
   return (
-    <div className="space-y-6 w-full">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-2xl font-bold text-white">{t('summarizer.title')}</h1>
+    <div className="w-full max-w-6xl">
+      <PageHeader
+        title={
+          <span className="inline-flex items-center gap-2">
+            {t('summarizer.title')}
             <HelpTip
               title={t('help.summarizer.overview.title')}
               description={t('help.summarizer.overview.desc')}
@@ -168,55 +172,60 @@ export default function TextSummarizer() {
               example={t('help.summarizer.overview.example')}
               buttonLabel={t('help.button')}
             />
-          </div>
-          <p className="text-zinc-400">{t('summarizer.subtitle')}</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleOpen}
-            disabled={busy}
-            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
-          >
-            <FileText size={18} />
-            <span>{t('summarizer.open')}</span>
-          </button>
-          <button
-            onClick={handleSummarize}
-            disabled={busy || !text.trim()}
-            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
-          >
-            {busy ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-            <span>{t('summarizer.summarize')}</span>
-          </button>
-          <HelpTip
-            title={t('help.summarizer.summarize.title')}
-            description={t('help.summarizer.summarize.desc')}
-            sections={[
-              { title: t('help.summarizer.summarize.sections.input.title'), content: t('help.summarizer.summarize.sections.input.desc') },
-              { title: t('help.summarizer.summarize.sections.output.title'), content: t('help.summarizer.summarize.sections.output.desc') }
-            ]}
-            example={t('help.summarizer.summarize.example')}
-            buttonLabel={t('help.button')}
-          />
-        </div>
-      </div>
+          </span>
+        }
+        subtitle={t('summarizer.subtitle')}
+        actions={
+          <>
+            <button onClick={handleOpen} disabled={busy} className="dh-btn">
+              <FileText size={16} />
+              <span>{t('summarizer.open')}</span>
+            </button>
+            <button
+              onClick={handleSummarize}
+              disabled={busy || !text.trim()}
+              className="dh-btn dh-btn-primary"
+            >
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+              <span>{t('summarizer.summarize')}</span>
+            </button>
+            <HelpTip
+              title={t('help.summarizer.summarize.title')}
+              description={t('help.summarizer.summarize.desc')}
+              sections={[
+                { title: t('help.summarizer.summarize.sections.input.title'), content: t('help.summarizer.summarize.sections.input.desc') },
+                { title: t('help.summarizer.summarize.sections.output.title'), content: t('help.summarizer.summarize.sections.output.desc') }
+              ]}
+              example={t('help.summarizer.summarize.example')}
+              buttonLabel={t('help.button')}
+            />
+          </>
+        }
+      />
 
-      {status ? <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg p-3">{status}</div> : null}
+      {status ? (
+        <div className="mb-4 flex items-center gap-3 text-[12.5px] text-red-400">
+          <span className="min-w-0 truncate">{status}</span>
+          <button onClick={handleOpen} disabled={busy} className="dh-btn dh-btn-sm shrink-0">
+            {t('common.retry', 'Tentar novamente')}
+          </button>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900 space-y-3">
+        <section className="dh-card p-4 flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold text-zinc-200">{t('summarizer.text')}</div>
-            <div className="text-xs text-zinc-500">{t('summarizer.sentencesCount').replace('{n}', String(sentenceCount))}</div>
+            <h2 className="dh-section-title">{t('summarizer.text')}</h2>
+            <div className="text-[11px] text-zinc-500 font-mono">{t('summarizer.sentencesCount').replace('{n}', String(sentenceCount))}</div>
           </div>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            className="w-full h-80 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-blue-500"
+            className="dh-input w-full h-80 py-2 resize-none leading-relaxed"
             placeholder={t('summarizer.textPlaceholder')}
           />
           <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-zinc-400 inline-flex items-center gap-2">
+            <div className="dh-label inline-flex items-center gap-2">
               {t('summarizer.size')}
               <HelpTip
                 title={t('help.summarizer.size.title')}
@@ -228,7 +237,7 @@ export default function TextSummarizer() {
                 buttonLabel={t('help.button')}
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <input
                 type="range"
                 min={3}
@@ -236,30 +245,38 @@ export default function TextSummarizer() {
                 value={sentences}
                 onChange={(e) => setSentences(Number(e.target.value))}
               />
-              <div className="text-xs text-zinc-300 w-10 text-right">{sentences}</div>
+              <div className="text-[12px] text-zinc-200 font-mono w-6 text-right">{sentences}</div>
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900 space-y-3">
+        <section className="dh-card p-4 flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold text-zinc-200">{t('summarizer.summary')}</div>
+            <h2 className="dh-section-title">{t('summarizer.summary')}</h2>
             <button
-              onClick={() => navigator.clipboard.writeText(summary)}
+              onClick={() => navigator.clipboard.writeText(summary).catch(() => {})}
               disabled={!summary.trim()}
-              className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+              className="dh-btn dh-btn-ghost dh-btn-sm"
             >
-              <Copy size={16} />
+              <Copy size={14} />
               <span>{t('summarizer.copy')}</span>
             </button>
           </div>
-          <textarea
-            value={summary}
-            readOnly
-            className="w-full h-80 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none"
-            placeholder={t('summarizer.summaryPlaceholder')}
-          />
-        </div>
+          {busy ? (
+            <div className="h-80 rounded-md border border-zinc-800 bg-zinc-950 p-3 space-y-2.5" aria-busy="true">
+              {[90, 74, 82, 58, 86, 66].map((w, i) => (
+                <div key={i} className="h-3 rounded bg-zinc-900 animate-pulse" style={{ width: `${w}%` }} />
+              ))}
+            </div>
+          ) : (
+            <textarea
+              value={summary}
+              readOnly
+              className="dh-input w-full h-80 py-2 resize-none leading-relaxed"
+              placeholder={t('summarizer.summaryPlaceholder')}
+            />
+          )}
+        </section>
       </div>
     </div>
   )

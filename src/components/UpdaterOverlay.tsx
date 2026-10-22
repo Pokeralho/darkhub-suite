@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
-  DownloadCloud, CheckCircle2, Loader2, AlertCircle, X, ShieldCheck,
-  Sparkles, ArrowRight, RefreshCw, Server, Zap, FileCode, Check
-} from 'lucide-react';
+  DownloadCloud, CheckCircle2, AlertCircle, X, ShieldCheck,
+  RefreshCw, FileCode, Check, ChevronDown, DarkHubMark, Power
+} from './icons';
 
 type UpdateStage = 'idle' | 'checking' | 'available' | 'downloading' | 'verifying' | 'downloaded' | 'error';
 
@@ -135,46 +135,33 @@ export default function UpdaterOverlay() {
   ];
 
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-md animate-fadeIn p-4">
-      <div className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden relative animate-scaleUp">
-        {}
-        <div className="h-1.5 bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600" />
-
-        {}
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/75 animate-in p-4" role="dialog" aria-modal="true" aria-labelledby="dh-updater-title">
+      <div className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl dh-raised overflow-hidden relative animate-in slide-in-from-bottom-2">
         {stage !== 'downloading' && stage !== 'verifying' && (
           <button
             onClick={() => setVisible(false)}
-            className="absolute top-4 right-4 text-zinc-500 hover:text-zinc-200 transition-colors p-1 hover:bg-zinc-900 rounded-lg"
+            aria-label="Fechar"
+            className="absolute top-3 right-3 dh-btn dh-btn-ghost dh-btn-sm w-7 px-0 justify-center"
           >
-            <X size={16} />
+            <X size={14} />
           </button>
         )}
 
-        <div className="p-6 sm:p-7 space-y-6">
-          {}
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-              {stage === 'downloaded' ? (
-                <CheckCircle2 size={26} className="text-emerald-400" />
-              ) : stage === 'verifying' ? (
-                <ShieldCheck size={26} className="text-indigo-400 animate-pulse" />
-              ) : stage === 'downloading' ? (
-                <DownloadCloud size={26} className="text-blue-400 animate-bounce" />
-              ) : stage === 'error' ? (
-                <AlertCircle size={26} className="text-rose-400" />
-              ) : (
-                <Sparkles size={26} />
-              )}
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-[10px] font-bold rounded uppercase tracking-wider">
-                  Nova Versão Oficial
-                </span>
-                <span className="text-xs font-mono text-zinc-400">v{updateInfo.version}</span>
-              </div>
-              <h2 className="text-base font-bold text-white tracking-tight mt-0.5">
+        <div className="p-6 space-y-5">
+          <div className="flex items-start gap-3 pr-8">
+            {stage === 'downloaded' ? (
+              <CheckCircle2 size={20} className="text-emerald-400 shrink-0 mt-0.5" />
+            ) : stage === 'verifying' ? (
+              <ShieldCheck size={20} className="text-zinc-400 shrink-0 mt-0.5" />
+            ) : stage === 'downloading' ? (
+              <DownloadCloud size={20} className="text-zinc-400 shrink-0 mt-0.5" />
+            ) : stage === 'error' ? (
+              <AlertCircle size={20} className="text-red-400 shrink-0 mt-0.5" />
+            ) : (
+              <DarkHubMark size={20} className="text-zinc-100 shrink-0 mt-0.5" />
+            )}
+            <div className="min-w-0">
+              <h2 id="dh-updater-title" className="text-[15px] font-semibold text-zinc-50 tracking-[-0.01em]">
                 {stage === 'downloaded'
                   ? 'Atualização Pronta para Instalar!'
                   : stage === 'verifying'
@@ -183,125 +170,104 @@ export default function UpdaterOverlay() {
                   ? 'Baixando Pacote Oficial...'
                   : 'Atualização do DarkHub Disponível'}
               </h2>
+              <p className="mt-0.5 text-[12px] text-zinc-500">
+                Nova Versão Oficial <span className="font-mono text-zinc-300">v{updateInfo.version}</span>
+              </p>
             </div>
           </div>
 
-          {}
-          <div className="p-4 bg-zinc-900/90 border border-zinc-850 rounded-xl space-y-3">
-            <div className="grid grid-cols-4 gap-2 relative">
-              {steps.map((s, idx) => {
-                const isCompleted = activeStep > idx;
-                const isCurrent = activeStep === idx;
-                return (
-                  <div key={idx} className="flex flex-col items-center text-center relative z-10">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                      isCompleted
-                        ? 'bg-emerald-500 text-zinc-950 shadow-sm'
-                        : isCurrent
-                        ? 'bg-blue-600 text-white ring-4 ring-blue-600/20 animate-pulse'
-                        : 'bg-zinc-800 text-zinc-500'
-                    }`}>
-                      {isCompleted ? <Check size={14} /> : idx + 1}
-                    </div>
-                    <span className={`text-[11px] font-semibold mt-1.5 ${
-                      isCurrent ? 'text-white' : isCompleted ? 'text-emerald-400' : 'text-zinc-500'
-                    }`}>
-                      {s.title}
-                    </span>
-                    <span className="text-[10px] text-zinc-500 font-mono">{s.desc}</span>
+          <ol className="grid grid-cols-4 border-y border-zinc-800/80 divide-x divide-zinc-800/80">
+            {steps.map((s, idx) => {
+              const isCompleted = activeStep > idx;
+              const isCurrent = activeStep === idx;
+              return (
+                <li key={idx} className="px-3 py-2.5 min-w-0" aria-current={isCurrent ? 'step' : undefined}>
+                  <div className={`flex items-center gap-1.5 text-[12px] font-medium ${isCurrent ? 'text-zinc-100' : isCompleted ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                    {isCompleted ? <Check size={12} className="text-emerald-400 shrink-0" /> : (
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isCurrent ? 'bg-blue-400' : 'bg-zinc-700'}`} aria-hidden />
+                    )}
+                    <span className="truncate">{s.title}</span>
                   </div>
-                );
-              })}
-            </div>
+                  <div className="mt-0.5 text-[11px] text-zinc-500 font-mono truncate">{s.desc}</div>
+                </li>
+              );
+            })}
+          </ol>
 
-            {}
-            {(stage === 'downloading' || stage === 'verifying') && (
-              <div className="space-y-1.5 pt-2 border-t border-zinc-800">
-                <div className="flex justify-between text-xs font-mono">
-                  <span className="text-zinc-400">{sizes || 'Baixando pacotes...'}</span>
-                  <span className="text-blue-400 font-bold">{progress}% {speed && `(${speed})`}</span>
-                </div>
-                <div className="w-full h-2 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-300 rounded-full"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
+          {(stage === 'downloading' || stage === 'verifying') && (
+            <div className="space-y-1.5">
+              <div className="flex justify-between gap-3 text-[11.5px] font-mono">
+                <span className="text-zinc-500 truncate">{sizes || 'Baixando pacotes...'}</span>
+                <span className="text-zinc-300 shrink-0">{progress}%{speed ? <span className="text-zinc-500"> · {speed}</span> : null}</span>
               </div>
-            )}
-          </div>
+              <div
+                className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(progress)}
+              >
+                <div className="h-full bg-blue-400 transition-[width] duration-200 ease-out rounded-full" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+          )}
 
-          {}
           {updateInfo.releaseNotes && (
-            <div className="border border-zinc-850 bg-zinc-900/60 rounded-xl overflow-hidden text-xs">
+            <div className="text-[12.5px]">
               <button
                 type="button"
                 onClick={() => setShowChangelog(!showChangelog)}
-                className="w-full p-3 flex items-center justify-between text-zinc-300 font-semibold hover:text-white transition-colors"
+                aria-expanded={showChangelog}
+                className="w-full flex items-center justify-between gap-2 text-zinc-300 hover:text-zinc-50 transition-colors"
               >
-                <span className="flex items-center gap-1.5">
-                  <FileCode size={13} className="text-blue-400" />
+                <span className="flex items-center gap-1.5 font-medium">
+                  <FileCode size={14} className="text-zinc-500" />
                   Novidades e Notas da Versão
                 </span>
-                <span className="text-[10px] text-zinc-500 underline">{showChangelog ? 'Ocultar' : 'Ver Detalhes'}</span>
+                <span className="inline-flex items-center gap-1 text-[12px] text-zinc-500">
+                  {showChangelog ? 'Ocultar' : 'Ver Detalhes'}
+                  <ChevronDown size={14} className={`transition-transform duration-150 ease-out ${showChangelog ? 'rotate-180' : ''}`} />
+                </span>
               </button>
 
               {showChangelog && (
-                <div className="p-3 pt-0 text-zinc-400 text-xs font-mono max-h-36 overflow-y-auto custom-scrollbar whitespace-pre-line border-t border-zinc-850">
+                <div className="mt-2 px-3 py-2.5 rounded-md bg-zinc-900 border border-zinc-800/80 text-zinc-400 text-[11.5px] leading-relaxed font-mono max-h-36 overflow-y-auto custom-scrollbar whitespace-pre-line animate-in">
                   {updateInfo.releaseNotes}
                 </div>
               )}
             </div>
           )}
 
-          {}
           {errorMsg && (
-            <div className="p-3 bg-rose-950/30 border border-rose-500/30 rounded-xl flex items-center gap-2 text-rose-300 text-xs font-medium">
-              <AlertCircle size={15} className="shrink-0" />
-              <span>{errorMsg}</span>
+            <div role="alert" className="flex items-start gap-2 border-l-2 border-red-400 pl-3 py-1 text-red-300 text-[12.5px]">
+              <AlertCircle size={14} className="shrink-0 mt-0.5" />
+              <span className="min-w-0 break-words">{errorMsg}</span>
             </div>
           )}
 
-          {}
-          <div className="flex items-center justify-end gap-3 pt-1">
+          <div className="flex items-center justify-end gap-2">
             {stage === 'available' && (
               <>
-                <button
-                  type="button"
-                  onClick={() => setVisible(false)}
-                  className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-semibold rounded-xl transition-colors"
-                >
+                <button type="button" onClick={() => setVisible(false)} className="dh-btn dh-btn-ghost">
                   Lembrar Mais Tarde
                 </button>
-                <button
-                  type="button"
-                  onClick={handleStartDownload}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center gap-2 transition-all shadow-md shadow-blue-600/20"
-                >
-                  <DownloadCloud size={15} />
+                <button type="button" onClick={handleStartDownload} className="dh-btn dh-btn-primary">
+                  <DownloadCloud size={14} />
                   Baixar e Atualizar Agora
                 </button>
               </>
             )}
 
             {stage === 'downloaded' && (
-              <button
-                type="button"
-                onClick={handleApplyInstall}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-600/25 animate-pulse"
-              >
-                <Zap size={16} />
+              <button type="button" onClick={handleApplyInstall} className="dh-btn dh-btn-primary w-full justify-center">
+                <Power size={14} />
                 Reiniciar e Aplicar Atualização
               </button>
             )}
 
             {stage === 'error' && (
-              <button
-                type="button"
-                onClick={handleStartDownload}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center gap-2 transition-all"
-              >
-                <RefreshCw size={13} />
+              <button type="button" onClick={handleStartDownload} className="dh-btn">
+                <RefreshCw size={14} />
                 Tentar Novamente
               </button>
             )}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useI18n } from '../i18n/I18nProvider';
+import { DarkOSConfirmDialog } from '../components/darkos/DarkOSConfirmDialog';
 import {
   Sparkles,
   FolderOpen,
@@ -23,8 +24,12 @@ import {
   ChevronDown,
   ChevronUp,
   Search,
-  Gamepad2
-} from 'lucide-react';
+  Gamepad2,
+  X,
+  Loader2,
+  ChevronRight
+} from '../components/icons';
+import PageHeader from '../components/ui/PageHeader';
 
 interface SteamGame {
   appId: string;
@@ -133,6 +138,7 @@ export default function Dlss5Manager() {
   // Action / State
   const [isApplying, setIsApplying] = useState<boolean>(false);
   const [isReverting, setIsReverting] = useState<boolean>(false);
+  const [confirmApplyOpen, setConfirmApplyOpen] = useState<boolean>(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
   // Logs & History
@@ -149,9 +155,10 @@ export default function Dlss5Manager() {
     g.name.toLowerCase().includes(steamSearchQuery.toLowerCase())
   );
 
-  // Auto-scroll logs terminal
+  // Auto-scroll only the log console itself (scrollIntoView would drag the whole page down to it on every line).
   useEffect(() => {
-    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const box = terminalEndRef.current?.parentElement;
+    if (box && logs.length) box.scrollTop = box.scrollHeight;
   }, [logs]);
 
   const refreshSteamGames = async () => {
@@ -330,8 +337,7 @@ export default function Dlss5Manager() {
     e.preventDefault();
     e.stopPropagation();
     setDragOver(false);
-    const files = Array.from(e.dataTransfer.files ?? []);
-    const firstPath = (files[0] as any)?.path;
+    const firstPath = window.darkhub?.dialog?.pathsForDroppedFiles?.(e.dataTransfer.files)?.[0];
     if (firstPath) {
       setTargetPath(firstPath);
       await handleScanGame(firstPath);
@@ -430,152 +436,126 @@ export default function Dlss5Manager() {
     }
   };
 
-  // Badge Color Helper for Graphics API
-  const getApiBadgeClass = (primaryApi?: string) => {
-    switch (primaryApi) {
-      case 'dx12_agility':
-        return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50';
-      case 'dx12':
-        return 'bg-blue-500/20 text-blue-300 border-blue-500/50';
-      case 'vulkan':
-        return 'bg-purple-500/20 text-purple-300 border-purple-500/50';
-      case 'opengl':
-        return 'bg-amber-500/20 text-amber-300 border-amber-500/50';
-      case 'dx9':
-        return 'bg-zinc-700/40 text-zinc-300 border-zinc-600';
-      default:
-        return 'bg-indigo-500/20 text-indigo-300 border-indigo-500/50';
+  const profileOptions: Array<{ id: 'nvidia' | 'amd' | 'intel'; label: string }> = [
+    { id: 'nvidia', label: t('dlss5.profileNvidia', 'NVIDIA (Nativo / Estável)') },
+    { id: 'amd', label: t('dlss5.profileAmd', 'AMD Radeon (Experimental / FSR)') },
+    { id: 'intel', label: t('dlss5.profileIntel', 'Intel Arc') }
+  ];
+
+  const amdEngines: Array<{ id: 'neural' | 'zluda' | 'fsr'; title: string; tag: string; desc: string; traits?: string[]; wide?: boolean }> = [
+    {
+      id: 'neural',
+      title: t('dlss5.amdEngineNeural', 'AMD Neural (AMD-NR / OptiScaler)'),
+      tag: 'dx12',
+      desc: t('dlss5.amdEngineNeuralDesc', 'Reconstrução neural DLSS-NR rodando em GPUs AMD via OptiScaler. Exige jogo DirectX 12, driver AMD atual e ~2 GB de VRAM livre. Ajuste fino no jogo: tecla INSERT, aba Neural.'),
+      wide: true
+    },
+    {
+      id: 'zluda',
+      title: t('dlss5.amdEngineZluda', 'ZLUDA HIP Neural Engine (RDNA 3 / 4 WMMA)'),
+      tag: 'rx 7000 / 8000',
+      desc: t('dlss5.amdEngineZludaDesc', 'Tradução de redes neurais CUDA para ROCm/HIP com aceleração por matrizes WMMA FP16/FP8 (RX 7000 / 8000).'),
+      traits: ['Aceleração WMMA FP16/FP8', 'Cache AOT Anti-Stutter']
+    },
+    {
+      id: 'fsr',
+      title: t('dlss5.amdEngineFsr', 'FSR 3.1 / FidelityFX Fallback (RDNA 1 / 2)'),
+      tag: 'rx 5000 / 6000',
+      desc: t('dlss5.amdEngineFsrDesc', 'Modo de alta compatibilidade DirectCompute para placas AMD sem núcleos WMMA físicos (RX 5000, RX 6000, Vega, Polaris).'),
+      traits: ['Tradução DirectCompute', 'FSR 3.1 Frame Gen']
     }
-  };
+  ];
+
+  const busyAny = isApplying || isReverting || isScanning;
+
+  const toggleRow = (opts: { title: React.ReactNode; desc: React.ReactNode; tag?: string; checked: boolean; onChange: (v: boolean) => void }) => (
+    <label className="flex items-start justify-between gap-3 py-3 cursor-pointer">
+      <span className="min-w-0">
+        <span className="flex flex-wrap items-baseline gap-x-2 text-[12.5px] font-medium text-zinc-200">
+          {opts.title}
+          {opts.tag && <span className="dh-tag">{opts.tag}</span>}
+        </span>
+        <span className="block mt-0.5 text-[11.5px] text-zinc-500">{opts.desc}</span>
+      </span>
+      <input
+        type="checkbox"
+        checked={opts.checked}
+        onChange={(e) => opts.onChange(e.target.checked)}
+        className="mt-0.5 shrink-0"
+      />
+    </label>
+  );
 
   return (
-    <div className="flex-1 h-full overflow-y-auto bg-zinc-950 text-zinc-100 p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl text-blue-400">
-            <Sparkles size={28} />
-          </div>
+    <div className="w-full text-zinc-100">
+      <PageHeader
+        title={t('dlss5.title', 'DLSS 5 & Universal Neural Upscaler Manager')}
+        subtitle={<>
+          {t(
+            'dlss5.subtitle',
+            'Injeção e configuração autônoma de upscaling neural por IA (DLSS 5, FSR 3.1/4.0 e XeSS) com Frame Generation universal para NVIDIA e AMD.'
+          )}
+          <span className="dh-tag ml-2">experimental</span>
+        </>}
+      />
+
+      <div className="space-y-5">
+      {/* Experimental notice */}
+      <p className="flex items-start gap-2.5 text-[12px] leading-relaxed text-zinc-400 max-w-[90ch]">
+        <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-[2px]" />
+        <span>
+          <span className="font-medium text-amber-200">Módulo Experimental / Pesquisa de IA. </span>
+          O DLSS 5 & Universal Neural Upscaler é uma tecnologia em estágio experimental para interoperabilidade de modelos neurais e frame generation entre NVIDIA, AMD e Intel. O DarkHub realiza backup preventivo dos arquivos modificados, permitindo reversão a qualquer momento.
+        </span>
+      </p>
+
+      {/* GPU + profile */}
+      <section className="dh-card grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] divide-y lg:divide-y-0 lg:divide-x divide-zinc-800/80">
+        <dl className="p-4 min-w-0">
+          <dt className="text-[11.5px] text-zinc-500">{t('dlss5.gpuCardTitle', 'Hardware Gráfico')}</dt>
+          <dd className="mt-1 text-[13px] font-medium text-zinc-100 truncate" title={gpu.model}>{gpu.model}</dd>
+          <dd className="mt-0.5 text-[11.5px] text-zinc-500 flex flex-wrap items-center gap-x-3">
+            <span>{t('dlss5.gpuVendor', 'Fabricante')}: <span className="font-mono text-zinc-300">{gpu.vendor}</span></span>
+            {gpu.driverVersion && (
+              <span>Driver: <span className="font-mono text-zinc-300">{gpu.driverVersion}</span></span>
+            )}
+          </dd>
+        </dl>
+        <div className="p-4 flex flex-col gap-2.5">
           <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
-                {t('dlss5.title', 'DLSS 5 & Universal Neural Upscaler Manager')}
-              </h1>
-              <span className="px-2.5 py-0.5 text-[10px] font-bold tracking-wider uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full flex items-center gap-1">
-                <AlertTriangle size={12} className="text-amber-400" />
-                <span>EXPERIMENTAL / BETA</span>
-              </span>
-              <span className="px-2 py-0.5 text-[10px] font-semibold tracking-wider uppercase bg-blue-500/20 text-blue-300 border border-blue-500/40 rounded-full">
-                {t('dlss5.badgeAi', 'AI Neural Reconstruction')}
-              </span>
-            </div>
-            <p className="text-sm text-zinc-400 mt-1 max-w-2xl">
-              {t(
-                'dlss5.subtitle',
-                'Injeção e configuração autônoma de upscaling neural por IA (DLSS 5, FSR 3.1/4.0 e XeSS) com Frame Generation universal para NVIDIA e AMD.'
-              )}
-            </p>
+            <div className="text-[11.5px] text-zinc-500">{t('dlss5.gpuProfile', 'Perfil de Otimização')}</div>
+            <div className="text-[11.5px] text-zinc-600 mt-0.5">Ajusta automaticamente hooks de memória, spoofing de vendor e Frame Generation.</div>
+          </div>
+          <div role="radiogroup" aria-label={t('dlss5.gpuProfile', 'Perfil de Otimização')} className="inline-flex self-start rounded-md border border-zinc-800 overflow-hidden divide-x divide-zinc-800">
+            {profileOptions.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                role="radio"
+                aria-checked={selectedProfile === p.id}
+                onClick={() => handleProfileChange(p.id)}
+                className={`h-8 px-3 text-[12px] font-medium transition-colors duration-150 ${
+                  selectedProfile === p.id ? 'bg-zinc-100 text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Experimental Disclaimer Alert */}
-      <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3.5">
-        <div className="p-2 bg-amber-500/20 rounded-lg text-amber-400 shrink-0 mt-0.5">
-          <AlertTriangle size={18} />
-        </div>
-        <div className="text-xs space-y-1">
-          <h4 className="font-bold text-amber-200">
-            Módulo Experimental / Pesquisa de IA
-          </h4>
-          <p className="text-amber-200/80 leading-relaxed">
-            O DLSS 5 & Universal Neural Upscaler é uma tecnologia em estágio <strong>experimental</strong> para interoperabilidade de modelos neurais e frame generation entre NVIDIA, AMD e Intel. O DarkHub realiza backup preventivo dos arquivos modificados, permitindo reversão a qualquer momento.
-          </p>
-        </div>
-      </div>
-
-      {/* GPU Hardware Detection & Profile Banner */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Hardware Status */}
-        <div className="bg-zinc-900/70 border border-zinc-800/80 rounded-xl p-4 flex items-center gap-4">
-          <div className="p-3 bg-zinc-800 border border-zinc-700/60 rounded-xl text-zinc-300">
-            <Monitor size={24} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs text-zinc-400 font-medium">{t('dlss5.gpuCardTitle', 'Hardware Gráfico')}</div>
-            <div className="text-sm font-semibold text-zinc-100 truncate" title={gpu.model}>
-              {gpu.model}
-            </div>
-            <div className="text-xs text-zinc-400 flex items-center gap-2 mt-0.5">
-              <span>{t('dlss5.gpuVendor', 'Fabricante')}: <strong className="text-zinc-200 uppercase">{gpu.vendor}</strong></span>
-              {gpu.driverVersion && (
-                <span>• Driver: <span className="font-mono text-zinc-300">{gpu.driverVersion}</span></span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Profile Selector */}
-        <div className="lg:col-span-2 bg-zinc-900/70 border border-zinc-800/80 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="text-xs text-zinc-400 font-medium">{t('dlss5.gpuProfile', 'Perfil de Otimização')}</div>
-            <div className="text-xs text-zinc-400 mt-0.5">
-              Ajusta automaticamente hooks de memória, spoofing de vendor e Frame Generation.
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 bg-zinc-950 p-1 rounded-lg border border-zinc-800">
-            <button
-              onClick={() => handleProfileChange('nvidia')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                selectedProfile === 'nvidia'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              {t('dlss5.profileNvidia', 'NVIDIA (Nativo / Estável)')}
-            </button>
-            <button
-              onClick={() => handleProfileChange('amd')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                selectedProfile === 'amd'
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              {t('dlss5.profileAmd', 'AMD Radeon (Experimental / FSR)')}
-            </button>
-            <button
-              onClick={() => handleProfileChange('intel')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                selectedProfile === 'intel'
-                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/50 shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              {t('dlss5.profileIntel', 'Intel Arc')}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* AMD Architecture & ZLUDA HIP Neural Engine Panel */}
+      {/* AMD engine panel */}
       {selectedProfile === 'amd' && (
-        <div className="space-y-4">
-          {/* Warning & Overview */}
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3.5">
-            <div className="p-2 bg-amber-500/20 rounded-lg text-amber-400 shrink-0 mt-0.5">
-              <AlertTriangle size={20} />
-            </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm font-semibold text-amber-300">
-                  {t('dlss5.amdWarningTitle', 'Aviso de Instabilidade - Placas AMD')}
-                </h4>
-                <span className="px-2 py-0.5 text-[10px] font-bold uppercase bg-amber-500/30 text-amber-200 rounded">
-                  Dual-Tier AMD
-                </span>
-              </div>
-              <p className="text-xs text-amber-200/80 leading-relaxed">
+        <section className="dh-card p-5 space-y-4 animate-in">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-[3px]" />
+            <div className="min-w-0">
+              <h2 className="dh-section-title">
+                {t('dlss5.amdWarningTitle', 'Aviso de Instabilidade - Placas AMD')}
+                <span className="dh-tag ml-2 font-normal">dual-tier amd</span>
+              </h2>
+              <p className="dh-help mt-0.5 max-w-[90ch]">
                 {t(
                   'dlss5.amdWarningDesc',
                   'GPUs AMD não contam com Tensor Cores físicos para execução de modelos proprietários da NVIDIA. O DarkHub utiliza a ponte OptiScaler com tradução DirectCompute e FSR 3.1/4.0 Frame Generation. Em alguns jogos podem ocorrer cintilação (flicker) no HUD ou artefatos visuais menores.'
@@ -584,166 +564,81 @@ export default function Dlss5Manager() {
             </div>
           </div>
 
-          {/* Engine Selector Card */}
-          <div className="bg-zinc-900/70 border border-zinc-800/80 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-xs font-semibold text-zinc-200">
-                  {t('dlss5.amdEngineLabel', 'Motor de Execução AMD')}
-                </span>
-                <p className="text-[11px] text-zinc-400">
-                  {t('dlss5.amdEngineHelp', 'Escolha entre AMD Neural (AMD-NR), ZLUDA (RDNA 3/4) ou o modo de compatibilidade FSR (RDNA 1/2).')}
-                </p>
-              </div>
+          <div className="pt-4 border-t border-zinc-800/80">
+            <h3 className="text-[12.5px] font-medium text-zinc-200">{t('dlss5.amdEngineLabel', 'Motor de Execução AMD')}</h3>
+            <p className="dh-help">{t('dlss5.amdEngineHelp', 'Escolha entre AMD Neural (AMD-NR), ZLUDA (RDNA 3/4) ou o modo de compatibilidade FSR (RDNA 1/2).')}</p>
+
+            <div role="radiogroup" aria-label={t('dlss5.amdEngineLabel', 'Motor de Execução AMD')} className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+              {amdEngines.map((eng) => {
+                const active = amdEngine === eng.id;
+                return (
+                  <div
+                    key={eng.id}
+                    role="radio"
+                    aria-checked={active}
+                    tabIndex={0}
+                    onClick={() => setAmdEngine(eng.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAmdEngine(eng.id); } }}
+                    className={`rounded-lg border p-3.5 cursor-pointer outline-none focus-visible:border-blue-400 transition-colors duration-150 ${eng.wide ? 'md:col-span-2' : ''} ${
+                      active ? 'border-blue-300/70 bg-blue-500/[0.05]' : 'border-zinc-800 hover:border-zinc-700'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="flex items-center gap-2 text-[12.5px] font-medium text-zinc-100">
+                        <span className={`w-3.5 h-3.5 rounded-full border shrink-0 flex items-center justify-center ${active ? 'border-blue-300' : 'border-zinc-600'}`}>
+                          {active && <span className="w-1.5 h-1.5 rounded-full bg-blue-300" />}
+                        </span>
+                        {eng.title}
+                      </span>
+                      <span className="dh-tag shrink-0">{eng.tag}</span>
+                    </div>
+                    <p className="mt-1.5 pl-[22px] text-[11.5px] leading-relaxed text-zinc-400">{eng.desc}</p>
+                    {eng.traits && (
+                      <p className="mt-2 pl-[22px] text-[11px] text-zinc-500">{eng.traits.join(' · ')}</p>
+                    )}
+                    {eng.id === 'neural' && active && (
+                      <div className="mt-3 ml-[22px] pt-3 border-t border-zinc-800/80 space-y-2" onClick={(e) => e.stopPropagation()}>
+                        <label className="flex items-center justify-between gap-3 text-[12px] text-zinc-300">
+                          <span>{t('dlss5.neuralPasses', 'Passes neurais implantados')}</span>
+                          <select
+                            value={neuralPasses}
+                            onChange={(e) => setNeuralPasses(Number(e.target.value) as 1 | 2 | 3)}
+                            className="dh-input h-7 font-mono w-20"
+                          >
+                            <option value={1}>1</option>
+                            <option value={2}>2</option>
+                            <option value={3}>3</option>
+                          </select>
+                        </label>
+                        <p className="text-[11px] text-zinc-500">
+                          {t('dlss5.amdNrPackageHint', 'O pacote AMD-NR (github.com/3zwr1/AMD-NR---OptiScaler) deve ser extraído em %APPDATA%/DarkHub Suite/OptiScaler/AMD_NR antes de aplicar.')}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* AMD-NR Neural Option */}
-              <div
-                onClick={() => setAmdEngine('neural')}
-                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-2 md:col-span-2 ${
-                  amdEngine === 'neural'
-                    ? 'bg-emerald-500/10 border-emerald-500/60 shadow-sm'
-                    : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-zinc-100 flex items-center gap-1.5">
-                      <Zap size={14} className={amdEngine === 'neural' ? 'text-emerald-400' : 'text-zinc-500'} />
-                      {t('dlss5.amdEngineNeural', 'AMD Neural (AMD-NR / OptiScaler)')}
-                    </span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">
-                      DX12
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-zinc-400 mt-1.5 leading-relaxed">
-                    {t('dlss5.amdEngineNeuralDesc', 'Reconstrução neural DLSS-NR rodando em GPUs AMD via OptiScaler. Exige jogo DirectX 12, driver AMD atual e ~2 GB de VRAM livre. Ajuste fino no jogo: tecla INSERT, aba Neural.')}
-                  </p>
-                </div>
-                {amdEngine === 'neural' && (
-                  <div className="space-y-2 pt-2 border-t border-zinc-800/60" onClick={(e) => e.stopPropagation()}>
-                    <label className="flex items-center justify-between text-[11px] text-zinc-300">
-                      <span>{t('dlss5.neuralPasses', 'Passes neurais implantados')}</span>
-                      <select
-                        value={neuralPasses}
-                        onChange={(e) => setNeuralPasses(Number(e.target.value) as 1 | 2 | 3)}
-                        className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200"
-                      >
-                        <option value={1}>1</option>
-                        <option value={2}>2</option>
-                        <option value={3}>3</option>
-                      </select>
-                    </label>
-                    <p className="text-[10px] text-zinc-500">
-                      {t('dlss5.amdNrPackageHint', 'O pacote AMD-NR (github.com/3zwr1/AMD-NR---OptiScaler) deve ser extraído em %APPDATA%/DarkHub Suite/OptiScaler/AMD_NR antes de aplicar.')}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* ZLUDA HIP Option */}
-              <div
-                onClick={() => setAmdEngine('zluda')}
-                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-2 ${
-                  amdEngine === 'zluda'
-                    ? 'bg-amber-500/10 border-amber-500/60 shadow-sm'
-                    : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-zinc-100 flex items-center gap-1.5">
-                      <Zap size={14} className={amdEngine === 'zluda' ? 'text-amber-400' : 'text-zinc-500'} />
-                      {t('dlss5.amdEngineZluda', 'ZLUDA HIP Neural Engine (RDNA 3 / 4 WMMA)')}
-                    </span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono">
-                      RX 7000 / 8000
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-zinc-400 mt-1.5 leading-relaxed">
-                    {t(
-                      'dlss5.amdEngineZludaDesc',
-                      'Tradução de redes neurais CUDA para ROCm/HIP com aceleração por matrizes WMMA FP16/FP8 (RX 7000 / 8000).'
-                    )}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 pt-1 border-t border-zinc-800/60 text-[10px] text-amber-400/90 font-medium">
-                  <span>• Aceleração WMMA FP16/FP8</span>
-                  <span>• Cache AOT Anti-Stutter</span>
-                </div>
-              </div>
-
-              {/* FSR Fallback Option */}
-              <div
-                onClick={() => setAmdEngine('fsr')}
-                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-2 ${
-                  amdEngine === 'fsr'
-                    ? 'bg-blue-500/10 border-blue-500/60 shadow-sm'
-                    : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-zinc-100 flex items-center gap-1.5">
-                      <Sliders size={14} className={amdEngine === 'fsr' ? 'text-blue-400' : 'text-zinc-500'} />
-                      {t('dlss5.amdEngineFsr', 'FSR 3.1 / FidelityFX Fallback (RDNA 1 / 2)')}
-                    </span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase bg-zinc-800 text-zinc-400 border border-zinc-700 font-mono">
-                      RX 5000 / 6000
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-zinc-400 mt-1.5 leading-relaxed">
-                    {t(
-                      'dlss5.amdEngineFsrDesc',
-                      'Modo de alta compatibilidade DirectCompute para placas AMD sem núcleos WMMA físicos (RX 5000, RX 6000, Vega, Polaris).'
-                    )}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 pt-1 border-t border-zinc-800/60 text-[10px] text-zinc-400 font-medium">
-                  <span>• Tradução DirectCompute</span>
-                  <span>• FSR 3.1 Frame Gen</span>
-                </div>
-              </div>
-            </div>
-
-            {/* ZLUDA Options & AMD HIP SDK Info */}
             {amdEngine === 'zluda' && (
-              <div className="space-y-3 pt-2">
-                {/* AOT Cache Toggle */}
-                <div className="bg-zinc-950/60 p-3 rounded-lg border border-zinc-800/80 flex items-center justify-between">
-                  <div className="pr-3">
-                    <div className="text-xs font-medium text-zinc-200 flex items-center gap-1.5">
-                      <span>{t('dlss5.zludaCache', 'Cache de Tradução AOT (Anti-Stutter)')}</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">RedDukeDev</span>
-                    </div>
-                    <div className="text-[10px] text-zinc-500 mt-0.5">
-                      {t('dlss5.zludaCacheDesc', 'Precompila módulos neurais do container DLSS para eliminar micro-travamentos (stutter) em tempo de execução.')}
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={zludaCache}
-                    onChange={(e) => setZludaCache(e.target.checked)}
-                    className="w-4 h-4 rounded text-amber-500 bg-zinc-900 border-zinc-700 focus:ring-0 cursor-pointer"
-                  />
-                </div>
-
-                {/* AMD HIP SDK Notice & External Link */}
-                <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                  <div className="space-y-0.5">
-                    <div className="font-semibold text-zinc-200">
-                      {t('dlss5.amdHipSdkTitle', 'Aceleração de IA AMD ROCm / HIP SDK')}
-                    </div>
-                    <div className="text-[11px] text-zinc-400">
-                      {t('dlss5.amdHipSdkDesc', 'Para máxima eficiência neural em placas RX 7000 e 8000, o runtime AMD HIP SDK fornece bibliotecas otimizadas de execução de tensores para Windows.')}
-                    </div>
+              <div className="mt-3 divide-y divide-zinc-800/80 border-y border-zinc-800/80 animate-in">
+                {toggleRow({
+                  title: t('dlss5.zludaCache', 'Cache de Tradução AOT (Anti-Stutter)'),
+                  tag: 'RedDukeDev',
+                  desc: t('dlss5.zludaCacheDesc', 'Precompila módulos neurais do container DLSS para eliminar micro-travamentos (stutter) em tempo de execução.'),
+                  checked: zludaCache,
+                  onChange: setZludaCache
+                })}
+                <div className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[12.5px] font-medium text-zinc-200">{t('dlss5.amdHipSdkTitle', 'Aceleração de IA AMD ROCm / HIP SDK')}</div>
+                    <div className="text-[11.5px] text-zinc-500">{t('dlss5.amdHipSdkDesc', 'Para máxima eficiência neural em placas RX 7000 e 8000, o runtime AMD HIP SDK fornece bibliotecas otimizadas de execução de tensores para Windows.')}</div>
                   </div>
                   <a
                     href="https://www.amd.com/en/developer/resources/rocm-hub/hip-sdk.html"
                     target="_blank"
                     rel="noreferrer"
-                    className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 self-start sm:self-auto"
+                    className="dh-btn dh-btn-sm shrink-0 self-start sm:self-auto"
                   >
                     <ExternalLink size={13} />
                     <span>{t('dlss5.amdHipSdkLink', 'Baixar AMD HIP SDK Oficial')}</span>
@@ -752,88 +647,90 @@ export default function Dlss5Manager() {
               </div>
             )}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Steam Library Integration Card */}
-      <div className="bg-zinc-900/70 border border-zinc-800/80 rounded-xl p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-400">
-              <Gamepad2 size={20} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-semibold text-zinc-100">
-                  {t('dlss5.steamLibrary', 'Jogos Instalados na Steam')}
-                </h3>
-                {steamGames.length > 0 && (
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                    {steamGames.length}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                {t(
-                  'dlss5.selectFromSteam',
-                  'Selecione um jogo instalado para escanear e injetar o DLSS 5 com 1 clique.'
-                )}
-              </p>
-            </div>
+      {/* Steam library */}
+      <section className="space-y-3" aria-labelledby="dlss5-steam">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+          <div>
+            <h2 id="dlss5-steam" className="dh-section-title">
+              {t('dlss5.steamLibrary', 'Jogos Instalados na Steam')}
+              {steamGames.length > 0 && <span className="ml-2 font-mono text-[11.5px] font-normal text-zinc-500">{steamGames.length}</span>}
+            </h2>
+            <p className="dh-help mt-0.5">
+              {t('dlss5.selectFromSteam', 'Selecione um jogo instalado para escanear e injetar o DLSS 5 com 1 clique.')}
+            </p>
           </div>
-
-          {/* Search & Refresh controls */}
           <div className="flex items-center gap-2 shrink-0">
             <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
               <input
                 type="text"
                 value={steamSearchQuery}
                 onChange={(e) => setSteamSearchQuery(e.target.value)}
                 placeholder={t('dlss5.filterGames', 'Buscar jogos instalados...')}
-                className="pl-8 pr-7 py-1.5 bg-zinc-950/70 border border-zinc-700/80 focus:border-blue-500 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 outline-none w-48 transition-colors"
+                aria-label={t('dlss5.filterGames', 'Buscar jogos instalados...')}
+                className="dh-input pl-8 pr-7 w-52"
               />
               {steamSearchQuery && (
                 <button
+                  type="button"
                   onClick={() => setSteamSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 text-xs"
+                  aria-label="Limpar"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-200"
                 >
-                  ✕
+                  <X size={13} />
                 </button>
               )}
             </div>
-
             <button
+              type="button"
               onClick={refreshSteamGames}
               disabled={isLoadingSteam}
               title={t('dlss5.refreshSteam', 'Atualizar Lista')}
-              className="p-1.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-300 rounded-lg border border-zinc-700 text-xs transition-colors flex items-center justify-center"
+              aria-label={t('dlss5.refreshSteam', 'Atualizar Lista')}
+              className="dh-btn px-2.5"
             >
-              <RotateCcw size={14} className={isLoadingSteam ? 'animate-spin text-blue-400' : ''} />
+              <RotateCcw size={14} className={isLoadingSteam ? 'animate-spin' : ''} />
             </button>
           </div>
         </div>
 
-        {/* Content area: loading, empty, or games grid */}
         {isLoadingSteam ? (
-          <div className="flex items-center justify-center py-8 text-zinc-400 text-xs gap-2 border border-dashed border-zinc-800 rounded-xl bg-zinc-950/40">
-            <RotateCcw size={16} className="animate-spin text-blue-400" />
-            <span>{t('dlss5.scanning', 'Analisando biblioteca da Steam...')}</span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3" aria-busy="true" aria-label={t('dlss5.scanning', 'Analisando biblioteca da Steam...')}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="rounded-lg border border-zinc-800/80 overflow-hidden">
+                <div className="h-24 bg-zinc-900 animate-pulse" />
+                <div className="p-2.5 space-y-1.5">
+                  <div className="h-3 w-3/4 rounded bg-zinc-900 animate-pulse" />
+                  <div className="h-2.5 w-1/3 rounded bg-zinc-900 animate-pulse" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : steamGames.length === 0 ? (
-          <div className="text-center py-6 border border-dashed border-zinc-800 rounded-xl bg-zinc-950/30 text-xs text-zinc-500 space-y-1">
-            <Gamepad2 size={24} className="mx-auto text-zinc-600 mb-1" />
-            <p>{t('dlss5.noSteamGames', 'Nenhum jogo da Steam detectado.')}</p>
-            <p className="text-[11px] text-zinc-600">
-              Você pode arrastar ou selecionar manualmente a pasta do jogo na seção abaixo.
+          <div className="py-8 rounded-xl border border-dashed border-zinc-800 flex flex-col items-center gap-3 text-center">
+            <p className="text-[12.5px] text-zinc-400">
+              {t('dlss5.noSteamGames', 'Nenhum jogo da Steam detectado.')}{' '}
+              <span className="text-zinc-500">Você pode arrastar ou selecionar manualmente a pasta do jogo na seção abaixo.</span>
             </p>
+            <button type="button" onClick={handleSelectFolder} disabled={busyAny} className="dh-btn dh-btn-sm">
+              <FolderOpen size={13} />
+              {t('dlss5.selectFolder', 'Selecionar Pasta do Jogo')}
+            </button>
           </div>
         ) : filteredSteamGames.length === 0 ? (
-          <div className="text-center py-6 border border-dashed border-zinc-800 rounded-xl bg-zinc-950/30 text-xs text-zinc-400">
-            Nenhum jogo encontrado com "{steamSearchQuery}".
+          <div className="py-8 rounded-xl border border-dashed border-zinc-800 flex flex-col items-center gap-3 text-center">
+            <p className="text-[12.5px] text-zinc-400">
+              Nenhum jogo encontrado com <span className="font-mono text-zinc-200">"{steamSearchQuery}"</span>.
+            </p>
+            <button type="button" onClick={() => setSteamSearchQuery('')} className="dh-btn dh-btn-sm">
+              {t('library.search.clear', 'Limpar busca')}
+            </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 max-h-[310px] overflow-y-auto pr-1">
+          <div role="listbox" aria-label={t('dlss5.steamLibrary', 'Jogos Instalados na Steam')} className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 max-h-[320px] overflow-y-auto pr-1">
             {filteredSteamGames.map((game) => {
               const isSelected =
                 (targetPath && targetPath.toLowerCase() === game.installDir.toLowerCase()) ||
@@ -843,56 +740,52 @@ export default function Dlss5Manager() {
               return (
                 <div
                   key={game.appId}
+                  role="option"
+                  aria-selected={Boolean(isSelected)}
+                  tabIndex={0}
                   onClick={() => handleScanGame(game.installDir)}
-                  className={`group relative flex flex-col justify-between rounded-xl overflow-hidden border transition-all cursor-pointer bg-zinc-950/50 hover:bg-zinc-800/60 ${
-                    isSelected
-                      ? 'border-blue-500 shadow-lg shadow-blue-500/10 ring-1 ring-blue-500'
-                      : 'border-zinc-800 hover:border-zinc-600'
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleScanGame(game.installDir); } }}
+                  className={`group relative flex flex-col rounded-lg overflow-hidden border cursor-pointer outline-none focus-visible:border-blue-400 transition-colors duration-150 ${
+                    isSelected ? 'border-blue-300 bg-zinc-900' : 'border-zinc-800/80 hover:border-zinc-600'
                   }`}
                 >
-                  {/* Thumbnail / Header */}
                   <div className="relative w-full h-24 bg-zinc-900 overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center text-zinc-700">
+                      <Gamepad2 size={20} />
+                    </div>
                     <img
                       src={game.headerUrl}
-                      alt={game.name}
+                      alt=""
                       loading="lazy"
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      decoding="async"
+                      className="relative w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
                       onError={(e) => {
                         (e.target as HTMLElement).style.display = 'none';
                       }}
                     />
-                    <div className="absolute inset-0 -z-0 flex items-center justify-center bg-zinc-900 text-zinc-700">
-                      <Gamepad2 size={32} />
-                    </div>
-
-                    {/* DLSS 5 Active Badge */}
-                    {game.isApplied && (
-                      <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-emerald-950/90 border border-emerald-500/50 text-[10px] font-semibold text-emerald-300 flex items-center gap-1 shadow-sm backdrop-blur-sm z-10">
-                        <CheckCircle2 size={10} className="text-emerald-400" />
-                        <span>{t('dlss5.dlss5Active', 'DLSS 5 Ativo')}</span>
-                      </div>
-                    )}
-
                     {isSelected && (
-                      <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-blue-600/90 border border-blue-400/50 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm z-10">
-                        Selecionado
-                      </div>
+                      <span className="absolute top-1.5 left-1.5 h-5 w-5 rounded-md bg-zinc-100 text-zinc-950 flex items-center justify-center" aria-hidden="true">
+                        <CheckCircle2 size={12} />
+                      </span>
                     )}
                   </div>
 
-                  {/* Title & Path Info */}
-                  <div className="p-2.5 flex flex-col justify-between flex-1">
-                    <span
-                      className="text-xs font-semibold text-zinc-200 line-clamp-1 group-hover:text-blue-400 transition-colors"
-                      title={game.name}
-                    >
+                  <div className="px-2.5 py-2 min-w-0">
+                    <span className="block text-[12px] font-medium text-zinc-200 truncate" title={game.name}>
                       {game.name}
                     </span>
-                    <div className="mt-1.5 flex items-center justify-between text-[10px] text-zinc-500">
-                      <span>AppID: {game.appId}</span>
-                      <span className="text-blue-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                        Configurar →
-                      </span>
+                    <div className="mt-0.5 flex items-center justify-between gap-2 font-mono text-[10.5px]">
+                      <span className="text-zinc-500">{game.appId}</span>
+                      {game.isApplied ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-300 shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          {t('dlss5.dlss5Active', 'DLSS 5 Ativo')}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 inline-flex items-center gap-0.5">
+                          Configurar <ChevronRight size={11} />
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -900,117 +793,88 @@ export default function Dlss5Manager() {
             })}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Game Selection Card (Drag & Drop + Autonomous Scan) */}
-      <div className="bg-zinc-900/70 border border-zinc-800/80 rounded-xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-semibold text-zinc-100">
-              {t('dlss5.gameSelectionTitle', 'Seleção Autônoma do Jogo')}
-            </h3>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              {t(
-                'dlss5.gameSelectionDesc',
-                'Selecione a pasta raiz do jogo ou o executável. O DarkHub Suite localiza automaticamente o executável real de 64 bits (ex: Binaries/Win64 no Unreal Engine) e prepara a injeção.'
-              )}
-            </p>
-          </div>
+      {/* Game selection / scan */}
+      <section className="dh-card p-5 space-y-4">
+        <div>
+          <h2 className="dh-section-title">{t('dlss5.gameSelectionTitle', 'Seleção Autônoma do Jogo')}</h2>
+          <p className="dh-help mt-0.5 max-w-[90ch]">
+            {t(
+              'dlss5.gameSelectionDesc',
+              'Selecione a pasta raiz do jogo ou o executável. O DarkHub Suite localiza automaticamente o executável real de 64 bits (ex: Binaries/Win64 no Unreal Engine) e prepara a injeção.'
+            )}
+          </p>
         </div>
 
-        {/* Drop zone / Buttons */}
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`border-2 border-dashed rounded-xl p-6 text-center transition-all ${
-            dragOver
-              ? 'border-blue-500 bg-blue-500/10'
-              : 'border-zinc-700/60 bg-zinc-950/40 hover:border-zinc-600'
+          className={`rounded-lg border border-dashed px-6 py-6 flex flex-col items-center text-center gap-3 transition-colors duration-150 ${
+            dragOver ? 'border-blue-300 bg-blue-500/[0.06]' : 'border-zinc-700 hover:border-zinc-600'
           }`}
         >
-          <div className="flex flex-col items-center justify-center gap-3">
-            <div className="p-3 bg-zinc-800 rounded-full text-blue-400">
-              <FolderOpen size={28} />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-zinc-200">
-                {targetPath ? (
-                  <span className="font-mono text-blue-400 break-all">{targetPath}</span>
-                ) : (
-                  t('dlss5.dragDropHint', 'Arraste e solte a pasta ou executável do jogo aqui')
-                )}
-              </p>
-              <p className="text-xs text-zinc-500 mt-1">
-                Suporta Steam, Epic Games, Xbox Game Pass, GOG e qualquer instalação local.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
-              <button
-                onClick={handleSelectFolder}
-                disabled={isScanning || isApplying}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 text-white"
-              >
-                <FolderOpen size={16} />
-                {t('dlss5.selectFolder', 'Selecionar Pasta do Jogo')}
-              </button>
-              <button
-                onClick={handleSelectExe}
-                disabled={isScanning || isApplying}
-                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 text-zinc-200"
-              >
-                <FileSearch size={16} />
-                {t('dlss5.selectExe', 'Selecionar Executável (.exe)')}
-              </button>
-            </div>
+          <FolderOpen size={20} className={dragOver ? 'text-blue-300' : 'text-zinc-500'} />
+          <div>
+            <p className="text-[12.5px] font-medium text-zinc-200">
+              {targetPath ? (
+                <span className="font-mono text-zinc-100 break-all">{targetPath}</span>
+              ) : (
+                t('dlss5.dragDropHint', 'Arraste e solte a pasta ou executável do jogo aqui')
+              )}
+            </p>
+            <p className="dh-help mt-1">Suporta Steam, Epic Games, Xbox Game Pass, GOG e qualquer instalação local.</p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button type="button" onClick={handleSelectFolder} disabled={isScanning || isApplying} className="dh-btn">
+              <FolderOpen size={14} />
+              {t('dlss5.selectFolder', 'Selecionar Pasta do Jogo')}
+            </button>
+            <button type="button" onClick={handleSelectExe} disabled={isScanning || isApplying} className="dh-btn">
+              <FileSearch size={14} />
+              {t('dlss5.selectExe', 'Selecionar Executável (.exe)')}
+            </button>
           </div>
         </div>
 
-        {/* Scanned Game Details Card */}
         {isScanning && (
-          <div className="p-4 bg-zinc-950/60 border border-zinc-800 rounded-xl flex items-center justify-center gap-3 text-zinc-400 text-xs">
-            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            <span>{t('dlss5.scanning', 'Analisando diretório do jogo...')}</span>
+          <div className="rounded-lg border border-zinc-800/80 p-4 space-y-3" aria-busy="true" aria-label={t('dlss5.scanning', 'Analisando diretório do jogo...')}>
+            <div className="h-3.5 w-48 rounded bg-zinc-900 animate-pulse" />
+            <div className="h-2.5 w-72 rounded bg-zinc-900 animate-pulse" />
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <div className="h-10 rounded-md bg-zinc-900 animate-pulse" />
+              <div className="h-10 rounded-md bg-zinc-900 animate-pulse" />
+            </div>
           </div>
         )}
 
         {scannedGame && !isScanning && (
-          <div className="bg-zinc-950/60 border border-zinc-800 rounded-xl p-4 space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3 flex-wrap gap-2">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400">
-                  <Play size={16} />
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-zinc-100">{scannedGame.gameName || 'Jogo Detectado'}</h4>
-                  <div className="text-xs text-zinc-400 flex items-center gap-2 flex-wrap">
-                    <span>{t('dlss5.engine', 'Motor')}: <strong className="text-zinc-300 uppercase">{scannedGame.engine || 'custom'}</strong></span>
-                    {scannedGame.graphicsApi?.bitness && (
-                      <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-[10px] text-zinc-300 font-mono font-bold border border-zinc-700">
-                        {scannedGame.graphicsApi.bitness}
-                      </span>
-                    )}
-                    {scannedGame.exePath && (
-                      <span>• {t('dlss5.executable', 'Executável')}: <code className="text-zinc-300 font-mono">{scannedGame.exePath.split(/[\\/]/).pop()}</code></span>
-                    )}
-                  </div>
+          <div className="rounded-lg border border-zinc-800/80 animate-in">
+            <div className="flex items-start justify-between flex-wrap gap-3 px-4 py-3 border-b border-zinc-800/80">
+              <div className="min-w-0">
+                <h3 className="text-[14px] font-semibold text-zinc-50">{scannedGame.gameName || 'Jogo Detectado'}</h3>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11.5px] text-zinc-500">
+                  <span>{t('dlss5.engine', 'Motor')}: <span className="font-mono text-zinc-300">{scannedGame.engine || 'custom'}</span></span>
+                  {scannedGame.graphicsApi?.bitness && <span className="font-mono text-zinc-300">{scannedGame.graphicsApi.bitness}</span>}
+                  {scannedGame.exePath && (
+                    <span>{t('dlss5.executable', 'Executável')}: <code className="font-mono text-zinc-300">{scannedGame.exePath.split(/[\\/]/).pop()}</code></span>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 {scannedGame.installed ? (
-                  <span className="px-2.5 py-1 text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full flex items-center gap-1.5">
-                    <CheckCircle2 size={13} />
+                  <span className="inline-flex items-center gap-1.5 text-[12px] text-emerald-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                     {t('dlss5.modActive', 'DLSS 5 / OptiScaler Ativo')}
                   </span>
                 ) : (
-                  <span className="px-2.5 py-1 text-xs font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700/60 rounded-full flex items-center gap-1.5">
-                    <Info size={13} />
-                    {t('dlss5.modInactive', 'Original (Sem Modificação)')}
-                  </span>
+                  <span className="text-[12px] text-zinc-500">{t('dlss5.modInactive', 'Original (Sem Modificação)')}</span>
                 )}
                 <button
+                  type="button"
                   onClick={() => handleOpenFolder(scannedGame.targetDir)}
-                  className="px-2.5 py-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/70 rounded-lg flex items-center gap-1.5 transition-colors"
+                  className="dh-btn dh-btn-sm"
                   title="Abrir pasta no Explorer"
                 >
                   <FolderOpen size={13} />
@@ -1019,110 +883,78 @@ export default function Dlss5Manager() {
               </div>
             </div>
 
-            {/* RTX Remix Safety Notice */}
-            {scannedGame.graphicsApi?.isRemix && (
-              <div className="bg-amber-950/40 border border-amber-500/40 rounded-xl p-3 flex items-start gap-3 text-amber-200 text-xs">
-                <AlertTriangle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <div className="font-semibold text-amber-300">{t('dlss5.remixWarningTitle', 'Runtime RTX Remix Detectado')}</div>
-                  <div className="text-[11px] text-amber-300/80 mt-0.5">
-                    {t('dlss5.remixWarningDesc', 'Identificado diretório .trex ou runtime RTX Remix. Injeção adaptada para rota dedicada Remix com proteção anti-crash e isolamento do ReShade.')}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Graphics API & Autopilot Route Card */}
-            {scannedGame.graphicsApi && (
-              <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3.5 space-y-2.5">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-zinc-300">{t('dlss5.apiDetected', 'API Gráfica Identificada')}:</span>
-                    <span className={`px-2.5 py-0.5 text-xs font-bold uppercase rounded-md border ${getApiBadgeClass(scannedGame.graphicsApi.primaryApi)}`}>
-                      {scannedGame.graphicsApi.apiName}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-zinc-400">
-                    Hook Recomendado: <strong className="text-blue-400 font-mono">{scannedGame.graphicsApi.recommendedLoader}</strong>
-                  </div>
-                </div>
-
-                <div className="text-[11px] text-zinc-400 leading-relaxed bg-zinc-950/40 p-2.5 rounded-lg border border-zinc-800/60">
-                  <p className="text-zinc-300">{scannedGame.graphicsApi.loaderReason}</p>
-                  <p className="text-zinc-500 mt-1">{scannedGame.graphicsApi.compatibilityNote}</p>
-                </div>
-
-                {/* Autopilot Route Banner */}
-                {scannedGame.routeInfo && (
-                  <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-zinc-800/60">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-zinc-300">{t('dlss5.routeAutoRecommended', 'Rota Recomendada (Autopilot)')}:</span>
-                      <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
-                        {scannedGame.routeInfo.routeBadge}
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-zinc-400">{scannedGame.routeInfo.routeDescription}</span>
-                  </div>
-                )}
-
-                {scannedGame.graphicsApi.importedDlls && scannedGame.graphicsApi.importedDlls.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-zinc-500 pt-1">
-                    <span>{t('dlss5.peImports', 'DLLs Importadas no Executável (PE)')}:</span>
-                    {scannedGame.graphicsApi.importedDlls.map((dll, i) => (
-                      <span key={i} className="px-1.5 py-0.5 rounded bg-zinc-950 font-mono text-zinc-400 border border-zinc-800">
-                        {dll}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-              <div className="bg-zinc-900/50 p-2.5 rounded-lg border border-zinc-800/60 space-y-1">
-                <span className="text-zinc-500">{t('dlss5.injectionDir', 'Diretório de Injeção')}</span>
-                <p className="font-mono text-zinc-300 break-all">{scannedGame.targetDir || targetPath}</p>
-              </div>
-              <div className="bg-zinc-900/50 p-2.5 rounded-lg border border-zinc-800/60 space-y-1">
-                <span className="text-zinc-500">{t('dlss5.existingDlss', 'DLSS Nativo no Jogo')}</span>
-                <p className="text-zinc-200 flex items-center gap-1.5">
-                  {scannedGame.dlssDetected ? (
-                    <span className="text-emerald-400 flex items-center gap-1">
-                      <CheckCircle2 size={13} /> {t('dlss5.existingDlssPresent', 'Presente (nvngx_dlss.dll detectado)')}
-                    </span>
-                  ) : (
-                    <span className="text-zinc-400">
-                      {t('dlss5.existingDlssNone', 'Não detectado (Injeção Universal)')}
-                    </span>
-                  )}
+            <div className="px-4 py-3 space-y-3">
+              {scannedGame.graphicsApi?.isRemix && (
+                <p className="flex items-start gap-2 text-[12px] text-zinc-300">
+                  <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-[1px]" />
+                  <span>
+                    <span className="font-medium text-amber-200">{t('dlss5.remixWarningTitle', 'Runtime RTX Remix Detectado')}. </span>
+                    <span className="text-zinc-400">{t('dlss5.remixWarningDesc', 'Identificado diretório .trex ou runtime RTX Remix. Injeção adaptada para rota dedicada Remix com proteção anti-crash e isolamento do ReShade.')}</span>
+                  </span>
                 </p>
-              </div>
+              )}
+
+              {scannedGame.graphicsApi && (
+                <div className="space-y-2">
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
+                    <div className="flex items-baseline justify-between gap-3 sm:block">
+                      <dt className="text-[11.5px] text-zinc-500">{t('dlss5.apiDetected', 'API Gráfica Identificada')}</dt>
+                      <dd className="font-mono text-zinc-100">{scannedGame.graphicsApi.apiName}</dd>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-3 sm:block">
+                      <dt className="text-[11.5px] text-zinc-500">Hook Recomendado</dt>
+                      <dd className="font-mono text-zinc-100">{scannedGame.graphicsApi.recommendedLoader}</dd>
+                    </div>
+                    {scannedGame.routeInfo && (
+                      <div className="sm:col-span-2">
+                        <dt className="text-[11.5px] text-zinc-500">{t('dlss5.routeAutoRecommended', 'Rota Recomendada (Autopilot)')}</dt>
+                        <dd className="text-zinc-300"><span className="font-mono text-zinc-100">{scannedGame.routeInfo.routeBadge}</span> <span className="text-zinc-500">{scannedGame.routeInfo.routeDescription}</span></dd>
+                      </div>
+                    )}
+                  </dl>
+                  <div className="text-[11.5px] leading-relaxed">
+                    <p className="text-zinc-300">{scannedGame.graphicsApi.loaderReason}</p>
+                    <p className="text-zinc-500 mt-0.5">{scannedGame.graphicsApi.compatibilityNote}</p>
+                  </div>
+                  {scannedGame.graphicsApi.importedDlls && scannedGame.graphicsApi.importedDlls.length > 0 && (
+                    <p className="text-[11px] text-zinc-500">
+                      {t('dlss5.peImports', 'DLLs Importadas no Executável (PE)')}:{' '}
+                      <span className="font-mono text-zinc-400">{scannedGame.graphicsApi.importedDlls.join('  ')}</span>
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 pt-3 border-t border-zinc-800/80 text-[12px]">
+                <div className="min-w-0">
+                  <dt className="text-[11.5px] text-zinc-500">{t('dlss5.injectionDir', 'Diretório de Injeção')}</dt>
+                  <dd className="font-mono text-zinc-300 break-all">{scannedGame.targetDir || targetPath}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11.5px] text-zinc-500">{t('dlss5.existingDlss', 'DLSS Nativo no Jogo')}</dt>
+                  <dd>
+                    {scannedGame.dlssDetected ? (
+                      <span className="text-emerald-300">{t('dlss5.existingDlssPresent', 'Presente (nvngx_dlss.dll detectado)')}</span>
+                    ) : (
+                      <span className="text-zinc-400">{t('dlss5.existingDlssNone', 'Não detectado (Injeção Universal)')}</span>
+                    )}
+                  </dd>
+                </div>
+              </dl>
             </div>
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Configuration & Options Card */}
+      {/* Configuration */}
       {scannedGame && (
-        <div className="bg-zinc-900/70 border border-zinc-800/80 rounded-xl p-5 space-y-5">
-          <div className="flex items-center gap-2 border-b border-zinc-800/80 pb-3">
-            <Sliders size={18} className="text-blue-400" />
-            <h3 className="text-sm font-semibold text-zinc-100">
-              {t('dlss5.configTitle', 'Opções de Upscaling & Frame Generation')}
-            </h3>
-          </div>
+        <section className="dh-card p-5 space-y-5 animate-in">
+          <h2 className="dh-section-title">{t('dlss5.configTitle', 'Opções de Upscaling & Frame Generation')}</h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Upscaler Backend */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-300">
-                {t('dlss5.backendLabel', 'Upscaler Backend')}
-              </label>
-              <select
-                value={upscaler}
-                onChange={(e) => setUpscaler(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-blue-500"
-              >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label htmlFor="dlss5-backend" className="dh-label block mb-1.5">{t('dlss5.backendLabel', 'Upscaler Backend')}</label>
+              <select id="dlss5-backend" value={upscaler} onChange={(e) => setUpscaler(e.target.value)} className="dh-input w-full">
                 <option value="dlss">{t('dlss5.backendDlss', 'DLSS 5 (NVIDIA Tensor Core)')}</option>
                 <option value="fsr31">{t('dlss5.backendFsr31', 'AMD FSR 3.1 (Universal)')}</option>
                 <option value="fsr4">{t('dlss5.backendFsr4', 'AMD FSR 4.0 Neural (FidelityFX)')}</option>
@@ -1130,23 +962,14 @@ export default function Dlss5Manager() {
               </select>
             </div>
 
-            {/* Hook Loader DLL */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-zinc-300">
-                  {t('dlss5.loaderLabel', 'Método do Loader (Hook)')}
-                </label>
+            <div>
+              <div className="flex items-baseline justify-between gap-2 mb-1.5">
+                <label htmlFor="dlss5-loader" className="dh-label">{t('dlss5.loaderLabel', 'Método do Loader (Hook)')}</label>
                 {scannedGame.graphicsApi?.recommendedLoader && (
-                  <span className="text-[10px] text-blue-400 font-mono">
-                    Auto: {scannedGame.graphicsApi.recommendedLoader}
-                  </span>
+                  <span className="dh-tag">auto: {scannedGame.graphicsApi.recommendedLoader}</span>
                 )}
               </div>
-              <select
-                value={loaderDll}
-                onChange={(e) => setLoaderDll(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-blue-500 font-mono"
-              >
+              <select id="dlss5-loader" value={loaderDll} onChange={(e) => setLoaderDll(e.target.value)} className="dh-input w-full font-mono">
                 <option value="dxgi.dll">dxgi.dll (Padrão DX11 / DX12)</option>
                 <option value="version.dll">version.dll (Recomendado para Vulkan & OpenGL)</option>
                 <option value="winmm.dll">winmm.dll (Vulkan & Xbox Game Pass)</option>
@@ -1154,26 +977,17 @@ export default function Dlss5Manager() {
               </select>
             </div>
 
-            {/* Injection Route (DLSS5-Autopilot Multi-Route Engine) */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-zinc-300">
-                  {t('dlss5.routeLabel', 'Rota de Injeção / Pipeline')}
-                </label>
+            <div>
+              <div className="flex items-baseline justify-between gap-2 mb-1.5">
+                <label htmlFor="dlss5-route" className="dh-label">{t('dlss5.routeLabel', 'Rota de Injeção / Pipeline')}</label>
                 {scannedGame.routeInfo?.recommendedRoute && (
-                  <span className="text-[10px] text-indigo-400 font-mono">
-                    Autopilot: {scannedGame.routeInfo.routeBadge}
-                  </span>
+                  <span className="dh-tag">autopilot: {scannedGame.routeInfo.routeBadge}</span>
                 )}
               </div>
-              <select
-                value={selectedRoute}
-                onChange={(e) => setSelectedRoute(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500 font-mono"
-              >
+              <select id="dlss5-route" value={selectedRoute} onChange={(e) => setSelectedRoute(e.target.value)} className="dh-input w-full font-mono">
                 {scannedGame.routeInfo?.allowedRoutes?.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.name} {r.id === scannedGame.routeInfo?.recommendedRoute ? '★ (Autopilot)' : ''}
+                    {r.name} {r.id === scannedGame.routeInfo?.recommendedRoute ? '(Autopilot)' : ''}
                   </option>
                 )) || (
                   <>
@@ -1185,169 +999,106 @@ export default function Dlss5Manager() {
                 )}
               </select>
             </div>
+          </div>
 
-            {/* Frame Generation Toggle */}
-            <div className="bg-zinc-950/60 p-3 rounded-lg border border-zinc-800/80 flex items-center justify-between">
-              <div>
-                <div className="text-xs font-medium text-zinc-200">
-                  {t('dlss5.frameGen', 'Frame Generation Neural')}
-                </div>
-                <div className="text-[10px] text-zinc-500">2x FPS via IA (dlssg / fsr3)</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={frameGen}
-                onChange={(e) => setFrameGen(e.target.checked)}
-                className="w-4 h-4 rounded text-blue-600 bg-zinc-900 border-zinc-700 focus:ring-0 cursor-pointer"
-              />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 border-y border-zinc-800/80 md:divide-x divide-zinc-800/80">
+            <div className="md:pr-0">
+              {toggleRow({
+                title: t('dlss5.frameGen', 'Frame Generation Neural'),
+                desc: '2x FPS via IA (dlssg / fsr3)',
+                checked: frameGen,
+                onChange: setFrameGen
+              })}
             </div>
-
-            {/* In-Game Overlay Toggle */}
-            <div className="bg-zinc-950/60 p-3 rounded-lg border border-zinc-800/80 flex items-center justify-between">
-              <div>
-                <div className="text-xs font-medium text-zinc-200">
-                  {t('dlss5.overlayMenu', 'Menu In-Game (Insert)')}
-                </div>
-                <div className="text-[10px] text-zinc-500">Ajustes em tempo real</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={overlayMenu}
-                onChange={(e) => setOverlayMenu(e.target.checked)}
-                className="w-4 h-4 rounded text-blue-600 bg-zinc-900 border-zinc-700 focus:ring-0 cursor-pointer"
-              />
+            <div className="md:pl-6">
+              {toggleRow({
+                title: t('dlss5.overlayMenu', 'Menu In-Game (Insert)'),
+                desc: 'Ajustes em tempo real',
+                checked: overlayMenu,
+                onChange: setOverlayMenu
+              })}
             </div>
-
-            {/* Neural Upstream Routing Toggle (DLSS5-Autopilot) */}
-            <div className="bg-zinc-950/60 p-3 rounded-lg border border-zinc-800/80 flex items-center justify-between">
-              <div className="pr-2">
-                <div className="text-xs font-medium text-zinc-200 flex items-center gap-1.5">
-                  <span>{t('dlss5.neuralUpstream', 'Neural Upstream Routing')}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">4K FPS+</span>
-                </div>
-                <div className="text-[10px] text-zinc-500">Reconstrução pré-upscale na resolução nativa interna</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={neuralUpstream}
-                onChange={(e) => setNeuralUpstream(e.target.checked)}
-                className="w-4 h-4 rounded text-indigo-600 bg-zinc-900 border-zinc-700 focus:ring-0 cursor-pointer"
-              />
+            <div className="md:pl-6">
+              {toggleRow({
+                title: t('dlss5.neuralUpstream', 'Neural Upstream Routing'),
+                desc: 'Reconstrução pré-upscale na resolução nativa interna',
+                checked: neuralUpstream,
+                onChange: setNeuralUpstream
+              })}
             </div>
           </div>
 
-          {/* Autopilot & Neural Upstream Architecture Note */}
-          <div className="p-3 bg-zinc-950/40 rounded-lg border border-zinc-800/80 flex items-start gap-2.5 text-xs text-zinc-400">
-            <Zap size={16} className="text-indigo-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <strong className="text-zinc-200">Arquitetura DLSS5-Autopilot & Neural Upstream: </strong>
-              <span>{t('dlss5.neuralUpstreamDesc', 'Processa modelos neurais e iluminação na resolução interna de renderização antes do upscaling. Aumento drástico de FPS a 1440p e 4K.')}</span>
-            </div>
-          </div>
+          <p className="dh-help max-w-[90ch]">
+            <span className="text-zinc-300">Arquitetura DLSS5-Autopilot & Neural Upstream: </span>
+            {t('dlss5.neuralUpstreamDesc', 'Processa modelos neurais e iluminação na resolução interna de renderização antes do upscaling. Aumento drástico de FPS a 1440p e 4K.')}
+          </p>
 
-          {/* Signature Bypass Setting (NVIDIA only, opt-in) */}
           {selectedProfile === 'nvidia' && (
-          <div className="p-3 bg-zinc-950/40 rounded-lg border border-zinc-800/80 flex items-center justify-between">
-            <div className="space-y-0.5">
-              <span className="text-xs font-medium text-zinc-200">
-                {t('dlss5.signatureBypass', 'Bypass de Assinatura NVIDIA (Registro)')}
-              </span>
-              <p className="text-[11px] text-zinc-400">
-                {t(
+            <div className="border-t border-zinc-800/80">
+              {toggleRow({
+                title: t('dlss5.signatureBypass', 'Bypass de Assinatura NVIDIA (Registro)'),
+                tag: 'registry',
+                desc: t(
                   'dlss5.signatureBypassDesc',
                   'Desativa checagem de assinatura de drivers no registro do Windows para evitar erros de autenticação da DLL.'
-                )}
-              </p>
+                ),
+                checked: signatureBypass,
+                onChange: setSignatureBypass
+              })}
             </div>
-            <input
-              type="checkbox"
-              checked={signatureBypass}
-              onChange={(e) => setSignatureBypass(e.target.checked)}
-              className="w-4 h-4 rounded text-blue-600 bg-zinc-900 border-zinc-700 focus:ring-0 cursor-pointer"
-            />
-          </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleApply}
-                disabled={isApplying || isReverting || isScanning}
-                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-xs font-bold rounded-lg transition-all shadow-md hover:shadow-blue-500/20 flex items-center gap-2 text-white"
-              >
-                {isApplying ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    {t('dlss5.applyingBtn', 'Injetando e Configurando...')}
-                  </>
-                ) : (
-                  <>
-                    <Zap size={16} />
-                    {t('dlss5.applyBtn', 'Aplicar DLSS 5 Autonomamente')}
-                  </>
-                )}
-              </button>
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => setConfirmApplyOpen(true)}
+              disabled={busyAny}
+              className="dh-btn dh-btn-primary h-9 px-4"
+            >
+              {isApplying ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+              {isApplying ? t('dlss5.applyingBtn', 'Injetando e Configurando...') : t('dlss5.applyBtn', 'Aplicar DLSS 5 Autonomamente')}
+            </button>
 
-              {(scannedGame.installed || scannedGame.existingDlls?.length) && (
-                <button
-                  onClick={handleRevert}
-                  disabled={isApplying || isReverting || isScanning}
-                  className="px-4 py-2.5 bg-zinc-800 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/40 border border-zinc-700 disabled:opacity-50 text-xs font-semibold rounded-lg transition-all flex items-center gap-2 text-zinc-300"
-                >
-                  {isReverting ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-                      {t('dlss5.revertingBtn', 'Restaurando...')}
-                    </>
-                  ) : (
-                    <>
-                      <RotateCcw size={15} />
-                      {t('dlss5.revertBtn', 'Desinstalar Mod / Restaurar Arquivos Originais')}
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
+            {(scannedGame.installed || scannedGame.existingDlls?.length) && (
+              <button
+                type="button"
+                onClick={handleRevert}
+                disabled={busyAny}
+                className="dh-btn h-9 px-4"
+              >
+                {isReverting ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+                {isReverting ? t('dlss5.revertingBtn', 'Restaurando...') : t('dlss5.revertBtn', 'Desinstalar Mod / Restaurar Arquivos Originais')}
+              </button>
+            )}
 
             {status && (
-              <div
-                className={`text-xs px-3 py-1.5 rounded-lg border flex items-center gap-1.5 ${
-                  status.type === 'success'
-                    ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                    : 'bg-red-500/10 text-red-300 border-red-500/30'
+              <p
+                role={status.type === 'error' ? 'alert' : 'status'}
+                className={`flex items-start gap-1.5 text-[12.5px] ${
+                  status.type === 'success' ? 'text-emerald-300' : status.type === 'error' ? 'text-red-300' : 'text-zinc-300'
                 }`}
               >
-                {status.type === 'success' ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                {status.type === 'success' ? <CheckCircle2 size={14} className="shrink-0 mt-[1px]" /> : status.type === 'error' ? <XCircle size={14} className="shrink-0 mt-[1px]" /> : <Info size={14} className="shrink-0 mt-[1px]" />}
                 <span>{status.message}</span>
-              </div>
+              </p>
             )}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Terminal & Live Injection Logs */}
-      <div className="bg-zinc-900/70 border border-zinc-800/80 rounded-xl p-4 space-y-3">
+      {/* Console */}
+      <section className="space-y-2" aria-labelledby="dlss5-console">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-zinc-300">
-            <Terminal size={16} className="text-blue-400" />
-            <h4 className="text-xs font-semibold">
-              {t('dlss5.terminalTitle', 'Console de Injeção & Logs')}
-            </h4>
-          </div>
+          <h2 id="dlss5-console" className="dh-section-title">{t('dlss5.terminalTitle', 'Console de Injeção & Logs')}</h2>
           {logs.length > 0 && (
-            <button
-              onClick={() => setLogs([])}
-              className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
-            >
+            <button type="button" onClick={() => setLogs([])} className="dh-btn dh-btn-ghost dh-btn-sm">
               {t('dlss5.clearLogs', 'Limpar Console')}
             </button>
           )}
         </div>
-
-        <div className="bg-zinc-950 border border-zinc-800/80 rounded-lg p-3 font-mono text-xs text-zinc-300 h-40 overflow-y-auto space-y-1 select-text">
+        <div className="rounded-lg border border-zinc-800/80 bg-zinc-950 p-3 font-mono text-[11.5px] leading-relaxed text-zinc-300 h-40 overflow-y-auto select-text" role="log" aria-live="polite">
           {logs.length === 0 ? (
-            <span className="text-zinc-600 italic">
+            <span className="text-zinc-600">
               Aguardando seleção de jogo para iniciar diagnósticos e injeção autônoma...
             </span>
           ) : (
@@ -1356,14 +1107,14 @@ export default function Dlss5Manager() {
                 key={i}
                 className={
                   log.includes('[SUCCESS]') || log.includes('[SUCESSO]') || log.includes('sucesso')
-                    ? 'text-emerald-400'
+                    ? 'text-emerald-300'
                     : log.includes('[ERROR]') || log.includes('Falha')
-                    ? 'text-red-400'
+                    ? 'text-red-300'
                     : log.includes('[AUTÊNTICO]') || log.includes('[PE SCAN]') || log.includes('[API DETECTADA]')
-                    ? 'text-cyan-400'
+                    ? 'text-blue-200'
                     : log.includes('[WARN]') || log.includes('[REVERSÃO]')
-                    ? 'text-amber-400'
-                    : 'text-zinc-300'
+                    ? 'text-amber-300'
+                    : 'text-zinc-400'
                 }
               >
                 {log}
@@ -1372,53 +1123,51 @@ export default function Dlss5Manager() {
           )}
           <div ref={terminalEndRef} />
         </div>
-      </div>
+      </section>
 
-      {/* Recent Games Quick-Access */}
+      {/* Recent games */}
       {recentGames.length > 0 && (
-        <div className="bg-zinc-900/70 border border-zinc-800/80 rounded-xl p-4 space-y-3">
-          <div className="flex items-center gap-2 text-zinc-300">
-            <History size={16} className="text-blue-400" />
-            <h4 className="text-xs font-semibold">
-              {t('dlss5.recentTitle', 'Jogos Configurados Recentemente')}
-            </h4>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <section className="space-y-2" aria-labelledby="dlss5-recent">
+          <h2 id="dlss5-recent" className="dh-section-title">{t('dlss5.recentTitle', 'Jogos Configurados Recentemente')}</h2>
+          <div className="rounded-lg border border-zinc-800/80 divide-y divide-zinc-800/80 overflow-hidden">
             {recentGames.map((game, idx) => (
-              <div
+              <button
                 key={idx}
+                type="button"
                 onClick={() => handleScanGame(game.targetDir)}
-                className="bg-zinc-950/60 hover:bg-zinc-900 border border-zinc-800/70 hover:border-blue-500/50 p-3 rounded-lg transition-all cursor-pointer group"
+                className="group w-full text-left px-4 py-2.5 flex items-center gap-4 hover:bg-zinc-900/70 transition-colors"
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-zinc-200 group-hover:text-blue-400 truncate">
-                    {game.gameName}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    {game.graphicsApi?.apiBadge && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 uppercase font-mono border border-blue-500/30">
-                        {game.graphicsApi.apiBadge}
-                      </span>
-                    )}
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 uppercase font-mono">
-                      {game.profile}
-                    </span>
-                  </div>
-                </div>
-                <div className="text-[11px] text-zinc-500 truncate font-mono mt-1">
-                  {game.targetDir}
-                </div>
-                {game.lastAppliedAt && (
-                  <div className="text-[10px] text-zinc-600 mt-2">
-                    Configurado em: {new Date(game.lastAppliedAt).toLocaleDateString()}
-                  </div>
-                )}
-              </div>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[12.5px] font-medium text-zinc-200 truncate">{game.gameName}</span>
+                  <span className="block font-mono text-[11px] text-zinc-500 truncate">{game.targetDir}</span>
+                </span>
+                <span className="shrink-0 flex items-center gap-3 font-mono text-[11px] text-zinc-500">
+                  {game.graphicsApi?.apiBadge && <span>{game.graphicsApi.apiBadge}</span>}
+                  <span>{game.profile}</span>
+                  {game.lastAppliedAt && <span className="hidden sm:inline">{new Date(game.lastAppliedAt).toLocaleDateString()}</span>}
+                  <ChevronRight size={13} className="text-zinc-600 group-hover:text-zinc-300 transition-colors" />
+                </span>
+              </button>
             ))}
           </div>
-        </div>
+        </section>
       )}
+      </div>
+
+      <DarkOSConfirmDialog
+        open={confirmApplyOpen}
+        title={t('dlss5.confirmApplyTitle', 'Substituir DLLs do jogo?')}
+        body={t(
+          'dlss5.confirmApplyBody',
+          'O DLSS 5 vai copiar DLLs proxy (ex.: dxgi.dll, OptiScaler.dll) para a pasta do jogo. Os arquivos originais são salvos em backup e podem ser restaurados em "Desinstalar Mod". Feche o jogo antes de continuar.'
+        )}
+        confirmLabel={t('dlss5.applyBtn', 'Aplicar DLSS 5 Autonomamente')}
+        onCancel={() => setConfirmApplyOpen(false)}
+        onConfirm={() => {
+          setConfirmApplyOpen(false);
+          void handleApply();
+        }}
+      />
     </div>
   );
 }

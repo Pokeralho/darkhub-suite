@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import Logger from './LoggerService.js';
+import { downloadToFile, assetSha256, GITHUB_HOSTS } from './SecureDownload.js';
 
 class UpdateService {
   constructor() {
@@ -36,7 +37,7 @@ class UpdateService {
       await this._setupUpdater();
       this._scheduleAutoCheck();
     } catch (err) {
-      Logger.warn('UpdateService', 'electron-updater setup notice, fallback engine is active:', err?.message || err);
+      Logger.warn('UpdateService', `electron-updater setup notice, fallback engine is active: ${err?.message || err}`);
     }
   }
 
@@ -118,7 +119,7 @@ class UpdateService {
 
       this._updater = updater;
     } catch (e) {
-      Logger.warn('UpdateService', 'Could not initialize electron-updater, using native fallback:', e);
+      Logger.warn('UpdateService', `Could not initialize electron-updater, using native fallback: ${e?.message ?? e}`);
     }
   }
 
@@ -144,7 +145,7 @@ class UpdateService {
           return { ok: true, version: res.updateInfo.version };
         }
       } catch (e) {
-        Logger.info('UpdateService', 'electron-updater check failed, trying native GitHub release query...');
+        Logger.info('UpdateService', `electron-updater check failed (${e?.message ?? e}), trying native GitHub release query...`);
       }
     }
 
@@ -161,7 +162,7 @@ class UpdateService {
 
       if (this._isNewerVersion(latestVer, currentVer)) {
         this._setState('available');
-        const asset = release.assets?.find(a => a.name.endsWith('.exe') && !a.name.includes('blockmap')) || release.assets?.[0];
+        const asset = release.assets?.find(a => a.name.endsWith('.exe') && !a.name.includes('blockmap')) || null;
 
         this._updateInfo = {
           version: latestVer,
@@ -170,6 +171,7 @@ class UpdateService {
           downloadUrl: asset?.browser_download_url || null,
           assetName: asset?.name || `DarkHub Setup ${latestVer}.exe`,
           assetSize: asset?.size || 0,
+          sha256: assetSha256(asset),
           githubUrl: release.html_url
         };
 
@@ -193,6 +195,9 @@ class UpdateService {
   }
 
   async downloadUpdate() {
+    if (this._state === 'downloading' || this._state === 'verifying') {
+      return { ok: false, error: 'Download already in progress.' };
+    }
     if (this._state !== 'available' && !this._updateInfo) {
       return { ok: false, error: 'No update available for download.' };
     }
@@ -201,99 +206,66 @@ class UpdateService {
 
     if (this._updater && app.isPackaged) {
       try {
+        // electron-updater verifies the sha512 published in latest.yml before emitting update-downloaded.
         await this._updater.downloadUpdate();
         return { ok: true };
       } catch (e) {
-        Logger.warn('UpdateService', 'electron-updater download failed, falling back to direct stream:', e);
+        Logger.warn('UpdateService', `electron-updater download failed, falling back to direct stream: ${e?.message ?? e}`);
       }
     }
 
-    if (!this._updateInfo.downloadUrl) {
-      const fileName = this._updateInfo.assetName || `DarkHub-Setup-${this._updateInfo.version}.exe`;
-      this._updateInfo.downloadUrl = `https://github.com/${this._repoOwner}/${this._repoName}/releases/download/v${this._updateInfo.version}/${fileName}`;
+    const fail = (message) => {
+      this._setState('error');
+      this._emit({ type: 'error', stage: 'error', message });
+      return { ok: false, error: message };
+    };
+
+    // The fallback installer is executed silently, so it must come from GitHub over HTTPS and match
+    // the SHA-256 digest GitHub publishes for the release asset. Without a digest we refuse.
+    const info = this._updateInfo;
+    if (!info?.downloadUrl || !info?.sha256) {
+      return fail('Integrity data (SHA-256) unavailable for this release. Download it manually from GitHub.');
     }
 
-    return new Promise((resolve) => {
-      const destDir = path.join(app.getPath('temp'), 'DarkHubUpdates');
-      try { if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true }); } catch {}
+    const destDir = path.join(app.getPath('temp'), 'DarkHubUpdates');
+    try { fs.mkdirSync(destDir, { recursive: true }); } catch {}
+    const safeName = path.basename(String(info.assetName || `DarkHub-Setup-${info.version}.exe`)).replace(/[<>:"|?*\u0000-\u001f]/g, '_');
+    const destFile = path.join(destDir, safeName);
+    this._downloadedFilePath = null;
 
-      const destFile = path.join(destDir, this._updateInfo.assetName || `DarkHub-Setup-${this._updateInfo.version}.exe`);
-      this._downloadedFilePath = destFile;
-
-      const fileStream = fs.createWriteStream(destFile);
-      let receivedBytes = 0;
-      let totalBytes = this._updateInfo.assetSize || 0;
-      let lastTime = Date.now();
-      let lastReceived = 0;
-
-      const performDownload = (url) => {
-        https.get(url, { headers: { 'User-Agent': 'DarkHub-Updater/' + app.getVersion() } }, (res) => {
-
-          if (res.statusCode === 302 || res.statusCode === 301) {
-            return performDownload(res.headers.location);
-          }
-
-          if (res.statusCode !== 200) {
-            this._setState('error');
-            this._emit({ type: 'error', stage: 'error', message: `HTTP ${res.statusCode} from download server.` });
-            return resolve({ ok: false, error: `HTTP ${res.statusCode}` });
-          }
-
-          totalBytes = parseInt(res.headers['content-length'] || totalBytes, 10);
-
-          res.on('data', (chunk) => {
-            receivedBytes += chunk.length;
-            fileStream.write(chunk);
-
-            const now = Date.now();
-            if (now - lastTime >= 300) {
-              const deltaBytes = receivedBytes - lastReceived;
-              const deltaTime = (now - lastTime) / 1000;
-              const speed = Math.round(deltaBytes / deltaTime);
-              const percent = totalBytes > 0 ? Math.min(Math.round((receivedBytes / totalBytes) * 100), 99) : 50;
-
-              this._emit({
-                type: 'progress',
-                stage: 'downloading',
-                percent,
-                bytesPerSecond: speed,
-                transferred: receivedBytes,
-                total: totalBytes
-              });
-
-              lastTime = now;
-              lastReceived = receivedBytes;
-            }
+    let lastTime = Date.now();
+    let lastReceived = 0;
+    try {
+      await downloadToFile(info.downloadUrl, destFile, {
+        allowedHosts: GITHUB_HOSTS,
+        expectedSha256: info.sha256,
+        timeoutMs: 60000,
+        userAgent: 'DarkHub-Updater/' + app.getVersion(),
+        onProgress: ({ transferred, total }) => {
+          const now = Date.now();
+          if (now - lastTime < 300) return;
+          const totalBytes = total || info.assetSize || 0;
+          this._emit({
+            type: 'progress',
+            stage: 'downloading',
+            percent: totalBytes > 0 ? Math.min(Math.round((transferred / totalBytes) * 100), 99) : 50,
+            bytesPerSecond: Math.round((transferred - lastReceived) / ((now - lastTime) / 1000)),
+            transferred,
+            total: totalBytes
           });
+          lastTime = now;
+          lastReceived = transferred;
+        }
+      });
+    } catch (err) {
+      return fail(err?.message ?? String(err));
+    }
 
-          res.on('end', () => {
-            fileStream.end(async () => {
-              Logger.info('UpdateService', 'Download complete. Verifying integrity...');
-              this._setState('verifying');
-              this._emit({ type: 'verifying', stage: 'verifying', percent: 100 });
-
-              setTimeout(() => {
-                this._setState('downloaded');
-                this._emit({ type: 'downloaded', stage: 'downloaded', version: this._updateInfo.version });
-                resolve({ ok: true });
-              }, 1000);
-            });
-          });
-
-          res.on('error', (err) => {
-            this._setState('error');
-            this._emit({ type: 'error', stage: 'error', message: err.message });
-            resolve({ ok: false, error: err.message });
-          });
-        }).on('error', (err) => {
-          this._setState('error');
-          this._emit({ type: 'error', stage: 'error', message: err.message });
-          resolve({ ok: false, error: err.message });
-        });
-      };
-
-      performDownload(this._updateInfo.downloadUrl);
-    });
+    Logger.info('UpdateService', 'Download complete. SHA-256 verified.');
+    this._downloadedFilePath = destFile;
+    this._setState('downloaded');
+    this._emit({ type: 'downloaded', stage: 'downloaded', version: info.version });
+    return { ok: true };
   }
 
   installUpdate() {
@@ -339,11 +311,16 @@ class UpdateService {
         },
         timeout: 10000
       }, (res) => {
-        if (res.statusCode === 404) return resolve(null);
-        if (res.statusCode !== 200) return reject(new Error(`GitHub API HTTP ${res.statusCode}`));
+        if (res.statusCode === 404) { res.resume(); return resolve(null); }
+        if (res.statusCode !== 200) { res.resume(); return reject(new Error(`GitHub API HTTP ${res.statusCode}`)); }
 
         let data = '';
-        res.on('data', chunk => data += chunk);
+        res.setEncoding('utf8');
+        res.on('data', chunk => {
+          data += chunk;
+          if (data.length > 5 * 1024 * 1024) res.destroy(new Error('GitHub API response too large'));
+        });
+        res.on('error', reject);
         res.on('end', () => {
           try {
             resolve(JSON.parse(data));

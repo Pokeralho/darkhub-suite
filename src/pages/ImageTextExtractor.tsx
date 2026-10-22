@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Type, Image as ImageIcon, Loader2, Copy, UploadCloud, Clipboard, Check, Sparkles, X, FileImage } from 'lucide-react';
+import { Image as ImageIcon, Loader2, Copy, UploadCloud, Clipboard, Check, X, RefreshCw } from '../components/icons';
 import { useI18n } from '../i18n/I18nProvider';
-import { HelpTip } from '../components/HelpTip';
+import PageHeader from '../components/ui/PageHeader';
 
 export default function ImageTextExtractor() {
   const { t } = useI18n();
@@ -14,6 +14,7 @@ export default function ImageTextExtractor() {
   const [preprocess, setPreprocess] = useState(true);
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const extractingRef = useRef(false);
 
   // --- Clipboard Paste Listener (Ctrl+V) ---
   useEffect(() => {
@@ -111,6 +112,9 @@ export default function ImageTextExtractor() {
 
   const triggerOcr = async (payload: { imagePath?: string; base64?: string }) => {
     if (!window.darkhub?.ocr?.extractText) return;
+    // a paste/drop while an OCR job is still running would race the result
+    if (extractingRef.current) return;
+    extractingRef.current = true;
     setIsExtracting(true);
     try {
       const res = await window.darkhub.ocr.extractText({
@@ -126,23 +130,52 @@ export default function ImageTextExtractor() {
     } catch (err: any) {
       setExtractedText(`Erro: ${err.message}`);
     } finally {
+      extractingRef.current = false;
       setIsExtracting(false);
     }
   };
 
   const handleCopyText = () => {
     if (!extractedText) return;
-    navigator.clipboard.writeText(extractedText);
+    navigator.clipboard.writeText(extractedText).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const handlePasteFromClipboard = () => {
+    navigator.clipboard.read().then(async (items) => {
+      for (const item of items) {
+        const imageType = item.types.find(type => type.startsWith('image/'));
+        if (imageType) {
+          const blob = await item.getType(imageType);
+          const reader = new FileReader();
+          reader.onload = (loadEvent) => {
+            const base64 = loadEvent.target?.result as string;
+            setImagePreview(base64);
+            setImagePath(null);
+            setExtractedText('');
+            triggerOcr({ base64 });
+          };
+          reader.readAsDataURL(blob);
+          break;
+        }
+      }
+    }).catch(() => {});
+  };
+
+  const rerunOcr = () => {
+    if (imagePath) triggerOcr({ imagePath });
+    else if (imagePreview) triggerOcr({ base64: imagePreview });
+  };
+
+  const isError = extractedText.startsWith('Erro:');
 
   return (
     <div
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="w-full max-w-6xl mx-auto space-y-4 p-1 md:p-2 animate-fadeIn text-zinc-100 pb-12"
+      className="w-full max-w-6xl text-zinc-100"
     >
       <input
         type="file"
@@ -152,91 +185,54 @@ export default function ImageTextExtractor() {
         className="hidden"
       />
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80">
-        <div>
-          <h1 className="text-lg font-bold text-zinc-100 tracking-tight flex items-center gap-2">
-            <Type className="w-5 h-5 text-rose-500" />
-            {t('ocr.title', 'Extrator de Texto (OCR)')}
-            <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono border border-zinc-700/60">
-              Offline Tesseract
-            </span>
-          </h1>
-          <p className="text-xs text-zinc-400 mt-0.5">
-            {t('ocr.subtitle', 'Extraia texto de imagens totalmente offline.')}
-          </p>
-        </div>
+      <PageHeader
+        title={t('ocr.title', 'Extrator de Texto (OCR)')}
+        subtitle={<>{t('ocr.subtitle', 'Extraia texto de imagens totalmente offline.')} <span className="dh-tag ml-1">tesseract</span></>}
+        actions={
+          <>
+            <button onClick={handlePasteFromClipboard} className="dh-btn">
+              <Clipboard size={16} className="text-zinc-400" />
+              {t('ocr.pasteHint', 'Colar Screenshot (Ctrl+V)')}
+            </button>
+            <button onClick={handleSelectImage} className="dh-btn dh-btn-primary">
+              <ImageIcon size={16} />
+              {t('ocr.selectImage', 'Selecionar Imagem')}
+            </button>
+          </>
+        }
+      />
 
-        <div className="flex items-center gap-2">
+      {/* Options */}
+      <div className="flex flex-wrap items-center gap-4 mb-4">
+        <label className="flex items-center gap-2">
+          <span className="dh-label">{t('ocr.language', 'Idioma')}</span>
           <select
             value={lang}
             onChange={(e) => setLang(e.target.value as any)}
-            className="bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 font-mono focus:outline-none"
+            className="dh-input"
           >
             <option value="eng+por">{t('ocr.langPorEng', 'Português + Inglês')}</option>
             <option value="por">{t('ocr.langPor', 'Apenas Português')}</option>
             <option value="eng">{t('ocr.langEng', 'Apenas Inglês')}</option>
           </select>
+        </label>
 
-          <label className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={preprocess}
-              onChange={(e) => setPreprocess(e.target.checked)}
-              className="rounded bg-zinc-800 border-zinc-700 text-rose-600 focus:ring-0 w-3.5 h-3.5"
-            />
-            <span>Filtro de Contraste Sharp</span>
-          </label>
-        </div>
-      </div>
-
-      {/* Action Bar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={handleSelectImage}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg transition shadow-sm"
-        >
-          <ImageIcon className="w-3.5 h-3.5" />
-          Selecionar Imagem
-        </button>
-
-        <button
-          onClick={() => {
-            navigator.clipboard.read().then(async (items) => {
-              for (const item of items) {
-                const imageType = item.types.find(type => type.startsWith('image/'));
-                if (imageType) {
-                  const blob = await item.getType(imageType);
-                  const reader = new FileReader();
-                  reader.onload = (loadEvent) => {
-                    const base64 = loadEvent.target?.result as string;
-                    setImagePreview(base64);
-                    setImagePath(null);
-                    setExtractedText('');
-                    triggerOcr({ base64 });
-                  };
-                  reader.readAsDataURL(blob);
-                  break;
-                }
-              }
-            }).catch(() => {});
-          }}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-lg border border-zinc-700 transition"
-        >
-          <Clipboard className="w-3.5 h-3.5 text-zinc-400" />
-          {t('ocr.pasteHint', 'Colar Screenshot (Ctrl+V)')}
-        </button>
+        <label className="flex items-center gap-2 text-[12.5px] text-zinc-300 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={preprocess}
+            onChange={(e) => setPreprocess(e.target.checked)}
+          />
+          <span>{t('ocr.preprocess', 'Filtro de contraste')}</span>
+        </label>
 
         {imagePreview && (
           <button
-            onClick={() => {
-              if (imagePath) triggerOcr({ imagePath });
-              else if (imagePreview) triggerOcr({ base64: imagePreview });
-            }}
+            onClick={rerunOcr}
             disabled={isExtracting}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-lg border border-zinc-700 transition disabled:opacity-50"
+            className="dh-btn dh-btn-ghost dh-btn-sm ml-auto"
           >
-            {isExtracting ? <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-500" /> : <Sparkles className="w-3.5 h-3.5 text-amber-400" />}
+            {isExtracting ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             {t('ocr.extract', 'Re-extrair Texto')}
           </button>
         )}
@@ -247,11 +243,13 @@ export default function ImageTextExtractor() {
         {/* Left: Image Dropzone / Preview */}
         <div
           onClick={!imagePreview ? handleSelectImage : undefined}
-          className={`border rounded-xl bg-zinc-950 flex flex-col items-center justify-center p-4 relative overflow-hidden select-none transition ${
-            isDragging
-              ? 'border-rose-500 bg-rose-950/20'
-              : 'border-zinc-800/80 hover:border-zinc-700'
-          } ${!imagePreview ? 'cursor-pointer' : ''}`}
+          className={`rounded-xl flex flex-col items-center justify-center p-4 relative overflow-hidden select-none transition-colors duration-150 ${
+            imagePreview
+              ? 'border border-zinc-800/80 bg-zinc-950'
+              : isDragging
+                ? 'border border-dashed border-blue-400 bg-blue-400/5 cursor-pointer'
+                : 'border border-dashed border-zinc-800 hover:border-zinc-700 cursor-pointer'
+          }`}
         >
           {imagePreview ? (
             <div className="w-full h-full flex flex-col items-center justify-center relative">
@@ -267,55 +265,62 @@ export default function ImageTextExtractor() {
                   setImagePath(null);
                   setExtractedText('');
                 }}
-                className="absolute top-2 right-2 p-1.5 rounded-lg bg-zinc-900/90 text-zinc-400 hover:text-zinc-100 border border-zinc-700 shadow-md"
-                title="Remover imagem"
+                className="dh-btn dh-btn-sm absolute top-2 right-2 bg-zinc-950/90"
+                title={t('ocr.removeImage', 'Remover imagem')}
+                aria-label={t('ocr.removeImage', 'Remover imagem')}
               >
-                <X className="w-4 h-4" />
+                <X size={14} />
               </button>
             </div>
           ) : (
             <div className="text-center space-y-3 p-6">
-              <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto text-zinc-400">
-                <UploadCloud className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="text-xs font-bold text-zinc-200">{t('ocr.dragDrop', 'Arraste uma imagem ou clique para selecionar')}</div>
-                <div className="text-[11px] text-zinc-500 mt-1 font-mono">Suporta JPG, PNG, WEBP, BMP ou colar direto com Ctrl+V</div>
-              </div>
+              <UploadCloud size={20} className="mx-auto text-zinc-500" />
+              <p className="text-[13px] text-zinc-300">{t('ocr.dragDrop', 'Arraste uma imagem ou clique para selecionar')}</p>
+              <p className="dh-tag">{t('ocr.supportedFormats', 'jpg, png, webp, bmp ou Ctrl+V')}</p>
             </div>
           )}
         </div>
 
         {/* Right: Extracted Text Workspace */}
         <div className="border border-zinc-800/80 rounded-xl bg-zinc-950 flex flex-col overflow-hidden">
-          <div className="p-3 border-b border-zinc-800/80 bg-zinc-900/60 flex items-center justify-between">
-            <span className="text-xs font-bold text-zinc-200 flex items-center gap-2">
-              <Type className="w-3.5 h-3.5 text-rose-500" />
-              {t('ocr.extractedTitle', 'Texto Reconhecido')}
-            </span>
+          <div className="h-11 px-3 border-b border-zinc-800/80 flex items-center justify-between">
+            <h2 className="dh-section-title">{t('ocr.extractedTitle', 'Texto Reconhecido')}</h2>
             <button
               onClick={handleCopyText}
               disabled={!extractedText.trim()}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700/60 transition disabled:opacity-40"
+              className="dh-btn dh-btn-ghost dh-btn-sm"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
               {copied ? t('ocr.textCopied', 'Copiado!') : t('ocr.copyText', 'Copiar')}
             </button>
           </div>
 
-          <div className="flex-1 p-3 relative flex flex-col">
+          <div className="flex-1 p-3 relative flex flex-col min-h-0">
             {isExtracting ? (
-              <div className="flex-1 flex flex-col items-center justify-center gap-2 text-xs text-zinc-400">
-                <Loader2 className="w-5 h-5 animate-spin text-rose-500" />
-                <span>{t('ocr.processing', 'Processando reconhecimento óptico de caracteres...')}</span>
+              <div className="flex-1 space-y-2.5" aria-busy="true" aria-label={t('ocr.processing', 'Processando reconhecimento óptico de caracteres...')}>
+                {[92, 78, 85, 60, 88, 70, 45].map((w, i) => (
+                  <div key={i} className="h-3 rounded bg-zinc-900 animate-pulse" style={{ width: `${w}%` }} />
+                ))}
               </div>
             ) : (
-              <textarea
-                value={extractedText}
-                onChange={(e) => setExtractedText(e.target.value)}
-                placeholder={t('ocr.placeholder', 'O texto extraído aparecerá aqui. Você poderá editar ou copiar livremente...')}
-                className="w-full h-full flex-1 bg-transparent text-xs text-zinc-200 resize-none font-mono focus:outline-none leading-relaxed"
-              />
+              <>
+                {isError && (
+                  <div className="flex items-center justify-between gap-3 mb-2 text-[12px] text-red-400">
+                    <span className="truncate">{extractedText}</span>
+                    {imagePreview && (
+                      <button onClick={rerunOcr} className="dh-btn dh-btn-sm shrink-0">
+                        {t('common.retry', 'Tentar novamente')}
+                      </button>
+                    )}
+                  </div>
+                )}
+                <textarea
+                  value={extractedText}
+                  onChange={(e) => setExtractedText(e.target.value)}
+                  placeholder={t('ocr.placeholder', 'O texto extraído aparecerá aqui. Você poderá editar ou copiar livremente...')}
+                  className="w-full h-full flex-1 bg-transparent text-[12.5px] text-zinc-200 resize-none font-mono focus:outline-none leading-relaxed placeholder:text-zinc-600"
+                />
+              </>
             )}
           </div>
         </div>

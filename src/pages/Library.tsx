@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Plus, Gamepad2 } from 'lucide-react'
+import { Plus, Gamepad2, Search, RefreshCw, Loader2, AlertCircle } from '../components/icons'
+import PageHeader from '../components/ui/PageHeader'
 import { useI18n } from '../i18n/I18nProvider'
 import { HelpTip } from '../components/HelpTip'
 import { Game, defaultGame, defaultProfile } from '../components/library/types'
@@ -96,7 +97,9 @@ export default function Library() {
           await window.darkhub?.library?.upsert?.({ game })
         }
       }
-    } catch {}
+    } catch (e: any) {
+      setError(e?.message ?? String(e))
+    }
     await refresh()
     setDiscovered(null)
   }
@@ -210,12 +213,16 @@ export default function Library() {
     }
   }
 
+  const showSkeleton = loading && games.length === 0
+  const libraryEmpty = !loading && games.length === 0
+  const noMatch = games.length > 0 && filtered.length === 0
+
   return (
-    <div className="space-y-6 w-full">
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-2xl font-bold text-white">{t('library.title', 'Biblioteca')}</h1>
+    <div className="w-full">
+      <PageHeader
+        title={
+          <span className="inline-flex items-center gap-2">
+            {t('library.title', 'Biblioteca')}
             <HelpTip
               title={t('library.help.title', 'Biblioteca de Jogos')}
               description={t('library.help.desc', 'O Game Launcher oficial do DarkHub. Artes, horas jogadas e injetores em um só lugar.')}
@@ -225,74 +232,107 @@ export default function Library() {
               ]}
               buttonLabel={t('help.button')}
             />
-          </div>
-          <p className="text-zinc-400">{t('library.subtitle', 'Explore, jogue e acompanhe suas horas nos seus títulos favoritos.')}</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={discoverGames}
-            disabled={discovering}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg transition-colors flex items-center gap-2 font-medium shadow-[0_0_15px_rgba(79,70,229,0.2)]"
-          >
-            <Gamepad2 size={18} />
-            <span>{discovering ? t('library.btn.discovering', 'Procurando...') : t('library.btn.discover', 'Descobrir Jogos')}</span>
-          </button>
-          <button
-            onClick={() => setEditing(defaultGame())}
-            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
-          >
-            <Plus size={18} />
+          </span>
+        }
+        subtitle={t('library.subtitle', 'Explore, jogue e acompanhe suas horas nos seus títulos favoritos.')}
+        actions={<>
+          <button type="button" onClick={() => setEditing(defaultGame())} className="dh-btn">
+            <Plus size={14} />
             <span>{t('library.btn.add', 'Adicionar Jogo')}</span>
           </button>
+          <button type="button" onClick={discoverGames} disabled={discovering} className={libraryEmpty ? 'dh-btn' : 'dh-btn dh-btn-primary'}>
+            {discovering ? <Loader2 size={14} className="animate-spin" /> : <Gamepad2 size={14} />}
+            <span>{discovering ? t('library.btn.discovering', 'Procurando...') : t('library.btn.discover', 'Descobrir Jogos')}</span>
+          </button>
+        </>}
+      >
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t('library.search.placeholder', 'Procurar jogo na biblioteca...')}
+              className="dh-input w-full pl-8"
+              aria-label={t('library.search.placeholder', 'Procurar jogo na biblioteca...')}
+            />
+          </div>
+          {games.length > 0 && (
+            <span className="font-mono text-[11.5px] text-zinc-500 tabular-nums shrink-0 px-1">
+              {filtered.length}<span className="text-zinc-700"> / </span>{games.length}
+            </span>
+          )}
+          <button type="button" onClick={refresh} disabled={loading} className="dh-btn dh-btn-ghost shrink-0">
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            {loading ? t('library.btn.loading', 'Sincronizando...') : t('library.btn.refresh', 'Atualizar')}
+          </button>
         </div>
-      </div>
+      </PageHeader>
 
       {error && (
-        <div className="text-sm text-amber-200 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-          {error}
+        <div role="alert" className="mb-5 flex items-start justify-between gap-3 text-[12.5px] text-red-300">
+          <span className="flex items-start gap-2 min-w-0">
+            <AlertCircle size={14} className="shrink-0 mt-[1px]" />
+            <span className="break-words">{error}</span>
+          </span>
+          <button type="button" onClick={refresh} disabled={loading} className="dh-btn dh-btn-ghost dh-btn-sm shrink-0">
+            {t('library.btn.refresh', 'Atualizar')}
+          </button>
         </div>
       )}
 
-      <div className="flex items-center gap-2">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t('library.search.placeholder', 'Procurar jogo na biblioteca...')}
-          className="w-full bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-lg px-4 py-3 focus:outline-none focus:border-indigo-500 transition-colors"
-        />
-        <button
-          onClick={refresh}
-          className="px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition-colors font-medium whitespace-nowrap"
-          disabled={loading}
-        >
-          {loading ? t('library.btn.loading', 'Sincronizando...') : t('library.btn.refresh', 'Atualizar')}
-        </button>
-      </div>
-
-      <div className="w-full h-full min-h-[400px]">
-        {filtered.length ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 pb-20">
-            {filtered.map((g) => (
-              <GameCard
-                key={g.id}
-                game={g}
-                selectedProfileId={g.defaultProfileId || g.profiles?.[0]?.id || ''}
-                launchingId={launchingId}
-                onLaunch={() => launch(g)}
-                onEdit={() => startEdit(g)}
-              />
-            ))}
+      {showSkeleton ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4" aria-busy="true">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i}>
+              <div className="aspect-[2/3] rounded-xl bg-zinc-900 animate-pulse" />
+              <div className="mt-2.5 h-3 w-3/4 rounded bg-zinc-900 animate-pulse" />
+              <div className="mt-1.5 h-2.5 w-1/3 rounded bg-zinc-900 animate-pulse" />
+            </div>
+          ))}
+        </div>
+      ) : filtered.length ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-4 gap-y-5 pb-16">
+          {filtered.map((g) => (
+            <GameCard
+              key={g.id}
+              game={g}
+              selectedProfileId={g.defaultProfileId || g.profiles?.[0]?.id || ''}
+              launchingId={launchingId}
+              onLaunch={() => launch(g)}
+              onEdit={() => startEdit(g)}
+            />
+          ))}
+        </div>
+      ) : noMatch ? (
+        <div className="py-16 flex flex-col items-center text-center gap-3">
+          <p className="text-[13px] text-zinc-400">
+            {t('library.empty.noMatch', 'Nenhum jogo corresponde a')} <span className="font-mono text-zinc-200">"{query.trim()}"</span>
+          </p>
+          <button type="button" onClick={() => setQuery('')} className="dh-btn dh-btn-sm">
+            {t('library.search.clear', 'Limpar busca')}
+          </button>
+        </div>
+      ) : libraryEmpty ? (
+        <div className="py-16 flex flex-col items-center text-center rounded-xl border border-dashed border-zinc-800">
+          <Gamepad2 size={20} className="text-zinc-600" />
+          <h2 className="mt-3 dh-section-title">{t('library.empty.title', 'Nenhum jogo encontrado')}</h2>
+          <p className="mt-1 dh-help max-w-[60ch]">
+            {t('library.empty.desc', 'Adicione seus jogos clicando em "Adicionar Jogo" para iniciar a construção do seu launcher, ou descubra instalações automáticas das principais lojas.')}
+          </p>
+          <div className="mt-5 flex items-center gap-2">
+            <button type="button" onClick={discoverGames} disabled={discovering} className="dh-btn dh-btn-primary">
+              {discovering ? <Loader2 size={14} className="animate-spin" /> : <Gamepad2 size={14} />}
+              {discovering ? t('library.btn.discovering', 'Procurando...') : t('library.btn.discover', 'Descobrir Jogos')}
+            </button>
+            <button type="button" onClick={() => setEditing(defaultGame())} className="dh-btn">
+              <Plus size={14} />
+              {t('library.btn.add', 'Adicionar Jogo')}
+            </button>
           </div>
-        ) : (
-          <div className="p-12 h-full text-center text-zinc-500 flex flex-col items-center justify-center border-2 border-dashed border-zinc-800 rounded-2xl">
-            <Gamepad2 size={64} className="text-zinc-800 mb-6" />
-            <div className="text-2xl font-bold text-zinc-400 mb-2">{t('library.empty.title', 'Nenhum jogo encontrado')}</div>
-            <p className="max-w-md text-sm leading-relaxed">
-              {t('library.empty.desc', 'Adicione seus jogos clicando em "Adicionar Jogo" para iniciar a construção do seu launcher, ou descubra instalações automáticas das principais lojas.')}
-            </p>
-          </div>
-        )}
-      </div>
+        </div>
+      ) : null}
 
       {editing && (
         <GameEditorModal

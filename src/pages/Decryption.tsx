@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Shield, Key, FileDigit, Link, ArrowRightLeft, Copy, Trash2 } from 'lucide-react';
+import { Shield, Key, FileDigit, Link, ArrowRightLeft, Copy, Trash2 } from '../components/icons';
+import PageHeader from '../components/ui/PageHeader';
 import CryptoJS from 'crypto-js';
 
 type Mode = 'base64' | 'url' | 'hex' | 'binary' | 'aes' | 'tripledes' | 'rabbit' | 'rc4';
@@ -22,9 +23,9 @@ const Decryption = () => {
       } else if (mode === 'url') {
         res = encodeURIComponent(input);
       } else if (mode === 'hex') {
-        res = Array.from(input).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+        res = Array.from(new TextEncoder().encode(input), (b) => b.toString(16).padStart(2, '0')).join('');
       } else if (mode === 'binary') {
-        res = Array.from(input).map(c => c.charCodeAt(0).toString(2).padStart(8, '0')).join(' ');
+        res = Array.from(new TextEncoder().encode(input), (b) => b.toString(2).padStart(8, '0')).join(' ');
       } else if (mode === 'aes') {
         if (!secretKey) throw new Error('A chave secreta é necessária para AES');
         res = CryptoJS.AES.encrypt(input, secretKey).toString();
@@ -57,14 +58,14 @@ const Decryption = () => {
         res = decodeURIComponent(input);
       } else if (mode === 'hex') {
         const hex = input.replace(/\s/g, '');
-        for (let i = 0; i < hex.length; i += 2) {
-          res += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
-        }
+        if (!/^([0-9a-f]{2})+$/i.test(hex)) throw new Error('invalid-hex');
+        const bytes = Uint8Array.from(hex.match(/../g) ?? [], (h) => parseInt(h, 16));
+        res = new TextDecoder().decode(bytes);
       } else if (mode === 'binary') {
         const bin = input.replace(/\s/g, '');
-        for (let i = 0; i < bin.length; i += 8) {
-          res += String.fromCharCode(parseInt(bin.substr(i, 8), 2));
-        }
+        if (!/^([01]{8})+$/.test(bin)) throw new Error('invalid-binary');
+        const bytes = Uint8Array.from(bin.match(/.{8}/g) ?? [], (b) => parseInt(b, 2));
+        res = new TextDecoder().decode(bytes);
       } else if (mode === 'aes') {
         if (!secretKey) throw new Error('A chave secreta é necessária para AES');
         const bytes = CryptoJS.AES.decrypt(input, secretKey);
@@ -103,181 +104,123 @@ const Decryption = () => {
     setError('');
   };
 
+  const encodings: { id: Mode; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
+    { id: 'base64', label: 'Base64', icon: Key },
+    { id: 'hex', label: 'Hexadecimal', icon: FileDigit },
+    { id: 'url', label: 'URL Encode', icon: Link },
+    { id: 'binary', label: 'Binário', icon: FileDigit },
+  ];
+  const ciphers: { id: Mode; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
+    { id: 'aes', label: 'AES-256', icon: Shield },
+    { id: 'tripledes', label: 'TripleDES', icon: Shield },
+    { id: 'rabbit', label: 'Rabbit', icon: Shield },
+    { id: 'rc4', label: 'RC4', icon: Shield },
+  ];
+  const needsKey = ['aes', 'tripledes', 'rabbit', 'rc4'].includes(mode);
+
+  const renderMode = ({ id, label, icon: Icon }: { id: Mode; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }) => {
+    const active = mode === id;
+    return (
+      <button
+        key={id}
+        role="radio"
+        aria-checked={active}
+        onClick={() => setMode(id)}
+        className={`w-full h-8 flex items-center gap-2.5 px-2.5 rounded-md text-[13px] transition-colors ${
+          active ? 'bg-zinc-800/80 text-zinc-50' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
+        }`}
+      >
+        <Icon size={16} className={active ? 'text-blue-300' : 'text-zinc-500'} />
+        <span>{label}</span>
+      </button>
+    );
+  };
+
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center space-x-3 mb-8">
-        <div className="p-3 bg-emerald-500/10 rounded-xl">
-          <Shield className="text-emerald-400" size={28} />
-        </div>
-        <div>
-          <h2 className="text-3xl font-bold text-zinc-100">Descriptografia & Hash</h2>
-          <p className="text-zinc-400 mt-1">Converta, codifique e decodifique dados em múltiplos formatos</p>
-        </div>
-      </div>
+    <div className="w-full max-w-6xl mx-auto">
+      <PageHeader title="Descriptografia e hash" subtitle="Converta, codifique e decodifique dados em múltiplos formatos" />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {}
-        <div className="md:col-span-1 space-y-2">
-          <button
-            onClick={() => setMode('base64')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-              mode === 'base64' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-800'
-            }`}
-          >
-            <Key size={18} />
-            <span className="font-medium">Base64</span>
-          </button>
-
-          <button
-            onClick={() => setMode('hex')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-              mode === 'hex' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-800'
-            }`}
-          >
-            <FileDigit size={18} />
-            <span className="font-medium">Hexadecimal</span>
-          </button>
-
-          <button
-            onClick={() => setMode('url')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-              mode === 'url' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-800'
-            }`}
-          >
-            <Link size={18} />
-            <span className="font-medium">URL Encode</span>
-          </button>
-
-          <button
-            onClick={() => setMode('binary')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-              mode === 'binary' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-800'
-            }`}
-          >
-            <FileDigit size={18} />
-            <span className="font-medium">Binário</span>
-          </button>
-
-          <div className="pt-2 pb-1">
-            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider pl-2">Simétrica (Requer Chave)</p>
+      <div className="grid grid-cols-1 md:grid-cols-[200px_minmax(0,1fr)] gap-8">
+        <nav role="radiogroup" aria-label="Formato" className="space-y-5">
+          <div className="space-y-0.5">
+            <p className="text-[11px] text-zinc-500 px-2.5 mb-1.5">Codificação</p>
+            {encodings.map(renderMode)}
           </div>
+          <div className="space-y-0.5">
+            <p className="text-[11px] text-zinc-500 px-2.5 mb-1.5">Simétrica (requer chave)</p>
+            {ciphers.map(renderMode)}
+          </div>
+        </nav>
 
-          <button
-            onClick={() => setMode('aes')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-              mode === 'aes' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-800'
-            }`}
-          >
-            <Shield size={18} />
-            <span className="font-medium">AES-256</span>
-          </button>
-
-          <button
-            onClick={() => setMode('tripledes')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-              mode === 'tripledes' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-800'
-            }`}
-          >
-            <Shield size={18} />
-            <span className="font-medium">TripleDES</span>
-          </button>
-
-          <button
-            onClick={() => setMode('rabbit')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-              mode === 'rabbit' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-800'
-            }`}
-          >
-            <Shield size={18} />
-            <span className="font-medium">Rabbit</span>
-          </button>
-
-          <button
-            onClick={() => setMode('rc4')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-              mode === 'rc4' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-800'
-            }`}
-          >
-            <Shield size={18} />
-            <span className="font-medium">RC4 Drop</span>
-          </button>
-        </div>
-
-        {}
-        <div className="md:col-span-3 space-y-4">
-          <div className="bg-zinc-800/50 border border-zinc-700/50 rounded-xl p-4">
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-sm font-medium text-zinc-300 uppercase tracking-wider">Entrada</label>
-              <button onClick={clearAll} className="text-zinc-500 hover:text-red-400 transition-colors">
-                <Trash2 size={16} />
+        <div className="space-y-4 min-w-0">
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label htmlFor="dec-input" className="dh-label">Entrada</label>
+              <button onClick={clearAll} disabled={!input && !output && !error} className="dh-btn dh-btn-ghost dh-btn-sm" title="Limpar">
+                <Trash2 size={14} /> Limpar
               </button>
             </div>
             <textarea
+              id="dec-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Cole o texto ou código aqui..."
-              className="w-full h-32 bg-zinc-900/50 border border-zinc-700 rounded-lg p-3 text-zinc-200 focus:outline-none focus:border-emerald-500/50 resize-none font-mono text-sm"
+              spellCheck={false}
+              className="dh-input w-full h-36 py-2.5 resize-none font-mono text-[12.5px] leading-relaxed"
             />
-            {['aes', 'tripledes', 'rabbit', 'rc4'].includes(mode) && (
-              <div className="mt-3">
-                <label className="text-xs font-medium text-zinc-400 mb-1 block">Chave Secreta</label>
-                <div className="relative">
-                  <Key size={16} className="absolute left-3 top-1/2 -tranzinc-y-1/2 text-zinc-500" />
-                  <input
-                    type="text"
-                    value={secretKey}
-                    onChange={(e) => setSecretKey(e.target.value)}
-                    placeholder="Digite a chave..."
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg py-2 pl-9 pr-3 text-zinc-200 focus:outline-none focus:border-emerald-500/50 text-sm"
-                  />
-                </div>
+          </div>
+
+          {needsKey && (
+            <div>
+              <label htmlFor="dec-key" className="dh-label block mb-1.5">Chave secreta</label>
+              <div className="relative max-w-md">
+                <Key size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input
+                  id="dec-key"
+                  type="text"
+                  value={secretKey}
+                  onChange={(e) => setSecretKey(e.target.value)}
+                  placeholder="Digite a chave..."
+                  spellCheck={false}
+                  autoComplete="off"
+                  className="dh-input w-full pl-8 font-mono"
+                />
               </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-center space-x-4">
-            <button
-              onClick={handleEncode}
-              disabled={!input}
-              className="px-6 py-2.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-200 rounded-lg font-medium transition-colors border border-zinc-700 flex items-center space-x-2"
-            >
-              <span>Codificar / Encrypt</span>
-              <ArrowRightLeft size={16} className="rotate-90 md:rotate-0" />
-            </button>
-
-            <button
-              onClick={handleDecode}
-              disabled={!input}
-              className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg font-medium transition-colors shadow-lg shadow-emerald-500/20 flex items-center space-x-2"
-            >
-              <ArrowRightLeft size={16} className="rotate-90 md:rotate-0" />
-              <span>Decodificar / Decrypt</span>
-            </button>
-          </div>
-
-          {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-sm text-center">
-              {error}
             </div>
           )}
 
-          <div className="bg-zinc-800/50 border border-zinc-700/50 rounded-xl p-4">
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-sm font-medium text-zinc-300 uppercase tracking-wider">Saída</label>
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={handleDecode} disabled={!input} className="dh-btn dh-btn-primary">
+              <ArrowRightLeft size={14} />
+              <span>Decodificar / Decrypt</span>
+            </button>
+            <button onClick={handleEncode} disabled={!input} className="dh-btn">
+              <span>Codificar / Encrypt</span>
+            </button>
+            {error && (
+              <span role="alert" className="text-[12.5px] text-red-400 ml-1">{error}</span>
+            )}
+          </div>
+
+          <div className="pt-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <label htmlFor="dec-output" className="dh-label">Saída</label>
               <button
                 onClick={copyToClipboard}
                 disabled={!output}
-                className="text-zinc-500 hover:text-emerald-400 transition-colors disabled:opacity-50"
+                className="dh-btn dh-btn-ghost dh-btn-sm"
                 title="Copiar resultado"
               >
-                <Copy size={16} />
+                <Copy size={14} /> Copiar
               </button>
             </div>
             <textarea
+              id="dec-output"
               value={output}
               readOnly
               placeholder="O resultado aparecerá aqui..."
-              className="w-full h-32 bg-zinc-900/50 border border-zinc-700 rounded-lg p-3 text-emerald-400 focus:outline-none resize-none font-mono text-sm"
+              spellCheck={false}
+              className="dh-input w-full h-36 py-2.5 bg-zinc-900/40 resize-none font-mono text-[12.5px] leading-relaxed"
             />
           </div>
         </div>

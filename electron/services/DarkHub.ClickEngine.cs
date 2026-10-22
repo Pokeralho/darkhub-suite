@@ -49,6 +49,21 @@ namespace DarkHub.Native
         [DllImport("winmm.dll", EntryPoint = "timeEndPeriod", SetLastError = true)]
         private static extern uint timeEndPeriod(uint uMilliseconds);
 
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern IntPtr CreateWaitableTimerExW(IntPtr lpTimerAttributes, string lpTimerName, uint dwFlags, uint dwDesiredAccess);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetWaitableTimer(IntPtr hTimer, ref long pDueTime, int lPeriod, IntPtr pfnCompletionRoutine, IntPtr lpArgToCompletionRoutine, bool fResume);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr hObject);
+
+        private const uint CREATE_WAITABLE_TIMER_HIGH_RESOLUTION = 0x00000002;
+        private const uint TIMER_ALL_ACCESS = 0x001F0003;
+
         private const uint INPUT_MOUSE = 0;
         private const uint MOUSEEVENTF_LEFTDOWN   = 0x0002;
         private const uint MOUSEEVENTF_LEFTUP     = 0x0004;
@@ -64,6 +79,9 @@ namespace DarkHub.Native
         private static Thread workerThread = null;
         private static Thread hotkeyThread = null;
         private static volatile bool exitRequested = false;
+        private static readonly object stateLock = new object();
+        private static int timerPeriodActive = 0;
+        private static IntPtr inputDesktop = IntPtr.Zero;
 
         private static void SendMouseButtonDown(uint downFlag)
         {
@@ -155,16 +173,38 @@ namespace DarkHub.Native
 
         private static void WorkerLoop()
         {
+            IntPtr hTimer = IntPtr.Zero;
             try
             {
-                IntPtr hDesk = OpenInputDesktop(0, false, 0x01FF);
-                if (hDesk != IntPtr.Zero)
+                // Opened once per process and reused: a desktop handle assigned to a thread cannot
+                // be closed (CloseDesktop fails while in use), so a per-START handle leaked forever.
+                if (inputDesktop == IntPtr.Zero)
                 {
-                    SetThreadDesktop(hDesk);
+                    inputDesktop = OpenInputDesktop(0, false, 0x01FF);
+                }
+                if (inputDesktop != IntPtr.Zero)
+                {
+                    SetThreadDesktop(inputDesktop);
                 }
             }
             catch {}
 
+            // High-resolution waitable timer (Win10 1803+): blocks instead of spinning a core.
+            try { hTimer = CreateWaitableTimerExW(IntPtr.Zero, null, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS); } catch {}
+
+            try
+            {
+                RunClickLoop(hTimer);
+            }
+            finally
+            {
+                ReleaseAllButtons();
+                if (hTimer != IntPtr.Zero) CloseHandle(hTimer);
+            }
+        }
+
+        private static void RunClickLoop(IntPtr hTimer)
+        {
             double frequency = (double)Stopwatch.Frequency;
 
             while (isRunning)
@@ -192,20 +232,33 @@ namespace DarkHub.Native
 
                 if (remainingTicks > 0)
                 {
-                    int remainingMs = (int)((remainingTicks * 1000) / frequency);
-                    if (remainingMs > 3)
+                    double remainingMsD = (remainingTicks * 1000.0) / frequency;
+                    if (hTimer != IntPtr.Zero && remainingMsD > 0.75)
                     {
-                        Thread.Sleep(remainingMs - 2);
+                        // Relative due time in 100 ns units (negative = relative); wake ~0.5 ms early.
+                        long due = -(long)((remainingMsD - 0.5) * 10000.0);
+                        if (due >= 0) due = -1;
+                        if (SetWaitableTimer(hTimer, ref due, 0, IntPtr.Zero, IntPtr.Zero, false))
+                        {
+                            WaitForSingleObject(hTimer, (uint)remainingMsD + 20);
+                        }
+                        else if (remainingMsD > 3)
+                        {
+                            Thread.Sleep((int)remainingMsD - 2);
+                        }
+                    }
+                    else if (remainingMsD > 3)
+                    {
+                        Thread.Sleep((int)remainingMsD - 2);
                     }
 
+                    // Short spin tail only (<= ~0.5 ms with the timer, <= ~3 ms without).
                     while (Stopwatch.GetTimestamp() < targetTicks && isRunning)
                     {
                         Thread.SpinWait(10);
                     }
                 }
             }
-
-            ReleaseAllButtons();
         }
 
         private static int ParseVkKey(string keyName)
@@ -268,33 +321,55 @@ namespace DarkHub.Native
 
         public static void StartClicking(string button, int interval)
         {
-            buttonType = button ?? "left";
-            intervalMs = Math.Max(1, Math.Min(10000, interval));
-
-            if (!isRunning)
+            // Called from both the stdin thread and the hotkey thread.
+            lock (stateLock)
             {
-                isRunning = true;
-                workerThread = new Thread(WorkerLoop)
-                {
-                    IsBackground = true,
-                    Priority = ThreadPriority.Highest
-                };
-                workerThread.Start();
-            }
+                string b = (button ?? "left").ToLowerInvariant();
+                if (b != "left" && b != "right" && b != "middle" && b != "double") b = "left";
+                buttonType = b;
+                intervalMs = Math.Max(1, Math.Min(10000, interval));
 
-            Console.WriteLine("{\"status\":\"running\",\"button\":\"" + buttonType + "\",\"intervalMs\":" + intervalMs + "}");
+                if (!isRunning)
+                {
+                    // A previous worker that did not finish within StopClicking's Join keeps
+                    // checking isRunning; let it exit before starting a new one.
+                    if (workerThread != null && workerThread.IsAlive) workerThread.Join(500);
+                    isRunning = true;
+                    workerThread = new Thread(WorkerLoop)
+                    {
+                        IsBackground = true,
+                        Priority = ThreadPriority.Highest
+                    };
+                    workerThread.Start();
+                }
+
+                Console.WriteLine("{\"status\":\"running\",\"button\":\"" + buttonType + "\",\"intervalMs\":" + intervalMs + "}");
+            }
         }
 
         public static void StopClicking()
         {
-            isRunning = false;
-            if (workerThread != null && workerThread.IsAlive)
+            lock (stateLock)
             {
-                workerThread.Join(250);
-                workerThread = null;
+                isRunning = false;
+                if (workerThread != null && workerThread.IsAlive)
+                {
+                    workerThread.Join(250);
+                }
+                ReleaseAllButtons();
+                Console.WriteLine("{\"status\":\"stopped\"}");
             }
+        }
+
+        private static void Cleanup()
+        {
+            exitRequested = true;
+            isRunning = false;
             ReleaseAllButtons();
-            Console.WriteLine("{\"status\":\"stopped\"}");
+            if (Interlocked.Exchange(ref timerPeriodActive, 0) == 1)
+            {
+                timeEndPeriod(1);
+            }
         }
 
         public static void SetHotkey(string key)
@@ -305,7 +380,9 @@ namespace DarkHub.Native
 
         public static void Main(string[] args)
         {
-            timeBeginPeriod(1);
+            if (timeBeginPeriod(1) == 0) timerPeriodActive = 1;
+            AppDomain.CurrentDomain.ProcessExit += (s, e) => Cleanup();
+            Console.CancelKeyPress += (s, e) => Cleanup();
 
             // Start hotkey listener thread
             hotkeyThread = new Thread(HotkeyListenerLoop)
@@ -324,8 +401,11 @@ namespace DarkHub.Native
             }
 
             string line;
-            while ((line = Console.ReadLine()) != null)
+            while (true)
             {
+                try { line = Console.ReadLine(); } catch { line = null; }
+                // EOF = parent (Electron) closed the pipe or died: stop clicking and exit.
+                if (line == null) break;
                 line = line.Trim();
                 if (string.IsNullOrEmpty(line)) continue;
 
@@ -361,7 +441,8 @@ namespace DarkHub.Native
             }
 
             exitRequested = true;
-            timeEndPeriod(1);
+            try { if (isRunning) StopClicking(); } catch {}
+            Cleanup();
         }
     }
 }

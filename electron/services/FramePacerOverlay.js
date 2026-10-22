@@ -322,21 +322,25 @@ export function createFramePacerOverlay() {
     FramePacerEngine.start()
   }
 
+  const win = overlayWindow
   const metricsHandler = (metrics) => {
-    if (!overlayWindow || overlayWindow.isDestroyed()) return
-    overlayWindow.webContents.executeJavaScript(`
+    // Skip the IPC round-trip while the overlay is hidden.
+    if (win.isDestroyed() || !win.isVisible()) return
+    win.webContents.executeJavaScript(`
       if (window.updateData) window.updateData(${JSON.stringify(metrics)});
     `).catch(() => {})
   }
 
   FramePacerEngine.on('metrics', metricsHandler)
 
-  overlayWindow.on('closed', () => {
+  win.on('closed', () => {
+    FramePacerEngine.off('metrics', metricsHandler);
+    // close() is async: a new overlay may already exist; don't clobber it.
+    if (overlayWindow !== win && overlayWindow !== null) return
     if (globalThis._darkhub_topmost_timer) {
       clearInterval(globalThis._darkhub_topmost_timer);
       globalThis._darkhub_topmost_timer = null;
     }
-    FramePacerEngine.off('metrics', metricsHandler);
     overlayWindow = null;
   });
 

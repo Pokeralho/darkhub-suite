@@ -21,11 +21,17 @@ export function isPs1(p) {
   return typeof p === 'string' && /\.ps1$/i.test(p.trim())
 }
 
-/** True only when `p` is a real descendant of the DarkOS root (no traversal, not the root itself). */
+/**
+ * True only when `p` is a real descendant of the DarkOS root (no traversal, not the root itself).
+ * Only plain drive paths are accepted: UNC/device paths (\\server\share, \\?\, \\.\) and NTFS alternate
+ * data streams (x.txt:evil.ps1) are refused.
+ */
 export function isUnderDarkOS(p, root = DARKOS_ROOT) {
   if (typeof p !== 'string' || !p.trim()) return false
+  const raw = p.trim()
+  if (!/^[A-Za-z]:\\/.test(raw) || raw.indexOf(':', 2) !== -1 || /[\u0000-\u001f*?"<>|]/.test(raw)) return false
   try {
-    const target = path.win32.resolve(p.trim())
+    const target = path.win32.resolve(raw)
     const base = path.win32.resolve(root)
     const rel = path.win32.relative(base, target)
     if (!rel || rel === '.') return false
@@ -64,6 +70,15 @@ function psQuote(value) {
   return `'${String(value ?? '').replace(/'/g, "''")}'`
 }
 
+/** parseJsonOutput throws on non-JSON output; here a bad payload is just "no data". */
+function safeJson(stdout, fallback) {
+  try {
+    return parseJsonOutput(stdout, fallback)
+  } catch {
+    return fallback
+  }
+}
+
 export class PowerShellToolsService {
   constructor({ runner, cmdRunner, fsImpl, root } = {}) {
     this._root = root || DARKOS_ROOT
@@ -72,12 +87,26 @@ export class PowerShellToolsService {
     this._cmd = cmdRunner || ((cmd, args, opts) => runCommand(cmd, args, opts))
   }
 
+  /**
+   * Lexical check + the same check on the fully resolved path, so a junction/symlink placed under the
+   * DarkOS root cannot point the runner at a script outside it.
+   */
+  _isTrustedPath(p) {
+    if (!isUnderDarkOS(p, this._root)) return false
+    if (typeof this._fs.realpathSync !== 'function') return true
+    try {
+      return isUnderDarkOS(this._fs.realpathSync(p.trim()), this._fs.realpathSync(this._root))
+    } catch {
+      return false
+    }
+  }
+
   /** Reads the execution policy of every scope and resolves the effective one (no admin needed). */
   async getPolicies() {
     if (process.platform !== 'win32') return { ok: false, error: 'Disponível apenas no Windows.', scopes: [] }
     const script = `Get-ExecutionPolicy -List | ForEach-Object { [pscustomobject]@{ scope = $_.Scope.ToString(); policy = $_.ExecutionPolicy.ToString() } } | ConvertTo-Json -Compress`
     const res = await this._runner(script, { timeoutMs: 15000, trim: true })
-    const scopes = normalizeScopes(parseJsonOutput(res?.stdout, []))
+    const scopes = normalizeScopes(safeJson(res?.stdout, []))
     if (!scopes.length) return { ok: false, error: (res?.stderr || '').trim() || 'Não foi possível ler a política de execução.', scopes: [] }
     return { ok: true, scopes, effective: effectivePolicy(scopes) }
   }
@@ -105,9 +134,12 @@ $out = foreach ($f in $files) {
 ConvertTo-Json -InputObject @($out) -Depth 3 -Compress
 `
     const res = await this._runner(script, { timeoutMs: 30000, trim: true })
-    const raw = parseJsonOutput(res?.stdout, [])
+    const raw = safeJson(res?.stdout, null)
+    if (raw === null && String(res?.stderr ?? '').trim()) {
+      return { ok: false, rootExists: true, root: this._root, scripts: [], error: String(res.stderr).trim().slice(0, 600) }
+    }
     const list = Array.isArray(raw) ? raw : (raw ? [raw] : [])
-    const scripts = list.map((s) => ({
+    const scripts = list.filter((s) => s && typeof s.path === 'string').map((s) => ({
       name: String(s.name ?? ''),
       path: String(s.path ?? ''),
       sizeBytes: Number(s.sizeBytes ?? 0) || 0,
@@ -119,30 +151,40 @@ ConvertTo-Json -InputObject @($out) -Depth 3 -Compress
 
   /** Returns the Authenticode signature of a single trusted script (validated path). */
   async getSignature(scriptPath) {
-    if (!isPs1(scriptPath) || !isUnderDarkOS(scriptPath, this._root)) {
+    if (!isPs1(scriptPath) || !this._isTrustedPath(scriptPath)) {
       return { ok: false, error: 'Caminho inválido ou fora de ' + this._root }
     }
     if (!this._fs.existsSync(scriptPath)) return { ok: false, error: 'Arquivo não encontrado.' }
-    const script = `$s = Get-AuthenticodeSignature -FilePath ${psQuote(scriptPath)} -ErrorAction SilentlyContinue; [pscustomobject]@{ status = "$($s.Status)"; signer = if ($s.SignerCertificate) { "$($s.SignerCertificate.Subject)" } else { '' } } | ConvertTo-Json -Compress`
+    const script = `$s = Get-AuthenticodeSignature -LiteralPath ${psQuote(scriptPath)} -ErrorAction SilentlyContinue; [pscustomobject]@{ status = "$($s.Status)"; signer = if ($s.SignerCertificate) { "$($s.SignerCertificate.Subject)" } else { '' } } | ConvertTo-Json -Compress`
     const res = await this._runner(script, { timeoutMs: 15000, trim: true })
-    const d = parseJsonOutput(res?.stdout, null)
+    const d = safeJson(res?.stdout, null)
     return { ok: true, signature: normalizeSignature(d || {}) }
   }
 
   /**
    * Runs a trusted DarkOS maintenance script. Refuses anything outside C:\ProgramData\DarkOS.
    * Uses `-ExecutionPolicy Bypass` scoped to this child process only — the system policy is untouched.
-   * The caller (UI) sees the signature so an unsigned script is never run without the user seeing it.
+   * A script without a valid Authenticode signature is refused (needsConfirmation) unless the caller
+   * passes `confirmUnsigned: true`, i.e. the user explicitly accepted running it.
    */
-  async runScript({ path: scriptPath } = {}) {
+  async runScript({ path: scriptPath, confirmUnsigned } = {}) {
     if (!isPs1(scriptPath)) return { ok: false, error: 'Selecione um arquivo .ps1.' }
-    if (!isUnderDarkOS(scriptPath, this._root)) {
+    if (!this._isTrustedPath(scriptPath)) {
       return { ok: false, error: `Por segurança, só é possível executar scripts dentro de ${this._root}.` }
     }
     if (!this._fs.existsSync(scriptPath)) return { ok: false, error: 'Arquivo não encontrado.' }
     const sig = await this.getSignature(scriptPath)
+    const signature = sig.ok ? sig.signature : { status: 'Unknown', trusted: false, signer: '' }
+    if (!signature.trusted && confirmUnsigned !== true) {
+      return {
+        ok: false,
+        needsConfirmation: true,
+        signature,
+        error: `O script não tem assinatura digital válida (${signature.status}). Confirme explicitamente para executá-lo.`
+      }
+    }
     const res = await this._cmd('powershell.exe', [
-      '-NoProfile', '-ExecutionPolicy', 'Bypass', '-NonInteractive', '-File', scriptPath
+      '-NoProfile', '-ExecutionPolicy', 'Bypass', '-NonInteractive', '-File', scriptPath.trim()
     ], { timeoutMs: 120000, trim: true })
     const stdout = String(res?.stdout ?? '')
     const stderr = String(res?.stderr ?? '')
@@ -151,7 +193,7 @@ ConvertTo-Json -InputObject @($out) -Depth 3 -Compress
       code: res?.code ?? 1,
       stdout,
       stderr,
-      signature: sig.ok ? sig.signature : { status: 'Unknown', trusted: false, signer: '' },
+      signature,
       error: res?.code === 0 ? undefined : (stderr.trim() || `O script terminou com código ${res?.code}.`)
     }
   }
@@ -163,7 +205,7 @@ ConvertTo-Json -InputObject @($out) -Depth 3 -Compress
   async openElevatedTerminal({ startingPath } = {}) {
     if (process.platform !== 'win32') return { ok: false, error: 'Disponível apenas no Windows.' }
     let startIn = this._root
-    if (startingPath && isUnderDarkOS(startingPath, this._root) && this._fs.existsSync(startingPath)) startIn = startingPath
+    if (startingPath && this._isTrustedPath(startingPath) && this._fs.existsSync(startingPath)) startIn = startingPath.trim()
     if (!this._fs.existsSync(startIn)) startIn = process.env.SystemRoot || 'C:\\'
     const inner = `Set-Location -LiteralPath ${psQuote(startIn)}`
     const launcher = `try { Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList @('-NoExit','-NoProfile','-Command',${psQuote(inner)}); 'DH_LAUNCHED' } catch { Write-Error $_.Exception.Message; exit 1 }`

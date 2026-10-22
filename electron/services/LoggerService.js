@@ -6,6 +6,23 @@ const AUDIT_FIELD_MAX_CHARS = 4000;
 
 const AUDIT_MAX_BYTES = 10 * 1024 * 1024;
 const AUDIT_KEEP_LINES_ON_ROTATE = 5000;
+const LOG_MAX_BYTES = 5 * 1024 * 1024;
+
+// Masks credentials that may end up in messages (URLs with tokens, auth headers, key=value pairs).
+const SECRET_PATTERNS = [
+  [/\b(authorization|proxy-authorization)\s*[:=]\s*(bearer|basic|token)?\s*[^\s,;"']+/gi, '$1: [REDACTED]'],
+  [/\b(bearer)\s+[a-z0-9._~+/=-]{8,}/gi, '$1 [REDACTED]'],
+  [/([?&](?:access_token|token|api[_-]?key|apikey|key|secret|password|passwd|pwd|sig|signature|auth)=)[^&\s"']+/gi, '$1[REDACTED]'],
+  [/\b((?:password|passwd|pwd|secret|token|api[_-]?key|masterPassword|recoveryWords)["']?\s*[:=]\s*["']?)[^\s,;"'&}]+/gi, '$1[REDACTED]'],
+  [/\b(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, '[REDACTED_GH_TOKEN]'],
+  [/(https?:\/\/)[^\s/:@]+:[^\s/@]+@/gi, '$1[REDACTED]@']
+];
+
+export function redactSecrets(value) {
+  let str = String(value ?? '');
+  for (const [re, replacement] of SECRET_PATTERNS) str = str.replace(re, replacement);
+  return str;
+}
 
 class LoggerService {
   constructor() {
@@ -17,11 +34,22 @@ class LoggerService {
     this.logPath = path.join(app.getPath('userData'), 'darkhub_elite.log');
 
     this.auditPath = path.join(app.getPath('userData'), 'optimizer_audit.jsonl');
+    this._rotateLogIfNeeded();
     this.info('LoggerService', 'Initialized Telemetry & Logging engine.');
   }
 
+  _rotateLogIfNeeded() {
+    try {
+      if (this.logPath && fs.existsSync(this.logPath) && fs.statSync(this.logPath).size > LOG_MAX_BYTES) {
+        fs.renameSync(this.logPath, this.logPath + '.old');
+      }
+    } catch {
+      // rotation is best effort
+    }
+  }
+
   _truncate(value, max = AUDIT_FIELD_MAX_CHARS) {
-    const str = String(value ?? '');
+    const str = redactSecrets(value);
     if (str.length <= max) return str;
     return str.slice(0, max) + `… [truncado, ${str.length - max} chars omitidos]`;
   }
@@ -75,7 +103,7 @@ class LoggerService {
   _format(level, moduleName, message, durationMs = null) {
     const timestamp = new Date().toISOString();
     const durStr = durationMs !== null ? ` [${durationMs}ms]` : '';
-    return `[${timestamp}] [${level}] [${moduleName}]${durStr} ${message}`;
+    return `[${timestamp}] [${level}] [${moduleName}]${durStr} ${redactSecrets(message)}`;
   }
 
   _write(line) {

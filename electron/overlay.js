@@ -3,7 +3,6 @@
 import { BrowserWindow, screen } from 'electron'
 import os from 'node:os'
 import net from 'node:net'
-import { spawn } from 'node:child_process'
 import { gamingBooster } from './gamingBooster.js'
 import { CpuLoadTracker } from './services/CpuLoadTracker.js'
 

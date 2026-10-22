@@ -1,6 +1,6 @@
 import React from 'react';
 import { useOptimizerProgress } from '../hooks/useOptimizerProgress';
-import { CheckCircle, Loader2, Terminal, XCircle } from 'lucide-react';
+import { CheckCircle, Loader2, Terminal, XCircle } from './icons';
 
 interface OptimizerProgressProps {
   routineId?: string | null;

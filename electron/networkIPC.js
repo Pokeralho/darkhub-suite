@@ -47,7 +47,9 @@ export function registerNetworkIPC() {
     }
   });
 
-  ipcMain.handle('network:portScan', async (_event, { host, ports } = {}) => {
+  ipcMain.handle('network:portScan', async (_event, payload) => {
+    // `payload` may be null from the renderer; destructuring defaults only cover `undefined`.
+    const { host, ports } = payload ?? {};
     let safeHost;
     try {
       safeHost = assertSafeHost(host);
@@ -92,8 +94,11 @@ export function registerNetworkIPC() {
       });
     };
 
-    for (const port of validPorts) {
-      results.push(await checkPort(port));
+    // Probe in small parallel batches (results keep port order): a 256-port sequential scan
+    // could take ~3.5 min at 800 ms per filtered port.
+    const BATCH = 16;
+    for (let i = 0; i < validPorts.length; i += BATCH) {
+      results.push(...await Promise.all(validPorts.slice(i, i + BATCH).map(checkPort)));
     }
 
     return { ok: true, results };

@@ -4,6 +4,159 @@ All notable changes to the DarkHub Suite project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-10-21
+
+### Monitor, Post-Install, embedded sites
+- System Monitor: new "All sensors" tab lists every LibreHardwareMonitor sensor per component (voltages,
+  temperatures, power, clocks, utilization, fans, memory, SMART data), HWMonitor style, with session min/max and a filter.
+- The sensor helper reports whether it runs elevated: PawnIO only answers an elevated caller, so without admin the
+  CPU temperature/clock/voltage/power and Super I/O placeholders are hidden and the UI says why (was "waiting").
+- Post-Install Hub: categories are collapsed by default (name, count and a preview of the apps), open on click or
+  while searching; "Expand all / Collapse all".
+- LuluFlix / Juuzou: the embedded site fills the window (it was capped at 420 px because its wrapper had no height).
+
+### Design
+- New "Frost" identity derived from the brand mark: cold ink neutrals, one glacial accent, Geist / Geist Mono,
+  tight radius scale and restrained motion. Rules in `DESIGN.md`; Tailwind palettes are remapped so every screen
+  inherits it.
+- 125 custom icons (`src/components/icons`, chamfered "ice tile" geometry); lucide-react removed.
+- Redesigned shell (title bar mark, sidebar with glacial active rail) and Home; all 30 screens polished
+  (no icon chips, no uppercase eyebrows, no hype pills, one primary action per view, skeleton/empty/error states).
+- Native checkbox / radio / select / range styled consistently app-wide.
+
+### Fixed (verified in a DarkOS VM: 35 registry tweaks and 36 optimizer operations applied, verified and reverted)
+- DarkOS Center status: 26 s -> ~5 s (bulk service / task / Appx reads, identical results).
+- DarkHub now runs the newest DarkOS module (installed vs bundled, by `# ModuleVersion`), so module fixes reach
+  DarkOS machines; "removed apps" no longer fails without admin.
+- Drag-and-drop in File Converter and DLSS 5 (File.path was removed in Electron 32) and a file-grant bypass.
+- File Converter / archive failed in the default flow (output folder next to the picked files was refused).
+- Duplicated Steam games (DLSS 5 and Library discovery); wrong game executable picked (e.g. Deadlock).
+- "Ultimate Performance" failed when the plan already existed; CPU unpark verification false negative
+  (hidden power settings are now read from the registry).
+- HAGS showed "Unavailable" until the GPU tab was opened; Dashboard said "Optimal" with a red security score.
+- Ultra Low Latency could not bind a bare F-key; log consoles scrolled the whole page.
+- Native helpers (FrameLimiter, ClickEngine, LatencyEngine, SensorDaemon) rebuilt from the audited sources.
+
+### Added
+- Driver Center: GPUs running Microsoft's generic display driver are identified by PCI vendor ID
+  ("NVIDIA/AMD/Intel card (Microsoft generic driver)") with a one-click link to the vendor's official app; Home
+  shows a banner when this happens.
+- Driver Center: camera and screen-capture check + repair (capture services, privacy policies, UVC driver
+  reinstall, ghost USB cleanup; on DarkOS it also reverts the lean items that block the camera).
+- Post-Install Hub: new Office/PDF, Image & Design, Video, Audio and 3D/CAD categories with open-source
+  alternatives (LibreOffice, ONLYOFFICE, GIMP, Inkscape, darktable, Kdenlive, Blender, FreeCAD...) and the
+  storytold "Craft" apps (PhotoCraft, WordCraft, GridCraft... marked alpha), installed from their official
+  GitHub releases with the SHA-256 checked.
+
+- DarkOS Mods on any Windows: on a stock Windows the DarkOS screen becomes "DarkOS Mods" and applies the 167 DarkOS
+  tweaks one by one (gaming and latency first), per category or by profile (Balanced / Competitive gaming /
+  Maximum performance). Same engine as DarkOS: original value captured, read-back verification, verified undo,
+  snapshots and "restore everything". State lives in `C:\ProgramData\DarkHub\WinMods`; per-user items target
+  the current user. Mods the system already has are shown as "Already active"; services/tasks that do not
+  exist on that Windows are shown as such instead of offering an Apply that does nothing.
+- DarkOS engine (ModuleVersion 3): protected services that refuse SCM changes even for admins (e.g. Delivery
+  Optimization / DoSvc) now get their startup type through the registry, instead of failing and rolling back.
+
+- WinUtil (Chris Titus) parity, adapted. 31 new Optimizer tweaks, all with original-value snapshot, read-back
+  verification and undo:
+  - Gaming / network: MPO off, prefer IPv4, IPv6 off, Teredo off (official policy).
+  - Power: no network in Modern Standby, S3 sleep.
+  - Privacy / anti-bloat: no Store results in Start search, notifications off, block device companion apps, block
+    the Razer Synapse / Logi Download Assistant auto-install (without turning off Windows Update drivers), WPBT off,
+    Brave debloat, keep classic Outlook.
+  - Storage: Storage Sense off, Reserved Storage off.
+  - System: long paths, registry backup, detailed BSOD, verbose logon, F8 boot menu, NTP pool, no warning for
+    unsigned .rdp files.
+  - Interface: Home/Gallery off, no folder-type detection (keeps saved views), previous Start menu, lock screen off,
+    Settings home page off, battery %, scrollbars always visible, Snap off, Num Lock on at startup.
+- Optimizer "Windows Features & Repairs" tab:
+  - Windows features with their real state: WSL, VM Platform, Hyper-V, Sandbox, .NET 3.5, legacy media, NFS,
+    OpenSSH server.
+  - Repairs: Windows Update reset, winget repair, component store cleanup without /ResetBase.
+  - Advanced actions: autologon through netplwiz, Edge remove/reinstall, BitLocker off.
+  - 19 classic Control Panel / MMC screens.
+- O&O ShutUp10++ added to the Post-Install Hub.
+- PowerShell runner: scripts too long for the Windows command line (32K) now run from a private temp file.
+  This had broken the status read of every tweak once the list grew.
+- "Prefer IPv4" and "Disable IPv6" are alternatives: applying one undoes the other first, so undo returns the
+  real original value.
+
+- Disk map (new screen, replaces the SpaceSniffer replica, which only showed made-up data and launched an exe that was
+  not shipped):
+  - Real scanning through the native `DarkHub.DiskScan.exe`: `FindFirstFileEx` with large fetch, multi-threaded, no
+    per-file stat, reparse points never followed. A full C: drive (~790k files) takes 4 to 8 s.
+  - The tree stays in the main process in column arrays (~40 MB for 790k files). The renderer only gets what can be
+    drawn; smaller items are folded into one block.
+  - The map updates live during the scan.
+  - Filters (name, size, age, folder, type, tags, real attributes, negation) run over the whole tree in ~0.3 s.
+  - Side panel for the selected item: open, Show in Explorer, copy path, tags, Move to Recycle Bin (with confirmation).
+  - TXT/CSV reports; real drives with capacity; free space optional; "not visible" space shown on whole drives.
+  - Frost design: canvas with a cached static layer, ResizeObserver, keyboard shortcuts.
+
+- Advanced sensors (System Monitor), opt-in: LibreHardwareMonitorLib 0.9.6 in a separate helper
+  (`DarkHub.HwSensors.exe`). Without a driver it reads the GPU (core, hot spot, VRAM, power) and the disks. With the
+  optional PawnIO driver (installed from the screen through winget, author-signed, Memory Integrity compatible) it
+  also reads per-core CPU temperature, fans and voltages. CPU / Super I/O placeholders are never shown without the
+  driver. WinRing0 was rejected: it is on Microsoft's vulnerable-driver blocklist.
+
+### Fixed (monitoring)
+- Installed builds: the native sensor daemon could never start (`spawn` from inside app.asar fails with ENOENT while
+  `existsSync` says yes), so disk, network, GPU and DPC sensors were dead and the daemon respawned every 5 s. Same
+  bug in the DLL injector (PowerShell cannot read a script inside app.asar). Both now use app.asar.unpacked.
+- Real data only:
+  - Counters that cannot be read come as null ("unavailable") instead of a measured 0.
+  - Disk active time is 100 - % Idle Time (as Task Manager shows), not a clamped % Disk Time.
+  - GPU usage and VRAM are read per adapter (DXGI LUID + name) instead of mixing iGPU and dGPU into "GPU 1";
+    nvidia-smi and the advanced sensors are matched by name, not position.
+  - CoreTemp in Fahrenheit or distance-to-TjMax mode is converted.
+  - "Distance to TjMax" is never used as a temperature, and the OHM/LHM WMI read takes exact sensor names.
+  - The ACPI zone is no longer presented as the CPU temperature.
+  - Removed fake values: Dashboard disk activity estimated against 7000 MB/s, the CPU temperature shown as the GPU's,
+    "0 B" of junk when the scan failed, "SMART OK" without data, per-core 0 % on the first sample, physical cores
+    guessed as threads / 2, "Disconnected" for an unknown link speed, "Integrated GPU" from an unreliable flag, the
+    "ADL / SMI fallback" tag, and "running" processes copying the total.
+  - Fixed: swapped cores / threads label, Windows 11 detection (build 22000+), registry driver date and nvidia-smi
+    power limit taken from the wrong adapter, sparkline history that skipped repeated values.
+- Lighter: the PowerShell slow daemon no longer repeats what the native daemon reads (processes, CoreTemp) and stops
+  its WMI / ACPI / disk-reliability temperature queries while the advanced sensors run. The PowerShell PDH fallback
+  (~200 lines duplicating the native daemon) was removed. The PawnIO check is cached.
+- PawnIO is installed automatically when advanced sensors are turned on: official 2.2.0 release, pinned SHA-256,
+  Authenticode check, silent install. Its setup has no published redistribution terms, so it is fetched instead of
+  shipped inside the installer.
+- New test guard: backslashes dropped inside JS template literals sent to PowerShell (parsed with TypeScript).
+- Home: the memory figure showed FREE memory next to a bar of USED memory, read once. It now shows memory in use (the
+  same number as Task Manager), refreshed every 3 s through a cheap `system:getMemory` (no PowerShell).
+- CPU temperature: when only an ACPI thermal zone was available, 16 degrees C were added to any value below 32. The
+  zone is now shown as it is, marked low quality.
+- Measured cost of the existing monitoring: ~0.1% of total CPU (PowerShell slow sensors 0.07%, SensorDaemon 0.02%).
+
+### Fixed (Post-Install Hub)
+- 19 catalog entries had winget IDs that no longer exist (HWiNFO, OCCT, FurMark, Prime95, System Informer,
+  Vivaldi, PeaZip, Afterburner, BCU, WhatsApp...): all corrected; Macrium Reflect Free (discontinued) removed.
+
+### Developer
+- `npm run dev` (auto-restart, separate profile, IPC trace panel), `npm run selftest`, `npm run shot`,
+  `npm run map` / `map:find`, `docs/PROJECT_MAP.md`, `CLAUDE.md`.
+
+### Fixed (shell)
+- App shell: each page now has its own error boundary (keyed by route), so one module crashing no longer leaves
+  every other page showing the error card; the card offers "Home", and chunk-load failures offer a full reload.
+  Render errors are also forwarded to the existing renderer error reporter. The updater overlay and the whole
+  shell are wrapped too (no more blank window if the layout throws).
+- 12 i18n keys used by the Microsoft Edge reinstall panel and the Defender image-restore flow were missing from
+  both dictionaries (English UI showed Portuguese fallbacks); added in pt-BR and en-US.
+- Pages now open scrolled to the top instead of inheriting the previous page's scroll position.
+- LuluFlix / Juuzou: show a retry card when the embedded site fails to load (previously a blank panel).
+
+### Changed
+- Dashboard is lazy-loaded like every other page (startup bundle only carries the shell).
+- Sidebar: `aria-current`, keyboard focus ring, Up/Down/Home/End navigation, Settings active state,
+  translated window-control / collapse labels; visible `:focus-visible` outline app-wide.
+- Boot skeleton in `index.html` matches the real shell (32px title bar, 224px sidebar, zinc palette).
+- Setup Hub / LuluFlix / Juuzou headers follow the standard page header; `<html lang>` follows the UI language.
+- Removed the unused `registerLanguage()` export from `src/i18n/messages.ts`.
+- `.gitignore`: dropped the blanket `*manifest*` pattern; added coverage/.vite/profiling outputs.
+
 ## [0.5.0] - 2026-10-12
 
 ### Added

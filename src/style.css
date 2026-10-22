@@ -1,15 +1,98 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   DarkHub "Frost" design system
+   Identity comes from the brand mark (a white snow crystal on ink-black): cold ink neutrals, one glacial
+   accent, crystalline (chamfered) icon geometry, mono numerals. Pages keep their Tailwind classes; the
+   palettes below are remapped so every screen inherits the identity without per-page rewrites:
+     zinc                -> Ink (cold neutrals, hue 255)
+     blue/indigo/violet/
+     purple/sky/cyan     -> Glacier (the single accent)
+     emerald/amber/red/rose stay semantic (ok / warning / error).
+   ========================================================================== */
 @theme {
-  --color-dark-bg: #09090b;
-  --color-dark-surface: #121215;
-  --color-dark-card: #18181b;
-  --color-dark-border: #27272a;
-  --color-primary: #3b82f6;
-  --color-zinc-750: #323238;
-  --color-zinc-850: #1f1f23;
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  /* Ink neutrals */
+  --color-zinc-50: oklch(0.975 0.004 255);
+  --color-zinc-100: oklch(0.945 0.006 255);
+  --color-zinc-200: oklch(0.885 0.008 255);
+  --color-zinc-300: oklch(0.79 0.011 255);
+  --color-zinc-400: oklch(0.67 0.014 255);
+  --color-zinc-500: oklch(0.55 0.015 255);
+  --color-zinc-600: oklch(0.44 0.014 255);
+  --color-zinc-700: oklch(0.34 0.013 255);
+  --color-zinc-750: oklch(0.30 0.013 255);
+  --color-zinc-800: oklch(0.262 0.012 255);
+  --color-zinc-850: oklch(0.225 0.012 255);
+  --color-zinc-900: oklch(0.193 0.011 255);
+  --color-zinc-950: oklch(0.158 0.010 255);
+
+  /* Glacier accent (600 keeps >= 4.5:1 with white text) */
+  --color-blue-50: oklch(0.97 0.014 228);
+  --color-blue-100: oklch(0.94 0.028 228);
+  --color-blue-200: oklch(0.90 0.048 228);
+  --color-blue-300: oklch(0.86 0.068 228);
+  --color-blue-400: oklch(0.81 0.085 228);
+  --color-blue-500: oklch(0.70 0.10 230);
+  --color-blue-600: oklch(0.52 0.092 232);
+  --color-blue-700: oklch(0.45 0.08 234);
+  --color-blue-800: oklch(0.37 0.065 236);
+  --color-blue-900: oklch(0.29 0.05 238);
+  --color-blue-950: oklch(0.21 0.035 240);
+
+  --color-indigo-50: var(--color-blue-50); --color-indigo-100: var(--color-blue-100); --color-indigo-200: var(--color-blue-200);
+  --color-indigo-300: var(--color-blue-300); --color-indigo-400: var(--color-blue-400); --color-indigo-500: var(--color-blue-500);
+  --color-indigo-600: var(--color-blue-600); --color-indigo-700: var(--color-blue-700); --color-indigo-800: var(--color-blue-800);
+  --color-indigo-900: var(--color-blue-900); --color-indigo-950: var(--color-blue-950);
+  --color-violet-50: var(--color-blue-50); --color-violet-100: var(--color-blue-100); --color-violet-200: var(--color-blue-200);
+  --color-violet-300: var(--color-blue-300); --color-violet-400: var(--color-blue-400); --color-violet-500: var(--color-blue-500);
+  --color-violet-600: var(--color-blue-600); --color-violet-700: var(--color-blue-700); --color-violet-800: var(--color-blue-800);
+  --color-violet-900: var(--color-blue-900); --color-violet-950: var(--color-blue-950);
+  --color-purple-50: var(--color-blue-50); --color-purple-100: var(--color-blue-100); --color-purple-200: var(--color-blue-200);
+  --color-purple-300: var(--color-blue-300); --color-purple-400: var(--color-blue-400); --color-purple-500: var(--color-blue-500);
+  --color-purple-600: var(--color-blue-600); --color-purple-700: var(--color-blue-700); --color-purple-800: var(--color-blue-800);
+  --color-purple-900: var(--color-blue-900); --color-purple-950: var(--color-blue-950);
+  --color-sky-50: var(--color-blue-50); --color-sky-100: var(--color-blue-100); --color-sky-200: var(--color-blue-200);
+  --color-sky-300: var(--color-blue-300); --color-sky-400: var(--color-blue-400); --color-sky-500: var(--color-blue-500);
+  --color-sky-600: var(--color-blue-600); --color-sky-700: var(--color-blue-700); --color-sky-800: var(--color-blue-800);
+  --color-sky-900: var(--color-blue-900); --color-sky-950: var(--color-blue-950);
+  --color-cyan-50: var(--color-blue-50); --color-cyan-100: var(--color-blue-100); --color-cyan-200: var(--color-blue-200);
+  --color-cyan-300: var(--color-blue-300); --color-cyan-400: var(--color-blue-400); --color-cyan-500: var(--color-blue-500);
+  --color-cyan-600: var(--color-blue-600); --color-cyan-700: var(--color-blue-700); --color-cyan-800: var(--color-blue-800);
+  --color-cyan-900: var(--color-blue-900); --color-cyan-950: var(--color-blue-950);
+  --color-fuchsia-400: var(--color-blue-400); --color-fuchsia-500: var(--color-blue-500);
+  --color-pink-400: var(--color-blue-400); --color-pink-500: var(--color-blue-500);
+
+  /* Semantic: success leans cold (aurora green) so it sits with the palette */
+  --color-emerald-300: oklch(0.86 0.11 168);
+  --color-emerald-400: oklch(0.80 0.13 166);
+  --color-emerald-500: oklch(0.72 0.14 164);
+  --color-emerald-600: oklch(0.58 0.12 164);
+
+  /* Legacy aliases still referenced by a few components */
+  --color-dark-bg: var(--color-zinc-950);
+  --color-dark-surface: var(--color-zinc-900);
+  --color-dark-card: var(--color-zinc-850);
+  --color-dark-border: var(--color-zinc-800);
+  --color-primary: var(--color-blue-500);
+
+  /* Type: Geist for UI, Geist Mono for every number and identifier */
+  --font-sans: "Geist Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", "Cascadia Mono", Consolas, ui-monospace, monospace;
+
+  /* One radius scale: tight, precise */
+  --radius-sm: 3px;
+  --radius: 5px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-3xl: 14px;
+
+  /* Motion: crisp, never sluggish */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -20,60 +103,180 @@ html, body, #app {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background-color: #09090b;
-  color: #f4f4f5;
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: oklch(0.138 0.010 255);
+  color: var(--color-zinc-100);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
   user-select: none;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-.drag-region {
-  -webkit-app-region: drag;
+::selection {
+  background: oklch(0.52 0.092 232 / 0.55);
+  color: var(--color-zinc-50);
 }
 
-.no-drag {
-  -webkit-app-region: no-drag;
+/* Numbers never jitter: every mono run uses tabular figures */
+.font-mono, code, kbd, samp, pre { font-variant-numeric: tabular-nums slashed-zero; }
+
+/* Visible keyboard focus everywhere (mouse clicks do not trigger :focus-visible). Kept in the base layer so a
+   component's own focus:ring / outline utilities still win. */
+@layer base {
+  :where(a, button, input, select, textarea, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 1.5px solid var(--color-blue-400);
+    outline-offset: 2px;
+  }
 }
 
-/* Crisp, professional interactive transitions without jumpy transforms */
-button, 
-[role="button"], 
+.drag-region { -webkit-app-region: drag; }
+.no-drag { -webkit-app-region: no-drag; }
+
+/* Pressable feedback: a 3% press, quick release. Colour changes stay on the Tailwind transition utilities. */
+button,
+[role="button"],
 .cursor-pointer {
   cursor: pointer !important;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+  transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), color 150ms var(--ease-out),
+    opacity 150ms var(--ease-out), transform 140ms var(--ease-out), box-shadow 150ms var(--ease-out);
 }
-
 button:active:not(:disabled),
 [role="button"]:active {
-  opacity: 0.85;
+  transform: scale(0.97);
 }
+button:disabled { cursor: not-allowed !important; }
 
-/* Minimalist engineering scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+/* Scrollbar: hairline, only visible when needed */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
-  border-radius: 3px;
+  background: var(--color-zinc-800);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
 }
+::-webkit-scrollbar-thumb:hover { background: var(--color-zinc-700); background-clip: padding-box; border: 2px solid transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+/* Inputs share one quiet field style unless a page overrides it */
+input::placeholder, textarea::placeholder { color: var(--color-zinc-500); }
+
+/* ---------------------------------------------------------------- native controls, one look everywhere
+   Deliberately unlayered: beats per-page Tailwind utilities (bg-*, h-4 w-4) so every checkbox matches. */
+:root { accent-color: var(--color-blue-400); color-scheme: dark; }
+
+input[type="checkbox"], input[type="radio"] {
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  flex: none;
+  display: inline-grid;
+  place-content: center;
+  border: 1.5px solid var(--color-zinc-600);
+  border-radius: 4px;
+  background: var(--color-zinc-950);
+  cursor: pointer;
+  transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out);
 }
+input[type="radio"] { border-radius: 999px; }
+/* Visually hidden inputs behind custom toggles keep working */
+input[type="checkbox"]:is(.hidden, .sr-only, .peer.opacity-0), input[type="radio"]:is(.hidden, .sr-only, .peer.opacity-0) {
+  position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none;
+}
+input[type="checkbox"].hidden, input[type="radio"].hidden { display: none; }
+input[type="checkbox"]::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  clip-path: polygon(14% 52%, 0 66%, 38% 100%, 100% 22%, 86% 8%, 38% 72%);
+  background: var(--color-zinc-950);
+  transform: scale(0);
+  transition: transform 140ms var(--ease-out);
+}
+input[type="radio"]::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--color-zinc-950);
+  transform: scale(0);
+  transition: transform 140ms var(--ease-out);
+}
+input[type="checkbox"]:checked, input[type="radio"]:checked {
+  background: var(--color-blue-400);
+  border-color: var(--color-blue-400);
+}
+input[type="checkbox"]:checked::before, input[type="radio"]:checked::before { transform: scale(1); }
+input[type="checkbox"]:hover:not(:disabled), input[type="radio"]:hover:not(:disabled) { border-color: var(--color-zinc-400); }
+input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.45; cursor: not-allowed; }
 
+select {
+  appearance: none;
+  padding-right: 28px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b93a1' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9.5l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+}
+select option { background: var(--color-zinc-900); color: var(--color-zinc-100); }
+
+input[type="range"] { accent-color: var(--color-blue-400); cursor: pointer; }
+
+/* ---------------------------------------------------------------- component vocabulary (see DESIGN.md) */
+@layer components {
+  .dh-card {
+    border: 1px solid oklch(0.262 0.012 255 / 0.8);
+    background: oklch(0.193 0.011 255 / 0.45);
+    border-radius: var(--radius-xl);
+  }
+  .dh-section-title { font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; color: var(--color-zinc-100); }
+  .dh-label { font-size: 12px; font-weight: 500; color: var(--color-zinc-400); }
+  .dh-help { font-size: 12px; line-height: 1.5; color: var(--color-zinc-500); }
+
+  .dh-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 32px; padding: 0 12px; border-radius: var(--radius-md);
+    font-size: 12.5px; font-weight: 500; white-space: nowrap;
+    border: 1px solid var(--color-zinc-700); color: var(--color-zinc-200); background: transparent;
+  }
+  .dh-btn:hover:not(:disabled) { background: var(--color-zinc-800); color: var(--color-zinc-50); }
+  .dh-btn:disabled { opacity: 0.45; }
+  .dh-btn-primary { border-color: transparent; background: var(--color-zinc-100); color: var(--color-zinc-950); }
+  .dh-btn-primary:hover:not(:disabled) { background: var(--color-zinc-50); color: var(--color-zinc-950); }
+  .dh-btn-accent { border-color: transparent; background: var(--color-blue-600); color: white; }
+  .dh-btn-accent:hover:not(:disabled) { background: var(--color-blue-500); color: var(--color-zinc-950); }
+  .dh-btn-danger { border-color: oklch(0.64 0.21 22 / 0.45); color: oklch(0.80 0.12 22); }
+  .dh-btn-danger:hover:not(:disabled) { background: oklch(0.64 0.21 22 / 0.14); color: oklch(0.88 0.08 22); }
+  .dh-btn-ghost { border-color: transparent; color: var(--color-zinc-400); }
+  .dh-btn-sm { height: 28px; padding: 0 10px; font-size: 12px; }
+
+  .dh-input {
+    height: 32px; padding: 0 10px; border-radius: var(--radius-md);
+    border: 1px solid var(--color-zinc-800); background: var(--color-zinc-950);
+    font-size: 12.5px; color: var(--color-zinc-100);
+    transition: border-color 150ms var(--ease-out);
+  }
+  .dh-input:hover { border-color: var(--color-zinc-700); }
+  .dh-input:focus { outline: none; border-color: var(--color-blue-400); }
+
+  /* Quiet metadata tag: mono, no box. Use for technical context (DXGI, winget), not for hype. */
+  .dh-tag { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-zinc-500); }
+}
 
 /* Entrance animations used across pages (no tailwindcss-animate dependency) */
 @keyframes dh-fade-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes dh-slide-up { from { opacity: 0; transform: translateY(0.5rem); } to { opacity: 1; transform: translateY(0); } }
+@keyframes dh-slide-up { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .animate-fadeIn,
-.animate-in { animation: dh-fade-in 0.25s ease-out both; }
-.animate-in.slide-in-from-bottom-2 { animation: dh-slide-up 0.25s ease-out both; }
+.animate-in { animation: dh-fade-in 200ms var(--ease-out) both; }
+.animate-in.slide-in-from-bottom-2 { animation: dh-slide-up 220ms var(--ease-out) both; }
+
+/* Page enter: content settles in once per navigation (not on every re-render) */
+.dh-page { animation: dh-slide-up 220ms var(--ease-out) both; }
+
+/* Hairline that reads as "frost" on ink: a 1px top highlight on raised surfaces */
+.dh-raised { box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.045), 0 1px 2px oklch(0 0 0 / 0.35); }
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-fadeIn, .animate-in { animation: none; }
+  .animate-fadeIn, .animate-in, .dh-page { animation: dh-fade-in 120ms linear both; }
+  button:active:not(:disabled), [role="button"]:active { transform: none; }
 }

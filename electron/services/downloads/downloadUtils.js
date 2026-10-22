@@ -7,7 +7,8 @@ const RESERVED_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i
 export function sanitizeFileName(name, fallback = 'download') {
   let n = String(name ?? '')
   try { n = decodeURIComponent(n) } catch { /* keep raw */ }
-  n = n.replace(/[\u0000-\u001f]/g, '')
+  // control chars + bidi overrides/isolates (U+202E "exe.pdf" extension spoofing)
+  n = n.replace(/[\u0000-\u001f\u007f‎‏‪-‮⁦-⁩]/g, '')
   n = n.split(/[\\/]/).pop() ?? ''
   n = n.replace(/[<>:"|?*]/g, '_').replace(/[. ]+$/g, '').replace(/^\.+/, '').trim()
   if (!n || RESERVED_NAMES.test(n)) n = n ? `_${n}` : fallback

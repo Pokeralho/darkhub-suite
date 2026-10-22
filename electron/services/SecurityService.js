@@ -87,15 +87,40 @@ class SecurityService {
     this.autoShieldBoot();
   }
 
+  // The shield is only re-applied on boot when the user turned it on before (e.g. Defender or
+  // another tool reverted the hosts file). Never trigger an unsolicited UAC prompt otherwise.
+  _getShieldPrefPath() {
+    return path.join(path.dirname(this._getRulesFilePath()), 'security_shield.json');
+  }
+
+  _readShieldPref() {
+    try {
+      return JSON.parse(fs.readFileSync(this._getShieldPrefPath(), 'utf8'))?.enabled === true;
+    } catch {
+      return false;
+    }
+  }
+
+  _writeShieldPref(enabled) {
+    try {
+      fs.writeFileSync(this._getShieldPrefPath(), JSON.stringify({ enabled: Boolean(enabled), updatedAt: new Date().toISOString() }), 'utf8');
+    } catch (e) {
+      Logger.warn('SecurityService', `Failed to persist shield preference: ${e?.message ?? e}`);
+    }
+  }
+
   async autoShieldBoot() {
     try {
       const status = this.getPhishingShieldStatus();
+      // Migration: installs that already have the block in hosts count as opted in.
+      if (status.active && !fs.existsSync(this._getShieldPrefPath())) this._writeShieldPref(true);
+      if (!this._readShieldPref()) return;
       if (!status.active && process.platform === 'win32') {
         Logger.info('SecurityService', 'Auto-enabling Real-Time Anti-Phishing Shield on boot...');
         await this.enablePhishingShield();
       }
     } catch (e) {
-      Logger.warn('SecurityService', 'Auto-shield boot notice:', e?.message || e);
+      Logger.warn('SecurityService', `Auto-shield boot notice: ${e?.message || e}`);
     }
   }
 
@@ -323,7 +348,7 @@ class SecurityService {
       }
     }
 
-    const lureKeywords = ['free-nitro', 'airdrop', 'claim-gift', 'wallet-connect', 'verify-account', 'account-locked', 'restore-seed', 'free-robux', 'claim-reward', 'security-update'];
+    const lureKeywords = ['free-nitro', 'airdrop', 'claim-gift', 'wallet-connect', 'verify-account', 'account-locked', 'restore-seed', 'free-robux', 'claim-reward', 'security-update', ...this.customKeywords];
     for (const kw of lureKeywords) {
       if (fullUrl.includes(kw)) {
         score += 35;
@@ -392,6 +417,7 @@ class SecurityService {
       `;
       const { code, stderr } = await ElevationHelper.runElevatedPowerShell(script);
       if (code !== 0) return { ok: false, error: stderr || 'Falha ao atualizar arquivo hosts' };
+      this._writeShieldPref(true);
 
       return {
         ok: true,
@@ -406,7 +432,7 @@ class SecurityService {
     if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
     try {
       const hostsPath = 'C:\\Windows\\System32\\drivers\\etc\\hosts';
-      if (!fs.existsSync(hostsPath)) return { ok: true, msg: 'Hosts padrão mantido.' };
+      if (!fs.existsSync(hostsPath)) { this._writeShieldPref(false); return { ok: true, msg: 'Hosts padrão mantido.' }; }
 
       const currentHosts = fs.readFileSync(hostsPath, 'utf8');
       const cleanHosts = currentHosts.replace(/# DarkHub Anti-Phishing Shield - BEGIN[\s\S]*?# DarkHub Anti-Phishing Shield - END/g, '').trim();
@@ -422,6 +448,7 @@ class SecurityService {
       `;
       const { code, stderr } = await ElevationHelper.runElevatedPowerShell(script);
       if (code !== 0) return { ok: false, error: stderr };
+      this._writeShieldPref(false);
 
       return { ok: true, msg: 'Escudo Anti-Phishing desativado e arquivo hosts restaurado.' };
     } catch (e) {
@@ -540,13 +567,17 @@ class SecurityService {
       if (fs.existsSync(p)) {
         const raw = fs.readFileSync(p, 'utf8');
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed.phishingDomains)) this.customPhishingDomains = parsed.phishingDomains;
-        if (Array.isArray(parsed.keywords)) this.customKeywords = parsed.keywords;
+        // The file is user-writable but its domains end up in the hosts file via an elevated
+        // process: re-validate so a tampered file cannot inject arbitrary hosts entries.
+        if (Array.isArray(parsed.phishingDomains)) {
+          this.customPhishingDomains = parsed.phishingDomains.map(d => String(d).trim().toLowerCase()).filter((d) => HOSTNAME_RE.test(d));
+        }
+        if (Array.isArray(parsed.keywords)) this.customKeywords = parsed.keywords.map(k => String(k).trim().toLowerCase()).filter(Boolean);
         if (Array.isArray(parsed.brands)) this.customBrands = parsed.brands;
         Logger.info('SecurityService', `Loaded ${this.customPhishingDomains.length} community phishing rules.`);
       }
     } catch (e) {
-      Logger.warn('SecurityService', 'Failed to load community rules:', e);
+      Logger.warn('SecurityService', `Failed to load community rules: ${e?.message ?? e}`);
     }
   }
 
