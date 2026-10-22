@@ -158,6 +158,21 @@ describe('DarkOSRecoveryService', () => {
     expect(svc.resolveCli()?.source).toBe('bundled');
   });
 
+  it('runs the bundled module when it is newer than the installed one', () => {
+    const installedMod = `${ROOT}\\bin\\DarkOS.Recovery.psm1`;
+    const bundledMod = 'D:\\app\\darkos\\DarkOS.Recovery.psm1';
+    const files: Record<string, string> = {
+      [installedMod.toLowerCase()]: '# DarkOS.Recovery.psm1\n',
+      [bundledMod.toLowerCase()]: '# DarkOS.Recovery.psm1\n# ModuleVersion: 2\n'
+    };
+    const present = [`${ROOT}\\Recovery\\manifest.json`, `${ROOT}\\bin\\DarkOS.Cli.ps1`, installedMod, 'D:\\app\\darkos\\DarkOS.Cli.ps1', bundledMod];
+    const fsImpl = { ...fakeFs(present), readFileSync: (p: string) => files[String(p).toLowerCase()] ?? '' };
+    const svc = new D.DarkOSRecoveryService({ root: ROOT, bundledDir: 'D:\\app\\darkos', runner: async () => out({}), fsImpl });
+    expect(svc.resolveCli()?.source).toBe('bundled');
+    files[bundledMod.toLowerCase()] = '# no version\n';
+    expect(svc.resolveCli()?.source).toBe('installed');
+  });
+
   it('refuses to run when not on DarkOS', async () => {
     const { svc, runner } = makeService(async () => out({}), { fs: fakeFs([]) });
     const r = await svc.getManifest();
@@ -270,6 +285,32 @@ describe('DarkOSRecoveryService', () => {
     expect((await good.exportDiagnostics({ destination: dest })).ok).toBe(true);
   });
 
+  it('counts profile items the module skipped (no security confirmation) as skipped, not failed', async () => {
+    const { svc } = makeService(async () => out({
+      profile: 'competitive',
+      results: [
+        { id: 'sec.x', ok: false, verified: false, skipped: true, reason: 'requiresConfirmation', error: null },
+        { id: 'a', ok: true, verified: true }
+      ]
+    }));
+    const r = await svc.setProfile({ profile: 'competitive' });
+    expect(r.ok).toBe(true);
+    expect(r.skipped.map((x: any) => x.id)).toEqual(['sec.x']);
+  });
+
+  it('does not announce read-only runs (no dangling run-start) and hides the PID line', async () => {
+    const { svc, runner } = makeService(async ({ onLine }: any) => {
+      onLine('DKPID:4242');
+      return { code: 0, stdout: 'DKPID:4242\r\nDKJSON:{"a":1}\r\nDHDONE\r\n', stderr: '' };
+    });
+    const events: any[] = [];
+    const r = await svc.getManifest({ onEvent: (e: any) => events.push(e) });
+    expect(r.ok).toBe(true);
+    expect(events).toEqual([]);
+    expect(runner.mock.calls[0][0].script).toContain('DKPID:$PID');
+    expect(D.parseCliOutput('DKPID:1\nDKJSON:{}\nDHDONE\n').logs).toEqual([]);
+  });
+
   it('rejects commands outside the whitelist', async () => {
     const { svc, runner } = makeService(async () => out({}));
     expect((await svc.run('Remove-Everything', {})).ok).toBe(false);
@@ -309,5 +350,42 @@ describe('DarkOS UI data helpers', () => {
     expect(normalizeReboot({ pending: false }).pending).toBe(false);
     const apps = normalizeRemovedApps([{ PackageName: 'Microsoft.BingNews', payloadAvailable: true }, { packageName: '' }]);
     expect(apps).toEqual([{ packageName: 'Microsoft.BingNews', displayName: 'Microsoft.BingNews', restorable: true }]);
+  });
+});
+
+describe('DarkOS Windows mode (mods on a stock Windows)', () => {
+  const BUNDLED = 'D:\\app\\darkos';
+  const make = (present: string[]) => {
+    const runner = vi.fn(async () => out([]));
+    const svc = new D.DarkOSRecoveryService({
+      mode: 'windows', bundledDir: BUNDLED, runner, isElevated: async () => true,
+      fsImpl: { ...fakeFs(present), readFileSync: () => '# ModuleVersion: 3' }
+    });
+    return { svc, runner };
+  };
+  const bundled = [`${BUNDLED}\\DarkOS.Cli.ps1`, `${BUNDLED}\\DarkOS.Recovery.psm1`];
+
+  it('runs without the DarkOS manifest, with its own root and the bundled catalog', async () => {
+    const { svc, runner } = make(bundled);
+    expect(svc.root).toBe(D.WINMODS_ROOT);
+    expect(svc.info()).toMatchObject({ mode: 'windows', isDarkOS: false, cliAvailable: true });
+    const r = await svc.getCatalog();
+    expect(r.ok).toBe(true);
+    const script = runner.mock.calls[0][0].script;
+    expect(script).toContain("-Mode Windows");
+    expect(script).toContain(`-Root '${D.WINMODS_ROOT}'`);
+    expect(script).toContain(`-CatalogPath '${BUNDLED}\\policy\\catalog.json'`);
+  });
+
+  it('never uses an installed DarkOS module (it predates -Mode)', () => {
+    const { svc } = make([...bundled, `${D.WINMODS_ROOT}\\bin\\DarkOS.Cli.ps1`, `${D.WINMODS_ROOT}\\bin\\DarkOS.Recovery.psm1`]);
+    expect(svc.resolveCli()?.source).toBe('bundled');
+  });
+
+  it('reports unavailable when the bundled module is missing', async () => {
+    const { svc, runner } = make([]);
+    const r = await svc.getCatalog();
+    expect(r.ok).toBe(false);
+    expect(runner).not.toHaveBeenCalled();
   });
 });

@@ -40,6 +40,9 @@ const POL_SEARCH = 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search
 const POL_EDGE_M = 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Edge';
 const POL_EDGE_U = 'HKCU\\Software\\Policies\\Microsoft\\Edge';
 const MMCSS = 'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile';
+const TCPIP6 = 'HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters';
+const POL_POWER = 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Power\\PowerSettings';
+const POL_BRAVE = 'HKLM\\SOFTWARE\\Policies\\BraveSoftware\\Brave';
 
 function defineTweak(def) {
   const rows = def.rows || [];
@@ -49,7 +52,8 @@ function defineTweak(def) {
     dflt === null || dflt === undefined ? { key, name, deleteValue: true } : { key, name, type, data: String(dflt) }
   ));
   delete out.rows;
-  out.requiresAdmin = def.requiresAdmin ?? out.changes.some((c) => !isUserHiveKey(c.key)) ?? false;
+  // command scripts always run in the elevated batch
+  out.requiresAdmin = def.requiresAdmin ?? (Boolean(def.commands) || out.changes.some((c) => !isUserHiveKey(c.key)));
   out.risk = def.risk || 'low';
   out.recommended = def.recommended === true;
   return out;
@@ -213,6 +217,7 @@ function buildPublicTweaks() {
       id: 'tweak:disableLocation', category: 'privacy', risk: 'medium', requiresAdmin: true,
       title: 'Desativar Rastreamento de Localização (política)',
       description: 'Bloqueia o acesso à localização para o sistema e apps via política. Pode quebrar clima, mapas, fuso horário automático e "Encontrar meu dispositivo".',
+      warning: 'Desativa clima/mapas locais, fuso horário automático e "Encontrar meu dispositivo".',
       rows: [['HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\LocationAndSensors', 'DisableLocation', DW, 1, null]]
     }),
     defineTweak({
@@ -318,6 +323,7 @@ function buildPublicTweaks() {
       id: 'tweak:setUtcTime', category: 'system', risk: 'medium', requiresReboot: true, requiresAdmin: true,
       title: 'Relógio do Hardware em UTC (somente dual boot com Linux)',
       description: 'Faz o Windows tratar o relógio da placa-mãe como UTC. SÓ use se tiver Linux em dual boot - num PC só com Windows a hora ficará errada. Reinicie e acerte o horário depois.',
+      warning: 'Somente para dual boot com Linux: num PC só com Windows o relógio ficará adiantado/atrasado após reiniciar.',
       rows: [['HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation', 'RealTimeIsUniversal', DW, 1, null]]
     }),
     defineTweak({
@@ -337,6 +343,307 @@ function buildPublicTweaks() {
         [POL_EDGE_M, 'BackgroundModeEnabled', DW, 0, null], [POL_EDGE_M, 'StartupBoostEnabled', DW, 0, null],
         [POL_EDGE_M, 'HideFirstRunExperience', DW, 1, null],
         [POL_EDGE_U, 'BackgroundModeEnabled', DW, 0, null], [POL_EDGE_U, 'StartupBoostEnabled', DW, 0, null]
+      ]
+    }),
+
+    // ===================================== WINUTIL PARITY (adapted: snapshot + read-back verification + undo)
+    // Command-only tweaks verify their own result inside the elevated script and only then write a marker under
+    // HKLM\SOFTWARE\DarkHub\Tweaks (or HKCU for per-user ones); status reads that marker, undo removes it.
+
+    // ---- Jogos / latência
+    defineTweak({
+      id: 'tweak:disableMpo', category: 'gaming', requiresReboot: true,
+      title: 'Desativar Multiplane Overlay (MPO)',
+      description: 'Desliga o MPO do DWM (OverlayTestMode=5, correção documentada pela NVIDIA). Resolve tela piscando, stutter e travadas em jogos em janela sem borda, principalmente com dois monitores ou taxas de atualização diferentes. Só aplique se tiver esses sintomas: em PCs sem o problema pode subir um pouco o uso de GPU. Reinicie para valer.',
+      rows: [['HKLM\\SOFTWARE\\Microsoft\\Windows\\Dwm', 'OverlayTestMode', DW, 5, null]]
+    }),
+
+    // ---- Rede
+    defineTweak({
+      id: 'tweak:preferIPv4', category: 'network', requiresReboot: true, conflictsWith: ['tweak:disableIPv6'],
+      title: 'Preferir IPv4 em vez de IPv6',
+      description: 'Mantém o IPv6 funcionando, mas faz o Windows tentar IPv4 primeiro (DisabledComponents=0x20, o método recomendado pela Microsoft). Útil em redes onde o IPv6 é mal configurado e causa atrasos de conexão. Alternativa mais segura a desativar o IPv6; aplicar um substitui o outro.',
+      rows: [[TCPIP6, 'DisabledComponents', DW, 32, null]]
+    }),
+    defineTweak({
+      id: 'tweak:disableIPv6', category: 'network', risk: 'medium', requiresReboot: true, conflictsWith: ['tweak:preferIPv4'],
+      title: 'Desativar IPv6',
+      description: 'Desliga o IPv6 em todas as interfaces (DisabledComponents=0xFF). A Microsoft não recomenda: alguns recursos (Grupo Doméstico, DirectAccess, partes do Xbox/Teams) dependem dele. Prefira "Preferir IPv4" se o objetivo for latência; aplicar um substitui o outro.',
+      warning: 'Pode quebrar recursos que dependem de IPv6 (Xbox party chat, DirectAccess, algumas VPNs). Prefira "Preferir IPv4".',
+      rows: [[TCPIP6, 'DisabledComponents', DW, 255, null]]
+    }),
+    defineTweak({
+      id: 'tweak:disableTeredo', category: 'network', requiresReboot: true,
+      title: 'Desativar túnel Teredo',
+      description: 'Desliga o Teredo (túnel IPv6 sobre IPv4) pela política oficial do Windows, sem mexer no resto do IPv6. Remove uma interface de rede extra que alguns jogos usam por engano. O chat em grupo do Xbox/Game Bar usa Teredo: se ele parar, desfaça.',
+      rows: [['HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\TCPIP\\v6Transition', 'Teredo_State', SZ, 'Disabled', null]],
+      commands: {
+        apply: "& netsh.exe interface teredo set state disabled | Out-Null",
+        revert: "& netsh.exe interface teredo set state default | Out-Null"
+      }
+    }),
+
+    // ---- Energia / notebooks
+    defineTweak({
+      id: 'tweak:standbyNetworkOff', category: 'power',
+      title: 'Sem rede durante a suspensão moderna (notebooks)',
+      description: 'Em notebooks com Modern Standby (S0), desliga Wi-Fi e rede enquanto a tela está apagada e o PC suspenso. Evita bateria drenada e notebook quente na mochila. E-mails e notificações só chegam ao acordar. Sem efeito em desktops.',
+      rows: [
+        [`${POL_POWER}\\f15576e8-98b7-4186-b944-eafa664402d9`, 'DCSettingIndex', DW, 0, null],
+        [`${POL_POWER}\\f15576e8-98b7-4186-b944-eafa664402d9`, 'ACSettingIndex', DW, 0, null]
+      ]
+    }),
+    defineTweak({
+      id: 'tweak:s3Sleep', category: 'power', risk: 'medium', requiresReboot: true,
+      title: 'Usar suspensão S3 clássica em vez do Modern Standby',
+      description: 'Faz o Windows usar a suspensão S3 (CPU desligada, só a RAM alimentada) em vez do Modern Standby, que deixa o PC "meio acordado". Só funciona se o firmware (BIOS/UEFI) ainda tiver S3; senão a opção Suspender some até desfazer. Confira com "powercfg /a" depois de reiniciar.',
+      warning: 'Se o firmware não tiver S3, a opção "Suspender" desaparece até você desfazer este ajuste.',
+      rows: [['HKLM\\SYSTEM\\CurrentControlSet\\Control\\Power', 'PlatformAoAcOverride', DW, 0, null]]
+    }),
+
+    // ---- Privacidade / antibloat
+    defineTweak({
+      id: 'tweak:disableStoreSearchResults', category: 'privacy',
+      title: 'Sem sugestões da Microsoft Store na pesquisa do Iniciar',
+      description: 'Impede que a pesquisa do Iniciar mostre apps recomendados da Store, bloqueando a escrita no índice de pesquisa da Store (store.db) para o seu usuário. Os apps instalados continuam aparecendo.',
+      statusOnly: [['HKCU\\Software\\DarkHub\\Tweaks', 'StoreSearchBlocked', DW, 1]],
+      commands: {
+        apply: `$db = Join-Path $env:LOCALAPPDATA 'Packages\\Microsoft.WindowsStore_8wekyb3d8bbwe\\LocalState\\store.db'
+if (-not (Test-Path -LiteralPath (Split-Path $db))) { throw 'A Microsoft Store nao esta instalada para este usuario.' }
+if (-not (Test-Path -LiteralPath $db)) { New-Item -ItemType File -Path $db -Force | Out-Null }
+& icacls.exe $db /deny '*S-1-1-0:(W)' | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "icacls falhou ($LASTEXITCODE)" }
+New-Item -Path 'HKCU:\\Software\\DarkHub\\Tweaks' -Force | Out-Null
+New-ItemProperty -Path 'HKCU:\\Software\\DarkHub\\Tweaks' -Name StoreSearchBlocked -PropertyType DWord -Value 1 -Force | Out-Null`,
+        revert: `$db = Join-Path $env:LOCALAPPDATA 'Packages\\Microsoft.WindowsStore_8wekyb3d8bbwe\\LocalState\\store.db'
+if (Test-Path -LiteralPath $db) { & icacls.exe $db /remove:d '*S-1-1-0' | Out-Null; if ($LASTEXITCODE -ne 0) { throw "icacls falhou ($LASTEXITCODE)" } }
+Remove-ItemProperty -Path 'HKCU:\\Software\\DarkHub\\Tweaks' -Name StoreSearchBlocked -ErrorAction SilentlyContinue`
+      }
+    }),
+    defineTweak({
+      id: 'tweak:disableNotifications', category: 'privacy', needsRelogin: true,
+      title: 'Desativar Central de Notificações e notificações pop-up',
+      description: 'Desliga os avisos (toasts) e a Central de Notificações/calendário da bandeja. Bom para quem joga ou grava tela sem interrupções. Você deixa de ver avisos de apps, inclusive de mensagens. Vale após sair e entrar na sessão.',
+      rows: [
+        ['HKCU\\Software\\Policies\\Microsoft\\Windows\\Explorer', 'DisableNotificationCenter', DW, 1, null],
+        ['HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PushNotifications', 'ToastEnabled', DW, 0, 1]
+      ]
+    }),
+    defineTweak({
+      id: 'tweak:blockDeviceMetadata', category: 'privacy',
+      title: 'Bloquear apps de fabricante baixados ao conectar dispositivos',
+      description: 'Impede que o Windows baixe da internet ícones, informações e apps "companheiros" ao conectar monitores, impressoras e periféricos (política oficial). Os drivers continuam vindo do Windows Update; alguns dispositivos podem aparecer com ícone genérico.',
+      rows: [['HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Device Metadata', 'PreventDeviceMetadataFromNetwork', DW, 1, null]]
+    }),
+    defineTweak({
+      id: 'tweak:blockPeripheralBloat', category: 'privacy',
+      title: 'Bloquear instalação automática do Razer Synapse e do Logi Download Assistant',
+      description: 'Impede que o Windows Update instale sozinho o Razer Synapse e o Logitech Download Assistant junto com os drivers. Mouse e teclado continuam funcionando. Diferente de outras ferramentas, NÃO desliga o download de drivers pelo Windows Update (que o DarkHub usa para achar o driver da GPU). Para instalar o Synapse ou o G Hub manualmente, desfaça antes.',
+      rows: [['HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Device Installer', 'DisableCoInstallers', DW, 1, null]],
+      commands: {
+        apply: `Stop-Process -Name 'logi_download_assistant' -Force -ErrorAction SilentlyContinue
+$pf = if ($env:ProgramW6432) { $env:ProgramW6432 } else { $env:ProgramFiles }
+foreach ($p in @((Join-Path $env:SystemRoot 'Installer\\Razer'), (Join-Path $pf 'LogiDownloadAssistant'))) {
+  if (Test-Path -LiteralPath $p) { Get-ChildItem -LiteralPath $p -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue } else { New-Item -ItemType Directory -Path $p -Force | Out-Null }
+  & icacls.exe $p /deny '*S-1-1-0:(OI)(CI)(W)' | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "icacls falhou em $p ($LASTEXITCODE)" }
+}`,
+        revert: `$pf = if ($env:ProgramW6432) { $env:ProgramW6432 } else { $env:ProgramFiles }
+foreach ($p in @((Join-Path $env:SystemRoot 'Installer\\Razer'), (Join-Path $pf 'LogiDownloadAssistant'))) {
+  if (Test-Path -LiteralPath $p) { & icacls.exe $p /remove:d '*S-1-1-0' | Out-Null; if ($LASTEXITCODE -ne 0) { throw "icacls falhou em $p ($LASTEXITCODE)" } }
+}`
+      }
+    }),
+    defineTweak({
+      id: 'tweak:disableWpbt', category: 'privacy', requiresReboot: true,
+      title: 'Impedir que o firmware instale programas no Windows (WPBT)',
+      description: 'Desliga a tabela WPBT, pela qual o fabricante da placa-mãe/notebook executa programas a cada boot (ex.: instaladores de utilitários da ASUS/MSI e softwares antirroubo). Drivers não são afetados. Se você usa rastreamento antirroubo do fabricante, não aplique.',
+      rows: [['HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager', 'DisableWpbtExecution', DW, 1, null]]
+    }),
+    defineTweak({
+      id: 'tweak:braveDebloat', category: 'privacy',
+      title: 'Brave sem Rewards, carteira cripto, VPN, IA e telemetria',
+      description: 'Políticas oficiais do Brave que escondem Rewards, Wallet, VPN, Leo (IA), News, Talk e Tor e desligam as métricas (P3A, ping de estatísticas). Só tem efeito com o Brave instalado; ele mostrará "gerenciado pela organização".',
+      rows: [
+        [POL_BRAVE, 'BraveRewardsDisabled', DW, 1, null], [POL_BRAVE, 'BraveWalletDisabled', DW, 1, null],
+        [POL_BRAVE, 'BraveVPNDisabled', DW, 1, null], [POL_BRAVE, 'BraveAIChatEnabled', DW, 0, null],
+        [POL_BRAVE, 'BraveNewsDisabled', DW, 1, null], [POL_BRAVE, 'BraveTalkDisabled', DW, 1, null],
+        [POL_BRAVE, 'TorDisabled', DW, 1, null], [POL_BRAVE, 'BraveStatsPingEnabled', DW, 0, null],
+        [POL_BRAVE, 'BraveP3AEnabled', DW, 0, null], [POL_BRAVE, 'MetricsReportingEnabled', DW, 0, null],
+        [POL_BRAVE, 'UrlKeyedAnonymizedDataCollectionEnabled', DW, 0, null],
+        [POL_BRAVE, 'SafeBrowsingExtendedReportingEnabled', DW, 0, null]
+      ]
+    }),
+    defineTweak({
+      id: 'tweak:keepClassicOutlook', category: 'privacy',
+      title: 'Manter o Outlook clássico (sem migração para o "novo Outlook")',
+      description: 'Esconde o botão "Experimentar o novo Outlook" e bloqueia a migração automática do Office 2016/2019/365. Só tem efeito com o Outlook do Office instalado.',
+      rows: [
+        ['HKCU\\Software\\Microsoft\\Office\\16.0\\Outlook\\Preferences', 'UseNewOutlook', DW, 0, null],
+        ['HKCU\\Software\\Microsoft\\Office\\16.0\\Outlook\\Options\\General', 'HideNewOutlookToggle', DW, 1, null],
+        ['HKCU\\Software\\Policies\\Microsoft\\Office\\16.0\\Outlook\\Options\\General', 'DoNewOutlookAutoMigration', DW, 0, null],
+        ['HKCU\\Software\\Policies\\Microsoft\\Office\\16.0\\Outlook\\Preferences', 'NewOutlookMigrationUserSetting', DW, 0, null]
+      ]
+    }),
+
+    // ---- Armazenamento
+    defineTweak({
+      id: 'tweak:disableStorageSense', category: 'storage',
+      title: 'Desativar o Sensor de Armazenamento',
+      description: 'Impede o Windows de apagar sozinho arquivos da Lixeira, da pasta Downloads e arquivos temporários. Útil se você guarda coisas na Lixeira ou em Downloads. Use a limpeza do DarkHub quando quiser liberar espaço.',
+      rows: [['HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\StorageSense\\Parameters\\StoragePolicy', '01', DW, 0, 1]]
+    }),
+    defineTweak({
+      id: 'tweak:disableReservedStorage', category: 'storage',
+      title: 'Liberar o Armazenamento Reservado (~7 GB)',
+      description: 'Desliga o espaço que o Windows reserva para atualizações (DISM Set-ReservedStorageState). Recomendado só em SSDs pequenos. Antes de uma atualização grande do Windows (ex.: 24H2 para 25H2), desfaça para evitar falha por falta de espaço. Não funciona enquanto houver atualização pendente.',
+      statusOnly: [['HKLM\\SOFTWARE\\DarkHub\\Tweaks', 'ReservedStorageOff', DW, 1]],
+      commands: {
+        apply: `$was = (Get-WindowsReservedStorageState -ErrorAction Stop).ReservedStorageState
+if ($was -ne 'Disabled') {
+  try { Set-WindowsReservedStorageState -State Disabled -ErrorAction Stop | Out-Null }
+  catch { if ("$_" -match '0x800f0975') { throw 'O Windows esta usando o armazenamento reservado agora (atualizacao pendente ou em andamento). Instale as atualizacoes, reinicie e tente de novo.' } else { throw } }
+}
+$now = (Get-WindowsReservedStorageState -ErrorAction Stop).ReservedStorageState
+if ($now -ne 'Disabled') { throw "O Windows manteve o estado $now (provavelmente ha uma atualizacao pendente)." }
+New-Item -Path 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks' -Force | Out-Null
+New-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks' -Name ReservedStorageOff -PropertyType DWord -Value 1 -Force | Out-Null
+New-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks' -Name ReservedStorageWasOn -PropertyType DWord -Value ([int]($was -ne 'Disabled')) -Force | Out-Null`,
+        revert: `$k = 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks'
+$wasOn = (Get-ItemProperty -Path $k -Name ReservedStorageWasOn -ErrorAction SilentlyContinue).ReservedStorageWasOn
+if ($wasOn -eq 1) {
+  Set-WindowsReservedStorageState -State Enabled -ErrorAction Stop | Out-Null
+  if ((Get-WindowsReservedStorageState -ErrorAction Stop).ReservedStorageState -eq 'Disabled') { throw 'O Windows nao reativou o armazenamento reservado.' }
+}
+Remove-ItemProperty -Path $k -Name ReservedStorageOff, ReservedStorageWasOn -ErrorAction SilentlyContinue`
+      }
+    }),
+
+    // ---- Sistema
+    defineTweak({
+      id: 'tweak:longPaths', category: 'system',
+      title: 'Permitir caminhos de arquivo com mais de 260 caracteres',
+      description: 'Liga o suporte a caminhos longos do NTFS. Evita erros "caminho muito longo" ao extrair arquivos, clonar projetos (node_modules, Git) e em mods de jogos com muitas pastas. Programas antigos continuam com o limite.',
+      rows: [['HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem', 'LongPathsEnabled', DW, 1, 0]]
+    }),
+    defineTweak({
+      id: 'tweak:registryBackup', category: 'system',
+      title: 'Backup automático do registro (RegBack)',
+      description: 'Reativa o backup do registro que o Windows deixou de fazer desde o 1803: a tarefa interna RegIdleBackup volta a copiar o registro para System32\\config\\RegBack, permitindo recuperar um sistema que não inicia. Usa alguns MB de disco.',
+      rows: [['HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Configuration Manager', 'EnablePeriodicBackup', DW, 1, null]]
+    }),
+    defineTweak({
+      id: 'tweak:detailedBsod', category: 'system',
+      title: 'Tela azul (BSOD) com detalhes técnicos',
+      description: 'Mostra o código de parada e os parâmetros na tela azul, sem o ":(" e o QR code. Facilita descobrir qual driver causou o travamento.',
+      rows: [
+        ['HKLM\\SYSTEM\\CurrentControlSet\\Control\\CrashControl', 'DisplayParameters', DW, 1, null],
+        ['HKLM\\SYSTEM\\CurrentControlSet\\Control\\CrashControl', 'DisableEmoticon', DW, 1, null]
+      ]
+    }),
+    defineTweak({
+      id: 'tweak:verboseLogon', category: 'system',
+      title: 'Mensagens detalhadas ao iniciar e desligar',
+      description: 'Mostra o que o Windows está fazendo no boot, no logon e no desligamento ("Aplicando configurações...", serviço X). Ajuda a descobrir o que deixa o boot ou o desligamento lento.',
+      rows: [['HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System', 'VerboseStatus', DW, 1, null]]
+    }),
+    defineTweak({
+      id: 'tweak:legacyBootMenu', category: 'system',
+      title: 'Menu de boot clássico (F8 / Modo de Segurança)',
+      description: 'Volta o menu de inicialização em texto do Windows 7: F8 durante o boot abre o Modo de Segurança direto, e o menu aparece quando há mais de um sistema. Deixa o boot alguns segundos mais lento se houver vários sistemas.',
+      statusOnly: [['HKLM\\SOFTWARE\\DarkHub\\Tweaks', 'LegacyBootMenu', DW, 1]],
+      commands: {
+        apply: `& bcdedit.exe /set '{current}' bootmenupolicy legacy | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "bcdedit falhou ($LASTEXITCODE)" }
+if (-not ((& bcdedit.exe /enum '{current}') -match 'bootmenupolicy\\s+Legacy')) { throw 'O BCD nao manteve bootmenupolicy=Legacy.' }
+New-Item -Path 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks' -Force | Out-Null
+New-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks' -Name LegacyBootMenu -PropertyType DWord -Value 1 -Force | Out-Null`,
+        revert: `& bcdedit.exe /set '{current}' bootmenupolicy standard | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "bcdedit falhou ($LASTEXITCODE)" }
+Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks' -Name LegacyBootMenu -ErrorAction SilentlyContinue`
+      }
+    }),
+    defineTweak({
+      id: 'tweak:ntpPool', category: 'system',
+      title: 'Sincronizar o relógio com pool.ntp.org',
+      description: 'Troca o servidor de hora do Windows (time.windows.com) pelo pool.ntp.org, mais preciso e com servidores no Brasil, e sincroniza na hora. Útil se o relógio vive atrasando (o que quebra login em jogos e sites).',
+      rows: [['HKLM\\SYSTEM\\CurrentControlSet\\Services\\W32Time\\Parameters', 'NtpServer', SZ, 'pool.ntp.org,0x8', 'time.windows.com,0x9']],
+      commands: {
+        apply: "& w32tm.exe /config /update | Out-Null; Restart-Service w32time -Force -ErrorAction SilentlyContinue; & w32tm.exe /resync /nowait | Out-Null",
+        revert: "& w32tm.exe /config /update | Out-Null; Restart-Service w32time -Force -ErrorAction SilentlyContinue; & w32tm.exe /resync /nowait | Out-Null"
+      }
+    }),
+
+    // ---- Customização
+    defineTweak({
+      id: 'tweak:hideHomeGallery', category: 'customization', explorerRestart: true,
+      title: 'Remover "Início" e "Galeria" do Explorador',
+      description: 'Tira os atalhos Início e Galeria do painel lateral do Explorador do Windows 11. Combine com "Abrir Explorador no Este Computador".',
+      rows: [
+        ['HKCU\\Software\\Classes\\CLSID\\{f874310e-b6b7-47dc-bc84-b9e6b38f5903}', 'System.IsPinnedToNameSpaceTree', DW, 0, null],
+        ['HKCU\\Software\\Classes\\CLSID\\{e88865ea-0e1c-4e20-9aa6-edcd0212c87c}', 'System.IsPinnedToNameSpaceTree', DW, 0, null]
+      ]
+    }),
+    defineTweak({
+      id: 'tweak:disableFolderDiscovery', category: 'customization', explorerRestart: true,
+      title: 'Explorador mais rápido em pastas grandes (sem detecção de tipo de pasta)',
+      description: 'Faz o Explorador tratar toda pasta como "Itens gerais" em vez de analisar o conteúdo para decidir se é pasta de fotos, música ou vídeo, o que deixa pastas grandes lentas. Diferente de outras ferramentas, não apaga as visualizações que você já configurou; elas continuam valendo.',
+      rows: [['HKCU\\Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\Shell\\Bags\\AllFolders\\Shell', 'FolderType', SZ, 'NotSpecified', null]]
+    }),
+    defineTweak({
+      id: 'tweak:classicStartMenu', category: 'customization', requiresReboot: true,
+      title: 'Menu Iniciar anterior (antes do novo layout do 25H2)',
+      description: 'Volta o Menu Iniciar ao layout anterior em builds que receberam o novo aos poucos. Em versões mais novas do Windows, em que o novo menu é definitivo, não tem efeito.',
+      rows: [['HKLM\\SYSTEM\\CurrentControlSet\\Control\\FeatureManagement\\Overrides\\8\\3036241548', 'EnabledState', DW, 1, null]]
+    }),
+    defineTweak({
+      id: 'tweak:disableLockScreen', category: 'customization',
+      title: 'Pular a tela de bloqueio (ir direto para a senha)',
+      description: 'Ao ligar ou voltar da suspensão, vai direto para o campo de senha/PIN, sem a tela com imagem e relógio. Não remove a senha. No Windows Home a política pode ser ignorada.',
+      rows: [['HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Personalization', 'NoLockScreen', DW, 1, null]]
+    }),
+    defineTweak({
+      id: 'tweak:hideSettingsHome', category: 'customization',
+      title: 'Ocultar a página "Início" do app Configurações',
+      description: 'O app Configurações abre direto em Sistema, sem a página Início com anúncios de Microsoft 365, Game Pass e OneDrive.',
+      rows: [['HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer', 'SettingsPageVisibility', SZ, 'hide:home', null]]
+    }),
+    defineTweak({
+      id: 'tweak:batteryPercentage', category: 'customization', explorerRestart: true,
+      title: 'Porcentagem da bateria na barra de tarefas',
+      description: 'Mostra o número da bateria (ex.: 87%) ao lado do ícone. Só em notebooks com Windows 11 recente.',
+      rows: [[ADV, 'IsBatteryPercentageEnabled', DW, 1, null]]
+    }),
+    defineTweak({
+      id: 'tweak:scrollbarsAlwaysVisible', category: 'customization', needsRelogin: true,
+      title: 'Barras de rolagem sempre visíveis',
+      description: 'Impede que o Windows 11 esconda as barras de rolagem finas quando o mouse sai de cima. Vale após sair e entrar na sessão.',
+      rows: [['HKCU\\Control Panel\\Accessibility', 'DynamicScrollbars', DW, 0, 1]]
+    }),
+    defineTweak({
+      id: 'tweak:disableWindowSnapping', category: 'customization', needsRelogin: true,
+      title: 'Desativar o encaixe automático de janelas (Snap)',
+      description: 'Ao arrastar uma janela até a borda ela não se encaixa nem maximiza sozinha, e o menu de layouts do Windows 11 não aparece. Útil em jogos em janela e com vários monitores. Vale após sair e entrar na sessão.',
+      rows: [['HKCU\\Control Panel\\Desktop', 'WindowArrangementActive', SZ, '0', '1']]
+    }),
+    defineTweak({
+      id: 'tweak:numLockOnStartup', category: 'customization',
+      title: 'Num Lock ligado ao iniciar',
+      description: 'Liga o Num Lock no seu usuário e também na tela de login, para digitar PIN numérico pelo teclado numérico. Em alguns PCs a BIOS também precisa estar com Num Lock ligado.',
+      rows: [['HKCU\\Control Panel\\Keyboard', 'InitialKeyboardIndicators', SZ, '2', '0']],
+      commands: {
+        apply: "Set-ItemProperty -LiteralPath 'Registry::HKEY_USERS\\.DEFAULT\\Control Panel\\Keyboard' -Name InitialKeyboardIndicators -Value '2' -Type String -ErrorAction Stop",
+        revert: "Set-ItemProperty -LiteralPath 'Registry::HKEY_USERS\\.DEFAULT\\Control Panel\\Keyboard' -Name InitialKeyboardIndicators -Value '2147483648' -Type String -ErrorAction Stop"
+      }
+    }),
+    defineTweak({
+      id: 'tweak:rdpUnsignedNoWarning', category: 'system', risk: 'medium', securityRelated: true,
+      title: 'Sem aviso ao abrir arquivos .rdp não assinados  [SEGURANÇA]',
+      description: 'Remove o aviso adicionado pela Microsoft em 2025 ao abrir arquivos de Área de Trabalho Remota (.rdp) sem assinatura. Só faz sentido se você abre arquivos .rdp seus com frequência: o aviso existe porque .rdp falsos são usados em golpes por e-mail.',
+      warning: 'Arquivos .rdp falsos são usados em golpes por e-mail. Só aplique se você abre arquivos .rdp seus com frequência.',
+      rows: [
+        ['HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\Terminal Services\\Client', 'RedirectionWarningDialogVersion', DW, 1, null],
+        ['HKCU\\Software\\Microsoft\\Terminal Server Client', 'RdpLaunchConsentAccepted', DW, 1, null]
       ]
     })
   ];
@@ -432,11 +739,24 @@ class DeepTweaksEngine {
     }
     this.deepTweaks = buildPublicTweaks();
     this.internalGroups = buildInternalGroups();
+    this._queue = Promise.resolve();
+  }
+
+  /**
+   * Serialises apply/restore runs. Concurrent IPC calls (e.g. a profile run while a single tweak is applied) used to
+   * interleave snapshot capture, registry writes and read-back verification of the same keys.
+   */
+  _exclusive(fn) {
+    const run = this._queue.then(fn, fn);
+    this._queue = run.catch(() => {});
+    return run;
   }
 
   /** Public tweaks shown in the UI (34 original + MMCSS). */
   listTweaks() {
-    return this.deepTweaks;
+    // IPC-safe copies: `commands.revert` is a function (tweak:disableHibernation) and Electron's structured clone
+    // throws on functions, which made `optimizer:deepTweaksList` reject and the UI show no registry tweak at all.
+    return this.deepTweaks.map(({ commands, ...rest }) => (commands ? { ...rest, hasCommands: true } : rest));
   }
 
   /** Ids of the safe, low-risk, reversible tweaks that make up the "recommended" selection. */
@@ -471,10 +791,6 @@ class DeepTweaksEngine {
     } catch (e) {
       Logger.warn('DeepTweaksEngine', 'Falha ao salvar undo store no disco', e);
     }
-  }
-
-  hasSnapshot(id) {
-    return this.deepTweaksUndoStore.has(id);
   }
 
   /** Free-form data engines may keep next to the registry snapshots (fsutil values, original service modes...). */
@@ -660,18 +976,16 @@ class DeepTweaksEngine {
     }
   }
 
-  async _runCommandScript(script) {
-    if (!script) return { ok: true };
-    const res = await ElevationHelper.runElevatedPowerShell(`$ErrorActionPreference = 'Stop'\r\n${script}`);
-    return { ok: res.code === 0, error: res.stderr || (res.code !== 0 ? 'comando falhou ou UAC cancelado' : '') };
-  }
-
   // ------------------------------------------------------------------ apply
   /**
    * Core apply for tweak definitions (public tweaks, internal groups or ad-hoc change sets).
    * Returns { ok, results:[{id, ok, error, verified}], needsReboot, needsRelogin }
    */
-  async _applyDefs(defs, eventSender = () => {}, runLabel = 'darkHubTweaks') {
+  _applyDefs(defs, eventSender = () => {}, runLabel = 'darkHubTweaks') {
+    return this._exclusive(() => this._applyDefsUnlocked(defs, eventSender, runLabel));
+  }
+
+  async _applyDefsUnlocked(defs, eventSender, runLabel) {
     const runId = `${runLabel}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     eventSender('optimizer:runEvent', { runId, type: 'run-start', total: defs.length, concurrency: 1, startedAt: Date.now() });
 
@@ -708,10 +1022,15 @@ class DeepTweaksEngine {
     });
     const opResults = await this.runRegistryOps(ops, cmds);
     const writeErrors = new Map();
+    const touched = new Set(); // defs for which at least one write/command really went through
     opResults.forEach((r, i) => {
       if (!r?.ok) writeErrors.set(owner[i], r?.message || 'falha ao escrever no registro');
+      else touched.add(owner[i]);
     });
-    for (const [di, r] of opResults.cmdResults) if (!r.ok && !writeErrors.has(di)) writeErrors.set(di, r.message || 'comando falhou');
+    for (const [di, r] of opResults.cmdResults) {
+      if (!r.ok && !writeErrors.has(di)) writeErrors.set(di, r.message || 'comando falhou');
+      if (r.ok) touched.add(di);
+    }
     const batchStdout = opResults.stdout;
 
     // 4) read back what the system really holds now
@@ -727,9 +1046,11 @@ class DeepTweaksEngine {
       else res.error = 'O Windows não manteve o valor (política bloqueada, Tamper Protection ou valor sobrescrito). Nada foi alterado de forma verificável.';
     });
 
-    // 5) drop snapshots of tweaks that did not change anything; keep `applied` current for the others
+    // 5) drop snapshots of tweaks that did not change anything; keep `applied` current for the others.
+    // A partially applied tweak (some values written, another refused) KEEPS its fresh snapshot: deleting it made the
+    // values that did change impossible to restore to what the user had before.
     defs.forEach((d, di) => {
-      if (!results[di].ok && freshSnapshots.has(d.id)) this.deepTweaksUndoStore.delete(d.id);
+      if (!results[di].ok && freshSnapshots.has(d.id) && !touched.has(di)) this.deepTweaksUndoStore.delete(d.id);
       else if (results[di].ok && this.deepTweaksUndoStore.has(d.id)) {
         this.deepTweaksUndoStore.get(d.id).applied = (d.changes || []).filter((c) => !c.deleteKey);
       }
@@ -774,8 +1095,13 @@ class DeepTweaksEngine {
   async applyTweaks(idsInput, eventSender = () => {}) {
     if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
     const ids = (Array.isArray(idsInput) ? idsInput : []).filter((i) => typeof i === 'string');
-    const defs = ids.map((id) => this.getDefinition(id)).filter(Boolean);
+    let defs = ids.map((id) => this.getDefinition(id)).filter(Boolean);
+    // Alternatives that write the same value (e.g. prefer IPv4 / disable IPv6): the last one selected wins, and one
+    // already applied is undone first so its snapshot keeps the user's real original value.
+    defs = defs.filter((d, i) => !defs.slice(i + 1).some((later) => (later.conflictsWith || []).includes(d.id)));
     if (defs.length === 0) return { ok: false, error: 'Nenhum tweak válido selecionado' };
+    const rivals = [...new Set(defs.flatMap((d) => d.conflictsWith || []))].filter((id) => this.deepTweaksUndoStore.has(id) && !defs.some((d) => d.id === id));
+    if (rivals.length) await this.undoTweaks(rivals, eventSender);
     const run = await this._applyDefs(defs, eventSender);
     const out = this._summarize('aplicado(s)', defs, run);
     Logger.auditOptimizer({ type: 'tweaks-apply', ids: defs.map((d) => d.id), ok: out.ok, error: out.error });
@@ -802,7 +1128,11 @@ class DeepTweaksEngine {
    * Restores a tweak: from the snapshot taken before it was applied when available (true previous values),
    * otherwise with the documented Windows defaults. Verifies by reading the registry back.
    */
-  async _restoreDefs(defs, eventSender, { requireSnapshot = false, runLabel = 'darkHubRevert', fallbackFor = null } = {}) {
+  _restoreDefs(defs, eventSender = () => {}, opts = {}) {
+    return this._exclusive(() => this._restoreDefsUnlocked(defs, eventSender, opts));
+  }
+
+  async _restoreDefsUnlocked(defs, eventSender, { requireSnapshot = false, runLabel = 'darkHubRevert', fallbackFor = null } = {}) {
     const runId = `${runLabel}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     eventSender('optimizer:runEvent', { runId, type: 'run-start', total: defs.length, concurrency: 1, startedAt: Date.now() });
     const results = defs.map((d) => ({ id: d.id, ok: false, error: '', verified: false, usedSnapshot: false }));

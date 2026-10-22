@@ -14,6 +14,8 @@ import { fileURLToPath } from 'node:url'
 import { isValidAppxName } from '../optimizer/OptimizerUtils.js'
 
 export const DARKOS_ROOT = 'C:\\ProgramData\\DarkOS'
+/** State folder of "Windows mode" (DarkOS tweaks applied on a stock Windows); never shared with a real DarkOS. */
+export const WINMODS_ROOT = 'C:\\ProgramData\\DarkHub\\WinMods'
 export const PROFILES = Object.freeze(['darkosDefault', 'competitive', 'maxPerformance'])
 export const CLI_FILE = 'DarkOS.Cli.ps1'
 export const MODULE_FILE = 'DarkOS.Recovery.psm1'
@@ -39,6 +41,8 @@ export const COMMANDS = Object.freeze({
 })
 
 const ID_RE = /^[a-zA-Z0-9._-]+$/
+/** First line printed by the wrapper script: the PowerShell host PID (used to kill the whole tree on timeout). */
+const PID_LINE_RE = /^DKPID:(\d{1,10})$/
 const FULL_PACKAGE_RE = /^[A-Za-z0-9][A-Za-z0-9._~-]{1,200}$/
 
 export function isValidChangeId(id) {
@@ -106,6 +110,8 @@ export function parseCliOutput(stdout, stderr = '', code = 0) {
       } catch (e) {
         jsonError = `JSON invalido do modulo DarkOS: ${e?.message ?? e}`
       }
+    } else if (PID_LINE_RE.test(line)) {
+      continue
     } else if (line === 'DHDONE') {
       done = true
     } else if (line.startsWith('DHFAIL')) {
@@ -196,7 +202,9 @@ export function summarizeChangeResults(data, { securityDeclined = false } = {}) 
     // Applied but only verifiable after a restart: never a success, never a hard failure.
     const pendingReboot = !verified && r?.ok === true && r?.rebootRequired === true
     // Security item refused by the module because the user did not confirm it: skipped on purpose.
-    const skipped = !ok && securityDeclined && /ConfirmSecurity/.test(String(r?.error ?? ''))
+    // Set-DarkOSProfile reports these itself ({ skipped: true, reason: 'requiresConfirmation' }, error null);
+    // Invoke-DarkOSChange reports them as an error mentioning ConfirmSecurity.
+    const skipped = !ok && (r?.skipped === true || (securityDeclined && /ConfirmSecurity/.test(String(r?.error ?? ''))))
     return {
       id: typeof r?.id === 'string' ? r.id : String(r?.id ?? r?.PackageName ?? r?.packageName ?? '?'),
       ok,
@@ -244,18 +252,39 @@ function defaultBundledDir() {
   }
 }
 
+/** Grace period between our own tree-kill and PowerShellRunner's last-resort kill of the host process. */
+const KILL_GRACE_MS = 15 * 1000
+
 async function defaultRunner({ script, timeoutMs, onLine }) {
-  const { runPowerShell } = await import('../PowerShellRunner.js')
+  const { runPowerShell, runCommand } = await import('../PowerShellRunner.js')
   let pending = ''
+  let pid = null
+  let timedOut = false
   const onStdout = (chunk) => {
     pending += chunk
     const parts = pending.split(/\r?\n/)
     pending = parts.pop() ?? ''
-    for (const p of parts) onLine?.(p)
+    for (const p of parts) {
+      const m = PID_LINE_RE.exec(p.trim())
+      if (m) pid = Number(m[1])
+      else onLine?.(p)
+    }
   }
-  const res = await runPowerShell(script, { timeoutMs, onStdout, maxBuffer: 32 * 1024 * 1024 })
-  if (pending) onLine?.(pending)
-  return res
+  // On timeout kill the WHOLE tree (winget/DISM/robocopy children included) while the host is still
+  // alive: PowerShellRunner's own timeout only kills powershell.exe and would orphan its children,
+  // which would then race the next queued operation.
+  const timer = setTimeout(() => {
+    timedOut = true
+    if (pid) runCommand('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { timeoutMs: 10000 }).catch(() => {})
+  }, timeoutMs)
+  try {
+    const res = await runPowerShell(script, { timeoutMs: timeoutMs + KILL_GRACE_MS, onStdout, maxBuffer: 32 * 1024 * 1024 })
+    if (pending) onLine?.(pending)
+    if (timedOut) throw new Error(`Command timed out after ${timeoutMs}ms`)
+    return res
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 async function defaultIsElevated() {
@@ -278,10 +307,12 @@ export class DarkOSRecoveryService extends EventEmitter {
    * @param {Function} [opts.isElevated]
    * @param {object} [opts.fsImpl]
    * @param {object} [opts.logger]
+   * @param {'darkos'|'windows'} [opts.mode]  'windows' runs the bundled module + catalog against WINMODS_ROOT
    */
   constructor(opts = {}) {
     super()
-    this.root = opts.root || DARKOS_ROOT
+    this.mode = opts.mode === 'windows' ? 'windows' : 'darkos'
+    this.root = opts.root || (this.mode === 'windows' ? WINMODS_ROOT : DARKOS_ROOT)
     this.bundledDir = opts.bundledDir === undefined ? defaultBundledDir() : opts.bundledDir
     this.runner = opts.runner || defaultRunner
     this.isElevated = opts.isElevated || defaultIsElevated
@@ -304,27 +335,46 @@ export class DarkOSRecoveryService extends EventEmitter {
     }
   }
 
-  /** Installed module wins; the bundled copy is only a fallback. Both files must exist. */
+  /**
+   * Runs the newest module: the "# ModuleVersion: N" header decides (no header = 0), ties keep the installed copy.
+   * Otherwise fixes shipped with DarkHub would never reach a DarkOS machine that has an older module in bin\.
+   * Both files of a pair must exist.
+   */
+  /** DarkOS mode needs the DarkOS manifest; Windows mode works on any Windows that has the bundled module. */
+  available() {
+    return this.mode === 'windows' ? Boolean(this.resolveCli()) : this.isDarkOS()
+  }
+
+  get catalogPath() {
+    return this.bundledDir ? path.join(this.bundledDir, 'policy', 'catalog.json') : null
+  }
+
   resolveCli() {
     const candidates = [
-      { dir: path.win32.join(this.root, 'bin'), source: 'installed' },
+      // Windows mode always uses the bundled module: it is the one that knows -Mode / -CatalogPath.
+      ...(this.mode === 'windows' ? [] : [{ dir: path.win32.join(this.root, 'bin'), source: 'installed' }]),
       ...(this.bundledDir ? [{ dir: this.bundledDir, source: 'bundled' }] : [])
     ]
+    let best = null
     for (const c of candidates) {
       const cli = path.join(c.dir, CLI_FILE)
       const mod = path.join(c.dir, MODULE_FILE)
       try {
-        if (this.fs.existsSync(cli) && this.fs.existsSync(mod)) return { cliPath: cli, modulePath: mod, source: c.source }
-      } catch { /* ignore */ }
+        if (!this.fs.existsSync(cli) || !this.fs.existsSync(mod)) continue
+      } catch { continue }
+      let version = 0
+      try { version = Number(/^# ModuleVersion:\s*(\d+)/m.exec(String(this.fs.readFileSync(mod, 'utf8')).slice(0, 4000))?.[1] || 0) } catch { /* unreadable: 0 */ }
+      if (!best || version > best.version) best = { cliPath: cli, modulePath: mod, source: c.source, version }
     }
-    return null
+    return best
   }
 
   info() {
     const cli = this.resolveCli()
     return {
       ok: true,
-      isDarkOS: this.isDarkOS(),
+      mode: this.mode,
+      isDarkOS: this.mode === 'darkos' && this.isDarkOS(),
       root: this.root,
       cliSource: cli?.source ?? null,
       cliAvailable: Boolean(cli),
@@ -351,11 +401,13 @@ export class DarkOSRecoveryService extends EventEmitter {
 
   buildScript(cliPath, command, args) {
     const json = JSON.stringify(args ?? {})
+    const winArgs = this.mode === 'windows' ? ` -Root ${psq(this.root)} -Mode Windows -CatalogPath ${psq(this.catalogPath)}` : ''
     return [
       "$ErrorActionPreference = 'Stop'",
       "$ProgressPreference = 'SilentlyContinue'",
       '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8',
-      `& ${psq(cliPath)} -Command ${psq(command)} -ArgsJson ${psq(json)}`
+      '[Console]::Out.WriteLine("DKPID:$PID"); [Console]::Out.Flush()',
+      `& ${psq(cliPath)} -Command ${psq(command)} -ArgsJson ${psq(json)}${winArgs}`
     ].join('\n')
   }
 
@@ -375,8 +427,8 @@ export class DarkOSRecoveryService extends EventEmitter {
     if (spec.mutates) this._emit({ runId, type: 'log', message: `${label}: aguardando na fila...` }, onEvent)
 
     return this._enqueue(async () => {
-      if (!this.isDarkOS()) {
-        return { ok: false, runId, error: 'Este Windows nao e o DarkOS (manifest.json nao encontrado).' }
+      if (!this.available()) {
+        return { ok: false, runId, error: this.mode === 'windows' ? 'Modulo de mods do DarkOS nao encontrado no DarkHub.' : 'Este Windows nao e o DarkOS (manifest.json nao encontrado).' }
       }
       const cli = this.resolveCli()
       if (!cli) {
@@ -387,14 +439,17 @@ export class DarkOSRecoveryService extends EventEmitter {
       }
 
       this._current = { runId, command, label, startedAt: Date.now() }
-      this._emit({ runId, type: 'run-start', message: `${label}: iniciando`, progress: 0 }, onEvent)
+      // Only mutating runs are announced: reads never emit run-finish, so a run-start for them would leave
+      // the renderer's activity panel stuck in "running" after every refresh.
+      if (spec.mutates) this._emit({ runId, type: 'run-start', message: `${label}: iniciando`, progress: 0 }, onEvent)
       const onLine = (line) => {
         const text = String(line ?? '').trim()
-        if (!text || text.startsWith('DKJSON:') || text === 'DHDONE') return
+        if (!text || text.startsWith('DKJSON:') || text === 'DHDONE' || PID_LINE_RE.test(text)) return
         const prog = parseProgressLine(text)
         if (prog) {
+          if (!spec.mutates) return
           this._emit({ runId, type: 'progress', progress: prog.progress, message: prog.message || `${prog.progress}%` }, onEvent)
-        } else if (text.startsWith('DHFAIL')) {
+        } else if (text.startsWith('DHFAIL') && spec.mutates) {
           this._emit({ runId, type: 'log', message: text.replace(/^DHFAIL\|?/, 'Falha: ') }, onEvent)
         } else if (spec.mutates) {
           this._emit({ runId, type: 'log', message: text.slice(0, 400) }, onEvent)

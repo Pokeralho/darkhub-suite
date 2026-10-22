@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { CheckCircle, Loader2, Terminal, XCircle } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { CheckCircle, Loader2, Terminal, XCircle } from '../icons';
 import type { DarkOSRunEvent } from '../../types/darkos';
 import { useI18n } from '../../i18n/I18nProvider';
 
@@ -9,6 +9,7 @@ export const DarkOSProgress: React.FC = () => {
   const [logs, setLogs] = useState<DarkOSRunEvent[]>([]);
   const [running, setRunning] = useState(false);
   const [last, setLast] = useState<DarkOSRunEvent | null>(null);
+  const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const off = window.darkhub?.darkos?.onRunEvent?.((evt) => {
@@ -23,51 +24,65 @@ export const DarkOSProgress: React.FC = () => {
     return () => { off?.(); };
   }, []);
 
+  // Keep the newest line visible.
+  useEffect(() => {
+    const el = logRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [logs]);
+
   const progressEvt = [...logs].reverse().find((l) => typeof l.progress === 'number');
   const progress = running && progressEvt ? Math.round(progressEvt.progress as number) : null;
   const success = !running && last?.type === 'run-finish' && last.ok === true;
   const failed = !running && last?.type === 'error';
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <Terminal className="w-4 h-4 text-zinc-400 shrink-0" />
-          <h3 className="text-sm font-semibold text-zinc-100 truncate">{t('darkos.progress.title', 'DarkOS activity')}</h3>
-        </div>
-        <div className="text-xs shrink-0">
+    <section className="dh-card overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-zinc-800/80">
+        <h2 className="dh-section-title truncate">{t('darkos.progress.title', 'DarkOS activity')}</h2>
+        <div className="text-[12px] shrink-0">
           {running ? (
-            <span className="inline-flex items-center gap-1.5 text-yellow-300">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              {t('darkos.busy', 'Running')}{progress !== null ? ` ${progress}%` : ''}
+            <span className="inline-flex items-center gap-1.5 text-zinc-300">
+              <Loader2 size={14} className="animate-spin text-blue-300" />
+              {t('darkos.busy', 'Running')}{progress !== null ? <span className="font-mono text-zinc-400"> {progress}%</span> : null}
             </span>
           ) : success ? (
-            <span className="inline-flex items-center gap-1.5 text-emerald-400"><CheckCircle className="w-3.5 h-3.5" />{t('darkos.result.ok', 'Done and verified.')}</span>
+            <span className="inline-flex items-center gap-1.5 text-emerald-400"><CheckCircle size={14} />{t('darkos.result.ok', 'Done and verified.')}</span>
           ) : failed ? (
-            <span className="inline-flex items-center gap-1.5 text-red-400"><XCircle className="w-3.5 h-3.5" />{t('darkos.result.fail', 'Not confirmed.')}</span>
+            <span className="inline-flex items-center gap-1.5 text-red-400"><XCircle size={14} />{t('darkos.result.fail', 'Not confirmed.')}</span>
           ) : null}
         </div>
       </div>
-      {running ? (
-        <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-zinc-800">
+      <div
+        className="h-px bg-zinc-800/80 overflow-hidden"
+        role={running ? 'progressbar' : undefined}
+        aria-label={running ? t('darkos.progress.title', 'DarkOS activity') : undefined}
+        aria-valuemin={running ? 0 : undefined}
+        aria-valuemax={running ? 100 : undefined}
+        aria-valuenow={running ? progress ?? undefined : undefined}
+      >
+        {running ? (
           <div
-            className={`h-full rounded-full bg-[#3b82f6] transition-[width] duration-500 ${progress === null ? 'w-1/2 animate-pulse' : ''}`}
+            className={`h-full bg-blue-400 transition-[width] duration-500 ease-out ${progress === null ? 'w-1/3 animate-pulse' : ''}`}
             style={progress !== null ? { width: `${progress}%` } : undefined}
           />
-        </div>
-      ) : null}
-      <div className="bg-black/60 rounded-lg p-3 font-mono text-[11px] text-zinc-300 h-40 overflow-y-auto border border-zinc-800">
-        {logs.length === 0 ? <div className="text-zinc-500 italic">{t('darkos.progress.empty', 'No operation running.')}</div> : null}
+        ) : null}
+      </div>
+      <div ref={logRef} role="log" aria-live="polite" className="bg-zinc-950 px-4 py-3 font-mono text-[11.5px] leading-[1.65] text-zinc-400 h-40 overflow-y-auto">
+        {logs.length === 0 ? (
+          <div className="flex items-center gap-2 text-zinc-600"><Terminal size={14} />{t('darkos.progress.empty', 'No operation running.')}</div>
+        ) : null}
         {logs.map((log, i) => (
           <div
             key={`${log.timestamp ?? 0}-${i}`}
-            className={log.type === 'error' ? 'text-red-400' : log.type === 'run-finish' && log.ok ? 'text-emerald-400' : ''}
+            className={`flex gap-3 ${log.type === 'error' ? 'text-red-400' : log.type === 'run-finish' && log.ok ? 'text-emerald-400' : ''}`}
           >
-            {new Date(log.timestamp || Date.now()).toLocaleTimeString()} - {typeof log.progress === 'number' ? `[${Math.round(log.progress)}%] ` : ''}{log.message || log.error || log.type}
+            <span className="text-zinc-600 shrink-0">{new Date(log.timestamp || Date.now()).toLocaleTimeString()}</span>
+            {typeof log.progress === 'number' ? <span className="text-zinc-500 shrink-0 w-10 text-right">{Math.round(log.progress)}%</span> : null}
+            <span className="min-w-0 break-words">{log.message || log.error || log.type}</span>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 };
 

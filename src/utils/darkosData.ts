@@ -17,12 +17,24 @@ export interface DarkOSRow extends DarkOSCatalogEntry {
   lastError?: string | null;
   lastTs?: string;
   verified?: boolean;
+  /** Live read-back: the system already has this value (Windows mode). */
+  live?: boolean;
+  /** The service/task does not exist on this Windows build (Apply would skip it). */
+  absent?: boolean;
 }
 
-export function mergeChanges(catalogData: any, manifest: DarkOSManifest | null | undefined): DarkOSRow[] {
+export function mergeChanges(catalogData: any, manifest: DarkOSManifest | null | undefined, statusData?: any): DarkOSRow[] {
   const catalog = asArray<DarkOSCatalogEntry>(catalogData, ['changes', 'catalog', 'items']);
   const byId = new Map<string, any>();
   for (const c of manifest?.changes ?? []) if (c && typeof c.id === 'string') byId.set(c.id, c);
+  // Live read-back (Get-DarkOSStatus): true when the system already has the tweak's value, applied by us or not.
+  const live = new Map<string, boolean>();
+  const absent = new Set<string>();
+  for (const s of asArray<any>(statusData, ['items'])) {
+    if (!s || typeof s.id !== 'string') continue;
+    live.set(s.id, s.live === true);
+    if (s.present === false) absent.add(s.id);
+  }
   const rows: DarkOSRow[] = catalog
     .filter((c) => c && typeof c.id === 'string')
     .map((c) => {
@@ -32,7 +44,9 @@ export function mergeChanges(catalogData: any, manifest: DarkOSManifest | null |
         status: m?.status || 'notApplied',
         lastError: m?.lastResult?.error ?? null,
         lastTs: m?.lastResult?.ts,
-        verified: m?.lastResult?.verified
+        verified: m?.lastResult?.verified,
+        live: live.get(c.id),
+        absent: absent.has(c.id) || undefined
       };
     });
   // Manifest entries missing from the catalog are still shown (read-only info).

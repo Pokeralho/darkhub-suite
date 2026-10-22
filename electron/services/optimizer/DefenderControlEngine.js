@@ -3,6 +3,7 @@ import Logger from '../LoggerService.js';
 import { spawn } from 'node:child_process';
 import { runPowerShell } from '../PowerShellRunner.js';
 import ElevationHelper from './ElevationHelper.js';
+import { psQuote } from './OptimizerUtils.js';
 
 const POLICY_KEY = 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows Defender';
 const RTP_KEY = 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Real-Time Protection';
@@ -12,6 +13,32 @@ const POLICY_CHANGES = [
   { key: POLICY_KEY, name: 'DisableAntiSpyware', type: 'REG_DWORD', data: '1' },
   { key: RTP_KEY, name: 'DisableRealtimeMonitoring', type: 'REG_DWORD', data: '1' }
 ];
+
+const IMAGE_DEFENDER_DEFAULTS = { WinDefend: 2, WdNisSvc: 3, Sense: 3, WdBoot: 0, WdFilter: 0, WdNisDrv: 3, MsSecFlt: 0, MsSecWfp: 0, MsSecCore: 0, SecurityHealthService: 2, webthreatdefsvc: 3, webthreatdefusersvc: 3 };
+/**
+ * Elevated script used by restoreImageDefender (exported for tests). The JSON goes through psQuote: inside a
+ * single-quoted PowerShell literal only ' needs doubling. The previous '""'-doubling produced invalid JSON, so
+ * ConvertFrom-Json threw and the restore always failed.
+ */
+export function buildImageDefenderRestoreScript(defaults = IMAGE_DEFENDER_DEFAULTS) {
+  return `
+$ErrorActionPreference = 'Stop'
+$defaults = ${psQuote(JSON.stringify(defaults))} | ConvertFrom-Json
+$bak = 'HKLM:\\SOFTWARE\\DarkOS\\DefenderServiceStart'
+foreach ($p in $defaults.PSObject.Properties) {
+  $svc = $p.Name
+  $start = $p.Value
+  if (Test-Path $bak) { $b = (Get-ItemProperty -Path $bak -Name $svc -ErrorAction SilentlyContinue).$svc; if ($null -ne $b) { $start = [int]$b } }
+  $k = "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\$svc"
+  if (Test-Path $k) { Set-ItemProperty -Path $k -Name Start -Value ([int]$start) -Type DWord -Force }
+}
+$pol = 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender'
+Remove-ItemProperty -Path $pol -Name 'DisableAntiSpyware','DisableAntiVirus','ServiceKeepAlive' -ErrorAction SilentlyContinue
+Remove-Item -Path "$pol\\Real-Time Protection" -Recurse -ErrorAction SilentlyContinue
+Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows Defender\\Features' -Name 'TamperProtection' -Value 0 -Type DWord -Force -ErrorAction SilentlyContinue
+Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkOS' -Name 'DefenderRemovedOffline' -ErrorAction SilentlyContinue
+Write-Output 'DKRESTORE-OK'`;
+}
 
 /**
  * Real-time protection control for Microsoft Defender.
@@ -125,32 +152,15 @@ if ($null -ne $wmi.IsTamperProtected) { $tamper = [bool]$wmi.IsTamperProtected }
     if (before.ok && !before.status?.imageLevelRemoved) {
       return { ok: false, error: 'Este sistema não teve o Defender removido no nível da imagem (marcador DarkOS ausente). Use o botão de proteção em tempo real.' };
     }
-    const defaults = { WinDefend: 2, WdNisSvc: 3, Sense: 3, WdBoot: 0, WdFilter: 0, WdNisDrv: 3, MsSecFlt: 0, MsSecWfp: 0, MsSecCore: 0, SecurityHealthService: 2, webthreatdefsvc: 3, webthreatdefusersvc: 3 };
-    const svcJson = JSON.stringify(defaults).replace(/"/g, '""');
-    const script = `
-$ErrorActionPreference = 'Stop'
-$defaults = '${svcJson}' | ConvertFrom-Json
-$bak = 'HKLM:\\SOFTWARE\\DarkOS\\DefenderServiceStart'
-foreach ($p in $defaults.PSObject.Properties) {
-  $svc = $p.Name
-  $start = $p.Value
-  if (Test-Path $bak) { $b = (Get-ItemProperty -Path $bak -Name $svc -ErrorAction SilentlyContinue).$svc; if ($null -ne $b) { $start = [int]$b } }
-  $k = "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\$svc"
-  if (Test-Path $k) { Set-ItemProperty -Path $k -Name Start -Value ([int]$start) -Type DWord -Force }
-}
-$pol = 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender'
-Remove-ItemProperty -Path $pol -Name 'DisableAntiSpyware','DisableAntiVirus','ServiceKeepAlive' -ErrorAction SilentlyContinue
-Remove-Item -Path "$pol\\Real-Time Protection" -Recurse -ErrorAction SilentlyContinue
-Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows Defender\\Features' -Name 'TamperProtection' -Value 0 -Type DWord -Force -ErrorAction SilentlyContinue
-Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkOS' -Name 'DefenderRemovedOffline' -ErrorAction SilentlyContinue
-Write-Output 'DKRESTORE-OK'`;
+    const script = buildImageDefenderRestoreScript();
     try {
       const res = await ElevationHelper.runElevatedPowerShell(script, { timeoutMs: 60000 });
       const out = `${res.stdout || ''}`;
-      if (res.code !== 0 && !out.includes('DKRESTORE-OK')) {
+      // success only with the marker printed after the last step (exit codes of the elevation wrapper are unreliable)
+      if (!out.includes('DKRESTORE-OK')) {
         return { ok: false, error: res.stderr || 'Falha ao restaurar os serviços do Defender.' };
       }
-      return { ok: true, rebootRequired: true, msg: 'Serviços do Microsoft Defender reativados no registro. Reinicie o PC para que o Defender volte a carregar. Componentes removidos da imagem (app Segurança do Windows) podem exigir reinstalação via Windows Update.' };
+      return { ok: true, rebootRequired: true, requiresReboot: true, msg: 'Serviços do Microsoft Defender reativados no registro. Reinicie o PC para que o Defender volte a carregar. Componentes removidos da imagem (app Segurança do Windows) podem exigir reinstalação via Windows Update.' };
     } catch (e) {
       Logger.error('DefenderControlEngine', 'restoreImageDefender', e);
       return { ok: false, error: e.message };

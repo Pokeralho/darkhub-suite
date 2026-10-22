@@ -1,6 +1,7 @@
 import ElevationHelper from './ElevationHelper.js';
 import DeepTweaksEngine from './DeepTweaksEngine.js';
 import { runPowerShell } from '../PowerShellRunner.js';
+import { psQuote } from './OptimizerUtils.js';
 
 /**
  * Services this tweak turns off. BITS was removed: its default is already "Manual" (so the old call changed
@@ -30,8 +31,9 @@ export function scArgFromStartMode(startMode, delayed) {
 class ServicesEngine {
   /** Reads the real service configuration (StartMode/State) of the managed services. */
   async readServices(names = MANAGED_SERVICES.map((s) => s.name)) {
-    const filter = names.map((n) => `Name='${n.replace(/'/g, '')}'`).join(' OR ');
-    const script = `Get-CimInstance Win32_Service -Filter "${filter}" | Select-Object Name, StartMode, DelayedAutoStart, State | ConvertTo-Json -Compress`;
+    // single-quoted PowerShell literal: names such as "MSSQL$SQLEXPRESS" were expanded as variables inside "..."
+    const filter = names.map((n) => `Name='${String(n).replace(/['\\]/g, '')}'`).join(' OR ');
+    const script = `Get-CimInstance Win32_Service -Filter ${psQuote(filter)} | Select-Object Name, StartMode, DelayedAutoStart, State | ConvertTo-Json -Compress`;
     try {
       const r = await runPowerShell(script, { timeoutMs: 20000, trim: true });
       if (r.code !== 0 || !r.stdout) return null;
@@ -60,7 +62,9 @@ class ServicesEngine {
     const present = MANAGED_SERVICES.filter((s) => before[s.name.toLowerCase()]);
     const alreadyAll = present.every((s) => before[s.name.toLowerCase()].startMode === 'Disabled');
     // keep the ORIGINAL configuration: never overwrite a snapshot while the services are still disabled by us
+    let createdSnapshot = false;
     if (!DeepTweaksEngine.getExtra(SNAPSHOT_ID) || !present.some((s) => before[s.name.toLowerCase()].startMode === 'Disabled')) {
+      createdSnapshot = true;
       DeepTweaksEngine.saveExtra(SNAPSHOT_ID, {
         services: present.map((s) => {
           const b = before[s.name.toLowerCase()];
@@ -88,7 +92,8 @@ class ServicesEngine {
       .map((s) => ({ service: s.name, expected: 'Disabled', actual: after[s.name.toLowerCase()]?.startMode ?? '(desconhecido)' }))
       .filter((m) => m.actual !== m.expected);
     if (mismatches.length === present.length) {
-      DeepTweaksEngine.clearExtra(SNAPSHOT_ID);
+      // only drop a snapshot taken by THIS call; an older one still describes the user's original configuration
+      if (createdSnapshot) DeepTweaksEngine.clearExtra(SNAPSHOT_ID);
       return { ok: false, error: 'O Windows não aceitou a alteração dos serviços (UAC cancelado ou política de TI).', verifyMismatches: mismatches };
     }
     if (mismatches.length > 0) {

@@ -231,3 +231,112 @@ describe('marked script protocol and result adaptation', () => {
     expect(ok.message).toBe('feito');
   });
 });
+
+describe('audit fixes (concurrency, snapshots, IPC safety)', () => {
+  it('listTweaks() is structured-cloneable (no functions reach Electron IPC)', async () => {
+    const engine = (await import('../electron/services/optimizer/DeepTweaksEngine.js')).default as any;
+    const list = engine.listTweaks();
+    expect(() => structuredClone(list)).not.toThrow();
+    expect(list.find((t: any) => t.id === 'tweak:disableHibernation')?.hasCommands).toBe(true);
+    // the internal definition keeps its commands
+    expect(typeof engine.getDefinition('tweak:disableHibernation').commands.revert).toBe('function');
+  });
+
+  it('a partially applied tweak keeps its fresh snapshot so the written values can be restored', async () => {
+    const engine = (await import('../electron/services/optimizer/DeepTweaksEngine.js')).default as any;
+    const key = 'HKCU\Software\DarkHubAuditTest';
+    const def = { id: 'test:partial', title: 'partial', changes: [
+      { key, name: 'A', type: 'REG_DWORD', data: '1' },
+      { key, name: 'B', type: 'REG_DWORD', data: '1' }
+    ] };
+    const orig = { readEntries: engine.readEntries, runRegistryOps: engine.runRegistryOps, saveUndoStore: engine.saveUndoStore };
+    let reads = 0;
+    engine.saveUndoStore = () => {};
+    engine.readEntries = async () => {
+      reads += 1;
+      const m = new Map();
+      m.set(U.regEntryId(key, 'A'), { key, name: 'A', keyExists: true, exists: reads > 1, type: 'REG_DWORD', value: reads > 1 ? 1 : null });
+      m.set(U.regEntryId(key, 'B'), { key, name: 'B', keyExists: true, exists: false, type: null, value: null });
+      return m;
+    };
+    engine.runRegistryOps = async () => Object.assign([{ ok: true, message: '' }, { ok: false, message: 'access denied' }], { cmdResults: new Map(), stdout: '' });
+    try {
+      const run = await engine._applyDefs([def]);
+      expect(run.results[0].ok).toBe(false);
+      expect(engine.deepTweaksUndoStore.has('test:partial')).toBe(true);
+    } finally {
+      engine.deepTweaksUndoStore.delete('test:partial');
+      Object.assign(engine, orig);
+    }
+  });
+
+  it('apply/restore runs of DeepTweaksEngine never overlap', async () => {
+    const engine = (await import('../electron/services/optimizer/DeepTweaksEngine.js')).default as any;
+    let active = 0;
+    let maxActive = 0;
+    const order: string[] = [];
+    const task = (name: string) => async () => {
+      active += 1; maxActive = Math.max(maxActive, active); order.push(`${name}:start`);
+      await new Promise((r) => setTimeout(r, 20));
+      order.push(`${name}:end`); active -= 1;
+      return name;
+    };
+    const res = await Promise.all([engine._exclusive(task('a')), engine._exclusive(task('b'))]);
+    expect(res).toEqual(['a', 'b']);
+    expect(maxActive).toBe(1);
+    expect(order).toEqual(['a:start', 'a:end', 'b:start', 'b:end']);
+    // a failing run does not block the queue
+    await expect(engine._exclusive(async () => { throw new Error('x'); })).rejects.toThrow('x');
+    await expect(engine._exclusive(async () => 'after')).resolves.toBe('after');
+  });
+
+  it('SystemOptimizerService.runTasks queues separate batches instead of interleaving them', async () => {
+    const svc = (await import('../electron/services/optimizer/SystemOptimizerService.js')).default as any;
+    const order: string[] = [];
+    const mk = (id: string) => ({ id, name: id, execute: async () => { order.push(`${id}:start`); await new Promise((r) => setTimeout(r, 15)); order.push(`${id}:end`); return { ok: true }; } });
+    svc.operations.set('test:a', mk('test:a'));
+    svc.operations.set('test:b', mk('test:b'));
+    const origCompat = svc.validateTaskCompatibility;
+    svc.validateTaskCompatibility = async () => ({ ok: true });
+    try {
+      await Promise.all([svc.runTasks(['test:a']), svc.runTasks(['test:b'])]);
+      expect(order).toEqual(['test:a:start', 'test:a:end', 'test:b:start', 'test:b:end']);
+    } finally {
+      svc.operations.delete('test:a');
+      svc.operations.delete('test:b');
+      svc.validateTaskCompatibility = origCompat;
+    }
+  });
+
+  it('tweak warnings reach the operation list (the UI only confirms items that carry a warning)', async () => {
+    const svc = (await import('../electron/services/optimizer/SystemOptimizerService.js')).default as any;
+    const ops = svc.listOperations();
+    expect(ops.find((o: any) => o.id === 'optimizer:disableLocation').warning).toBeTruthy();
+    const engine = (await import('../electron/services/optimizer/DeepTweaksEngine.js')).default as any;
+    expect(engine.getDefinition('tweak:setUtcTime').warning).toBeTruthy();
+  });
+
+  it('the image-level Defender restore script embeds valid JSON', async () => {
+    const { buildImageDefenderRestoreScript } = await import('../electron/services/optimizer/DefenderControlEngine.js') as any;
+    const script: string = buildImageDefenderRestoreScript({ WinDefend: 2, "it's": 3 });
+    const m = /\$defaults = '((?:[^']|'')*)' \| ConvertFrom-Json/.exec(script);
+    expect(m).not.toBeNull();
+    const parsed = JSON.parse(m![1].replace(/''/g, "'"));
+    expect(parsed.WinDefend).toBe(2);
+    expect(script).toContain('DKRESTORE-OK');
+  });
+
+  it('waitForElevated gives up early when the elevated process never starts (UAC refused)', async () => {
+    const { waitForElevated } = await import('../electron/services/optimizer/ElevationHelper.js') as any;
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const fs = await import('node:fs');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-elev-'));
+    const flag = path.join(dir, 'x.done');
+    const started = path.join(dir, 'x.started');
+    expect(await waitForElevated(flag, started, 300)).toBe('not-started');
+    fs.writeFileSync(flag, 'DONE');
+    expect(await waitForElevated(flag, started, 300)).toBe('done');
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});

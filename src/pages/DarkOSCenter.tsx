@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertTriangle, Archive, Bug, Camera, CheckCircle, FileArchive, Gauge, Layers, LifeBuoy,
-  Loader2, Package, RefreshCw, RotateCcw, ShieldAlert, Undo2, Redo2, XCircle, HardDrive, Info
-} from 'lucide-react';
+  AlertTriangle, Archive, Camera, Check, CheckCircle, ChevronRight, DarkHubMark, FileArchive, Gauge,
+  RefreshCw, RotateCcw, Search, ShieldAlert, Undo2, Redo2, XCircle, HardDrive, Info
+} from '../components/icons';
+import PageHeader from '../components/ui/PageHeader';
 import { useI18n } from '../i18n/I18nProvider';
 import DarkOSProgress from '../components/darkos/DarkOSProgress';
 import DarkOSConfirmDialog from '../components/darkos/DarkOSConfirmDialog';
@@ -27,31 +28,42 @@ interface ConfirmState {
   run: (opts: { confirmSecurity: boolean }) => Promise<any>;
 }
 
-const STATUS_STYLE: Record<string, string> = {
-  applied: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
-  reverted: 'bg-zinc-800 text-zinc-300 border-zinc-700',
-  failed: 'bg-red-500/10 text-red-300 border-red-500/30',
-  'pending-reboot': 'bg-amber-500/10 text-amber-300 border-amber-500/30',
-  notApplied: 'bg-zinc-900 text-zinc-500 border-zinc-800'
+/** Status is quiet coloured text with a 6px dot: it is a real, live per-tweak state. */
+const STATUS_TONE: Record<string, { text: string; dot: string }> = {
+  applied: { text: 'text-emerald-400', dot: 'bg-emerald-400' },
+  reverted: { text: 'text-zinc-400', dot: 'bg-zinc-500' },
+  failed: { text: 'text-red-400', dot: 'bg-red-400' },
+  'pending-reboot': { text: 'text-amber-300', dot: 'bg-amber-300' },
+  notApplied: { text: 'text-zinc-500', dot: 'bg-zinc-700' }
 };
 
 const api = () => window.darkhub?.darkos;
 
-const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`bg-zinc-900 border border-zinc-800 rounded-xl p-4 ${className}`}>{children}</div>
+/** A section on a tab: sentence-case title, optional help, optional right-side actions. */
+const Section: React.FC<{ title: React.ReactNode; help?: React.ReactNode; actions?: React.ReactNode; children?: React.ReactNode; className?: string }> = ({ title, help, actions, children, className = '' }) => (
+  <section className={className}>
+    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-3">
+      <div className="min-w-0 max-w-[75ch]">
+        <h2 className="dh-section-title">{title}</h2>
+        {help ? <p className="mt-1 dh-help">{help}</p> : null}
+      </div>
+      {actions ? <div className="flex items-center gap-2 shrink-0">{actions}</div> : null}
+    </div>
+    {children}
+  </section>
 );
 
-const Stat: React.FC<{ label: string; value: React.ReactNode; tone?: string }> = ({ label, value, tone = 'text-zinc-100' }) => (
-  <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg p-3 min-w-0">
-    <div className="text-[10px] uppercase tracking-wider text-zinc-500 truncate">{label}</div>
-    <div className={`mt-1 text-sm font-semibold font-mono truncate ${tone}`}>{value}</div>
+/** Overview figure: label above, mono value, coloured only when the number carries meaning. */
+const Figure: React.FC<{ label: string; value: React.ReactNode; tone?: string }> = ({ label, value, tone = 'text-zinc-100' }) => (
+  <div className="min-w-0 px-4 py-3">
+    <div className="text-[11.5px] text-zinc-500 truncate">{label}</div>
+    <div className={`mt-1 font-mono text-[18px] leading-tight tabular-nums truncate ${tone}`}>{value}</div>
   </div>
 );
 
-const btn = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition disabled:opacity-40 disabled:cursor-not-allowed';
-const btnGhost = `${btn} bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 border-zinc-700/60`;
-const btnPrimary = `${btn} bg-[#3b82f6] hover:bg-blue-500 text-white border-blue-500/50`;
-const btnDanger = `${btn} bg-red-600/90 hover:bg-red-500 text-white border-red-500/50`;
+const Empty: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <p className="px-4 py-6 text-[12.5px] text-zinc-500">{children}</p>
+);
 
 export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: string) => void }) {
   const { t } = useI18n();
@@ -72,30 +84,49 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
   const [snapLabel, setSnapLabel] = useState('');
   const [diffTarget, setDiffTarget] = useState<DarkOSProfileId | null>(null);
 
+  const mounted = useRef(true);
+  // Each load gets a sequence number; a slower, older load never overwrites a newer one.
+  const loadSeq = useRef(0);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
+    const current = () => mounted.current && seq === loadSeq.current;
     setLoading(true);
     setLoadError(null);
     try {
       const i = await api()?.isDarkOS?.();
+      if (!current()) return;
       setInfo(i ?? { ok: false, isDarkOS: false });
-      if (!i?.isDarkOS || !i?.cliAvailable) return;
+      if (!(i?.isDarkOS || i?.mode === 'windows') || !i?.cliAvailable) return;
       const [cat, man] = [await api()!.getCatalog(), await api()!.getManifest()];
+      if (!current()) return;
       if (!man.ok) setLoadError(man.error || null);
       else if (!cat.ok) setLoadError(cat.error || null);
       setManifest(man.ok ? man.data ?? null : null);
-      setRows(mergeChanges(cat.ok ? cat.data : [], man.ok ? man.data : null));
+      // Windows mode also reads the live state, so tweaks the system already has are not offered as new.
+      const st = i?.mode === 'windows' ? await api()!.getStatus() : null;
+      if (!current()) return;
+      setRows(mergeChanges(cat.ok ? cat.data : [], man.ok ? man.data : null, st?.ok ? st.data : null));
       const removed = await api()!.getRemovedApps();
+      if (!current()) return;
       setApps(removed.ok ? normalizeRemovedApps(removed.data) : []);
       const snaps = await api()!.listSnapshots();
+      if (!current()) return;
       setSnapshots(snaps.ok ? normalizeSnapshots(snaps.data) : normalizeSnapshots(man.data?.snapshots));
       const fails = await api()!.getFailures();
+      if (!current()) return;
       setFailures(fails.ok ? normalizeFailures(fails.data) : []);
       const rb = await api()!.getRebootPending();
+      if (!current()) return;
       setReboot(rb.ok ? normalizeReboot(rb.data) : { pending: false, ids: [] });
     } catch (e: any) {
-      setLoadError(e?.message ?? String(e));
+      if (current()) setLoadError(e?.message ?? String(e));
     } finally {
-      setLoading(false);
+      if (current()) setLoading(false);
     }
   }, []);
 
@@ -107,10 +138,10 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
     setBanner(null);
     try {
       const res = await fn();
-      if (res?.canceled) return;
+      if (res?.canceled || !mounted.current) return;
       if (res?.ok === true) {
-        const reboot = res.rebootRequired ? ` ${t('darkos.reboot.body', 'Restart required.')}` : '';
-        setBanner({ ok: true, message: `${res.message || t('darkos.result.ok', 'Done and verified.')}${reboot}` });
+        const rebootNote = res.rebootRequired ? ` ${t('darkos.reboot.body', 'Restart required.')}` : '';
+        setBanner({ ok: true, message: `${res.message || t('darkos.result.ok', 'Done and verified.')}${rebootNote}` });
       } else if (res?.status === 'pending-reboot') {
         setBanner({ ok: false, pending: true, message: t('darkos.result.pending', 'Applied; it can only be verified after a restart.') });
       } else {
@@ -120,16 +151,19 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
         setBanner({ ok: false, message: `${res?.error || t('darkos.result.fail', 'Not confirmed.')}${failed}` });
       }
     } catch (e: any) {
-      setBanner({ ok: false, message: e?.message ?? String(e) });
+      if (mounted.current) setBanner({ ok: false, message: e?.message ?? String(e) });
     } finally {
-      setBusy(false);
-      load();
+      if (mounted.current) {
+        setBusy(false);
+        load();
+      }
     }
   }, [load, t]);
 
   const counts = useMemo(() => countStatuses(rows), [rows]);
+  const winMode = info?.mode === 'windows';
   const activeProfile = (manifest?.activeProfile || 'darkosDefault') as DarkOSProfileId;
-  const profileName = (p: string) => t(`darkos.profile.${p}`, p);
+  const profileName = (p: string) => (winMode ? t(`darkos.win.profile.${p}`, t(`darkos.profile.${p}`, p)) : t(`darkos.profile.${p}`, p));
   const describe = (r: DarkOSRow) => r.description || r.id;
 
   const toggleChange = (r: DarkOSRow) => {
@@ -150,6 +184,14 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
       return;
     }
     runAction(() => api()!.applyChange({ ids }));
+  };
+
+  /** Applies (or undoes) every item of one category; security items are never part of a bulk apply. */
+  const toggleGroup = (items: DarkOSRow[], undo: boolean) => {
+    const ids = items
+      .filter((r) => (undo ? r.status === 'applied' || r.status === 'pending-reboot' : r.status !== 'applied' && r.status !== 'pending-reboot' && !r.live && !r.absent && !r.securityRelated))
+      .map((r) => r.id);
+    if (ids.length) runAction(() => (undo ? api()!.revertChange({ ids }) : api()!.applyChange({ ids })));
   };
 
   const askProfile = (target: DarkOSProfileId) => {
@@ -194,93 +236,119 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
   });
 
   const header = (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80">
-      <div className="min-w-0">
-        <h1 className="text-lg font-bold text-zinc-100 tracking-tight flex items-center gap-2">
-          <LifeBuoy className="w-5 h-5 text-[#3b82f6]" />
-          {t('darkos.title', 'DarkOS Center')}
-          {info?.isDarkOS ? (
-            <span className="text-[10px] px-2 py-0.5 rounded bg-[#3b82f6]/10 text-blue-300 font-mono border border-blue-500/30">
-              {manifest?.darkosVersion ? `v${manifest.darkosVersion}` : 'DarkOS'}
-            </span>
+    <PageHeader
+      title={(
+        <span className="inline-flex items-center gap-2.5">
+          <DarkHubMark size={20} className="text-zinc-100" />
+          {winMode ? t('darkos.win.title', 'DarkOS Mods') : t('darkos.title', 'DarkOS Center')}
+          {info?.isDarkOS && manifest?.darkosVersion ? (
+            <span className="dh-tag text-[11.5px] font-normal translate-y-px">v{manifest.darkosVersion}</span>
           ) : null}
-        </h1>
-        <p className="text-xs text-zinc-400 mt-0.5">{t('darkos.subtitle', 'See, undo and recover everything DarkOS changed.')}</p>
-      </div>
-      <button onClick={load} disabled={loading || busy} className={btnGhost}>
-        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-        {t('darkos.refresh', 'Refresh')}
-      </button>
-    </div>
+        </span>
+      )}
+      subtitle={winMode ? t('darkos.win.subtitle', '') : t('darkos.subtitle', 'See, undo and recover everything DarkOS changed.')}
+      actions={(
+        <button onClick={load} disabled={loading || busy} className="dh-btn">
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          {t('darkos.refresh', 'Refresh')}
+        </button>
+      )}
+    />
   );
 
   if (loading && !info) {
     return (
-      <div className="w-full max-w-6xl mx-auto space-y-4 p-1 md:p-2">
+      <div className="w-full">
         {header}
-        <div className="flex items-center gap-2 text-xs text-zinc-400"><Loader2 className="w-4 h-4 animate-spin" />{t('darkos.loading', 'Loading...')}</div>
+        <div role="status" aria-label={t('darkos.loading', 'Loading...')} className="space-y-6">
+          <div className="dh-card grid grid-cols-2 md:grid-cols-4 md:divide-x divide-zinc-800/80">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="px-4 py-3 space-y-2">
+                <div className="h-3 w-20 rounded bg-zinc-800/80 animate-pulse" />
+                <div className="h-5 w-24 rounded bg-zinc-800/80 animate-pulse" />
+              </div>
+            ))}
+          </div>
+          <div className="dh-card divide-y divide-zinc-800/80">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="px-4 py-3 flex items-center gap-3">
+                <div className="h-3 w-16 rounded bg-zinc-800/80 animate-pulse" />
+                <div className="h-3 flex-1 max-w-sm rounded bg-zinc-800/80 animate-pulse" />
+                <div className="ml-auto h-7 w-20 rounded-md bg-zinc-800/80 animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
-  if (!info?.isDarkOS) {
+  if (!info?.isDarkOS && !winMode) {
     return (
-      <div className="w-full max-w-6xl mx-auto space-y-4 p-1 md:p-2">
+      <div className="w-full space-y-8">
         {header}
-        <Card className="max-w-2xl">
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-zinc-800 shrink-0"><Info className="w-5 h-5 text-zinc-400" /></div>
-            <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-zinc-100">{t('darkos.empty.title', 'This Windows is not DarkOS')}</h2>
-              <p className="mt-2 text-xs text-zinc-400 leading-relaxed">{t('darkos.empty.body', '')}</p>
-              <p className="mt-2 text-xs text-zinc-500">{t('darkos.empty.hint', '')}</p>
-              {onNavigate ? (
-                <button onClick={() => onNavigate('optimizer')} className={`${btnGhost} mt-3`}>
-                  <Gauge className="w-3.5 h-3.5" />System Optimizer
-                </button>
-              ) : null}
-            </div>
+        <div className="flex items-start gap-3 max-w-[75ch]">
+          <Info size={18} className="text-zinc-500 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <h2 className="dh-section-title">{t('darkos.empty.title', 'This Windows is not DarkOS')}</h2>
+            <p className="mt-1.5 text-[12.5px] text-zinc-400 leading-relaxed">{t('darkos.empty.body', '')}</p>
+            <p className="mt-1.5 dh-help">{t('darkos.empty.hint', '')}</p>
+            {onNavigate ? (
+              <button onClick={() => onNavigate('optimizer')} className="dh-btn mt-4">
+                <Gauge size={14} />System Optimizer
+              </button>
+            ) : null}
           </div>
-        </Card>
+        </div>
         <DarkOSSystemPanel onNavigate={onNavigate} />
       </div>
     );
   }
 
-  const tabs: { id: TabId; label: string; icon: React.ComponentType<{ className?: string }>; count?: number }[] = [
-    { id: 'overview', label: t('darkos.tab.overview', 'Overview'), icon: Gauge },
-    { id: 'system', label: t('darkos.sys.title', 'System & updates'), icon: HardDrive },
-    { id: 'changes', label: t('darkos.tab.changes', 'Applied optimizations'), icon: Layers, count: rows.length },
-    { id: 'profiles', label: t('darkos.tab.profiles', 'Profiles'), icon: Gauge },
-    { id: 'recovery', label: t('darkos.tab.recovery', 'Recovery'), icon: RotateCcw, count: apps.length },
-    { id: 'snapshots', label: t('darkos.tab.snapshots', 'Snapshots'), icon: Camera, count: snapshots.length },
-    { id: 'failures', label: t('darkos.tab.failures', 'Failures'), icon: Bug, count: failures.length },
-    { id: 'diagnostics', label: t('darkos.tab.diagnostics', 'Diagnostics'), icon: FileArchive },
+  const tabs: { id: TabId; label: string; count?: number }[] = [
+    { id: 'overview', label: t('darkos.tab.overview', 'Overview') },
+    { id: 'system', label: t('darkos.sys.title', 'System & updates') },
+    { id: 'changes', label: winMode ? t('darkos.win.tab', 'Mods') : t('darkos.tab.changes', 'Applied optimizations'), count: rows.length },
+    { id: 'profiles', label: t('darkos.tab.profiles', 'Profiles') },
+    { id: 'recovery', label: t('darkos.tab.recovery', 'Recovery'), count: apps.length },
+    { id: 'snapshots', label: t('darkos.tab.snapshots', 'Snapshots'), count: snapshots.length },
+    { id: 'failures', label: t('darkos.tab.failures', 'Failures'), count: failures.length },
+    { id: 'diagnostics', label: t('darkos.tab.diagnostics', 'Diagnostics') },
   ];
 
   const renderOverview = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label={t('darkos.ov.version', 'DarkOS version')} value={manifest?.darkosVersion || '-'} />
-        <Stat label={t('darkos.ov.build', 'Windows build')} value={manifest?.osBuild || '-'} />
-        <Stat label={t('darkos.ov.profile', 'Active profile')} value={profileName(activeProfile)} tone="text-blue-300" />
-        <Stat label={t('darkos.ov.snapshots', 'Snapshots')} value={snapshots.length} />
-        <Stat label={t('darkos.ov.applied', 'Applied')} value={counts.applied} tone="text-emerald-300" />
-        <Stat label={t('darkos.ov.reverted', 'Reverted')} value={counts.reverted} />
-        <Stat label={t('darkos.ov.failed', 'Failed')} value={counts.failed} tone={counts.failed ? 'text-red-300' : 'text-zinc-100'} />
-        <Stat label={t('darkos.ov.pendingReboot', 'Awaiting restart')} value={counts['pending-reboot']} tone={counts['pending-reboot'] ? 'text-amber-300' : 'text-zinc-100'} />
-      </div>
-      <Card>
-        <div className="flex items-center gap-2 text-xs text-zinc-400">
-          <Package className="w-4 h-4" />
-          {t('darkos.ov.removedApps', 'Removed apps')}: <span className="font-mono text-zinc-200">{apps.length}</span>
-          <span className="text-zinc-600">|</span>
-          <HardDrive className="w-4 h-4" />
-          <span className="font-mono text-zinc-500 truncate">{info?.root}</span>
-          <span className="text-zinc-600">|</span>
-          <span className="font-mono text-zinc-500">module: {info?.cliSource}</span>
+    <div className="space-y-6">
+      <section className="dh-card">
+        <div className="grid grid-cols-2 md:grid-cols-4 md:divide-x divide-zinc-800/80 border-b border-zinc-800/80">
+          {winMode
+            ? <Figure label={t('darkos.win.modeLabel', 'Mode')} value={<span className="font-sans text-[15px] font-medium">Windows</span>} />
+            : <Figure label={t('darkos.ov.version', 'DarkOS version')} value={manifest?.darkosVersion || '-'} />}
+          <Figure label={t('darkos.ov.build', 'Windows build')} value={manifest?.osBuild || '-'} />
+          <Figure label={t('darkos.ov.profile', 'Active profile')} value={<span className="font-sans text-[15px] font-medium text-blue-300">{profileName(activeProfile)}</span>} />
+          <Figure label={t('darkos.ov.snapshots', 'Snapshots')} value={snapshots.length} />
         </div>
-      </Card>
+        <div className="grid grid-cols-2 md:grid-cols-4 md:divide-x divide-zinc-800/80">
+          <Figure label={t('darkos.ov.applied', 'Applied')} value={counts.applied} tone={counts.applied ? 'text-emerald-400' : 'text-zinc-100'} />
+          <Figure label={t('darkos.ov.reverted', 'Reverted')} value={counts.reverted} />
+          <Figure label={t('darkos.ov.failed', 'Failed')} value={counts.failed} tone={counts.failed ? 'text-red-400' : 'text-zinc-100'} />
+          <Figure label={t('darkos.ov.pendingReboot', 'Awaiting restart')} value={counts['pending-reboot']} tone={counts['pending-reboot'] ? 'text-amber-300' : 'text-zinc-100'} />
+        </div>
+      </section>
+      <dl className="divide-y divide-zinc-800/80 border-y border-zinc-800/80 text-[12.5px]">
+        <div className="flex items-center gap-4 py-2.5">
+          <dt className="w-40 shrink-0 text-zinc-500">{t('darkos.ov.removedApps', 'Removed apps')}</dt>
+          <dd className="font-mono text-zinc-200">{apps.length}</dd>
+          {apps.length ? <button onClick={() => setTab('recovery')} className="ml-auto text-[12px] text-zinc-400 hover:text-zinc-100 transition-colors">{t('darkos.tab.recovery', 'Recovery')}</button> : null}
+        </div>
+        <div className="flex items-center gap-4 py-2.5 min-w-0">
+          <dt className="w-40 shrink-0 text-zinc-500 inline-flex items-center gap-1.5"><HardDrive size={14} />{t('darkos.ov.root', 'Pasta raiz')}</dt>
+          <dd className="font-mono text-zinc-300 truncate">{info?.root || '-'}</dd>
+        </div>
+        <div className="flex items-center gap-4 py-2.5 min-w-0">
+          <dt className="w-40 shrink-0 text-zinc-500">{t('darkos.ov.module', 'Module')}</dt>
+          <dd className="font-mono text-zinc-300 truncate">{info?.cliSource || '-'}</dd>
+        </div>
+      </dl>
     </div>
   );
 
@@ -288,140 +356,185 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
     const q = search.trim().toLowerCase();
     const filtered = rows.filter((r) => !q || r.id.toLowerCase().includes(q) || (r.description || '').toLowerCase().includes(q));
     const groups = new Map<string, DarkOSRow[]>();
+    // Gaming and latency first: that is what most people come here for.
+    const order = ['gaming', 'power', 'network', 'services', 'privacy', 'ui', 'tasks', 'appx', 'debloat'];
+    filtered.sort((a, b) => {
+      const ia = order.indexOf(a.category || ''), ib = order.indexOf(b.category || '');
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
     for (const r of filtered) {
       const c = r.category || 'other';
       if (!groups.has(c)) groups.set(c, []);
       groups.get(c)!.push(r);
     }
     return (
-      <div className="space-y-3">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t('darkos.change.search', 'Search tweak...')}
-          className="w-full md:w-80 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-blue-500/60"
-        />
-        {filtered.length === 0 ? <p className="text-xs text-zinc-500">{t('darkos.change.none', 'No tweak found.')}</p> : null}
+      <div className="space-y-5">
+        <div className="relative w-full md:w-80">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label={t('darkos.change.search', 'Search tweak...')}
+            placeholder={t('darkos.change.search', 'Search tweak...')}
+            className="dh-input w-full pl-8"
+          />
+        </div>
+        {filtered.length === 0 ? <p className="text-[12.5px] text-zinc-500">{t('darkos.change.none', 'No tweak found.')}</p> : null}
         {[...groups.entries()].map(([cat, items]) => (
-          <Card key={cat} className="p-0 overflow-hidden">
-            <div className="px-4 py-2 border-b border-zinc-800 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-              {t(`darkos.cat.${cat}`, cat)} <span className="text-zinc-600 font-mono">({items.length})</span>
+          <section key={cat}>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <h2 className="dh-section-title">
+                {t(`darkos.cat.${cat}`, cat)} <span className="ml-1 font-mono text-[11.5px] font-normal text-zinc-500">{items.length}</span>
+              </h2>
+              <div className="flex items-center gap-1">
+                <button disabled={busy} onClick={() => toggleGroup(items, false)} className="dh-btn dh-btn-sm">
+                  <Redo2 size={14} />{t('darkos.change.applyAll', 'Apply all')}
+                </button>
+                <button disabled={busy} onClick={() => toggleGroup(items, true)} className="dh-btn dh-btn-sm dh-btn-ghost">
+                  <Undo2 size={14} />{t('darkos.change.undoAll', 'Undo all')}
+                </button>
+              </div>
             </div>
-            <ul className="divide-y divide-zinc-800/70">
+            <ul className="dh-card divide-y divide-zinc-800/80">
               {items.map((r) => {
                 const on = r.status === 'applied' || r.status === 'pending-reboot';
                 const canToggle = on ? r.reversible !== 'nonReversible' : true;
+                const already = !on && r.status !== 'failed' && r.live === true;
+                const absent = !on && r.absent === true;
+                const tone = already ? STATUS_TONE.applied : STATUS_TONE[r.status] || STATUS_TONE.notApplied;
                 return (
-                  <li key={r.id} className="px-4 py-2.5 flex items-start gap-3">
+                  <li key={r.id} className="px-4 py-2.5 flex items-start gap-4 hover:bg-zinc-800/20 transition-colors">
+                    <span className={`w-28 shrink-0 pt-0.5 inline-flex items-center gap-1.5 text-[11.5px] ${tone.text}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tone.dot}`} aria-hidden />
+                      <span className="truncate">{absent ? t('darkos.status.absent', 'Not on this Windows') : already ? t('darkos.status.live', 'Already active') : t(`darkos.status.${r.status}`, r.status)}</span>
+                    </span>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded border font-mono ${STATUS_STYLE[r.status] || STATUS_STYLE.notApplied}`}>
-                          {t(`darkos.status.${r.status}`, r.status)}
-                        </span>
-                        <span className="text-xs text-zinc-200">{describe(r)}</span>
-                        {r.rebootRequired ? <span className="text-[10px] text-amber-300/90">{t('darkos.change.reboot', 'Needs restart')}</span> : null}
-                        {r.securityRelated ? <span className="text-[10px] inline-flex items-center gap-1 text-amber-300"><ShieldAlert className="w-3 h-3" />{t('darkos.change.security', 'Security')}</span> : null}
-                        {r.reversible === 'nonReversible' ? <span className="text-[10px] text-zinc-500">{t('darkos.change.nonReversible', 'No automatic undo')}</span> : null}
+                      <div className="text-[13px] text-zinc-200">{describe(r)}</div>
+                      <div className="mt-0.5 flex items-center gap-3 flex-wrap text-[11.5px]">
+                        <span className="font-mono text-zinc-600 truncate">{r.id}</span>
+                        {r.rebootRequired ? <span className="text-amber-300/90">{t('darkos.change.reboot', 'Needs restart')}</span> : null}
+                        {r.securityRelated ? <span className="inline-flex items-center gap-1 text-amber-300"><ShieldAlert size={12} />{t('darkos.change.security', 'Security')}</span> : null}
+                        {r.reversible === 'nonReversible' ? <span className="text-zinc-500">{t('darkos.change.nonReversible', 'No automatic undo')}</span> : null}
                       </div>
-                      <div className="mt-0.5 text-[10.5px] font-mono text-zinc-600 truncate">{r.id}</div>
-                      {r.lastError ? <div className="mt-0.5 text-[11px] text-red-300/90">{r.lastError}</div> : null}
+                      {r.lastError ? <div className="mt-1 text-[12px] text-red-300 break-words">{r.lastError}</div> : null}
                     </div>
-                    <button disabled={busy || !canToggle} onClick={() => toggleChange(r)} className={`${btnGhost} shrink-0`}>
-                      {on ? <Undo2 className="w-3.5 h-3.5" /> : <Redo2 className="w-3.5 h-3.5" />}
-                      {on ? t('darkos.change.undo', 'Undo') : t('darkos.change.reapply', 'Reapply')}
-                    </button>
+                    {already || absent ? null : (
+                      <button disabled={busy || !canToggle} onClick={() => toggleChange(r)} className="dh-btn dh-btn-sm shrink-0">
+                        {on ? <Undo2 size={14} /> : <Redo2 size={14} />}
+                        {on ? t('darkos.change.undo', 'Undo') : r.status === 'notApplied' ? t('darkos.change.apply', 'Apply') : t('darkos.change.reapply', 'Reapply')}
+                      </button>
+                    )}
                   </li>
                 );
               })}
             </ul>
-          </Card>
+          </section>
         ))}
       </div>
     );
   };
 
   const renderProfiles = () => (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <ul className="dh-card divide-y divide-zinc-800/80">
       {DARKOS_PROFILES.map((p) => {
         const active = p === activeProfile;
         const diff = profileDiff(rows, p);
         const open = diffTarget === p;
         return (
-          <Card key={p} className={active ? 'border-blue-500/50' : ''}>
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-zinc-100">{profileName(p)}</h3>
-              {active ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#3b82f6]/15 text-blue-300 border border-blue-500/30">{t('darkos.profile.active', 'Active')}</span> : null}
-            </div>
-            <p className="mt-2 text-xs text-zinc-400 leading-relaxed min-h-[3rem]">{t(`darkos.profile.${p}.desc`, '')}</p>
-            {!active ? (
-              <>
-                <button onClick={() => setDiffTarget(open ? null : p)} className="mt-2 text-[11px] text-blue-300 hover:text-blue-200">
-                  {t('darkos.profile.diffTitle', 'What will change')}: +{diff.apply.length} / -{diff.revert.length}
-                  {diff.security.length ? <span className="text-amber-300"> ({diff.security.length} {t('darkos.change.security', 'Security')})</span> : null}
-                </button>
-                {open ? (
-                  <ul className="mt-2 max-h-40 overflow-y-auto text-[11px] text-zinc-400 space-y-0.5">
-                    {diff.apply.map((r) => <li key={`a-${r.id}`} className={r.securityRelated ? 'text-amber-300' : 'text-emerald-300/90'}>+ {describe(r)}</li>)}
-                    {diff.revert.map((r) => <li key={`r-${r.id}`} className="text-zinc-400">- {describe(r)}</li>)}
-                  </ul>
+          <li key={p} className="px-4 py-4">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+              <div className="min-w-0 max-w-[75ch]">
+                <h3 className="text-[13.5px] font-semibold text-zinc-100 flex items-center gap-2">
+                  {profileName(p)}
+                  {active ? (
+                    <span className="inline-flex items-center gap-1.5 text-[11.5px] font-normal text-blue-300">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400" aria-hidden />{t('darkos.profile.active', 'Active')}
+                    </span>
+                  ) : null}
+                </h3>
+                <p className="mt-1 dh-help">{t(`darkos.profile.${p}.desc`, '')}</p>
+                {!active ? (
+                  <button onClick={() => setDiffTarget(open ? null : p)} aria-expanded={open} className="mt-2 inline-flex items-center gap-1 text-[12px] text-zinc-400 hover:text-zinc-100 transition-colors">
+                    <ChevronRight size={14} className={`transition-transform duration-150 ease-out ${open ? 'rotate-90' : ''}`} />
+                    {t('darkos.profile.diffTitle', 'What will change')}
+                    <span className="font-mono text-zinc-500">+{diff.apply.length} / -{diff.revert.length}</span>
+                    {diff.security.length ? <span className="text-amber-300">({diff.security.length} {t('darkos.change.security', 'Security')})</span> : null}
+                  </button>
                 ) : null}
-                <button disabled={busy} onClick={() => askProfile(p)} className={`${btnPrimary} mt-3 w-full justify-center`}>
+              </div>
+              {!active ? (
+                <button disabled={busy} onClick={() => askProfile(p)} className="dh-btn dh-btn-sm shrink-0">
                   {t('darkos.profile.switch', 'Switch to this profile')}
                 </button>
-              </>
+              ) : null}
+            </div>
+            {!active && open ? (
+              <ul className="mt-3 ml-5 max-h-48 overflow-y-auto border-l border-zinc-800/80 pl-3 text-[12px] space-y-1">
+                {diff.apply.map((r) => (
+                  <li key={`a-${r.id}`} className={`flex gap-2 ${r.securityRelated ? 'text-amber-300' : 'text-zinc-300'}`}>
+                    <span className="font-mono text-emerald-400 w-3 shrink-0">+</span>{describe(r)}
+                  </li>
+                ))}
+                {diff.revert.map((r) => (
+                  <li key={`r-${r.id}`} className="flex gap-2 text-zinc-400">
+                    <span className="font-mono text-zinc-500 w-3 shrink-0">-</span>{describe(r)}
+                  </li>
+                ))}
+              </ul>
             ) : null}
-          </Card>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 
   const renderRecovery = () => (
-    <div className="space-y-4">
-      <Card>
-        <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2"><Package className="w-4 h-4 text-zinc-400" />{t('darkos.recovery.appsTitle', 'Removed apps')}</h3>
-        <p className="mt-1 text-xs text-zinc-500">{t('darkos.recovery.appsHint', '')}</p>
-        {apps.length === 0 ? <p className="mt-3 text-xs text-zinc-500">{t('darkos.recovery.noApps', 'No removed apps.')}</p> : (
-          <ul className="mt-3 divide-y divide-zinc-800/70">
-            {apps.map((a) => (
-              <li key={a.packageName} className="py-2 flex items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs text-zinc-200 truncate">{a.displayName}</div>
-                  <div className="text-[10.5px] font-mono text-zinc-600 truncate">{a.packageName}</div>
-                </div>
-                {a.installed ? (
-                  <span className="text-[10.5px] text-emerald-300/90 shrink-0">{t('darkos.recovery.installed', 'Installed')}</span>
-                ) : a.restorable ? (
-                  <button disabled={busy} onClick={() => runAction(() => api()!.restoreAppx({ packageNames: [a.packageName] }))} className={btnGhost}>
-                    <RotateCcw className="w-3.5 h-3.5" />{t('darkos.recovery.restore', 'Restore')}
-                  </button>
-                ) : <span className="text-[10.5px] text-zinc-500 shrink-0">{t('darkos.recovery.noPayload', 'No local copy')}</span>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-      <Card className="border-red-500/20">
-        <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-red-400" />{t('darkos.recovery.allTitle', 'Restore everything')}</h3>
-        <p className="mt-1 text-xs text-zinc-400 leading-relaxed">{t('darkos.recovery.allBody', '')}</p>
-        <button disabled={busy} onClick={askRestoreAll} className={`${btnDanger} mt-3`}>
-          <RotateCcw className="w-3.5 h-3.5" />{t('darkos.recovery.allButton', 'Restore everything')}
+    <div className="space-y-8">
+      <Section title={t('darkos.recovery.appsTitle', 'Removed apps')} help={t('darkos.recovery.appsHint', '')}>
+        <div className="dh-card">
+          {apps.length === 0 ? <Empty>{t('darkos.recovery.noApps', 'No removed apps.')}</Empty> : (
+            <ul className="divide-y divide-zinc-800/80">
+              {apps.map((a) => (
+                <li key={a.packageName} className="px-4 py-2.5 flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] text-zinc-200 truncate">{a.displayName}</div>
+                    <div className="text-[11.5px] font-mono text-zinc-600 truncate">{a.packageName}</div>
+                  </div>
+                  {a.installed ? (
+                    <span className="inline-flex items-center gap-1.5 text-[11.5px] text-emerald-400 shrink-0"><Check size={14} />{t('darkos.recovery.installed', 'Installed')}</span>
+                  ) : a.restorable ? (
+                    <button disabled={busy} onClick={() => runAction(() => api()!.restoreAppx({ packageNames: [a.packageName] }))} className="dh-btn dh-btn-sm">
+                      <RotateCcw size={14} />{t('darkos.recovery.restore', 'Restore')}
+                    </button>
+                  ) : <span className="text-[11.5px] text-zinc-500 shrink-0">{t('darkos.recovery.noPayload', 'No local copy')}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </Section>
+      <section className="border-t border-zinc-800/80 pt-6 flex flex-col md:flex-row md:items-start justify-between gap-4">
+        <div className="min-w-0 max-w-[75ch]">
+          <h2 className="dh-section-title">{t('darkos.recovery.allTitle', 'Restore everything')}</h2>
+          <p className="mt-1 dh-help">{t('darkos.recovery.allBody', '')}</p>
+        </div>
+        <button disabled={busy} onClick={askRestoreAll} className="dh-btn dh-btn-danger shrink-0">
+          <RotateCcw size={14} />{t('darkos.recovery.allButton', 'Restore everything')}
         </button>
-      </Card>
+      </section>
     </div>
   );
 
   const renderSnapshots = () => (
-    <Card>
-      <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2"><Camera className="w-4 h-4 text-zinc-400" />{t('darkos.snap.title', 'Snapshots')}</h3>
-      <p className="mt-1 text-xs text-zinc-500">{t('darkos.snap.hint', '')}</p>
-      <div className="mt-3 flex gap-2">
+    <Section title={t('darkos.snap.title', 'Snapshots')} help={t('darkos.snap.hint', '')}>
+      <div className="flex gap-2 mb-4 max-w-xl">
         <input
           value={snapLabel}
           maxLength={80}
           onChange={(e) => setSnapLabel(e.target.value)}
+          aria-label={t('darkos.snap.labelPlaceholder', 'Snapshot name')}
           placeholder={t('darkos.snap.labelPlaceholder', 'Snapshot name')}
-          className="flex-1 min-w-0 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-blue-500/60"
+          className="dh-input flex-1 min-w-0"
         />
         <button
           disabled={busy}
@@ -430,61 +543,66 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
             if (r.ok) setSnapLabel('');
             return r;
           })}
-          className={btnPrimary}
+          className="dh-btn dh-btn-primary shrink-0"
         >
-          <Camera className="w-3.5 h-3.5" />{t('darkos.snap.create', 'Create snapshot')}
+          <Camera size={14} />{t('darkos.snap.create', 'Create snapshot')}
         </button>
       </div>
-      {snapshots.length === 0 ? <p className="mt-3 text-xs text-zinc-500">{t('darkos.snap.none', 'No snapshots yet.')}</p> : (
-        <ul className="mt-3 divide-y divide-zinc-800/70">
-          {[...snapshots].reverse().map((s) => (
-            <li key={s.id} className="py-2 flex items-center gap-3">
-              <Archive className="w-4 h-4 text-zinc-500 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <div className="text-xs text-zinc-200 truncate">{s.label || s.id}</div>
-                <div className="text-[10.5px] font-mono text-zinc-600">{s.ts ? new Date(s.ts).toLocaleString() : s.id}</div>
-              </div>
-              <button disabled={busy} onClick={() => askRestoreSnapshot(s)} className={btnGhost}>
-                <RotateCcw className="w-3.5 h-3.5" />{t('darkos.snap.restore', 'Restore')}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
+      <div className="dh-card">
+        {snapshots.length === 0 ? <Empty>{t('darkos.snap.none', 'No snapshots yet.')}</Empty> : (
+          <ul className="divide-y divide-zinc-800/80">
+            {[...snapshots].reverse().map((s) => (
+              <li key={s.id} className="px-4 py-2.5 flex items-center gap-3">
+                <Archive size={16} className="text-zinc-500 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] text-zinc-200 truncate">{s.label || s.id}</div>
+                  <div className="text-[11.5px] font-mono text-zinc-500">{s.ts ? new Date(s.ts).toLocaleString() : s.id}</div>
+                </div>
+                <button disabled={busy} onClick={() => askRestoreSnapshot(s)} className="dh-btn dh-btn-sm">
+                  <RotateCcw size={14} />{t('darkos.snap.restore', 'Restore')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Section>
   );
 
   const renderFailures = () => (
-    <Card>
-      <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2"><Bug className="w-4 h-4 text-zinc-400" />{t('darkos.fail.title', 'Failures')}</h3>
-      {failures.length === 0 ? (
-        <p className="mt-3 text-xs text-emerald-300/90 flex items-center gap-1.5"><CheckCircle className="w-4 h-4" />{t('darkos.fail.none', 'No failures.')}</p>
-      ) : (
-        <ul className="mt-3 divide-y divide-zinc-800/70">
-          {failures.map((f, i) => (
-            <li key={`${f.id}-${i}`} className="py-2">
-              <div className="flex items-center gap-2 text-xs">
-                <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                <span className="text-zinc-200">{rows.find((r) => r.id === f.id)?.description || f.id}</span>
-                {f.action ? <span className="text-[10px] font-mono text-zinc-500">{f.action}</span> : null}
-                {f.ts ? <span className="text-[10px] font-mono text-zinc-600 ml-auto">{new Date(f.ts).toLocaleString()}</span> : null}
-              </div>
-              <div className="mt-0.5 pl-5 text-[11px] text-red-300/90 break-words">{f.error}</div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
+    <Section title={t('darkos.fail.title', 'Failures')}>
+      <div className="dh-card">
+        {failures.length === 0 ? (
+          <p className="px-4 py-6 text-[12.5px] text-zinc-400 flex items-center gap-2"><CheckCircle size={16} className="text-emerald-400" />{t('darkos.fail.none', 'No failures.')}</p>
+        ) : (
+          <ul className="divide-y divide-zinc-800/80">
+            {failures.map((f, i) => (
+              <li key={`${f.id}-${i}`} className="px-4 py-2.5">
+                <div className="flex items-center gap-2 text-[13px] min-w-0">
+                  <XCircle size={14} className="text-red-400 shrink-0" />
+                  <span className="text-zinc-200 truncate">{rows.find((r) => r.id === f.id)?.description || f.id}</span>
+                  {f.action ? <span className="dh-tag shrink-0">{f.action}</span> : null}
+                  {f.ts ? <span className="text-[11.5px] font-mono text-zinc-600 ml-auto shrink-0">{new Date(f.ts).toLocaleString()}</span> : null}
+                </div>
+                <div className="mt-1 pl-[22px] font-mono text-[11.5px] text-red-300/90 break-words">{f.error}</div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Section>
   );
 
   const renderDiagnostics = () => (
-    <Card className="max-w-2xl">
-      <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2"><FileArchive className="w-4 h-4 text-zinc-400" />{t('darkos.diag.title', 'Export diagnostics')}</h3>
-      <p className="mt-1 text-xs text-zinc-400 leading-relaxed">{t('darkos.diag.body', '')}</p>
-      <button disabled={busy} onClick={() => runAction(() => api()!.exportDiagnostics())} className={`${btnPrimary} mt-3`}>
-        <FileArchive className="w-3.5 h-3.5" />{t('darkos.diag.export', 'Export .zip')}
+    <section className="flex flex-col md:flex-row md:items-start justify-between gap-4 max-w-4xl">
+      <div className="min-w-0 max-w-[75ch]">
+        <h2 className="dh-section-title">{t('darkos.diag.title', 'Export diagnostics')}</h2>
+        <p className="mt-1 dh-help">{t('darkos.diag.body', '')}</p>
+      </div>
+      <button disabled={busy} onClick={() => runAction(async () => { const r = await api()!.exportDiagnostics(); return r?.ok && r.path ? { ...r, message: `${t('darkos.diag.saved', 'Diagnostics saved to')} ${r.path}` } : r; })} className="dh-btn dh-btn-primary shrink-0">
+        <FileArchive size={14} />{t('darkos.diag.export', 'Export .zip')}
       </button>
-    </Card>
+    </section>
   );
 
   const content: Record<TabId, () => React.ReactNode> = {
@@ -498,56 +616,60 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
     diagnostics: renderDiagnostics,
   };
 
+  const notice = (tone: 'ok' | 'warn' | 'err', icon: React.ReactNode, children: React.ReactNode, role: 'alert' | 'status' = 'status') => (
+    <div
+      role={role}
+      aria-live={role === 'status' ? 'polite' : undefined}
+      className={`flex items-start gap-2 border-l-2 pl-3 py-1 text-[12.5px] ${tone === 'ok' ? 'border-emerald-400 text-emerald-300' : tone === 'warn' ? 'border-amber-300 text-amber-200' : 'border-red-400 text-red-300'}`}
+    >
+      <span className="shrink-0 mt-px">{icon}</span>
+      <div className="min-w-0 break-words">{children}</div>
+    </div>
+  );
+
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-4 p-1 md:p-2 text-zinc-100 pb-16">
+    <div className="w-full pb-16">
       {header}
 
-      {!info.cliAvailable ? (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{t('darkos.noModule', 'Module not found.')}</div>
-      ) : null}
-
-      {reboot.pending || counts['pending-reboot'] > 0 ? (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
-          <div className="text-xs">
-            <div className="font-semibold text-amber-200">{t('darkos.reboot.title', 'Restart pending')}</div>
-            <div className="text-amber-100/80">{t('darkos.reboot.body', '')}</div>
-          </div>
-        </div>
-      ) : null}
-
-      {loadError ? (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300 break-words">{loadError}</div>
-      ) : null}
-
-      {banner ? (
-        <div className={`rounded-lg border px-3 py-2 text-xs flex items-start gap-2 ${banner.ok ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : banner.pending ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-red-500/30 bg-red-500/10 text-red-300'}`}>
-          {banner.ok ? <CheckCircle className="w-4 h-4 shrink-0" /> : banner.pending ? <AlertTriangle className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
-          <span className="break-words">{banner.message}</span>
-        </div>
-      ) : null}
-
-      <div className="flex gap-1 overflow-x-auto border-b border-zinc-800/80 pb-px">
-        {tabs.map((tb) => {
-          const Icon = tb.icon;
-          const active = tab === tb.id;
-          return (
-            <button
-              key={tb.id}
-              onClick={() => setTab(tb.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-xs whitespace-nowrap border-b-2 -mb-px transition-colors ${active ? 'border-[#3b82f6] text-zinc-100 font-semibold' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
-            >
-              <Icon className={`w-3.5 h-3.5 ${active ? 'text-blue-400' : ''}`} />
-              {tb.label}
-              {typeof tb.count === 'number' && tb.count > 0 ? <span className="text-[10px] font-mono text-zinc-500">{tb.count}</span> : null}
-            </button>
-          );
-        })}
+      <div className="space-y-2 empty:hidden mb-5">
+        {!info.cliAvailable ? notice('err', <XCircle size={14} />, t('darkos.noModule', 'Module not found.'), 'alert') : null}
+        {winMode && tab === 'overview' ? notice('ok', <Info size={14} />, t('darkos.win.intro', '')) : null}
+        {reboot.pending || counts['pending-reboot'] > 0 ? notice('warn', <AlertTriangle size={14} />, (
+          <><span className="font-medium text-amber-200">{t('darkos.reboot.title', 'Restart pending')}</span> <span className="text-amber-100/70">{t('darkos.reboot.body', '')}</span></>
+        )) : null}
+        {loadError ? notice('err', <XCircle size={14} />, (
+          <>{loadError} <button onClick={load} disabled={loading} className="ml-1 underline underline-offset-2 text-red-200 hover:text-red-100">{t('darkos.refresh', 'Refresh')}</button></>
+        ), 'alert') : null}
+        {banner ? notice(banner.ok ? 'ok' : banner.pending ? 'warn' : 'err', banner.ok ? <CheckCircle size={14} /> : banner.pending ? <AlertTriangle size={14} /> : <XCircle size={14} />, banner.message) : null}
       </div>
 
-      {content[tab]()}
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+        <nav role="tablist" aria-orientation="vertical" className="flex lg:flex-col gap-0.5 overflow-x-auto lg:overflow-visible lg:w-48 shrink-0 border-b lg:border-b-0 border-zinc-800/80 pb-2 lg:pb-0">
+          {tabs.map((tb) => {
+            const active = tab === tb.id;
+            return (
+              <button
+                key={tb.id}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(tb.id)}
+                className={`relative flex items-center justify-between gap-3 h-8 px-3 rounded-md text-[12.5px] whitespace-nowrap text-left transition-colors duration-150 ${active ? 'bg-zinc-900 text-zinc-50 font-medium' : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60'}`}
+              >
+                {active ? <span className="hidden lg:block absolute left-0 top-2 bottom-2 w-px bg-blue-400" aria-hidden /> : null}
+                <span className="truncate">{tb.label}</span>
+                {typeof tb.count === 'number' && tb.count > 0 ? (
+                  <span className={`font-mono text-[11px] ${tb.id === 'failures' ? 'text-red-400' : 'text-zinc-500'}`}>{tb.count}</span>
+                ) : null}
+              </button>
+            );
+          })}
+        </nav>
 
-      <DarkOSProgress />
+        <div className="min-w-0 flex-1 space-y-8">
+          <div key={tab} className="animate-in">{content[tab]()}</div>
+          <DarkOSProgress />
+        </div>
+      </div>
 
       <DarkOSConfirmDialog
         open={Boolean(confirm)}

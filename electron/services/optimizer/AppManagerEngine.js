@@ -261,7 +261,8 @@ ConvertTo-Json -InputObject ([pscustomobject]@{ value = [string]$v; kind = $kind
 
     if (restore) {
       const snap = store[name];
-      if (!snap?.startArg) return { ok: false, error: `Não há configuração salva de "${name}" para restaurar.` };
+      // the value comes from the persisted store and is written into an elevated script: accept only sc.exe keywords
+      if (!/^(auto|delayed-auto|demand|disabled|boot|system)$/.test(String(snap?.startArg || ''))) return { ok: false, error: `Não há configuração salva de "${name}" para restaurar.` };
       const script = `& sc.exe config ${psQuote(name)} start= ${snap.startArg} | Out-Null
 DhCheck 'sc config'${snap.wasRunning && snap.startArg !== 'disabled' ? `\r\n& sc.exe start ${psQuote(name)} | Out-Null` : ''}`;
       const r = await ElevationHelper.runMarked(script, 60000);

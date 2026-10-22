@@ -6,6 +6,11 @@ import { DarkOSRecoveryService } from '../services/darkos/DarkOSRecoveryService.
  */
 export function registerDarkOSIPC({ ipcMain, dialog, BrowserWindow, app, logger, service } = {}) {
   const svc = service || new DarkOSRecoveryService({ logger })
+  // On a stock Windows the same screens drive "Windows mode": DarkOS tweaks one by one, own state folder.
+  const win = new DarkOSRecoveryService({ logger, mode: 'windows' })
+  // DARKHUB_WINMODS=1 (dev builds only) previews Windows mode on a DarkOS machine.
+  const forceWin = process.env.DARKHUB_WINMODS === '1' && app && !app.isPackaged
+  const pick = () => (!forceWin && svc.isDarkOS() ? svc : win)
 
   const sendTo = (sender) => (evt) => {
     try {
@@ -31,6 +36,7 @@ export function registerDarkOSIPC({ ipcMain, dialog, BrowserWindow, app, logger,
     const ids = ['edge.noDesktopShortcut', 'svc.lean.edgeupdate', 'svc.lean.edgeupdatem', 'svc.lean.microsoftedgeelevationservice',
       'task.edge.updatecore.disabled', 'task.edge.updateua.disabled']
     const rev = await svc.revertChange({ ids }, o)
+    if (!rev?.ok) return { ok: false, revert: rev, error: rev?.error || 'Nao foi possivel desfazer os bloqueios do DarkOS ao Edge.' }
     const { default: ElevationHelper } = await import('../services/optimizer/ElevationHelper.js')
     const script = [
       "$ErrorActionPreference = 'Continue'",
@@ -38,7 +44,7 @@ export function registerDarkOSIPC({ ipcMain, dialog, BrowserWindow, app, logger,
       "$w = Get-Command winget.exe -ErrorAction SilentlyContinue",
       "if (-not $w) { Write-Output 'DKEDGE:NOWINGET'; exit 2 }",
       "& $w.Source install --id Microsoft.Edge -e --silent --scope machine --accept-package-agreements --accept-source-agreements",
-      "if (Test-Path \"${env:ProgramFiles(x86)}\\Microsoft\\Edge\\Application\\msedge.exe\") { Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkOS' -Name 'EdgeRemoved' -ErrorAction SilentlyContinue; Write-Output 'DKEDGE:OK'; exit 0 }",
+      "if ((Test-Path \"${env:ProgramFiles(x86)}\\Microsoft\\Edge\\Application\\msedge.exe\") -or (Test-Path \"$env:ProgramFiles\\Microsoft\\Edge\\Application\\msedge.exe\")) { Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkOS' -Name 'EdgeRemoved' -ErrorAction SilentlyContinue; Write-Output 'DKEDGE:OK'; exit 0 }",
       "Write-Output 'DKEDGE:FAIL'; exit 1"
     ].join('\r\n')
     const r = await ElevationHelper.runElevatedPowerShell(script, { timeoutMs: 15 * 60 * 1000 })
@@ -50,21 +56,21 @@ export function registerDarkOSIPC({ ipcMain, dialog, BrowserWindow, app, logger,
       : 'A instalacao automatica falhou. Abri a pagina oficial de download do Edge; os bloqueios do DarkOS ja foram desfeitos.' }
   })
 
-  handle('darkos:isDarkOS', async () => svc.info())
-  handle('darkos:getCatalog', (p, o) => svc.getCatalog(p, o))
-  handle('darkos:getManifest', (_p, o) => svc.getManifest(o))
-  handle('darkos:getStatus', (p, o) => svc.getStatus(p, o))
-  handle('darkos:applyChange', (p, o) => svc.applyChange(p, o))
-  handle('darkos:revertChange', (p, o) => svc.revertChange(p, o))
-  handle('darkos:setProfile', (p, o) => svc.setProfile(p, o))
-  handle('darkos:restoreProfile', (_p, o) => svc.restoreProfile(o))
-  handle('darkos:getRemovedApps', (_p, o) => svc.getRemovedApps(o))
-  handle('darkos:restoreAppx', (p, o) => svc.restoreAppx(p, o))
-  handle('darkos:listSnapshots', (_p, o) => svc.listSnapshots(o))
-  handle('darkos:createSnapshot', (p, o) => svc.createSnapshot(p, o))
-  handle('darkos:restoreSnapshot', (p, o) => svc.restoreSnapshot(p, o))
-  handle('darkos:getFailures', (_p, o) => svc.getFailures(o))
-  handle('darkos:getRebootPending', (_p, o) => svc.getRebootPending(o))
+  handle('darkos:isDarkOS', async () => pick().info())
+  handle('darkos:getCatalog', (p, o) => pick().getCatalog(p, o))
+  handle('darkos:getManifest', (_p, o) => pick().getManifest(o))
+  handle('darkos:getStatus', (p, o) => pick().getStatus(p, o))
+  handle('darkos:applyChange', (p, o) => pick().applyChange(p, o))
+  handle('darkos:revertChange', (p, o) => pick().revertChange(p, o))
+  handle('darkos:setProfile', (p, o) => pick().setProfile(p, o))
+  handle('darkos:restoreProfile', (_p, o) => pick().restoreProfile(o))
+  handle('darkos:getRemovedApps', (_p, o) => pick().getRemovedApps(o))
+  handle('darkos:restoreAppx', (p, o) => pick().restoreAppx(p, o))
+  handle('darkos:listSnapshots', (_p, o) => pick().listSnapshots(o))
+  handle('darkos:createSnapshot', (p, o) => pick().createSnapshot(p, o))
+  handle('darkos:restoreSnapshot', (p, o) => pick().restoreSnapshot(p, o))
+  handle('darkos:getFailures', (_p, o) => pick().getFailures(o))
+  handle('darkos:getRebootPending', (_p, o) => pick().getRebootPending(o))
 
   // The destination is always chosen in the native dialog; a renderer-supplied path is ignored.
   handle('darkos:exportDiagnostics', async (_p, o, event) => {
@@ -79,7 +85,7 @@ export function registerDarkOSIPC({ ipcMain, dialog, BrowserWindow, app, logger,
     })
     if (pick.canceled || !pick.filePath) return { ok: false, canceled: true }
     const dest = /\.zip$/i.test(pick.filePath) ? pick.filePath : `${pick.filePath}.zip`
-    return svc.exportDiagnostics({ destination: dest }, o)
+    return pick().exportDiagnostics({ destination: dest }, o)
   })
 
   return svc

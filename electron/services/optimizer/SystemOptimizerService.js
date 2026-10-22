@@ -36,6 +36,7 @@ class SystemOptimizerService {
   constructor() {
     this.operations = new Map();
     this.profiles = {};
+    this._runQueue = Promise.resolve();
     this.registerOperations();
     this.registerReverts();
     this.registerProfiles();
@@ -59,6 +60,8 @@ class SystemOptimizerService {
       risk,
       ...def,
       description: def.description || defs.map((d) => d.description).join(' '),
+      // the tweak definitions' own warnings must reach the UI (it asks for confirmation only when a warning exists)
+      warning: def.warning || defs.map((d) => d.warning).filter(Boolean).join(' ') || undefined,
       revert: async () => adaptResult(await DeepTweaksEngine.revertTweaks(def.tweakIds), { resources: def.resources })
     };
     op.execute = async () => adaptResult(await DeepTweaksEngine.applyTweaks(def.tweakIds, () => {}), { resources: def.resources, processed: defs.length });
@@ -126,8 +129,8 @@ class SystemOptimizerService {
       estimatedTimeMs: 500,
       execute: async () => adaptResult(await PowerEngine.setHighPerformance(), { resources: ['Powercfg'] }),
       revert: async () => adaptResult(await PowerEngine.restorePrevious(), { resources: ['Powercfg'] }),
-      statusFn: async () => {
-        const g = await PowerEngine._getActiveSchemeGuid();
+      statusFn: async (ctx) => {
+        const g = await ctx.activeScheme();
         return g === POWER_GUIDS.high || g === POWER_GUIDS.ultimate;
       }
     });
@@ -144,8 +147,8 @@ class SystemOptimizerService {
       estimatedTimeMs: 600,
       execute: async () => adaptResult(await PowerEngine.setUltimate(), { resources: ['Powercfg'] }),
       revert: async () => adaptResult(await PowerEngine.restorePrevious(), { resources: ['Powercfg'] }),
-      statusFn: async () => {
-        const g = await PowerEngine._getActiveSchemeGuid();
+      statusFn: async (ctx) => {
+        const g = await ctx.activeScheme();
         return g === POWER_GUIDS.ultimate;
       }
     });
@@ -350,7 +353,7 @@ class SystemOptimizerService {
       id: 'optimizer:darkModeAndColors',
       name: 'Modo Escuro no Sistema e Aplicativos',
       tweakIds: ['tweak:darkModeAndColors'],
-      technicalDescription: 'SystemUsesLightTheme=0, AppsUseLightTheme=0, ColorPrevalence e EnableTransparency.',
+      technicalDescription: 'SystemUsesLightTheme=0, AppsUseLightTheme=0 e EnableTransparency=1 (HKCU).',
       category: 'system',
       resources: ['Windows Personalize Registry']
     });
@@ -658,10 +661,10 @@ class SystemOptimizerService {
   }
 
   /** applied: true/false from the REAL system state when it can be known, null for one-shot actions. */
-  async _appliedState(op, statusMap) {
+  async _appliedState(op, statusMap, ctx = this._statusContext()) {
     try {
       if (op.isRevert) return null;
-      if (op.statusFn) return await op.statusFn();
+      if (op.statusFn) return await op.statusFn(ctx);
       if (op.statusExtra) return Boolean(DeepTweaksEngine.getExtra(op.statusExtra));
       if (op.statusKey) return statusMap ? Boolean(statusMap.status?.[op.statusKey]) : null;
       if (op.tweakIds?.length && statusMap?.ok) return op.tweakIds.every((id) => Boolean(statusMap.status?.[id]));
@@ -680,11 +683,23 @@ class SystemOptimizerService {
     }));
   }
 
+  /** Per-status-pass memo: several operations need the active power scheme; read it with ONE powercfg spawn. */
+  _statusContext() {
+    let scheme = null;
+    return {
+      activeScheme: () => {
+        if (!scheme) scheme = PowerEngine._getActiveSchemeGuid().catch(() => null);
+        return scheme;
+      }
+    };
+  }
+
   async checkOperationsStatus() {
     let statusMap = null;
     try { statusMap = await DeepTweaksEngine.checkTweaksStatus(); } catch { statusMap = null; }
     const ops = Array.from(this.operations.values());
-    const applied = await Promise.all(ops.map((op) => this._appliedState(op, statusMap)));
+    const ctx = this._statusContext();
+    const applied = await Promise.all(ops.map((op) => this._appliedState(op, statusMap, ctx)));
     const status = {};
     const partial = {};
     ops.forEach((op, i) => {
@@ -748,9 +763,16 @@ class SystemOptimizerService {
   /**
    * Runs operations ONE AT A TIME. They share the snapshot store, may need a UAC prompt and several touch the same
    * registry keys, so the previous parallel execution (concurrency > 1) could corrupt snapshots or stack UAC prompts.
-   * The `concurrency` argument is kept for API compatibility and ignored.
+   * The `concurrency` argument is kept for API compatibility and ignored. Separate runTasks() calls (double click,
+   * profile + single item) are queued as well, so two batches never interleave.
    */
-  async runTasks(ids, _concurrency = 1, eventSender = () => {}) {
+  runTasks(ids, _concurrency = 1, eventSender = () => {}) {
+    const run = this._runQueue.then(() => this._runTasksNow(ids, eventSender));
+    this._runQueue = run.catch(() => {});
+    return run;
+  }
+
+  async _runTasksNow(ids, eventSender) {
     const list = (Array.isArray(ids) ? ids : []).filter((id) => typeof id === 'string');
     const runId = `run_${Date.now()}`;
     let completed = 0;

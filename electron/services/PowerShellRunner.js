@@ -2,6 +2,13 @@
 
 import log from 'electron-log'
 import { spawn } from 'node:child_process'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import crypto from 'node:crypto'
+
+/** Longest -EncodedCommand value that keeps the whole command line under Windows' 32767-char limit. */
+export const MAX_ENCODED_ARG = 30000
 
 export function runCommand(command, args = [], {
   timeoutMs = 30000,
@@ -51,6 +58,12 @@ export function runCommand(command, args = [], {
 
     const timer = typeof timeoutMs === 'number' && timeoutMs > 0
       ? setTimeout(() => {
+          // Kill the whole tree so winget/DISM grandchildren are not orphaned.
+          try {
+            if (process.platform === 'win32' && child.pid) {
+              spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }).on('error', () => {})
+            }
+          } catch {}
           try {
             child.kill()
           } catch {}
@@ -180,6 +193,20 @@ export async function runPowerShell(script, {
       maxBuffer,
       trim
     })
+  }
+
+  // Windows caps a command line at 32767 chars and -EncodedCommand doubles the script size (UTF-16 + base64):
+  // big scripts (e.g. the batched registry status read of every tweak) go through a private temp .ps1 instead.
+  if (encodedScript.length > MAX_ENCODED_ARG) {
+    const file = path.join(os.tmpdir(), `dh_ps_${process.pid}_${crypto.randomBytes(8).toString('hex')}.ps1`)
+    fs.writeFileSync(file, `﻿${script}`, 'utf8')
+    try {
+      return await runCommand('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-NonInteractive', '-File', file], {
+        timeoutMs, spawnOptions, onStdout, onStderr, maxBuffer, trim
+      })
+    } finally {
+      try { fs.rmSync(file, { force: true }) } catch {}
+    }
   }
 
   return runCommand('powershell.exe', powerShellArgsForEncodedScript(encodedScript), {

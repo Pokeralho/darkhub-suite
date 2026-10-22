@@ -10,7 +10,9 @@ param(
     [Parameter(Mandatory)][string]$Command,
     [string]$ArgsJson = '{}',
     [switch]$DryRun,
-    [string]$Root
+    [string]$Root,
+    [ValidateSet('DarkOS', 'Windows')][string]$Mode,
+    [string]$CatalogPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -20,7 +22,7 @@ try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 function Write-DhLine { param([string]$Text) [Console]::Out.WriteLine($Text); [Console]::Out.Flush() }
 function Write-DhFail { param([string]$Message) $m = ($Message -replace '[\r\n]+', ' '); Write-DhLine ('DHFAIL|' + $m); exit 1 }
 
-# Local JSON compressor (module internal ConvertTo-DarkOSJson is not exported): escape non-ASCII.
+# Compressed JSON with every non-ASCII char escaped as \uXXXX (console-encoding safe).
 function ConvertTo-CliJson {
     param($InputObject)
     $json = ConvertTo-Json -InputObject $InputObject -Depth 25 -Compress
@@ -61,6 +63,8 @@ try {
     }
     $envArgs = @{ ProgressHandler = $progress }
     if ($Root) { $envArgs.Root = $Root }
+    if ($Mode) { $envArgs.Mode = $Mode }
+    if ($CatalogPath) { $envArgs.CatalogPath = $CatalogPath }
     if ($DryRun) { $envArgs.DryRun = $true }
     Set-DarkOSEnvironment @envArgs | Out-Null
 

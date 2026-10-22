@@ -1,24 +1,33 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  Activity, AlertTriangle, CheckCircle, Clock, Cpu, DownloadCloud, Gauge, Loader2,
-  MemoryStick, Monitor, MonitorCog, Power, RefreshCw, Server, XCircle
-} from 'lucide-react';
+  CheckCircle, DownloadCloud, Gauge, Loader2, Monitor, MonitorCog, Power, RefreshCw, XCircle
+} from '../icons';
 import { useI18n } from '../../i18n/I18nProvider';
+import DarkOSConfirmDialog from './DarkOSConfirmDialog';
 
 type LiveStats = Awaited<ReturnType<Window['darkhub']['system']['getLiveStats']>>;
 
-const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`bg-zinc-900 border border-zinc-800 rounded-xl p-4 ${className}`}>{children}</div>
+/** One metric in the live strip: quiet label, mono value, dim unit. */
+const Metric: React.FC<{ label: string; value: React.ReactNode; unit?: React.ReactNode; tone?: string }> = ({ label, value, unit, tone = 'text-zinc-100' }) => (
+  <div className="min-w-0 px-4 py-3">
+    <div className="text-[11.5px] text-zinc-500 truncate">{label}</div>
+    <div className={`mt-1 font-mono text-[15px] tabular-nums truncate ${tone}`}>
+      {value}{unit ? <span className="ml-1 text-[11.5px] text-zinc-500">{unit}</span> : null}
+    </div>
+  </div>
 );
 
-const btn = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition disabled:opacity-40 disabled:cursor-not-allowed';
-const btnGhost = `${btn} bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 border-zinc-700/60`;
-const btnPrimary = `${btn} bg-[#3b82f6] hover:bg-blue-500 text-white border-blue-500/50`;
-
-const Stat: React.FC<{ icon: React.ComponentType<{ className?: string }>; label: string; value: React.ReactNode; tone?: string }> = ({ icon: Icon, label, value, tone = 'text-zinc-100' }) => (
-  <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg p-3 min-w-0">
-    <div className="text-[10px] uppercase tracking-wider text-zinc-500 flex items-center gap-1"><Icon className="w-3 h-3" />{label}</div>
-    <div className={`mt-1 text-sm font-semibold font-mono truncate ${tone}`}>{value}</div>
+/** A settings-style row: title + help on the left, controls on the right; the parent draws the hairlines. */
+const Row: React.FC<{ title: React.ReactNode; help?: React.ReactNode; aside?: React.ReactNode; children?: React.ReactNode }> = ({ title, help, aside, children }) => (
+  <div className="px-4 py-4">
+    <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+      <div className="min-w-0 max-w-[75ch]">
+        <h3 className="text-[13px] font-medium text-zinc-100">{title}</h3>
+        {help ? <p className="mt-1 dh-help">{help}</p> : null}
+      </div>
+      {aside ? <div className="flex flex-wrap items-center gap-2 shrink-0">{aside}</div> : null}
+    </div>
+    {children}
   </div>
 );
 
@@ -43,8 +52,11 @@ export default function DarkOSSystemPanel({ onNavigate }: { onNavigate?: (page: 
   useEffect(() => {
     let cancelled = false;
     let timer: number | null = null;
+    let inFlight = false;
     const tick = async () => {
-      if (document.hidden) return;
+      // A slow read must not stack up behind the 4s interval.
+      if (document.hidden || inFlight) return;
+      inFlight = true;
       try {
         const r = await window.darkhub?.system?.getLiveStats?.();
         if (cancelled) return;
@@ -52,6 +64,8 @@ export default function DarkOSSystemPanel({ onNavigate }: { onNavigate?: (page: 
         else setStatsErr(r?.error || t('darkos.sys.live.error', 'Could not read system data.'));
       } catch (e: any) {
         if (!cancelled) setStatsErr(e?.message ?? String(e));
+      } finally {
+        inFlight = false;
       }
     };
     const start = () => { if (timer == null) { tick(); timer = window.setInterval(tick, 4000); } };
@@ -66,25 +80,46 @@ export default function DarkOSSystemPanel({ onNavigate }: { onNavigate?: (page: 
   const [upd, setUpd] = useState<UpdState>({ status: 'idle' });
   const [updBusy, setUpdBusy] = useState(false);
   const [edgeBusy, setEdgeBusy] = useState(false);
-  const [edgeMsg, setEdgeMsg] = useState<string | null>(null);
+  const [edgeMsg, setEdgeMsg] = useState<{ ok: boolean; message: string } | null>(null);
+  const [edgeConfirm, setEdgeConfirm] = useState(false);
+  const mounted = useRef(true);
+  const powerTimer = useRef<number | null>(null);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      if (powerTimer.current !== null) window.clearTimeout(powerTimer.current);
+    };
+  }, []);
   const reinstallEdge = async () => {
+    setEdgeConfirm(false);
     setEdgeBusy(true); setEdgeMsg(null);
     try {
       const r = await window.darkhub?.darkos?.reinstallEdge?.();
-      setEdgeMsg(r?.ok ? (r.msg || 'OK') : (r?.error || 'Falha ao reinstalar o Edge.'));
-    } finally { setEdgeBusy(false); }
+      if (!mounted.current) return;
+      setEdgeMsg(r?.ok
+        ? { ok: true, message: r.msg || t('darkos.sys.edge.ok', 'Microsoft Edge reinstalled.') }
+        : { ok: false, message: r?.error || t('darkos.sys.edge.fail', 'Could not reinstall Microsoft Edge.') });
+    } catch (e: any) {
+      if (mounted.current) setEdgeMsg({ ok: false, message: e?.message ?? String(e) });
+    } finally {
+      if (mounted.current) setEdgeBusy(false);
+    }
   };
   useEffect(() => {
     let off: (() => void) | undefined;
+    let cancelled = false;
     (async () => {
       try {
         const s = await window.darkhub?.updater?.getStatus?.();
-        if (s) setUpd((u) => ({ ...u, status: s.state || 'idle', version: s.currentVersion, latest: s.updateInfo?.version, notes: s.updateInfo?.releaseNotes }));
+        if (!cancelled && s) setUpd((u) => ({ ...u, status: s.state || 'idle', version: s.currentVersion, latest: s.updateInfo?.version, notes: s.updateInfo?.releaseNotes }));
       } catch { /* ignore */ }
+      // Unmounted while awaiting: never subscribe (the cleanup below already ran and could not unsubscribe).
+      if (cancelled) return;
       off = window.darkhub?.updater?.onEvent?.((evt: any) => {
         setUpd((u) => {
           const next: UpdState = { ...u };
-          if (evt?.type === 'checking') next.status = 'checking';
+          if (evt?.type === 'checking') { next.status = 'checking'; next.error = undefined; }
           else if (evt?.type === 'available') { next.status = 'available'; next.latest = evt.info?.version; next.notes = evt.info?.releaseNotes; }
           else if (evt?.type === 'not-available') { next.status = 'idle'; next.version = evt.currentVersion || next.version; }
           else if (evt?.type === 'progress') { next.status = 'downloading'; next.percent = evt.percent; }
@@ -95,32 +130,46 @@ export default function DarkOSSystemPanel({ onNavigate }: { onNavigate?: (page: 
         });
       });
     })();
-    return () => { off?.(); };
+    return () => { cancelled = true; off?.(); };
   }, []);
 
-  const checkUpdates = async () => { setUpdBusy(true); try { await window.darkhub?.updater?.check?.(); } finally { setUpdBusy(false); } };
-  const downloadUpdate = async () => { setUpdBusy(true); try { await window.darkhub?.updater?.download?.(); } finally { setUpdBusy(false); } };
-  const installUpdate = async () => { await window.darkhub?.updater?.install?.(); };
+  // Updater IPC failures surface in the card instead of becoming unhandled rejections.
+  const updaterCall = async (fn: () => Promise<unknown> | undefined) => {
+    setUpdBusy(true);
+    try {
+      await fn();
+    } catch (e: any) {
+      if (mounted.current) setUpd((u) => ({ ...u, status: 'error', error: e?.message ?? String(e) }));
+    } finally {
+      if (mounted.current) setUpdBusy(false);
+    }
+  };
+  const checkUpdates = () => updaterCall(() => window.darkhub?.updater?.check?.());
+  const downloadUpdate = () => updaterCall(() => window.darkhub?.updater?.download?.());
+  const installUpdate = () => updaterCall(() => window.darkhub?.updater?.install?.());
 
   // --- (c) start-with-Windows (background) toggle; defaults off, reads real task state ---
   const [startup, setStartup] = useState<boolean | null>(null);
   const [startupBusy, setStartupBusy] = useState(false);
   const [startupErr, setStartupErr] = useState<string | null>(null);
   useEffect(() => {
+    let alive = true;
     window.darkhub?.settings?.getConfig?.().then((r: any) => {
-      if (r?.ok) setStartup(Boolean(r.config?.app?.openAtLogin));
+      if (alive && r?.ok) setStartup(Boolean(r.config?.app?.openAtLogin));
     }).catch(() => {});
+    return () => { alive = false; };
   }, []);
   const toggleStartup = async () => {
     const next = !startup;
     setStartupBusy(true); setStartupErr(null);
     try {
       const r = await window.darkhub?.settings?.updateStartupBehavior?.({ openAtLogin: next, openAsHidden: true });
+      if (!mounted.current) return;
       if (r?.ok) setStartup(Boolean(r.openAtLogin));
       else setStartupErr(r?.error || t('darkos.sys.startup.error', 'Could not change the startup setting.'));
     } catch (e: any) {
-      setStartupErr(e?.message ?? String(e));
-    } finally { setStartupBusy(false); }
+      if (mounted.current) setStartupErr(e?.message ?? String(e));
+    } finally { if (mounted.current) setStartupBusy(false); }
   };
 
   // --- (4) hardware & power: reuses existing GPU detection + power-plan operations ---
@@ -128,23 +177,29 @@ export default function DarkOSSystemPanel({ onNavigate }: { onNavigate?: (page: 
   const [powerBusy, setPowerBusy] = useState<string | null>(null);
   const [powerMsg, setPowerMsg] = useState<{ ok: boolean; message: string } | null>(null);
   useEffect(() => {
+    let alive = true;
     window.darkhub?.optimizer?.getGpuInfo?.().then((r: any) => {
-      if (r?.ok && Array.isArray(r.controllers)) setGpus(r.controllers);
+      if (alive && r?.ok && Array.isArray(r.controllers)) setGpus(r.controllers);
     }).catch(() => {});
+    return () => { alive = false; };
   }, []);
 
   const applyPower = async (id: string) => {
     setPowerBusy(id); setPowerMsg(null);
+    if (powerTimer.current !== null) { window.clearTimeout(powerTimer.current); powerTimer.current = null; }
     try {
       const res: any = await window.darkhub?.optimizer?.run?.({ operationIds: [id] });
+      if (!mounted.current) return;
       const r = Array.isArray(res?.results) ? res.results[0] : null;
       const ok = Boolean(r?.ok);
       setPowerMsg({ ok, message: ok ? (r?.output?.msg || t('darkos.sys.hw.powerApplied', 'Power plan applied.')) : (r?.error || t('darkos.sys.hw.powerFail', 'Could not apply the power plan.')) });
     } catch (e: any) {
-      setPowerMsg({ ok: false, message: e?.message ?? String(e) });
+      if (mounted.current) setPowerMsg({ ok: false, message: e?.message ?? String(e) });
     } finally {
-      setPowerBusy(null);
-      window.setTimeout(() => setPowerMsg(null), 5000);
+      if (mounted.current) {
+        setPowerBusy(null);
+        powerTimer.current = window.setTimeout(() => { powerTimer.current = null; setPowerMsg(null); }, 5000);
+      }
     }
   };
 
@@ -157,123 +212,169 @@ export default function DarkOSSystemPanel({ onNavigate }: { onNavigate?: (page: 
 
   const updBanner = upd.status === 'available' || upd.status === 'downloading' || upd.status === 'downloaded' || upd.status === 'verifying';
 
+  const gb = (mb?: number) => Math.round((mb ?? 0) / 1024 * 10) / 10;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Live activity */}
-      <Card>
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2"><Activity className="w-4 h-4 text-blue-400" />{t('darkos.sys.live.title', 'Live activity')}</h3>
-          <span className="text-[10px] font-mono text-zinc-500">{paused ? t('darkos.sys.live.paused', 'Paused') : t('darkos.sys.live.refreshing', 'Refreshing...')}</span>
+      <section>
+        <div className="flex items-baseline justify-between gap-2 mb-2">
+          <h2 className="dh-section-title">{t('darkos.sys.live.title', 'Live activity')}</h2>
+          <span className="text-[11.5px] text-zinc-500 inline-flex items-center gap-1.5">
+            {!paused && stats?.ok ? <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" aria-hidden /> : null}
+            {paused ? t('darkos.sys.live.paused', 'Paused') : t('darkos.sys.live.refreshing', 'Refreshing...')}
+          </span>
         </div>
         {statsErr ? (
-          <p className="mt-2 text-xs text-red-300">{statsErr}</p>
+          <p role="alert" className="text-[12.5px] text-red-300">{statsErr}</p>
         ) : !stats?.ok ? (
-          <div className="mt-3 flex items-center gap-2 text-xs text-zinc-400"><Loader2 className="w-4 h-4 animate-spin" />...</div>
+          <div role="status" aria-label={t('darkos.loading', 'Loading...')} className="dh-card grid grid-cols-2 md:grid-cols-5 md:divide-x divide-zinc-800/80">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="px-4 py-3 space-y-2">
+                <div className="h-3 w-16 rounded bg-zinc-800/80 animate-pulse" />
+                <div className="h-4 w-20 rounded bg-zinc-800/80 animate-pulse" />
+              </div>
+            ))}
+          </div>
         ) : (
-          <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-3">
-            <Stat icon={Cpu} label={t('darkos.sys.live.cpu', 'CPU')} value={`${stats.cpuPercent ?? 0}%`} tone={(stats.cpuPercent ?? 0) > 85 ? 'text-amber-300' : 'text-zinc-100'} />
-            <Stat icon={MemoryStick} label={t('darkos.sys.live.mem', 'Memory')} value={`${stats.memPercent ?? 0}% (${Math.round((stats.memUsedMb ?? 0) / 1024 * 10) / 10}/${Math.round((stats.memTotalMb ?? 0) / 1024 * 10) / 10} GB)`} />
-            <Stat icon={Activity} label={t('darkos.sys.live.processes', 'Processes')} value={stats.processes ?? 0} />
-            <Stat icon={Server} label={t('darkos.sys.live.services', 'Running services')} value={`${stats.servicesRunning ?? 0}/${stats.servicesTotal ?? 0}`} />
-            <Stat icon={Clock} label={t('darkos.sys.live.uptime', 'Uptime')} value={fmtUptime(stats.uptimeSec ?? 0)} />
+          <div className="dh-card grid grid-cols-2 md:grid-cols-5 md:divide-x divide-zinc-800/80">
+            <Metric label={t('darkos.sys.live.cpu', 'CPU')} value={stats.cpuPercent ?? 0} unit="%" tone={(stats.cpuPercent ?? 0) > 85 ? 'text-amber-300' : 'text-zinc-100'} />
+            <Metric label={t('darkos.sys.live.mem', 'Memory')} value={stats.memPercent ?? 0} unit={<>% · {gb(stats.memUsedMb)}/{gb(stats.memTotalMb)} GB</>} />
+            <Metric label={t('darkos.sys.live.processes', 'Processes')} value={stats.processes ?? 0} />
+            <Metric label={t('darkos.sys.live.services', 'Running services')} value={stats.servicesRunning ?? 0} unit={`/ ${stats.servicesTotal ?? 0}`} />
+            <Metric label={t('darkos.sys.live.uptime', 'Uptime')} value={fmtUptime(stats.uptimeSec ?? 0)} />
           </div>
         )}
-      </Card>
+      </section>
 
-      {/* Microsoft Edge (removed by DarkOS) */}
-      <Card>
-        <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2"><DownloadCloud className="w-4 h-4 text-zinc-400" />{t('darkos.sys.edge.title', 'Microsoft Edge')}</h3>
-        <p className="mt-1 text-xs text-zinc-400">{t('darkos.sys.edge.desc', 'O DarkOS vem sem o Microsoft Edge (o navegador padrão é o Zen). Se precisar dele, reinstale aqui: os bloqueios do DarkOS são desfeitos e o Edge é instalado pelo winget.')}</p>
-        <div className="mt-2 flex items-center gap-2">
-          <button onClick={reinstallEdge} disabled={edgeBusy} className={btnGhost}><DownloadCloud className="w-3.5 h-3.5" />{edgeBusy ? t('darkos.sys.edge.busy', 'Reinstalando...') : t('darkos.sys.edge.do', 'Reinstalar Microsoft Edge')}</button>
-          {edgeMsg && <span className="text-xs text-zinc-300">{edgeMsg}</span>}
-        </div>
-      </Card>
-
-      {/* Update status */}
-      <Card>
-        <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2"><DownloadCloud className="w-4 h-4 text-zinc-400" />{t('darkos.sys.update.title', 'DarkHub update')}</h3>
-        <div className="mt-2 grid grid-cols-2 gap-3">
-          <Stat icon={CheckCircle} label={t('darkos.sys.update.current', 'Installed version')} value={upd.version || '-'} />
-          <Stat icon={DownloadCloud} label={t('darkos.sys.update.latest', 'Available version')} value={updBanner && upd.latest ? upd.latest : '-'} tone={updBanner ? 'text-blue-300' : 'text-zinc-100'} />
-        </div>
-        {upd.status === 'downloading' ? (
-          <div className="mt-2 h-1.5 rounded bg-zinc-800 overflow-hidden"><div className="h-full bg-blue-500" style={{ width: `${upd.percent ?? 0}%` }} /></div>
-        ) : null}
-        {upd.error ? <p className="mt-2 text-xs text-red-300">{upd.error}</p> : null}
-        {!updBanner && upd.status !== 'checking' ? <p className="mt-2 text-xs text-emerald-300/90">{t('darkos.sys.update.upToDate', 'You are on the latest version.')}</p> : null}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button onClick={checkUpdates} disabled={updBusy || upd.status === 'checking'} className={btnGhost}>
-            <RefreshCw className={`w-3.5 h-3.5 ${upd.status === 'checking' ? 'animate-spin' : ''}`} />
-            {upd.status === 'checking' ? t('darkos.sys.update.checking', 'Checking...') : t('darkos.sys.update.check', 'Check for updates')}
-          </button>
-          {upd.status === 'available' ? (
-            <button onClick={downloadUpdate} disabled={updBusy} className={btnPrimary}><DownloadCloud className="w-3.5 h-3.5" />{t('darkos.sys.update.download', 'Download update')}</button>
-          ) : null}
-          {upd.status === 'downloaded' ? (
-            <button onClick={installUpdate} className={btnPrimary}><Power className="w-3.5 h-3.5" />{t('darkos.sys.update.install', 'Install & restart')}</button>
-          ) : null}
-        </div>
-        <p className="mt-2 text-[11px] text-zinc-500">{t('darkos.sys.update.hint', '')}</p>
-      </Card>
-
-      {/* Start with Windows (background) */}
-      <Card>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2"><Power className="w-4 h-4 text-zinc-400" />{t('darkos.sys.startup.title', 'Start with Windows (in background)')}</h3>
-            <p className="mt-1 text-xs text-zinc-400 leading-relaxed">{t('darkos.sys.startup.desc', '')}</p>
-            {startupErr ? <p className="mt-1 text-xs text-red-300">{startupErr}</p> : null}
-          </div>
-          <button
-            onClick={toggleStartup}
-            disabled={startup === null || startupBusy}
-            role="switch"
-            aria-checked={Boolean(startup)}
-            className={`shrink-0 mt-0.5 w-11 h-6 rounded-full border transition relative ${startup ? 'bg-blue-600 border-blue-500' : 'bg-zinc-800 border-zinc-700'} disabled:opacity-50`}
-          >
-            <span className={`absolute top-0.5 ${startup ? 'left-5' : 'left-0.5'} w-5 h-5 rounded-full bg-white transition-all`} />
-          </button>
-        </div>
-        <div className="mt-2 text-[11px] font-mono text-zinc-500">
-          {startup === null ? '...' : startup ? t('darkos.sys.startup.on', 'On') : t('darkos.sys.startup.off', 'Off')}
-        </div>
-      </Card>
-
-      {/* Hardware & power */}
-      <Card>
-        <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2"><Gauge className="w-4 h-4 text-zinc-400" />{t('darkos.sys.hw.title', 'Hardware & power')}</h3>
-        <p className="mt-1 text-xs text-zinc-400 leading-relaxed">{t('darkos.sys.hw.desc', '')}</p>
-        {gpus.length ? (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {gpus.map((g, i) => (
-              <span key={i} className="text-[10.5px] px-2 py-0.5 rounded bg-zinc-950/60 border border-zinc-800 text-zinc-300 font-mono inline-flex items-center gap-1">
-                <MonitorCog className="w-3 h-3 text-zinc-500" />{g.model}{g.vram ? ` · ${Math.round(g.vram / 1024)}GB` : ''}
-              </span>
-            ))}
-          </div>
-        ) : null}
-        <div className="mt-3">
-          <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5">{t('darkos.sys.hw.power', 'Power plan')}</div>
-          <div className="flex flex-wrap gap-2">
-            {powerBtns.map((b) => (
-              <button key={b.id} onClick={() => applyPower(b.id)} disabled={powerBusy !== null} className={btnGhost}>
-                {powerBusy === b.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Power className="w-3.5 h-3.5" />}{b.label}
+      <section className="dh-card divide-y divide-zinc-800/80">
+        {/* Update status */}
+        <Row
+          title={t('darkos.sys.update.title', 'DarkHub update')}
+          help={t('darkos.sys.update.hint', '')}
+          aside={(
+            <>
+              <button onClick={checkUpdates} disabled={updBusy || upd.status === 'checking'} className="dh-btn dh-btn-sm">
+                <RefreshCw size={14} className={upd.status === 'checking' ? 'animate-spin' : ''} />
+                {upd.status === 'checking' ? t('darkos.sys.update.checking', 'Checking...') : t('darkos.sys.update.check', 'Check for updates')}
               </button>
-            ))}
-          </div>
-          {powerMsg ? (
-            <div className={`mt-2 text-xs flex items-center gap-1.5 break-words ${powerMsg.ok ? 'text-emerald-300' : 'text-red-300'}`}>
-              {powerMsg.ok ? <CheckCircle className="w-3.5 h-3.5 shrink-0" /> : <XCircle className="w-3.5 h-3.5 shrink-0" />}{powerMsg.message}
+              {upd.status === 'available' ? (
+                <button onClick={downloadUpdate} disabled={updBusy} className="dh-btn dh-btn-primary dh-btn-sm"><DownloadCloud size={14} />{t('darkos.sys.update.download', 'Download update')}</button>
+              ) : null}
+              {upd.status === 'downloaded' ? (
+                <button onClick={installUpdate} className="dh-btn dh-btn-primary dh-btn-sm"><Power size={14} />{t('darkos.sys.update.install', 'Install & restart')}</button>
+              ) : null}
+            </>
+          )}
+        >
+          <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-1 text-[12.5px]">
+            <div className="flex gap-2"><dt className="text-zinc-500">{t('darkos.sys.update.current', 'Installed version')}</dt><dd className="font-mono text-zinc-200">{upd.version || '-'}</dd></div>
+            <div className="flex gap-2"><dt className="text-zinc-500">{t('darkos.sys.update.latest', 'Available version')}</dt><dd className={`font-mono ${updBanner ? 'text-blue-300' : 'text-zinc-200'}`}>{updBanner && upd.latest ? upd.latest : '-'}</dd></div>
+            {upd.status === 'idle' && !upd.error ? <div className="text-emerald-400">{t('darkos.sys.update.upToDate', 'You are on the latest version.')}</div> : null}
+          </dl>
+          {upd.status === 'downloading' ? (
+            <div className="mt-3 flex items-center gap-3">
+              <div
+                className="flex-1 h-1 rounded-full bg-zinc-800 overflow-hidden"
+                role="progressbar"
+                aria-label={t('darkos.sys.update.download', 'Download update')}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(upd.percent ?? 0)}
+              ><div className="h-full bg-blue-400 transition-[width] duration-200 ease-out" style={{ width: `${upd.percent ?? 0}%` }} /></div>
+              <span className="font-mono text-[11.5px] text-zinc-400 w-10 text-right">{Math.round(upd.percent ?? 0)}%</span>
             </div>
           ) : null}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button onClick={() => onNavigate?.('monitor')} className={btnGhost}><Monitor className="w-3.5 h-3.5" />{t('darkos.sys.hw.openMonitor', 'Open System Monitor')}</button>
-          <button onClick={() => onNavigate?.('optimizer')} className={btnGhost}><Gauge className="w-3.5 h-3.5" />{t('darkos.sys.hw.openOptimizer', 'Open System Optimizer')}</button>
-          <button onClick={() => onNavigate?.('driver')} className={btnGhost}><MonitorCog className="w-3.5 h-3.5" />{t('darkos.sys.hw.openDrivers', 'Open Driver Center')}</button>
-        </div>
-      </Card>
+          {upd.error ? <p role="alert" className="mt-2 text-[12.5px] text-red-300">{upd.error}</p> : null}
+        </Row>
+
+        {/* Start with Windows (background) */}
+        <Row
+          title={t('darkos.sys.startup.title', 'Start with Windows (in background)')}
+          help={t('darkos.sys.startup.desc', '')}
+          aside={(
+            <>
+              <span className="text-[12px] text-zinc-500">
+                {startup === null ? '...' : startup ? t('darkos.sys.startup.on', 'On') : t('darkos.sys.startup.off', 'Off')}
+              </span>
+              <button
+                onClick={toggleStartup}
+                disabled={startup === null || startupBusy}
+                role="switch"
+                aria-checked={Boolean(startup)}
+                aria-label={t('darkos.sys.startup.title', 'Start with Windows (in background)')}
+                className={`relative w-9 h-5 rounded-full border transition-colors duration-150 ease-out ${startup ? 'bg-blue-500 border-blue-400' : 'bg-zinc-800 border-zinc-700'} disabled:opacity-50`}
+              >
+                <span className={`absolute top-[2px] ${startup ? 'left-[18px]' : 'left-[2px]'} w-3.5 h-3.5 rounded-full bg-zinc-50 transition-all duration-150 ease-out`} />
+              </button>
+            </>
+          )}
+        >
+          {startupErr ? <p role="alert" className="mt-2 text-[12.5px] text-red-300">{startupErr}</p> : null}
+        </Row>
+
+        {/* Microsoft Edge (removed by DarkOS) */}
+        <Row
+          title={t('darkos.sys.edge.title', 'Microsoft Edge')}
+          help={t('darkos.sys.edge.desc', 'O DarkOS vem sem o Microsoft Edge (o navegador padrão é o Zen). Se precisar dele, reinstale aqui: os bloqueios do DarkOS são desfeitos e o Edge é instalado pelo winget.')}
+          aside={(
+            <button onClick={() => setEdgeConfirm(true)} disabled={edgeBusy} aria-busy={edgeBusy} className="dh-btn dh-btn-sm">
+              {edgeBusy ? <Loader2 size={14} className="animate-spin" /> : <DownloadCloud size={14} />}
+              {edgeBusy ? t('darkos.sys.edge.busy', 'Reinstalando...') : t('darkos.sys.edge.do', 'Reinstalar Microsoft Edge')}
+            </button>
+          )}
+        >
+          {edgeMsg ? (
+            <p role="status" className={`mt-2 text-[12.5px] flex items-center gap-1.5 break-words ${edgeMsg.ok ? 'text-emerald-400' : 'text-red-300'}`}>
+              {edgeMsg.ok ? <CheckCircle size={14} className="shrink-0" /> : <XCircle size={14} className="shrink-0" />}{edgeMsg.message}
+            </p>
+          ) : null}
+        </Row>
+
+        {/* Hardware & power */}
+        <Row title={t('darkos.sys.hw.title', 'Hardware & power')} help={t('darkos.sys.hw.desc', '')}>
+          {gpus.length ? (
+            <ul className="mt-3 divide-y divide-zinc-800/80 border-y border-zinc-800/80">
+              {gpus.map((g, i) => (
+                <li key={i} className="py-2 flex items-center gap-2 text-[12.5px]">
+                  <MonitorCog size={14} className="text-zinc-500 shrink-0" />
+                  <span className="text-zinc-200 truncate">{g.model}</span>
+                  {g.vram ? <span className="ml-auto font-mono text-zinc-400">{Math.round(g.vram / 1024)}<span className="text-zinc-500"> GB</span></span> : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <div className="mt-4">
+            <div className="dh-label mb-2">{t('darkos.sys.hw.power', 'Power plan')}</div>
+            <div className="flex flex-wrap gap-2">
+              {powerBtns.map((b) => (
+                <button key={b.id} onClick={() => applyPower(b.id)} disabled={powerBusy !== null} className="dh-btn dh-btn-sm">
+                  {powerBusy === b.id ? <Loader2 size={14} className="animate-spin" /> : null}{b.label}
+                </button>
+              ))}
+            </div>
+            {powerMsg ? (
+              <p role="status" className={`mt-2 text-[12.5px] flex items-center gap-1.5 break-words ${powerMsg.ok ? 'text-emerald-400' : 'text-red-300'}`}>
+                {powerMsg.ok ? <CheckCircle size={14} className="shrink-0" /> : <XCircle size={14} className="shrink-0" />}{powerMsg.message}
+              </p>
+            ) : null}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-1 -ml-2.5">
+            <button onClick={() => onNavigate?.('monitor')} className="dh-btn dh-btn-ghost dh-btn-sm"><Monitor size={14} />{t('darkos.sys.hw.openMonitor', 'Open System Monitor')}</button>
+            <button onClick={() => onNavigate?.('optimizer')} className="dh-btn dh-btn-ghost dh-btn-sm"><Gauge size={14} />{t('darkos.sys.hw.openOptimizer', 'Open System Optimizer')}</button>
+            <button onClick={() => onNavigate?.('driver')} className="dh-btn dh-btn-ghost dh-btn-sm"><MonitorCog size={14} />{t('darkos.sys.hw.openDrivers', 'Open Driver Center')}</button>
+          </div>
+        </Row>
+      </section>
+
+      <DarkOSConfirmDialog
+        open={edgeConfirm}
+        title={t('darkos.sys.edge.do', 'Reinstalar Microsoft Edge')}
+        body={t('darkos.sys.edge.confirm', 'The DarkOS items that block Edge will be undone and Edge will be installed with winget (administrator required). Continue?')}
+        confirmLabel={t('darkos.sys.edge.do', 'Reinstalar Microsoft Edge')}
+        onCancel={() => setEdgeConfirm(false)}
+        onConfirm={() => { reinstallEdge(); }}
+      />
     </div>
   );
 }

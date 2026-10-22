@@ -177,7 +177,13 @@ try { $static = (Get-ItemProperty -LiteralPath ('HKLM:\\SYSTEM\\CurrentControlSe
       if (!verified) return { ok: false, error: `O Windows não manteve o DNS solicitado (atual: ${after.servers.join(', ') || 'nenhum'})` };
 
       const undoToken = `dns_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-      const entry = { adapter: adapter.name, guid: adapter.guid, servers: before.servers, wasStatic: before.isStatic };
+      // Applying a second preset must not make the FIRST preset the "original": keep the pre-DarkHub DNS of this adapter.
+      const prev = DeepTweaksEngine.getExtra('dns:last');
+      const keepOriginal = prev && prev.adapter === adapter.name && Array.isArray(prev.servers);
+      const entry = keepOriginal
+        ? { adapter: adapter.name, guid: adapter.guid, servers: prev.servers, wasStatic: Boolean(prev.wasStatic) }
+        : { adapter: adapter.name, guid: adapter.guid, servers: before.servers, wasStatic: before.isStatic };
+      if (prev?.token && prev.token !== undoToken) DeepTweaksEngine.clearExtra(prev.token); // superseded (undo falls back to dns:last)
       DeepTweaksEngine.saveExtra(undoToken, entry);
       DeepTweaksEngine.saveExtra('dns:last', { token: undoToken, ...entry });
       return {
@@ -199,8 +205,9 @@ try { $static = (Get-ItemProperty -LiteralPath ('HKLM:\\SYSTEM\\CurrentControlSe
     const entry = (undoToken && DeepTweaksEngine.getExtra(undoToken)) || DeepTweaksEngine.getExtra('dns:last');
     if (!entry) return { ok: false, error: 'Undo token inválido ou expirado' };
     try {
-      const restore = entry.wasStatic && entry.servers?.length
-        ? `Set-DnsClientServerAddress -InterfaceAlias ${psQuote(entry.adapter)} -ServerAddresses @(${entry.servers.filter(isValidIpv4).map(psQuote).join(',')})`
+      const staticServers = (entry.servers || []).filter(isValidIpv4);
+      const restore = entry.wasStatic && staticServers.length
+        ? `Set-DnsClientServerAddress -InterfaceAlias ${psQuote(entry.adapter)} -ServerAddresses @(${staticServers.map(psQuote).join(',')})`
         : `Set-DnsClientServerAddress -InterfaceAlias ${psQuote(entry.adapter)} -ResetServerAddresses`;
       const res = await ElevationHelper.runElevatedPowerShell(`$ErrorActionPreference = 'Stop'\r\n${restore}\r\nClear-DnsClientCache`);
       if (res.code !== 0) return { ok: false, error: res.stderr || 'Falha ao restaurar o DNS' };

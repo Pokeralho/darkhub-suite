@@ -309,30 +309,6 @@ export const POWER_GUIDS = {
   ultimate: 'e9a42b02-d5df-448d-aa00-03f14749eb61'
 };
 
-/** Last two 0x... numbers of `powercfg /query` output are the AC and DC indexes (locale independent). */
-export function parsePowercfgAcDc(stdout) {
-  const hex = String(stdout || '').match(/0x[0-9a-f]{8}/gi) || [];
-  if (hex.length < 2) return null;
-  return { ac: Number.parseInt(hex[hex.length - 2], 16), dc: Number.parseInt(hex[hex.length - 1], 16) };
-}
-
-/** `fsutil behavior query X` -> first integer after '='. */
-export function parseFsutilValue(stdout) {
-  const m = /=\s*(\d+)/.exec(String(stdout || ''));
-  return m ? Number.parseInt(m[1], 10) : null;
-}
-
-/** Windows service start mode from the registry values Start (+ DelayedAutostart) -> `sc config start=` argument. */
-export function scStartArg(start, delayed) {
-  const s = Number(start);
-  if (s === 2) return delayed ? 'delayed-auto' : 'auto';
-  if (s === 3) return 'demand';
-  if (s === 4) return 'disabled';
-  if (s === 1) return 'system';
-  if (s === 0) return 'boot';
-  return null;
-}
-
 /** Splits a program's UninstallString into executable + argument string (never goes through a shell). */
 export function parseUninstallString(raw) {
   const str = String(raw || '').trim();
@@ -454,20 +430,6 @@ export function buildStartupApprovedBytes(disabled, nowMs = Date.now()) {
   }
   return bytes;
 }
-/** Maps a Run key (PS style path) / folder item to its StartupApproved key. */
-export function startupApprovedKeyFor(type, path) {
-  const p = String(path || '').toLowerCase();
-  if (type === 'Folder') return 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\StartupFolder';
-  if (p.includes('wow6432node')) return 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run32';
-  if (p.endsWith('\\run')) return 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run';
-  return null; // RunOnce is not managed by StartupApproved
-}
-
-/** Recursively sums sizes given a flat list of numbers - kept for test symmetry. */
-export function sum(list) {
-  return (list || []).reduce((a, b) => a + (Number(b) || 0), 0);
-}
-
 /** `DHCMD|<index>|ok` / `DHCMD|<index>|fail|msg` markers emitted by buildCommandBlock. */
 export function parseDhCommandResults(stdout) {
   const map = new Map();

@@ -63,10 +63,14 @@ export interface DarkOSReadResponse<T = any> { ok: boolean; data?: T; error?: st
 export interface DarkOSInfo {
   ok: boolean;
   isDarkOS: boolean;
+  /** 'windows': DarkOS tweaks applied one by one on a stock Windows (own state folder). */
+  mode?: 'darkos' | 'windows';
   root?: string;
   cliAvailable?: boolean;
   cliSource?: 'installed' | 'bundled' | null;
   busy?: boolean;
+  /** Command currently running in the main process (null when idle). */
+  current?: { runId: string; command: string; label: string; startedAt: number } | null;
 }
 
 export interface DarkOSRunEvent {

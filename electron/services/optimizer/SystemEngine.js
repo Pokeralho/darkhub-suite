@@ -31,13 +31,9 @@ const MSI_SET_ID = 'msi:display';
 export { wrapMarkedScript, parseMarkedOutput };
 
 class SystemEngine {
-  async _runMarked(script, timeoutMs = 120000) {
-    try {
-      const res = await ElevationHelper.runElevatedPowerShell(wrapMarkedScript(script), { timeoutMs });
-      return parseMarkedOutput(res);
-    } catch (e) {
-      return { ok: false, out: '', error: e?.message ?? String(e) };
-    }
+  /** Same protocol as ElevationHelper.runMarked (kept as a method so callers/tests can stub it per engine). */
+  _runMarked(script, timeoutMs = 120000) {
+    return ElevationHelper.runMarked(script, timeoutMs);
   }
 
   // ------------------------------------------------------------------ restore point
@@ -233,6 +229,10 @@ if ($laM.Success) { Write-Output ('@TAG@|lastaccess|' + $laM.Groups[1].Value) } 
       const got = bcdValueToArg(after.disabledynamictick);
       if (want !== got) bad.push('disabledynamictick');
     }
+    if (lastAccess) {
+      const want = Number.isInteger(snapLa?.value) && snapLa.value >= 0 && snapLa.value <= 3 ? snapLa.value : 2;
+      if (after.lastaccess !== undefined && after.lastaccess !== '-' && Number.parseInt(after.lastaccess, 10) !== want) bad.push('disablelastaccess');
+    }
     if (bad.length) return { ok: false, error: `Não foi possível restaurar: ${bad.join(', ')}` };
     if (timer) DeepTweaksEngine.clearExtra(BCD_EXTRA);
     if (lastAccess) DeepTweaksEngine.clearExtra(LASTACCESS_EXTRA);
@@ -376,6 +376,13 @@ Write-Output ('DHAFT|rsc|' + $o.ReceiveSegmentCoalescing)`;
   $t = (& powercfg.exe /query $scheme SUB_PROCESSOR $alias) | Out-String
   $m = [regex]::Matches($t, '0x[0-9a-fA-F]{8}')
   if ($m.Count -ge 2) { return [Convert]::ToInt32($m[$m.Count-2].Value.Substring(2), 16) }
+  # Core parking settings are hidden by default and /query prints nothing for them: read the stored AC index.
+  $ids = @{ CPMINCORES = '0cc5b647-c1df-4637-891a-dec35c318583'; CPMAXCORES = 'ea062031-0e34-4ff1-9b6d-eb1059334028'; PROCFREQMAX = '75b0ae3f-bce0-45a7-8c89-c9611c25e100' }
+  if ($ids.ContainsKey($alias)) {
+    $k = "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Power\\User\\PowerSchemes\\$scheme\\54533251-82be-4824-96c1-47b60b740d00\\$($ids[$alias])"
+    $v = (Get-ItemProperty -LiteralPath $k -Name ACSettingIndex -ErrorAction SilentlyContinue).ACSettingIndex
+    if ($null -ne $v) { return [int]$v }
+  }
   return '-'
 }
 $act = (& powercfg.exe /getactivescheme) | Out-String
@@ -506,13 +513,14 @@ if (-not $v -or [int]$v.InitialSize -ne ${sizes.init} -or [int]$v.MaximumSize -n
 
   async revertPagefile() {
     if (process.platform !== 'win32') return NOT_WINDOWS;
+    // The snapshot is cleared only after the restore succeeded: clearing it first lost the original sizes on any
+    // failure (UAC cancelled...) and let setPagefile() snapshot the CURRENT custom sizes as if they were the original.
     const snap = DeepTweaksEngine.getExtra(PAGEFILE_EXTRA);
-    if (!snap || /^true$/i.test(String(snap.auto))) return this.setPagefile('auto');
-    const first = String(snap.pf || '').split(';').filter(Boolean)[0];
+    const first = String(snap?.pf || '').split(';').filter(Boolean)[0];
     const m = /^(.+),(\d+),(\d+)$/.exec(first || '');
-    DeepTweaksEngine.clearExtra(PAGEFILE_EXTRA);
-    if (!m) return this.setPagefile('auto');
-    const res = await this.setPagefile(Number(m[2]), Number(m[3]));
+    const res = !snap || /^true$/i.test(String(snap.auto)) || !m
+      ? await this.setPagefile('auto')
+      : await this.setPagefile(Number(m[2]), Number(m[3]));
     if (res.ok) DeepTweaksEngine.clearExtra(PAGEFILE_EXTRA);
     return res;
   }
@@ -592,9 +600,10 @@ if ($rec -and $rec.State -eq 'Enabled') {
     const removed = [...r.out.matchAll(/^DHREM\|(.+)$/gm)].map((m) => m[1].trim());
     const errors = [...r.out.matchAll(/^DHERR\|(.+)$/gm)].map((m) => m[1].trim());
     const recall = /^DHRECALL\|(\w+)/m.exec(r.out)?.[1] || 'absent';
-    if (removed.length) {
-      const prev = DeepTweaksEngine.getExtra(CAPS_EXTRA)?.removed || [];
-      DeepTweaksEngine.saveExtra(CAPS_EXTRA, { removed: [...new Set([...prev, ...removed])] });
+    if (removed.length || recall === 'removed') {
+      const prevSnap = DeepTweaksEngine.getExtra(CAPS_EXTRA) || {};
+      // Recall is recorded too, otherwise "Reverter" (advertised as restoring what was removed) never brought it back
+      DeepTweaksEngine.saveExtra(CAPS_EXTRA, { removed: [...new Set([...(prevSnap.removed || []), ...removed])], recall: Boolean(prevSnap.recall) || recall === 'removed' });
     }
     const recallTxt = { removed: 'Recall removido', already: 'Recall já estava desativado', absent: 'Recall não existe neste Windows', error: 'Recall não pôde ser removido' }[recall] || recall;
     const parts = [];
@@ -609,14 +618,22 @@ if ($rec -and $rec.State -eq 'Enabled') {
     if (process.platform !== 'win32') return NOT_WINDOWS;
     const snap = DeepTweaksEngine.getExtra(CAPS_EXTRA);
     const names = (snap?.removed || []).filter(isValidCapabilityName);
-    if (!names.length) return { ok: false, error: 'Não há componentes removidos pelo DarkHub para reinstalar.' };
-    const script = names.map((n) => `Add-WindowsCapability -Online -Name ${psQuote(n)} -ErrorAction Stop | Out-Null\r\nWrite-Output ('DHADD|' + ${psQuote(n)})`).join('\r\n');
-    const r = await this._runMarked(script, 900000);
+    const recall = snap?.recall === true;
+    if (!names.length && !recall) return { ok: false, error: 'Não há componentes removidos pelo DarkHub para reinstalar.' };
+    const lines = names.map((n) => `Add-WindowsCapability -Online -Name ${psQuote(n)} -ErrorAction Stop | Out-Null\r\nWrite-Output ('DHADD|' + ${psQuote(n)})`);
+    if (recall) lines.push("Enable-WindowsOptionalFeature -Online -FeatureName Recall -All -NoRestart -ErrorAction Stop | Out-Null\r\nWrite-Output 'DHRECALL|restored'");
+    const r = await this._runMarked(lines.join('\r\n'), 900000);
     const added = [...r.out.matchAll(/^DHADD\|(.+)$/gm)].map((m) => m[1].trim());
-    if (added.length === names.length) DeepTweaksEngine.clearExtra(CAPS_EXTRA);
-    else if (added.length) DeepTweaksEngine.saveExtra(CAPS_EXTRA, { removed: names.filter((n) => !added.includes(n)) });
-    if (!r.ok) return { ok: false, error: `Falha ao reinstalar (${added.length}/${names.length} concluídos): ${r.error}` };
-    return { ok: true, msg: `${added.length} componente(s) reinstalado(s): ${added.map((n) => n.split('~')[0]).join(', ')}.` };
+    const recallBack = recall && /^DHRECALL\|restored/m.test(r.out);
+    const left = names.filter((n) => !added.includes(n));
+    const recallLeft = recall && !recallBack;
+    if (!left.length && !recallLeft) DeepTweaksEngine.clearExtra(CAPS_EXTRA);
+    else if (added.length || recallBack) DeepTweaksEngine.saveExtra(CAPS_EXTRA, { removed: left, recall: recallLeft });
+    const total = names.length + (recall ? 1 : 0);
+    const done = added.length + (recallBack ? 1 : 0);
+    if (!r.ok) return { ok: false, error: `Falha ao reinstalar (${done}/${total} concluídos): ${r.error}` };
+    const doneNames = [...added.map((n) => n.split('~')[0]), ...(recallBack ? ['Recall'] : [])];
+    return { ok: true, requiresReboot: recallBack, msg: `${done} componente(s) reinstalado(s): ${doneNames.join(', ')}.${recallBack ? ' Reinicie o Windows para concluir o Recall.' : ''}` };
   }
 
   // ------------------------------------------------------------------ OneDrive / Explorer

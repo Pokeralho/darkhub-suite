@@ -1,4 +1,5 @@
 # DarkOS.Recovery.psm1 - DarkOS change catalog / manifest / recovery engine
+# ModuleVersion: 3   (bump on every behaviour change: DarkHub runs the newest of installed vs bundled)
 # Windows PowerShell 5.1, ASCII only. Shared by first-boot provisioning and DarkHub Suite.
 # Every system interaction goes through a backend table ($script:DK.Backend). The "Real" backend
 # touches the system; the "Fake" backend (DryRun) keeps an in-memory state persisted to
@@ -8,6 +9,8 @@
 # ordered dictionaries that were re-hydrated from JSON (missing keys return $null, not an error).
 Set-StrictMode -Version 1.0
 
+# Read cache, active only while Get-DarkOSStatus runs (see Invoke-Dk). Declared here because of StrictMode.
+$script:DkReadCache = $null
 $script:DK = @{
     Root            = (Join-Path $env:ProgramData 'DarkOS')
     DryRun          = $false
@@ -20,12 +23,15 @@ $script:DK = @{
     HiveMount       = $null
     HiveDepth       = 0
     ProgressHandler = $null
+    Mode            = 'DarkOS'
+    CatalogPath     = $null
     Catalog         = $null
     UltimateGuid    = 'e9a42b02-d5df-448d-aa00-03f14749eb61'
     HighPerfGuid    = '8c5e7fda-e8bf-4a96-9a85-cf2db1f4b5a0'
     DarkOSPlanGuid  = '3f0c4c5e-6d8b-4a3a-9f2e-0da7c0de0001'
 }
 
+$script:DkWindowsExcluded = @('ui.start.pins', 'onedrive.preventSetup.defaultUser')
 $script:Profiles = @('darkosDefault', 'competitive', 'maxPerformance')
 
 # ---------------------------------------------------------------- paths / environment
@@ -37,7 +43,7 @@ function Get-DkPath {
         'Recovery'    { return (Join-Path $r 'Recovery') }
         'Manifest'    { return (Join-Path $r 'Recovery\manifest.json') }
         'Policy'      { return (Join-Path $r 'Recovery\policy') }
-        'Catalog'     { return (Join-Path $r 'Recovery\policy\catalog.json') }
+        'Catalog'     { if ($script:DK.CatalogPath) { return $script:DK.CatalogPath }; return (Join-Path $r 'Recovery\policy\catalog.json') }
         'AppPackages' { return (Join-Path $r 'Recovery\AppPackages') }
         'AppIndex'    { return (Join-Path $r 'Recovery\AppPackages\index.json') }
         'Snapshots'   { return (Join-Path $r 'Recovery\Snapshots') }
@@ -50,8 +56,13 @@ function Get-DkPath {
 function Set-DarkOSEnvironment {
     <# Configures root / dry-run / progress callback. -DryRun selects the fake backend (no system access). #>
     [CmdletBinding()]
-    param([string]$Root, [switch]$DryRun, [scriptblock]$ProgressHandler, [hashtable]$FakeState)
+    param([string]$Root, [switch]$DryRun, [scriptblock]$ProgressHandler, [hashtable]$FakeState,
+        [ValidateSet('DarkOS', 'Windows')][string]$Mode, [string]$CatalogPath)
     if ($Root) { $script:DK.Root = $Root }
+    # Windows mode: DarkOS tweaks applied one by one on a stock Windows, with their own state folder and the
+    # catalog shipped with DarkHub. "defaultUser" items target the current user instead of the Default hive.
+    if ($Mode) { $script:DK.Mode = $Mode }
+    if ($CatalogPath) { $script:DK.CatalogPath = $CatalogPath }
     if ($PSBoundParameters.ContainsKey('ProgressHandler')) { $script:DK.ProgressHandler = $ProgressHandler }
     if ($DryRun) {
         $script:DK.DryRun = $true
@@ -73,6 +84,30 @@ function Invoke-Dk {
     param([string]$Op, [object[]]$ArgList = @())
     $b = Get-DkBackend
     if (-not $b.ContainsKey($Op)) { throw "Backend sem operacao: $Op" }
+    # Read cache (only while Get-DarkOSStatus runs): the Appx enumerations cost ~0.5 s each and ran once per item.
+    if ($null -ne $script:DkReadCache) {
+        if ($Op -eq 'AppxProvisionedList') {
+            if (-not $script:DkReadCache.ContainsKey('prov')) { $v = (& $b[$Op]); $script:DkReadCache['prov'] = @($v) }
+            return $script:DkReadCache['prov']
+        }
+        if ($Op -eq 'AppxInstalledList') {
+            if (-not $script:DkReadCache.ContainsKey('inst')) { $v = (& $b[$Op] '*'); $script:DkReadCache['inst'] = @($v) }
+            $like = [string]$ArgList[0]
+            return @($script:DkReadCache['inst'] | Where-Object { $_.name -like $like })
+        }
+        if ($Op -eq 'SvcGet' -and $b.ContainsKey('SvcGetAll')) {
+            if (-not $script:DkReadCache.ContainsKey('svc')) { $script:DkReadCache['svc'] = (& $b['SvcGetAll']) }
+            $k = ([string]$ArgList[0]).ToLowerInvariant()
+            if ($script:DkReadCache['svc'].ContainsKey($k)) { return $script:DkReadCache['svc'][$k] }
+            return $null
+        }
+        if ($Op -eq 'TaskGet' -and $b.ContainsKey('TaskGetAll')) {
+            if (-not $script:DkReadCache.ContainsKey('task')) { $script:DkReadCache['task'] = (& $b['TaskGetAll']) }
+            $k = ("$($ArgList[0])|$($ArgList[1])").ToLowerInvariant()
+            if ($script:DkReadCache['task'].ContainsKey($k)) { return $script:DkReadCache['task'][$k] }
+            return @{ state = 'Missing'; exists = $false }
+        }
+    }
     return (& $b[$Op] @ArgList)
 }
 
@@ -141,19 +176,6 @@ function Read-DkJsonFile {
     if ([string]::IsNullOrWhiteSpace($text)) { return $null }
     $obj = ConvertFrom-Json -InputObject $text
     return (ConvertTo-DkHashtable $obj)
-}
-
-function ConvertTo-DarkOSJson {
-    <# Compressed JSON, every non-ASCII char escaped as \uXXXX (console-encoding safe). #>
-    param($InputObject, [switch]$AsArray)
-    if ($AsArray) { $json = ConvertTo-Json -InputObject @($InputObject) -Depth 25 -Compress }
-    else { $json = ConvertTo-Json -InputObject $InputObject -Depth 25 -Compress }
-    if ($null -eq $json) { return 'null' }
-    $sb = New-Object System.Text.StringBuilder
-    foreach ($ch in $json.ToCharArray()) {
-        if ([int]$ch -gt 127) { [void]$sb.AppendFormat('\u{0:x4}', [int]$ch) } else { [void]$sb.Append($ch) }
-    }
-    return $sb.ToString()
 }
 
 function Write-DkJsonFileAtomic {
@@ -263,14 +285,12 @@ function Get-DkCatalogRaw {
         $e.profiles = @($e.profiles); $e.dependsOn = @($e.dependsOn); $e.payload = @($e.payload)
         $list += , $e
     }
+    if ($script:DK.Mode -eq 'Windows') {
+        # Not offered on a stock Windows: retired items (no profile), image-only steps and DarkOS-branded pins.
+        $list = @($list | Where-Object { @($_.profiles).Count -gt 0 -and $_.component -ne 'defaultassoc' -and $script:DkWindowsExcluded -notcontains $_.id })
+    }
     $script:DK.Catalog = $list
     return $list
-}
-
-function Get-DkChange {
-    param([string]$Id)
-    foreach ($c in (Get-DkCatalogRaw)) { if ($c.id -eq $Id) { return $c } }
-    return $null
 }
 
 # ================================================================ BACKENDS
@@ -486,12 +506,41 @@ function New-DkRealBackend {
         param($Name, $StartType, $Stop)
         $map = @{ 'Automatic' = 'Automatic'; 'AutomaticDelayed' = 'Automatic'; 'Manual' = 'Manual'; 'Disabled' = 'Disabled' }
         if ($Stop) { try { Stop-Service -Name $Name -Force -ErrorAction SilentlyContinue } catch { } }
-        Set-Service -Name $Name -StartupType $map[$StartType] -ErrorAction Stop
+        try { Set-Service -Name $Name -StartupType $map[$StartType] -ErrorAction Stop }
+        catch {
+            # Protected services (e.g. DoSvc) refuse SCM config changes even for admins; Start in the registry is
+            # what SCM reads at boot. If this write is denied too, the error stands and the caller rolls back.
+            $startVal = @{ 'Automatic' = 2; 'AutomaticDelayed' = 2; 'Manual' = 3; 'Disabled' = 4 }[$StartType]
+            Set-ItemProperty -LiteralPath "HKLM:\SYSTEM\CurrentControlSet\Services\$Name" -Name Start -Value $startVal -Type DWord -ErrorAction Stop
+        }
         if ($StartType -eq 'AutomaticDelayed') {
             New-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\$Name" -Name DelayedAutostart -PropertyType DWord -Value 1 -Force | Out-Null
         } elseif ($StartType -eq 'Automatic') {
             New-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\$Name" -Name DelayedAutostart -PropertyType DWord -Value 0 -Force | Out-Null
         }
+    }
+    # Bulk reads used only by the status cache (one enumeration instead of one query per catalog item).
+    $b['SvcGetAll'] = {
+        $map = @{}
+        $wmi = @{}
+        foreach ($w in @(Get-CimInstance Win32_Service -ErrorAction SilentlyContinue)) { $wmi[$w.Name.ToLowerInvariant()] = $w.StartMode }
+        foreach ($svc in @(Get-Service -ErrorAction SilentlyContinue)) {
+            $n = $svc.Name
+            $start = if ($wmi.ContainsKey($n.ToLowerInvariant())) { $wmi[$n.ToLowerInvariant()] } else { 'Unknown' }
+            $delayed = $false
+            if ($start -eq 'Auto') {
+                $r = Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\$n" -Name DelayedAutostart -ErrorAction SilentlyContinue
+                if ($r -and $r.DelayedAutostart -eq 1) { $delayed = $true }
+            }
+            $norm = switch ($start) { 'Auto' { if ($delayed) { 'AutomaticDelayed' } else { 'Automatic' } } 'Manual' { 'Manual' } 'Disabled' { 'Disabled' } default { $start } }
+            $map[$n.ToLowerInvariant()] = @{ startType = $norm; status = [string]$svc.Status }
+        }
+        return , $map
+    }
+    $b['TaskGetAll'] = {
+        $map = @{}
+        foreach ($t in @(Get-ScheduledTask -ErrorAction SilentlyContinue)) { $map[("$($t.TaskPath)|$($t.TaskName)").ToLowerInvariant()] = @{ state = [string]$t.State; exists = $true } }
+        return , $map
     }
     $b['TaskGet'] = {
         param($Path, $Name)
@@ -516,7 +565,14 @@ function New-DkRealBackend {
     $b['AppxInstalledList'] = {
         param($NameLike)
         $out = @()
-        foreach ($p in (Get-AppxPackage -AllUsers -Name $NameLike -ErrorAction SilentlyContinue)) {
+        # -AllUsers needs elevation ("Access denied" otherwise); unelevated, the current user's packages are what counts.
+        $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+        $pkgs = @()
+        try {
+            if ($admin) { $pkgs = @(Get-AppxPackage -AllUsers -Name $NameLike -ErrorAction Stop) }
+            else { $pkgs = @(Get-AppxPackage -Name $NameLike -ErrorAction Stop) }
+        } catch { $pkgs = @(Get-AppxPackage -Name $NameLike -ErrorAction SilentlyContinue) }
+        foreach ($p in $pkgs) {
             $out += @{ name = $p.Name; fullName = $p.PackageFullName; installLocation = $p.InstallLocation; dependencies = @($p.Dependencies | ForEach-Object { $_.PackageFullName }) }
         }
         return , $out
@@ -551,33 +607,40 @@ function New-DkRealBackend {
         param($StoreId, $ShortName)
         # VM test 16/10: Store installs via winget work with DoSvc disabled (no DO needed); DoSvc is NOT touched here.
         # (Even SYSTEM gets "Acesso negado" from the SCM on DoSvc; its Start value is restored via the registry backup.)
+        # PS 5.1: with the caller's EAP=Stop, any native stderr line redirected by 2>&1 becomes a terminating
+        # error, so winget warnings would abort the install. Native exit codes are checked explicitly instead.
+        $ErrorActionPreference = 'Continue'
         $wg = (Get-Command winget.exe -ErrorAction SilentlyContinue).Source
         if (-not $wg) { $wg = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\winget.exe' }
         if (-not (Test-Path -LiteralPath $wg)) { throw 'winget nao encontrado (App Installer ausente).' }
         $out = & $wg install --id $StoreId --source msstore --accept-package-agreements --accept-source-agreements --disable-interactivity --silent 2>&1 | Out-String
         $rc = $LASTEXITCODE
-        # 0 = installed; 0x8A15002B (-1978335189) = already installed / no applicable update
-        if ($rc -ne 0 -and $rc -ne -1978335189) {
+        # 0 = installed; 0x8A15002B (-1978335189) = no applicable update; 0x8A150061 (-1978335135) = already installed
+        if ($rc -ne 0 -and $rc -ne -1978335189 -and $rc -ne -1978335135) {
             throw ('winget msstore {0} exit {1}: {2}' -f $StoreId, $rc, (($out.Trim() -split "`n") | Select-Object -Last 1))
         }
         # registration for the user can lag a few seconds behind winget's exit
         for ($i = 0; $i -lt 15; $i++) { if (@(Get-AppxPackage -Name $ShortName -ErrorAction SilentlyContinue).Count) { break }; Start-Sleep -Seconds 2 }
         return $true
     }
+    # powercfg/dism: local EAP=Continue so a stderr line under the caller's EAP=Stop does not throw (PS 5.1).
     $b['PowerActiveGuid'] = {
+        $ErrorActionPreference = 'Continue'
         $line = (powercfg /getactivescheme) 2>$null
         if ($line -match '([0-9a-fA-F-]{36})') { return $Matches[1] }
         return $null
     }
     $b['PowerDuplicate'] = {
         param($SourceGuid, $TargetGuid)
+        $ErrorActionPreference = 'Continue'
         $out = (powercfg /duplicatescheme $SourceGuid $TargetGuid) 2>$null
         if ($out -match '([0-9a-fA-F-]{36})') { return $Matches[1] }
         return $null
     }
-    $b['PowerSetActive'] = { param($Guid) powercfg /setactive $Guid 2>$null | Out-Null }
+    $b['PowerSetActive'] = { param($Guid) $ErrorActionPreference = 'Continue'; powercfg /setactive $Guid 2>$null | Out-Null }
     $b['PowerSchemeExists'] = {
         param($Guid)
+        $ErrorActionPreference = 'Continue'
         $all = (powercfg /list) 2>$null
         return ($all -match [regex]::Escape($Guid)).Count -gt 0
     }
@@ -623,6 +686,7 @@ function New-DkRealBackend {
     $b['DefaultUserRoot'] = { 'HKLM:\DARKOS_DEFUSER' }
     $b['DismImportAssoc'] = {
         param($XmlPath)
+        $ErrorActionPreference = 'Continue'
         $out = dism.exe /Online /Import-DefaultAppAssociations:$XmlPath 2>&1
         return ($LASTEXITCODE -eq 0)
     }
@@ -659,7 +723,8 @@ function Resolve-DkRegTarget {
     param([string]$Scope, [string]$RawPath)
     $p = $RawPath -replace '^Registry::', ''
     $p = $p -replace '^HKEY_LOCAL_MACHINE\\', 'HKLM:\' -replace '^HKEY_CURRENT_USER\\', 'HKCU:\'
-    if ($Scope -eq 'defaultUser') {
+    if ($Scope -eq 'defaultUser' -and $script:DK.Mode -eq 'Windows') { $p = $p -replace '^HKLM:\\', 'HKCU:\' }
+    elseif ($Scope -eq 'defaultUser') {
         $mount = $script:DK.HiveMount
         $sub = $p -replace '^HKCU:\\', '' -replace '^HKLM:\\', ''
         # defaultUser entries are authored as HKCU paths
@@ -887,7 +952,10 @@ function Save-DkAppxPayload {
         $src = $pkg.installLocation
         if (-not $src) { $src = Join-Path $winapps $pfn }
         $dst = Join-Path $root $pfn
-        [void](Invoke-Dk 'FileCopy' @($src, $dst))
+        # Never remove a package whose payload could not be preserved, unless the Store can reinstall it.
+        if (-not (Invoke-Dk 'FileCopy' @($src, $dst)) -and -not $Change.apply.storeId) {
+            throw ("Falha ao preservar o payload de {0}; remocao cancelada." -f $pfn)
+        }
         $indexEntries += @{
             packageFullName = $pfn
             kind            = (Get-DkAppxKind $pfn)
@@ -910,7 +978,6 @@ function Save-DkAppxPayload {
         $existing += $ie
     }
     $idx.packages = $existing
-    if (-not $script:DK.DryRun -or (Invoke-Dk 'FileExists' @($root))) { }
     Write-DkJsonFileAtomic -Path $idxPath -Object $idx
     return $indexEntries
 }
@@ -949,17 +1016,14 @@ function Restore-DkAppxPackage {
     param([string]$ShortName)
     $idx = Read-DkJsonFile (Get-DkPath AppIndex)
     $entries = @()
-    if ($idx -and $idx.packages) { $entries = @($idx.packages | Where-Object { $_.displayName -eq $ShortName -or $_.packageFullName -like "$ShortName*" }) }
+    # Exact family match only: a bare prefix ("Microsoft.Xbox*") would also pick up other families.
+    if ($idx -and $idx.packages) { $entries = @($idx.packages | Where-Object { $_.displayName -eq $ShortName -or $_.packageFullName -eq $ShortName -or $_.packageFullName -like "${ShortName}_*" }) }
+    $sid = @(Get-DkCatalogRaw | Where-Object { $_.component -eq 'appx' -and $_.apply.packageName -eq $ShortName -and $_.apply.storeId } | ForEach-Object { [string]$_.apply.storeId } | Select-Object -First 1)
     if ($entries.Count -eq 0) {
         # No local payload (the golden image keeps only apps that are not in the Microsoft Store):
         # reinstall from the Store via winget when the catalog entry has a storeId.
-        $sid = @(Get-DkCatalogRaw | Where-Object { $_.component -eq 'appx' -and $_.apply.packageName -eq $ShortName -and $_.apply.storeId } | ForEach-Object { [string]$_.apply.storeId } | Select-Object -First 1)
         if ($sid.Count -eq 0) { return @{ packageName = $ShortName; ok = $false; verified = $false; error = 'Sem payload preservado no index.json.'; pathUsed = $null } }
-        $err = $null
-        try { [void](Invoke-Dk 'StoreInstall' @($sid[0], $ShortName)) } catch { $err = $_.Exception.Message }
-        $verified = (@(Invoke-Dk 'AppxInstalledList' @("$ShortName")).Count -gt 0)
-        if (-not $verified -and -not $err) { $err = 'Instalacao pela Microsoft Store nao confirmada.' }
-        return @{ packageName = $ShortName; ok = $verified; verified = $verified; reprovisioned = $false; pathUsed = ('msstore:' + $sid[0]); error = $err; warnings = @() }
+        return (Restore-DkAppxFromStore $ShortName $sid[0] @())
     }
     $winapps = Get-DkWindowsAppsRoot
     $registered = $false
@@ -989,9 +1053,24 @@ function Restore-DkAppxPackage {
     }
     $installed = @(Invoke-Dk 'AppxInstalledList' @("$ShortName"))
     $verified = ($installed.Count -gt 0)
+    # Preserved payload unusable (copy/ACL/register failed): fall back to the Store when the catalog allows it.
+    if (-not $verified -and $sid.Count -gt 0) {
+        return (Restore-DkAppxFromStore $ShortName $sid[0] @($errors))
+    }
     $err = $null
     if (-not $verified) { $err = 'Registro nao confirmado por leitura. ' + ($errors -join ' | ') }
     return @{ packageName = $ShortName; ok = $registered; verified = $verified; reprovisioned = $reprovisioned; pathUsed = ($pathUsed -join '; '); error = $err; warnings = @($errors) }
+}
+
+# Reinstall a package family from the Microsoft Store (winget msstore). Verified by read-back only.
+function Restore-DkAppxFromStore {
+    param([string]$ShortName, [string]$StoreId, [string[]]$Warnings = @())
+    $err = $null
+    try { [void](Invoke-Dk 'StoreInstall' @($StoreId, $ShortName)) } catch { $err = $_.Exception.Message }
+    $verified = (@(Invoke-Dk 'AppxInstalledList' @("$ShortName")).Count -gt 0)
+    if (-not $verified -and -not $err) { $err = 'Instalacao pela Microsoft Store nao confirmada.' }
+    if ($verified) { $err = $null }
+    return @{ packageName = $ShortName; ok = $verified; verified = $verified; reprovisioned = $false; pathUsed = ('msstore:' + $StoreId); error = $err; warnings = @($Warnings) }
 }
 
 function Test-DkAppxOriginallyPresent {
@@ -1011,8 +1090,6 @@ function Invoke-DkAppxRevert {
 # ================================================================ TRANSACTION ENGINE
 # Per change: capture originalState (first time only) -> precheck -> apply -> verify (read-back) ->
 # record to manifest -> on failure rollback to originalState and record. Idempotent.
-
-function Test-DkComponent { param([string]$C) return ($C -in 'registry', 'service', 'task', 'appx', 'powercfg', 'defaultassoc', 'file') }
 
 function Invoke-DkCapture {
     param($Change)
@@ -1101,7 +1178,7 @@ function Invoke-DkRevert {
 }
 
 # Does a change need the Default-user hive mounted?
-function Test-DkNeedsHive { param($Change) return ($Change.scope -eq 'defaultUser' -and $Change.component -eq 'registry') }
+function Test-DkNeedsHive { param($Change) return ($script:DK.Mode -ne 'Windows' -and $Change.scope -eq 'defaultUser' -and $Change.component -eq 'registry') }
 
 function Test-DkDependencies {
     param($Change, $Manifest)
@@ -1248,6 +1325,7 @@ function Get-DarkOSStatus {
     $out = @()
     $hive = (@($cat | Where-Object { Test-DkNeedsHive $_ }).Count -gt 0) -and [bool](Invoke-Dk 'IsAdmin' @())
     if ($hive) { [void](Enter-DkDefaultUser) }
+    $script:DkReadCache = @{}
     try {
     foreach ($c in @($cat)) {
         $entry = Get-DkEntry $manifest $c.id
@@ -1255,15 +1333,22 @@ function Get-DarkOSStatus {
         $live = $false
         try { $live = [bool](Test-DkApplied $c) } catch { $live = $false }
         $appliedStatus = ($status -eq 'applied')
+        # Services/tasks missing on this build are skipped by Apply; report it so the UI does not offer them.
+        $present = $true
+        try {
+            if ($c.component -eq 'service') { $present = ($null -ne (Invoke-Dk 'SvcGet' @($c.apply.name))) }
+            elseif ($c.component -eq 'task') { $present = [bool]((Invoke-Dk 'TaskGet' @($c.apply.path, $c.apply.name)).exists) }
+        } catch { $present = $true }
         $out += [ordered]@{
             id             = $c.id
             status         = $status
             live           = $live
+            present        = $present
             matchesApplied = ($live -eq $appliedStatus)
             rebootPending  = ($rebootPending -or $status -eq 'pending-reboot')
         }
     }
-    } finally { if ($hive) { Exit-DkDefaultUser } }
+    } finally { $script:DkReadCache = $null; if ($hive) { Exit-DkDefaultUser } }
     return @($out)
 }
 
@@ -1369,9 +1454,8 @@ function Set-DarkOSProfile {
     if ($toRevert.Count -gt 0) { Add-DkResults $results (Invoke-DarkOSChange -Id $toRevert -Action Revert -Source darkhub) }
     if ($applyable.Count -gt 0) { Add-DkResults $results (Invoke-DarkOSChange -Id $applyable -Action Apply -Source darkhub -ConfirmSecurity:$ConfirmSecurity) }
 
-    $manifest = Get-DkManifestOrInit
-    $manifest.activeProfile = $Profile
-    Enter-DkLock; try { Save-DkManifest $manifest } finally { Exit-DkLock }
+    # read-modify-write under the lock so a concurrent writer is never overwritten with a stale copy
+    Enter-DkLock; try { $manifest = Get-DkManifestOrInit; $manifest.activeProfile = $Profile; Save-DkManifest $manifest } finally { Exit-DkLock }
     $flat = @($results.ToArray())
     $failed = @($flat | Where-Object { -not $_.ok -and -not $_.skipped })
     return [ordered]@{ profile = $Profile; results = $flat; ok = ($failed.Count -eq 0); skipped = @($flat | Where-Object { $_.skipped } | ForEach-Object { $_.id }) }
@@ -1383,9 +1467,7 @@ function Restore-DarkOSProfile {
     $appliedIds = @($manifest.changes | Where-Object { $_.status -eq 'applied' -or $_.status -eq 'pending-reboot' -or $_.status -eq 'failed' } | ForEach-Object { $_.id })
     $results = New-Object System.Collections.ArrayList
     if ($appliedIds.Count -gt 0) { Add-DkResults $results (Invoke-DarkOSChange -Id $appliedIds -Action Revert -Source darkhub -ConfirmSecurity:$ConfirmSecurity) }
-    $manifest = Get-DkManifestOrInit
-    $manifest.activeProfile = 'none'
-    Enter-DkLock; try { Save-DkManifest $manifest } finally { Exit-DkLock }
+    Enter-DkLock; try { $manifest = Get-DkManifestOrInit; $manifest.activeProfile = 'none'; Save-DkManifest $manifest } finally { Exit-DkLock }
     $flat = @($results.ToArray())
     return [ordered]@{ ok = (@($flat | Where-Object { -not $_.ok -and -not $_.skipped }).Count -eq 0); results = $flat }
 }
@@ -1421,7 +1503,8 @@ function Restore-DarkOSAppx {
             # update manifest entry for the matching appx change(s)
             foreach ($c in (Get-DkCatalogRaw | Where-Object { $_.component -eq 'appx' -and $_.apply.packageName -eq $pn })) {
                 $e = Get-DkEntry $manifest $c.id
-                if ($e) { $e.status = 'reverted'; $e.lastResult = @{ ts = (Get-DkTimestamp); action = 'revert'; ok = $r.verified; verified = $r.verified; error = $r.error; source = 'darkhub' }; Set-DkEntry $manifest $e }
+                # Only a verified restore marks the change reverted; a failed one stays visible in Get-DarkOSFailures.
+                if ($e) { $e.status = $(if ($r.verified) { 'reverted' } else { 'failed' }); $e.lastResult = @{ ts = (Get-DkTimestamp); action = 'revert'; ok = $r.verified; verified = $r.verified; error = $r.error; source = 'darkhub' }; Set-DkEntry $manifest $e }
             }
             $results += @{ id = $pn; ok = $r.ok; verified = $r.verified; rebootRequired = $false; error = $r.error; pathUsed = $r.pathUsed }
         }
@@ -1434,16 +1517,16 @@ function Restore-DarkOSAppx {
 # ---- snapshots
 function New-DarkOSSnapshot {
     [CmdletBinding()] param([Parameter(Mandatory)][string]$Label)
-    $manifest = Get-DkManifestOrInit
     $id = (Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmss') + '-' + ([guid]::NewGuid().ToString('N').Substring(0, 8))
     $snapDir = Get-DkPath Snapshots
     if (-not (Test-Path -LiteralPath $snapDir)) { New-Item -ItemType Directory -Path $snapDir -Force | Out-Null }
     $relPath = "Snapshots\$id.json"
-    $snapObj = [ordered]@{ id = $id; ts = (Get-DkTimestamp); label = $Label; activeProfile = $manifest.activeProfile; changes = @($manifest.changes) }
     Enter-DkLock
     try {
-        Write-DkJsonFileAtomic -Path (Join-Path (Get-DkPath Recovery) $relPath) -Object $snapObj
+        # the snapshot content and the manifest update come from the same locked read
         $manifest = Get-DkManifestOrInit
+        $snapObj = [ordered]@{ id = $id; ts = (Get-DkTimestamp); label = $Label; activeProfile = $manifest.activeProfile; changes = @($manifest.changes) }
+        Write-DkJsonFileAtomic -Path (Join-Path (Get-DkPath Recovery) $relPath) -Object $snapObj
         $manifest.snapshots = @($manifest.snapshots) + @([ordered]@{ id = $id; ts = $snapObj.ts; label = $Label; path = $relPath })
         Save-DkManifest $manifest
     } finally { Exit-DkLock }
@@ -1513,8 +1596,8 @@ function Export-DarkOSDiagnostics {
         }
         $status = Get-DarkOSStatus
         Write-DkJsonFileAtomic -Path (Join-Path $tmp 'status.json') -Object @($status)
-        $env = [ordered]@{ osBuild = [string](Invoke-Dk 'OsBuild'); ts = (Get-DkTimestamp); darkosVersion = $script:DK.Version; activeProfile = $man.activeProfile }
-        Write-DkJsonFileAtomic -Path (Join-Path $tmp 'environment.json') -Object $env
+        $envInfo = [ordered]@{ osBuild = [string](Invoke-Dk 'OsBuild'); ts = (Get-DkTimestamp); darkosVersion = $script:DK.Version; activeProfile = $man.activeProfile }
+        Write-DkJsonFileAtomic -Path (Join-Path $tmp 'environment.json') -Object $envInfo
         if (Test-Path -LiteralPath $Destination) { Remove-Item -LiteralPath $Destination -Force -ErrorAction SilentlyContinue }
         if (-not $script:DK.DryRun) {
             Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -1535,10 +1618,13 @@ function Initialize-DarkOSRecovery {
     foreach ($d in (Get-DkPath Recovery), (Get-DkPath Policy), (Get-DkPath AppPackages), (Get-DkPath Snapshots), (Get-DkPath Logs), (Get-DkPath Files)) {
         if (-not (Test-Path -LiteralPath $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
     }
-    $manifest = Read-DkManifest
-    if (-not $manifest) { $manifest = New-DkManifest }
-    $manifest.osBuild = [string](Invoke-Dk 'OsBuild')
-    Enter-DkLock; try { Save-DkManifest $manifest } finally { Exit-DkLock }
+    Enter-DkLock
+    try {
+        $manifest = Read-DkManifest
+        if (-not $manifest) { $manifest = New-DkManifest }
+        $manifest.osBuild = [string](Invoke-Dk 'OsBuild')
+        Save-DkManifest $manifest
+    } finally { Exit-DkLock }
     return [ordered]@{ ok = $true; root = (Get-DkPath Root); manifest = (Get-DkPath Manifest) }
 }
 

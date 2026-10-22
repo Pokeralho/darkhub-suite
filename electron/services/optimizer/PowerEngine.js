@@ -57,9 +57,12 @@ class PowerEngine {
     if (plans.some((p) => p.guid === guid)) return { ok: true, created: false };
     // The built-in scheme exists in the system even when not listed: duplicate it under the same GUID.
     const dup = await this._powercfg(['/duplicatescheme', guid, guid]);
-    if (dup.code !== 0) return { ok: false, error: dup.stderr || dup.stdout || 'Plano de energia indisponível neste PC' };
-    await this._fetchPowerPlans();
-    return { ok: true, created: true };
+    const fresh = await this._fetchPowerPlans();
+    if (dup.code === 0) return { ok: true, created: true };
+    // "A scheme with this GUID already exists" (the cached list was stale, e.g. DarkOS ships Ultimate):
+    // the plan is there, so let /setactive + the active-scheme check decide.
+    if ((fresh || []).some((p) => p.guid === guid) || /GUID/i.test(`${dup.stderr}${dup.stdout}`)) return { ok: true, created: false };
+    return { ok: false, error: dup.stderr || dup.stdout || 'Plano de energia indisponível neste PC' };
   }
 
   _rememberPrevious(guid) {
@@ -132,7 +135,10 @@ class PowerEngine {
     if (!plans.some((p) => p.guid === prev)) return this.setBalanced();
     const set = await this._powercfg(['/setactive', prev]);
     if (set.code !== 0) return this._result('Error', `Falha ao restaurar o plano anterior: ${set.stderr || set.stdout}`);
-    return this._result('Success', 'Plano de energia anterior restaurado.');
+    // verified like _activate(): a policy / Windows 11 power mode can silently keep the current plan
+    const active = await this._getActiveSchemeGuid();
+    if (active !== prev) return this._result('Error', `O comando foi aceito, mas o plano ativo continua sendo ${active ?? 'desconhecido'}.`);
+    return this._result('Success', 'Plano de energia anterior restaurado (verificado).');
   }
 }
 
