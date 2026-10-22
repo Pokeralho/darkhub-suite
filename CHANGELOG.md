@@ -95,7 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Advanced sensors (System Monitor), opt-in: LibreHardwareMonitorLib 0.9.6 in a separate helper
   (`DarkHub.HwSensors.exe`). Without a driver it reads the GPU (core, hot spot, VRAM, power) and the disks. With the
-  optional PawnIO driver (installed from the screen through winget, author-signed, Memory Integrity compatible) it
+  PawnIO driver (installed automatically when the sensors are turned on, author-signed, Memory Integrity compatible) it
   also reads per-core CPU temperature, fans and voltages. CPU / Super I/O placeholders are never shown without the
   driver. WinRing0 was rejected: it is on Microsoft's vulnerable-driver blocklist.
 
