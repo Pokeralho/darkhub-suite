@@ -22,8 +22,8 @@ It also fixes a long-standing bug: **in the installed version, the fast sensors 
 
 **SHA-256**
 ```
-323624104849b4cdf7e094391b45c7bcedd62cbdb80ed0e8e7cb61885f12b76a  DarkHub-Setup-0.6.0.exe / DarkHub.Setup.0.6.0.exe
-f2c3f9d68b90f853a902e5391069e40a3de53fdfaaed825b0586d714f830ee21  DarkHub.0.6.0-portable.exe
+759edcb8ff4c7467eb7c9f88bd14beefd6e06671de1ddd1b7880c9439d7178ca  DarkHub-Setup-0.6.0.exe / DarkHub.Setup.0.6.0.exe
+50119987b78d0ee628429fc14524030047ad7f55c9f766072600fec2a5a10815  DarkHub.0.6.0-portable.exe
 ```
 
 **One-line install** (PowerShell as Administrator). The script now checks the installer's SHA-512 before running it:
@@ -179,6 +179,7 @@ Requirements: Windows 10 or 11, 64-bit. DarkHub runs as administrator.
 ---
 
 ### 7. Driver Center and other fixes
+- **Startup hardening** (updated build of 0.6.0): on some PCs the app failed to open and a second launch showed "Cannot access 'mainWindow' before initialization". Each feature now registers in isolation (a failure is logged, never fatal), and an unresolvable Downloads folder falls back to the profile folder.
 - GPUs running on **Microsoft's generic display driver** are identified by vendor, with a direct link to the official app. Home shows a notice when this happens.
 - **Camera and screen-capture check and repair**:
   - services;

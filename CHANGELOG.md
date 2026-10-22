@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.6.0] - 2026-10-21
 
+### Fixed (startup)
+- The app could fail to open on some PCs (a second launch then showed "Cannot access 'mainWindow' before
+  initialization"): every feature's IPC registration is isolated and logged, `mainWindow` is declared before the
+  second-instance handler, and `app.getPath('downloads')` falls back to the profile folder.
+
 ### Monitor, Post-Install, embedded sites
 - System Monitor: new "All sensors" tab lists every LibreHardwareMonitor sensor per component (voltages,
   temperatures, power, clocks, utilization, fans, memory, SMART data), HWMonitor style, with session min/max and a filter.
