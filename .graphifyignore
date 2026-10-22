@@ -1,0 +1,19 @@
+node_modules/
+dist/
+dist_app/
+dist_app_release/
+dist_release/
+build/
+scratch/
+PGE Portable/
+native_pacer/target/
+docs/
+graphify-out/
+*.traineddata
+*.zip
+*.exe
+*.dll
+*.pdb
+*.lib
+*.exp
+package-lock.json

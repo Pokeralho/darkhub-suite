@@ -25,6 +25,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version)
   },
   resolve: {
+    preserveSymlinks: true,
     alias: {
       '@': path.resolve(__dirname, './src'),
     },

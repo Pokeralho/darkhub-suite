@@ -19,6 +19,12 @@ out/
 target/
 *.local
 *.tsbuildinfo
+coverage/
+.vite/
+vite.config.*.timestamp-*
+.eslintcache
+*.cpuprofile
+*.heapsnapshot
 
 # Keep build assets (icons, nsis hooks)
 build/*
@@ -82,7 +88,8 @@ lerna-debug.log*
 # ── Internal Manifests, Agent Artifacts & Scratch Files ──
 GIT_COMMIT_MANIFEST.md
 *MANIFEST*.md
-*manifest*
+# (a blanket *manifest* pattern used to live here; it silently ignored any future manifest.json/.manifest
+#  source file, e.g. DarkOS contract fixtures or the Windows app manifest)
 scratch/
 tmp/
 temp/
@@ -92,6 +99,7 @@ temp/
 *.swo
 *~
 .gemini/
+.claude/settings.local.json
 .antigravity/
 .system_generated/
 brain/
@@ -109,3 +117,6 @@ brain/
 Thumbs.db
 desktop.ini
 
+
+# graphify (keep report/graph, skip cache)
+graphify-out/cache/
