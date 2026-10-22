@@ -79,6 +79,8 @@ class NvidiaDaemon extends EventEmitter {
     });
 
     child.on('close', (code) => {
+      // stop()+start() can spawn a new child before this one exits; never clobber the new one.
+      if (this.process !== child) return;
       this.process = null;
       this.buffer = '';
       if (this._stopped || this._restarting) return;

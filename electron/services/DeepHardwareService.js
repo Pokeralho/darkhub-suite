@@ -7,6 +7,7 @@ class DeepHardwareService {
   constructor() {
     this.cache = null;
     this.isFetching = false;
+    this._fetchPromise = null;
   }
 
   async runPowerShell(script, timeoutMs = 8000) {
@@ -133,27 +134,26 @@ class DeepHardwareService {
               match.videoProcessor = w.VideoProcessor;
               match.refreshRate = w.CurrentRefreshRate;
               match.architecture = w.VideoArchitecture;
-            } else if (gpus.length === 1) {
-              if (!gpus[0].driverVersion && w.DriverVersion) gpus[0].driverVersion = w.DriverVersion;
-              gpus[0].videoProcessor = w.VideoProcessor;
-              gpus[0].refreshRate = w.CurrentRefreshRate;
-              gpus[0].architecture = w.VideoArchitecture;
             }
+            // no name match: the WMI row belongs to another adapter (Basic Display, remote), never copied over
           });
         }
 
-        const psReg = `Get-ItemProperty "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\0000" -ErrorAction SilentlyContinue | Select-Object DriverDate, FeatureScore | ConvertTo-Json -Compress`;
-        const regRes = await this.runPowerShell(psReg, 2000);
+        // every display-class key, matched to the adapter by DriverDesc (0000 is often another or a removed adapter)
+        const psReg = `@(Get-ChildItem "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}" -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -match '^\\d{4}$' } | ForEach-Object { Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue } | Where-Object { $_.DriverDesc } | Select-Object DriverDesc, DriverDate, FeatureScore) | ConvertTo-Json -Compress`;
+        const regRes = await this.runPowerShell(psReg, 3000);
         if (regRes.stdout && !regRes.timeout) {
-          const regParsed = JSON.parse(regRes.stdout);
-          if (gpus.length > 0) {
-            gpus[0].driverDate = regParsed.DriverDate;
-            gpus[0].featureScore = regParsed.FeatureScore;
+          let regs = JSON.parse(regRes.stdout);
+          if (!Array.isArray(regs)) regs = [regs];
+          for (const g of gpus) {
+            const r = regs.find((x) => x && (String(g.model).includes(x.DriverDesc) || String(x.DriverDesc).includes(g.model)));
+            if (r) { g.driverDate = r.DriverDate; g.featureScore = r.FeatureScore; }
           }
         }
       } catch (e) {  }
 
-      try {
+      // Only spawn nvidia-smi when an NVIDIA adapter is actually present.
+      if (gpus.some((g) => /nvidia/i.test(String(g.vendor)))) try {
         const smiRes = await new Promise((res) => {
           cp.exec('nvidia-smi -q -x', { windowsHide: true, timeout: 3000 }, (err, stdout) => {
             res({ err, stdout });
@@ -162,9 +162,12 @@ class DeepHardwareService {
 
         if (!smiRes.err && smiRes.stdout) {
 
+           // one <gpu> block per card: the power limit is taken from the block whose product name matches
+           const blocks = smiRes.stdout.split(/<gpu id=/).slice(1);
            gpus = gpus.map(g => {
              if (String(g.vendor).toLowerCase().includes('nvidia')) {
-               const pwrMatch = smiRes.stdout.match(/<power_limit>([\d.]+)\s*W<\/power_limit>/);
+               const block = blocks.find((b) => { const n = /<product_name>([^<]+)<\/product_name>/.exec(b)?.[1] || ''; return n && (String(g.model).includes(n) || n.includes(g.model)); });
+               const pwrMatch = block && block.match(/<power_limit>([\d.]+)\s*W<\/power_limit>/);
                if (pwrMatch) g.powerLimit = pwrMatch[1];
              }
              return g;
@@ -320,12 +323,18 @@ class DeepHardwareService {
   }
 
   async getDeepInfo(forceRefresh = false) {
-    if (this.cache && !forceRefresh) return this.cache;
-    if (this.isFetching) {
-      while(this.isFetching) { await new Promise(r => setTimeout(r, 150)); }
-      if (this.cache) return this.cache;
-    }
+    // getCategory() may have created a partial cache ({ cpu }) — only a cache
+    // stamped by a full scan counts here, otherwise callers got a partial object.
+    if (this.cache?.timestamp && !forceRefresh) return this.cache;
+    // Share the in-flight scan instead of busy-polling every 150 ms.
+    if (this._fetchPromise) return this._fetchPromise;
+    this._fetchPromise = this._scanAll().finally(() => {
+      this._fetchPromise = null;
+    });
+    return this._fetchPromise;
+  }
 
+  async _scanAll() {
     this.isFetching = true;
     Logger.info('DeepHW', 'Iniciando varredura profunda de Hardware (Modo AIDA64)...');
 

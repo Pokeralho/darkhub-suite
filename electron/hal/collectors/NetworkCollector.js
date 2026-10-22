@@ -1,6 +1,6 @@
 import SensorBus from './SensorBus.js';
 import { BaseCollector } from './BaseCollector.js';
-import { createSensor, createUnavailableSensor } from '../models/SensorModel.js';
+import { createSensor, createUnavailableSensor, numOrNull } from '../models/SensorModel.js';
 
 class NetworkCollector extends BaseCollector {
   constructor() {
@@ -11,8 +11,8 @@ class NetworkCollector extends BaseCollector {
 
     SensorBus.on('data', (payload) => {
       if (payload.type !== 'network') return;
-      this.rxBps = Number(payload.rxBps) || 0;
-      this.txBps = Number(payload.txBps) || 0;
+      this.rxBps = numOrNull(payload.rxBps);
+      this.txBps = numOrNull(payload.txBps);
       this.lastUpdate = Date.now();
     });
   }
@@ -44,8 +44,8 @@ class NetworkCollector extends BaseCollector {
         status: 'OK',
         timestamp: Date.now(),
         values: {
-          rxBps: createSensor(this.rxBps, 'B/s', 'wmi'),
-          txBps: createSensor(this.txBps, 'B/s', 'wmi')
+          rxBps: createSensor(this.rxBps, 'B/s', 'pdh'),
+          txBps: createSensor(this.txBps, 'B/s', 'pdh')
         }
       };
     });

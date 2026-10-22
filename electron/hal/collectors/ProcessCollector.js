@@ -53,8 +53,6 @@ class ProcessCollector extends BaseCollector {
         timestamp: Date.now(),
         values: {
           all: this.all,
-
-          running: this.all,
           topCpu: normalize(this.topCpu),
           topMem: normalize(this.topMem)
         }

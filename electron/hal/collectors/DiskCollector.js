@@ -1,6 +1,6 @@
 import SensorBus from './SensorBus.js';
 import { BaseCollector } from './BaseCollector.js';
-import { createSensor, createUnavailableSensor } from '../models/SensorModel.js';
+import { createSensor, createUnavailableSensor, numOrNull } from '../models/SensorModel.js';
 
 class DiskCollector extends BaseCollector {
   constructor() {
@@ -12,9 +12,9 @@ class DiskCollector extends BaseCollector {
 
     SensorBus.on('data', (payload) => {
       if (payload.type !== 'diskIo') return;
-      this.readBps = Number(payload.readBps) || 0;
-      this.writeBps = Number(payload.writeBps) || 0;
-      this.activity = Number(payload.activity) || 0;
+      this.readBps = numOrNull(payload.readBps);
+      this.writeBps = numOrNull(payload.writeBps);
+      this.activity = numOrNull(payload.activity);
       this.lastUpdate = Date.now();
     });
   }
@@ -47,9 +47,9 @@ class DiskCollector extends BaseCollector {
         status: 'OK',
         timestamp: Date.now(),
         values: {
-          readBps: createSensor(this.readBps, 'B/s', 'wmi'),
-          writeBps: createSensor(this.writeBps, 'B/s', 'wmi'),
-          activity: createSensor(this.activity, '%', 'wmi')
+          readBps: createSensor(this.readBps, 'B/s', 'pdh'),
+          writeBps: createSensor(this.writeBps, 'B/s', 'pdh'),
+          activity: createSensor(this.activity, '%', 'pdh')
         }
       };
     });

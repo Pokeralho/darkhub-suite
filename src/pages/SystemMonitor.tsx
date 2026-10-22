@@ -1,19 +1,22 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useI18n } from '../i18n/I18nProvider';
 import {
   Cpu, Server, HardDrive, Network, Monitor, Zap,
   RefreshCw, AlertTriangle, PlaySquare, ShieldCheck,
   CheckCircle2, LayoutTemplate, Wifi, FileDigit, CpuIcon, Activity, List, Thermometer, Copy, Clock,
-  Loader2, Filter
-} from 'lucide-react';
+  Loader2, Filter, Gauge as GaugeIcon
+} from '../components/icons';
 import { useSystemMetrics } from '../hooks/useSystemMetrics';
 import { useDeepHardware } from '../hooks/useDeepHardware';
 import { HelpTip } from '../components/HelpTip';
+import PageHeader from '../components/ui/PageHeader';
+import AdvancedSensorsPanel from '../components/monitor/AdvancedSensorsPanel';
+import LhmSensorTree from '../components/monitor/LhmSensorTree';
 import { Sparkline } from '../components/library/Sparkline';
 import { useSensorHistory } from '../hooks/useSensorHistory';
 
 const formatBytes = (bytes: number | null | undefined) => {
-  if (bytes == null || isNaN(bytes)) return '—';
+  if (bytes == null || isNaN(bytes)) return '--';
   if (bytes === 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -22,17 +25,33 @@ const formatBytes = (bytes: number | null | undefined) => {
 };
 
 const PropertyRow = ({ label, value, status }: { label: string; value: React.ReactNode; status?: string }) => (
-  <div className="flex justify-between items-center py-2.5 border-b border-zinc-800/80 last:border-0 hover:bg-zinc-800/30 px-3 rounded transition-colors group">
-    <span className="text-sm text-zinc-400 group-hover:text-zinc-300">{label}</span>
-    <div className="flex items-center gap-2">
-      {status === 'Error' && <span title="Falha ao ler sensor"><AlertTriangle size={14} className="text-amber-500" /></span>}
-      {status === 'OK' && <CheckCircle2 size={14} className="text-emerald-500" />}
-      <span className="text-sm font-medium text-zinc-200">{value ?? '—'}</span>
+  <div className="flex justify-between items-center gap-6 min-h-9 py-2 px-4 border-b border-zinc-800/80 last:border-0 hover:bg-zinc-900/60 transition-colors">
+    <span className="text-[12.5px] text-zinc-500 shrink-0">{label}</span>
+    <div className="flex items-center gap-2 min-w-0">
+      {status === 'Error' && <span title="Falha ao ler sensor"><AlertTriangle size={13} className="text-amber-400" /></span>}
+      {status === 'OK' && <CheckCircle2 size={13} className="text-emerald-400" />}
+      <span className="text-[12.5px] font-mono text-zinc-100 text-right break-all">{value ?? '--'}</span>
     </div>
   </div>
 );
 
-const Gauge = React.memo(({ label, value, unit, history, color = "#3b82f6" }: any) => {
+const Skel = ({ className = '' }: { className?: string }) => (
+  <span aria-hidden="true" className={`inline-block rounded bg-zinc-800/80 animate-pulse align-middle ${className}`} />
+);
+
+// Threshold tone for a reading: neutral until it crosses warn/crit.
+const toneFor = (v: any, warn?: number, crit?: number) => {
+  const n = Number(v);
+  if (v == null || !Number.isFinite(n)) return 'text-zinc-50';
+  if (crit != null && n >= crit) return 'text-red-300';
+  if (warn != null && n >= warn) return 'text-amber-300';
+  return 'text-zinc-50';
+};
+
+// Load bar for per-core readings: glacier, amber/red only past thresholds.
+const loadBar = (v: number) => (v > 90 ? 'bg-red-400' : v > 80 ? 'bg-amber-400' : 'bg-blue-400');
+
+const Gauge = React.memo(({ label, value, unit, history, max = 100, warn, crit }: any) => {
   const { t } = useI18n();
 
   const stats = useMemo(() => {
@@ -51,39 +70,46 @@ const Gauge = React.memo(({ label, value, unit, history, color = "#3b82f6" }: an
   }, [history]);
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex flex-col gap-2 shadow-sm">
-      <div className="flex justify-between items-end">
-        <span className="text-zinc-400 text-sm font-medium">{label}</span>
-        <span className="text-2xl font-bold text-white tracking-tighter">
-          {value != null ? value : '-'}
-          <span className="text-sm text-zinc-500 ml-1">{unit}</span>
+    <div className="bg-zinc-950 px-4 pt-3.5 pb-3 flex flex-col min-w-0">
+      <div className="flex justify-between items-baseline gap-3">
+        <span className="text-[12px] text-zinc-500 truncate">{label}</span>
+        <span className={`font-mono text-[22px] leading-none tabular-nums whitespace-nowrap ${toneFor(value, warn, crit)}`}>
+          {value != null ? value : <Skel className="h-5 w-14" />}
+          <span className="text-[12px] text-zinc-500 ml-0.5">{unit}</span>
         </span>
       </div>
-      <div className="h-10 mt-1">
-        <Sparkline data={history} min={0} max={100} color={color} />
+      <div className="h-10 mt-3">
+        <Sparkline data={history} min={0} max={max} color="var(--color-blue-400)" strokeWidth={1.25} />
       </div>
-      <div className="flex justify-between items-center text-[10px] text-zinc-500 pt-2 border-t border-zinc-800/80 font-mono">
-        <span>{t('monitor.stats.min', 'Mín')}: <strong className="text-zinc-300 font-semibold">{stats.min != null ? `${stats.min}${unit}` : '--'}</strong></span>
-        <span>{t('monitor.stats.avg', 'Média')}: <strong className="text-zinc-300 font-semibold">{stats.avg != null ? `${stats.avg}${unit}` : '--'}</strong></span>
-        <span>{t('monitor.stats.max', 'Máx')}: <strong className="text-zinc-300 font-semibold">{stats.max != null ? `${stats.max}${unit}` : '--'}</strong></span>
-      </div>
+      <dl className="mt-2.5 grid grid-cols-3 text-[11px] font-mono">
+        {[
+          [t('monitor.stats.min', 'Mín'), stats.min],
+          [t('monitor.stats.avg', 'Média'), stats.avg],
+          [t('monitor.stats.max', 'Máx'), stats.max]
+        ].map(([k, v], i) => (
+          <div key={i} className={`flex gap-1.5 ${i === 1 ? 'justify-center' : i === 2 ? 'justify-end' : ''}`}>
+            <dt className="text-zinc-600 font-sans">{k}</dt>
+            <dd className="text-zinc-300">{v != null ? <>{v}<span className="text-zinc-600">{unit}</span></> : '--'}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 });
 
 const SectionBlock = ({ title, children, icon: Icon }: { title: string; children: React.ReactNode; icon?: any }) => (
-  <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mb-6 shadow-sm">
-    <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-950 flex items-center gap-2">
-      {Icon && <Icon size={16} className="text-blue-400" />}
-      <h3 className="font-semibold text-zinc-200">{title}</h3>
+  <section className="dh-card overflow-hidden">
+    <div className="px-4 h-10 border-b border-zinc-800/80 flex items-center gap-2 min-w-0">
+      {Icon && <Icon size={14} className="text-zinc-500 shrink-0" />}
+      <h3 className="dh-section-title truncate">{title}</h3>
     </div>
-    <div className="p-1">
+    <div>
       {children}
     </div>
-  </div>
+  </section>
 );
 
-type TabType = 'overview' | 'cpu' | 'ram' | 'gpu' | 'mobo' | 'storage' | 'network' | 'temps' | 'procs' | 'monitors' | 'os' | 'latency';
+type TabType = 'overview' | 'cpu' | 'ram' | 'gpu' | 'mobo' | 'storage' | 'network' | 'temps' | 'sensors' | 'procs' | 'monitors' | 'os' | 'latency';
 
 const toFixedSafe = (v: any, d: number = 1) => {
   if (v == null || typeof v !== 'number' || isNaN(v)) return undefined;
@@ -91,7 +117,7 @@ const toFixedSafe = (v: any, d: number = 1) => {
 };
 
 const formatSource = (source?: string) => {
-  if (!source) return 'ACPI / Windows';
+  if (!source) return '--';
   const s = source.toLowerCase();
   if (s.includes('coretemp')) return 'CoreTemp';
   if (s.includes('lhm') || s.includes('libre')) return 'LibreHardwareMonitor';
@@ -126,12 +152,19 @@ const SystemMonitor = () => {
   // In-app toast notification to replace alert()
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+  }, []);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
-    setTimeout(() => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => {
+      toastTimerRef.current = null;
       setToast(prev => (prev?.message === message ? null : prev));
     }, 4000);
-  };
+  }, []);
 
   // Self-consumption of DarkHub Suite
   const [darkhubUsage, setDarkhubUsage] = useState<{
@@ -148,21 +181,22 @@ const SystemMonitor = () => {
     }
   }, [activeTab, fetchCategory]);
 
-  // Enable process polling only when procs tab is open
+  // Enable process polling only when procs tab is open. The cleanup already
+  // disables it, so only the procs tab needs to send anything.
+  const isProcsTab = activeTab === 'procs';
   useEffect(() => {
-    if (activeTab === 'procs') {
-      window.darkhub?.system?.enableProcessTracking?.(true);
-    } else {
-      window.darkhub?.system?.enableProcessTracking?.(false);
-    }
+    if (!isProcsTab) return;
+    const sys = window.darkhub?.system as { enableProcessTracking?: (on: boolean) => unknown } | undefined;
+    sys?.enableProcessTracking?.(true);
     return () => {
-      window.darkhub?.system?.enableProcessTracking?.(false);
+      sys?.enableProcessTracking?.(false);
     };
-  }, [activeTab]);
+  }, [isProcsTab]);
 
   // DarkHub resource usage polling on overview tab
+  const isOverviewTab = activeTab === 'overview';
   useEffect(() => {
-    if (activeTab !== 'overview') return;
+    if (!isOverviewTab) return;
 
     let mounted = true;
     const fetchUsage = async () => {
@@ -170,9 +204,9 @@ const SystemMonitor = () => {
         const usage = await window.darkhub?.app?.getResourceUsage?.();
         if (mounted && usage?.ok) {
           setDarkhubUsage({
-            totalCpuPercent: usage.totalCpuPercent,
-            totalWorkingSetMb: usage.totalWorkingSetMb,
-            processes: usage.processes || []
+            totalCpuPercent: Number(usage.totalCpuPercent ?? 0),
+            totalWorkingSetMb: Number(usage.totalWorkingSetMb ?? 0),
+            processes: (usage.processes || []).map((p: any) => ({ ...p, name: String(p?.name ?? '') }))
           });
         }
       } catch (err) {
@@ -186,14 +220,14 @@ const SystemMonitor = () => {
       mounted = false;
       clearInterval(interval);
     };
-  }, [activeTab]);
+  }, [isOverviewTab]);
 
-  const cpuLoadHistory = useSensorHistory(metrics?.cpu?.values?.currentLoad?.value, 60);
-  const ramUseHistory = useSensorHistory(metrics?.ram?.values?.percent?.value, 60);
-  const gpuUtilHistory = useSensorHistory(metrics?.gpu?.values?.gpus?.[0]?.utilization?.value, 60);
-  const diskActHistory = useSensorHistory(metrics?.diskIo?.values?.activity?.value, 60);
-  const tempHistory = useSensorHistory(metrics?.temps?.values?.main?.value, 60);
-  const dpcHistory = useSensorHistory(metrics?.latency?.values?.dpcsQueued?.value, 60);
+  const cpuLoadHistory = useSensorHistory(metrics?.cpu?.values?.currentLoad?.value, 60, metrics);
+  const ramUseHistory = useSensorHistory(metrics?.ram?.values?.percent?.value, 60, metrics);
+  const gpuUtilHistory = useSensorHistory(metrics?.gpu?.values?.gpus?.[0]?.utilization?.value, 60, metrics);
+  const diskActHistory = useSensorHistory(metrics?.diskIo?.values?.activity?.value, 60, metrics);
+  const tempHistory = useSensorHistory(metrics?.temps?.values?.main?.value, 60, metrics);
+  const dpcHistory = useSensorHistory(metrics?.latency?.values?.dpcsQueued?.value, 60, metrics);
 
   const handleBenchmark = async () => {
     if (window.darkhub) {
@@ -248,6 +282,7 @@ const SystemMonitor = () => {
       { id: 'storage', icon: HardDrive, label: t('monitor.tab.storage', 'Armazenamento') },
       { id: 'network', icon: Network, label: t('monitor.tab.network', 'Rede') },
       { id: 'temps', icon: Thermometer, label: t('monitor.tab.temps', 'Temperaturas') },
+      { id: 'sensors', icon: GaugeIcon, label: t('monitor.tab.sensors', 'Todos os sensores') },
       { id: 'latency', icon: Clock, label: t('monitor.tab.latency', 'Latência DPC/ISR') },
       { id: 'procs', icon: List, label: t('monitor.tab.procs', 'Processos') },
       { id: 'monitors', icon: LayoutTemplate, label: t('monitor.tab.displays', 'Monitores') },
@@ -256,77 +291,81 @@ const SystemMonitor = () => {
     ];
 
     return (
-      <div className="flex flex-col gap-2 w-full md:w-64 shrink-0 overflow-y-auto custom-scrollbar">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as TabType)}
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 border ${
-              activeTab === tab.id
-              ? 'bg-blue-600/10 text-blue-400 border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]'
-              : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300'
-            }`}
-          >
-            <tab.icon size={18} className={activeTab === tab.id ? 'text-blue-400' : 'text-zinc-500'} />
-            {tab.label}
-          </button>
-        ))}
+      <nav aria-label={t('monitor.title', 'Monitor de Sistema')} className="flex flex-col w-full md:w-56 shrink-0 overflow-y-auto custom-scrollbar">
+        <div className="flex flex-col gap-0.5">
+          {tabs.map(tab => {
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as TabType)}
+                aria-current={active ? 'page' : undefined}
+                className={`flex items-center gap-2.5 h-8 px-2.5 rounded-md text-[12.5px] text-left transition-colors ${
+                  active ? 'bg-zinc-900 text-zinc-50 font-medium' : 'text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200'
+                }`}
+              >
+                <tab.icon size={15} className={`shrink-0 ${active ? 'text-blue-300' : 'text-zinc-500'}`} />
+                <span className="truncate">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
-        <div className="mt-4 pt-4 border-t border-zinc-800 space-y-3 pb-4">
-          <button
-            onClick={handleTabRefresh}
-            disabled={isCurrentTabLoading}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm transition-colors disabled:opacity-50"
-          >
-            <RefreshCw size={16} className={isCurrentTabLoading ? 'animate-spin' : ''} />
-            {t('monitor.refreshSensors', 'Atualizar')}
-          </button>
-
-          <button
-            onClick={handleBenchmark}
-            disabled={isBenchmarking}
-            className="w-full py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 border border-blue-500/20"
-          >
-            {isBenchmarking ? <RefreshCw size={16} className="animate-spin" /> : <PlaySquare size={16} />}
-            <span>{isBenchmarking ? t('monitor.running', 'Executando...') : t('monitor.runBenchmark', 'Executar Benchmark de CPU')}</span>
+        <div className="mt-4 pt-4 border-t border-zinc-800/80 space-y-2 pb-4">
+          <button onClick={handleBenchmark} disabled={isBenchmarking} className="dh-btn dh-btn-primary w-full">
+            {isBenchmarking ? <Loader2 size={14} className="animate-spin" /> : <PlaySquare size={14} />}
+            <span className="truncate">{isBenchmarking ? t('monitor.running', 'Executando...') : t('monitor.runBenchmark', 'Executar Benchmark de CPU')}</span>
           </button>
 
-          <button
-            onClick={generateReport}
-            className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors border border-zinc-700"
-          >
-            <Copy size={16} />
-            {t('monitor.copyReport', 'Copiar Relatório')}
-          </button>
+          <div className="flex flex-col gap-2">
+            <button onClick={handleTabRefresh} disabled={isCurrentTabLoading} className="dh-btn w-full">
+              <RefreshCw size={13} className={isCurrentTabLoading ? 'animate-spin' : ''} />
+              <span className="truncate">{t('monitor.refreshSensors', 'Atualizar')}</span>
+            </button>
+            <button onClick={generateReport} className="dh-btn w-full">
+              <Copy size={13} />
+              <span className="truncate">{t('monitor.copyReport', 'Copiar Relatório')}</span>
+            </button>
+          </div>
 
           {benchmarkResult && (
-            <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-lg text-center animate-in fade-in zoom-in">
-              <p className="text-emerald-400 font-bold text-lg">{benchmarkResult.mops} <span className="text-xs">MOPS</span></p>
-              <p className="text-zinc-500 text-[10px]">Tempo: {benchmarkResult.time}ms</p>
-            </div>
+            <dl className="animate-in rounded-lg border border-zinc-800/80 px-3 py-2.5 flex items-baseline justify-between">
+              <dt className="text-[11.5px] text-zinc-500">Benchmark</dt>
+              <dd className="font-mono text-right">
+                <span className="text-[16px] text-zinc-50">{benchmarkResult.mops}</span><span className="text-[11px] text-zinc-500"> MOPS</span>
+                <span className="block text-[11px] text-zinc-500">{benchmarkResult.time} ms</span>
+              </dd>
+            </dl>
           )}
         </div>
-      </div>
+      </nav>
     );
   };
 
   const renderTabLoadingState = () => (
-    <div className="flex flex-col items-center justify-center h-64 text-zinc-400 space-y-3">
-      <Loader2 className="animate-spin text-blue-500" size={32} />
-      <p className="text-sm">{t('monitor.tabLoading', 'Carregando dados desta seção...')}</p>
+    <div className="space-y-4" aria-busy="true" aria-label={t('monitor.tabLoading', 'Carregando dados desta seção...')}>
+      {[6, 3].map((rows, b) => (
+        <div key={b} className="dh-card overflow-hidden">
+          <div className="px-4 h-10 border-b border-zinc-800/80 flex items-center"><Skel className="h-3 w-40" /></div>
+          {Array.from({ length: rows }).map((_, i) => (
+            <div key={i} className="flex justify-between items-center h-9 px-4 border-b border-zinc-800/80 last:border-0">
+              <Skel className="h-2.5 w-32" />
+              <Skel className="h-2.5 w-24" />
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   );
 
   const renderTabErrorState = (tabKey: string) => (
-    <div className="p-6 border border-amber-500/20 bg-amber-500/10 rounded-xl flex items-start gap-4">
-      <AlertTriangle className="text-amber-500 shrink-0 mt-1" />
-      <div>
-        <h3 className="text-amber-200 font-semibold mb-1">{t('monitor.tabError', 'Falha ao obter dados desta seção')}</h3>
-        <p className="text-amber-400/80 text-sm mb-4">{errorMap[tabKey] || 'O Windows não retornou os dados para esta categoria.'}</p>
-        <button
-          onClick={() => refreshCategory(tabKey)}
-          className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm"
-        >
+    <div role="alert" className="dh-card p-4 flex items-start gap-3">
+      <AlertTriangle size={16} className="text-red-400 shrink-0 mt-0.5" />
+      <div className="min-w-0">
+        <h3 className="dh-section-title">{t('monitor.tabError', 'Falha ao obter dados desta seção')}</h3>
+        <p className="mt-1 text-[12.5px] text-red-300 break-words">{errorMap[tabKey] || 'O Windows não retornou os dados para esta categoria.'}</p>
+        <button onClick={() => refreshCategory(tabKey)} className="dh-btn dh-btn-sm mt-3">
+          <RefreshCw size={13} />
           {t('monitor.tabRetry', 'Tentar Novamente')}
         </button>
       </div>
@@ -338,35 +377,35 @@ const SystemMonitor = () => {
       case 'overview': {
         const cores = metrics?.cpu?.values?.coresLoad || [];
         return (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            <div>
-              <h2 className="text-xl font-semibold text-white mb-4">
+          <div className="space-y-6 animate-in">
+            <section aria-labelledby="mon-realtime">
+              <h2 id="mon-realtime" className="dh-section-title mb-3">
                 {t('monitor.overview.realtime', 'Painel de Sensores (Tempo Real)')}
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <Gauge label={t('monitor.gauge.cpuLoad', 'Carga da CPU')} value={toFixedSafe(metrics?.cpu?.values?.currentLoad?.value, 1)} unit="%" history={cpuLoadHistory} color="#3b82f6" />
-                <Gauge label={t('monitor.gauge.ramUsage', 'Uso de RAM')} value={toFixedSafe(metrics?.ram?.values?.percent?.value, 1)} unit="%" history={ramUseHistory} color="#8b5cf6" />
-                <Gauge label={t('monitor.gauge.gpuUtil', 'Uso da GPU')} value={toFixedSafe(metrics?.gpu?.values?.gpus?.[0]?.utilization?.value, 1)} unit="%" history={gpuUtilHistory} color="#10b981" />
-                <Gauge label={t('monitor.gauge.diskAct', 'Atividade do Disco')} value={toFixedSafe(metrics?.diskIo?.values?.activity?.value, 1)} unit="%" history={diskActHistory} color="#f59e0b" />
-                <Gauge label={t('monitor.gauge.cpuTemp', 'Temp. da CPU')} value={toFixedSafe(metrics?.temps?.values?.main?.value, 0)} unit="°C" history={tempHistory} color="#ef4444" />
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-px rounded-xl border border-zinc-800/80 bg-zinc-800/70 overflow-hidden">
+                <Gauge label={t('monitor.gauge.cpuLoad', 'Carga da CPU')} value={toFixedSafe(metrics?.cpu?.values?.currentLoad?.value, 1)} unit="%" history={cpuLoadHistory} warn={85} crit={95} />
+                <Gauge label={t('monitor.gauge.ramUsage', 'Uso de RAM')} value={toFixedSafe(metrics?.ram?.values?.percent?.value, 1)} unit="%" history={ramUseHistory} warn={80} crit={90} />
+                <Gauge label={t('monitor.gauge.gpuUtil', 'Uso da GPU')} value={toFixedSafe(metrics?.gpu?.values?.gpus?.[0]?.utilization?.value, 1)} unit="%" history={gpuUtilHistory} />
+                <Gauge label={t('monitor.gauge.diskAct', 'Atividade do Disco')} value={toFixedSafe(metrics?.diskIo?.values?.activity?.value, 1)} unit="%" history={diskActHistory} warn={95} />
+                <Gauge label={t('monitor.gauge.cpuTemp', 'Temp. da CPU')} value={toFixedSafe(metrics?.temps?.values?.main?.value, 0)} unit="°C" history={tempHistory} warn={80} crit={90} />
+                <Gauge label="DPC/s" value={toFixedSafe(metrics?.latency?.values?.dpcsQueued?.value, 0)} unit="" history={dpcHistory} max={25000} warn={5000} crit={15000} />
               </div>
-            </div>
+            </section>
 
             {/* Compact Per-Core CPU Preview */}
             {cores.length > 0 && (
               <SectionBlock title="Distribuição de Carga por Núcleo" icon={Zap}>
-                <div className="p-3 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                <div className="px-4 py-3 grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-x-4 gap-y-3">
                   {cores.map((core: any, idx: number) => {
-                    const val = core?.value ?? 0;
-                    const barColor = val > 80 ? 'bg-rose-500' : val > 50 ? 'bg-amber-500' : 'bg-blue-500';
+                    const val: number | null = core?.value ?? null;
                     return (
-                      <div key={idx} className="bg-zinc-950 p-2 rounded-lg border border-zinc-800 flex flex-col justify-between">
-                        <div className="flex justify-between text-[11px] text-zinc-400 mb-1">
-                          <span>C{idx}</span>
-                          <span className="font-mono text-zinc-200">{toFixedSafe(val, 0)}%</span>
+                      <div key={idx} className="min-w-0">
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-zinc-600 font-mono">C{idx}</span>
+                          <span className="font-mono text-zinc-200 tabular-nums">{val == null ? '--' : toFixedSafe(val, 0)}</span>
                         </div>
-                        <div className="w-full bg-zinc-800 rounded-full h-1 overflow-hidden">
-                          <div className={`${barColor} h-full transition-all duration-300`} style={{ width: `${Math.min(100, Math.max(3, val))}%` }} />
+                        <div className="w-full bg-zinc-800 rounded-full h-[3px] overflow-hidden">
+                          <div className={`${loadBar(val ?? 0)} h-full transition-all duration-300`} style={{ width: `${val == null ? 0 : Math.min(100, Math.max(3, val))}%` }} />
                         </div>
                       </div>
                     );
@@ -375,79 +414,53 @@ const SystemMonitor = () => {
               </SectionBlock>
             )}
 
-            {/* DarkHub Suite Self-Consumption Card */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 shadow-sm space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20">
-                    <ShieldCheck size={20} />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-zinc-100 text-sm">
-                      {t('monitor.darkhubUsage.title', 'Consumo do DarkHub Suite')}
-                    </h3>
-                    <p className="text-xs text-zinc-500">
-                      {t('monitor.darkhubUsage.desc', 'Pegada de recursos em tempo real do próprio aplicativo')}
-                    </p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">
-                  Otimizado
-                </span>
+            {/* DarkHub Suite Self-Consumption */}
+            <section className="dh-card overflow-hidden" aria-labelledby="mon-selfuse">
+              <div className="px-4 py-3 border-b border-zinc-800/80">
+                <h3 id="mon-selfuse" className="dh-section-title">
+                  {t('monitor.darkhubUsage.title', 'Consumo do DarkHub Suite')}
+                </h3>
+                <p className="dh-help">
+                  {t('monitor.darkhubUsage.desc', 'Pegada de recursos em tempo real do próprio aplicativo')}
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800">
-                  <span className="text-xs text-zinc-400">{t('monitor.darkhubUsage.cpu', 'Uso de CPU')}</span>
-                  <div className="text-xl font-bold text-blue-400 mt-1">
-                    {darkhubUsage ? `${darkhubUsage.totalCpuPercent}%` : '--'}
+              <dl className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-zinc-800/70">
+                {[
+                  { label: t('monitor.darkhubUsage.cpu', 'Uso de CPU'), value: darkhubUsage ? darkhubUsage.totalCpuPercent : null, unit: '%', hint: t('monitor.darkhubUsage.cpuHint', 'Threads de renderização e main') },
+                  { label: t('monitor.darkhubUsage.ram', 'Memória RAM'), value: darkhubUsage ? darkhubUsage.totalWorkingSetMb : null, unit: ' MB', hint: t('monitor.darkhubUsage.ramHint', 'Working Set (processos somados)') },
+                  { label: t('monitor.darkhubUsage.procs', 'Processos Ativos'), value: darkhubUsage ? darkhubUsage.processes.length : null, unit: '', hint: t('monitor.darkhubUsage.procsHint', 'Main, Renderer & GPU') }
+                ].map((m, i) => (
+                  <div key={i} className="bg-zinc-900 px-4 py-3 min-w-0">
+                    <dt className="text-[12px] text-zinc-500">{m.label}</dt>
+                    <dd className="mt-1.5 font-mono text-[20px] leading-none text-zinc-50 tabular-nums">
+                      {m.value != null ? <>{m.value}<span className="text-[12px] text-zinc-500">{m.unit}</span></> : <Skel className="h-5 w-14" />}
+                    </dd>
+                    <dd className="mt-1.5 text-[11px] text-zinc-500 truncate">{m.hint}</dd>
                   </div>
-                  <span className="text-[10px] text-zinc-500">
-                    {t('monitor.darkhubUsage.cpuHint', 'Threads de renderização e main')}
-                  </span>
-                </div>
-
-                <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800">
-                  <span className="text-xs text-zinc-400">{t('monitor.darkhubUsage.ram', 'Memória RAM')}</span>
-                  <div className="text-xl font-bold text-purple-400 mt-1">
-                    {darkhubUsage ? `${darkhubUsage.totalWorkingSetMb} MB` : '--'}
-                  </div>
-                  <span className="text-[10px] text-zinc-500">
-                    {t('monitor.darkhubUsage.ramHint', 'Working Set (processos somados)')}
-                  </span>
-                </div>
-
-                <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800">
-                  <span className="text-xs text-zinc-400">{t('monitor.darkhubUsage.procs', 'Processos Ativos')}</span>
-                  <div className="text-xl font-bold text-emerald-400 mt-1">
-                    {darkhubUsage ? `${darkhubUsage.processes.length}` : '--'}
-                  </div>
-                  <span className="text-[10px] text-zinc-500">
-                    {t('monitor.darkhubUsage.procsHint', 'Main, Renderer & GPU')}
-                  </span>
-                </div>
-              </div>
+                ))}
+              </dl>
 
               {darkhubUsage && darkhubUsage.processes.length > 0 && (
-                <div className="pt-2 border-t border-zinc-800/60">
-                  <div className="text-[11px] font-medium text-zinc-400 mb-2">
-                    {t('monitor.darkhubUsage.internalProcs', 'Processos Internos:')}
+                <div className="px-4 py-3 border-t border-zinc-800/80">
+                  <div className="text-[11.5px] text-zinc-500 mb-1.5">
+                    {t('monitor.darkhubUsage.internalProcs', 'Processos Internos:').replace(/:\s*$/, '')}
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6">
                     {darkhubUsage.processes.map((p, idx) => (
-                      <div key={idx} className="bg-zinc-950/60 px-2.5 py-1.5 rounded border border-zinc-800/60 flex items-center justify-between text-[11px]">
-                        <span className="text-zinc-300 font-mono capitalize truncate mr-2" title={`${p.type} (${p.pid})`}>
-                          {p.type || p.name || 'Process'} ({p.pid})
+                      <li key={idx} className="flex items-center justify-between gap-2 py-1.5 border-b border-zinc-800/60 text-[11.5px] font-mono">
+                        <span className="text-zinc-300 capitalize truncate" title={`${p.type} (${p.pid})`}>
+                          {p.type || p.name || 'Process'} <span className="text-zinc-600">{p.pid}</span>
                         </span>
-                        <span className="text-zinc-400 font-mono shrink-0">
-                          {p.workingSetMb} MB • {p.cpuPercent}%
+                        <span className="text-zinc-400 shrink-0 tabular-nums">
+                          {p.workingSetMb}<span className="text-zinc-600"> MB</span> · {p.cpuPercent}<span className="text-zinc-600">%</span>
                         </span>
-                      </div>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 </div>
               )}
-            </div>
+            </section>
           </div>
         );
       }
@@ -460,41 +473,42 @@ const SystemMonitor = () => {
         const r = metrics?.cpu?.values || {};
 
         return (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="space-y-4 animate-in">
             <SectionBlock title="Desempenho por Núcleo" icon={Zap}>
-              <div className="px-4 py-3 grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-x-5 gap-y-3.5">
                 {r.coresLoad?.map((core: any, idx: number) => {
-                  const val = core?.value ?? 0;
-                  const barColor = val > 80 ? 'bg-rose-500' : val > 50 ? 'bg-amber-500' : 'bg-blue-500';
+                  const val: number | null = core?.value ?? null;
                   return (
-                    <div key={idx} className="bg-zinc-950 p-3 rounded-lg border border-zinc-800">
-                      <div className="flex justify-between text-xs text-zinc-400 mb-2">
-                        <span>Core {idx}</span>
-                        <span className="font-mono text-zinc-200">{toFixedSafe(val, 1)}%</span>
+                    <div key={idx} className="min-w-0">
+                      <div className="flex justify-between text-[11.5px] mb-1.5">
+                        <span className="text-zinc-500">Core <span className="font-mono">{idx}</span></span>
+                        <span className="font-mono text-zinc-100 tabular-nums">{val == null ? '--' : <>{toFixedSafe(val, 1)}<span className="text-zinc-500">%</span></>}</span>
                       </div>
-                      <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                        <div className={`${barColor} h-full transition-all duration-300`} style={{ width: `${val}%` }} />
+                      <div className="w-full bg-zinc-800 rounded-full h-[3px] overflow-hidden">
+                        <div className={`${loadBar(val ?? 0)} h-full transition-all duration-300`} style={{ width: `${val ?? 0}%` }} />
                       </div>
                     </div>
                   );
                 })}
-                {(!r.coresLoad || r.coresLoad.length === 0) && <p className="text-zinc-500 text-sm">Carregando dados dos núcleos...</p>}
+                {(!r.coresLoad || r.coresLoad.length === 0) && Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="space-y-2" aria-hidden="true"><Skel className="h-2.5 w-full" /><Skel className="h-[3px] w-full" /></div>
+                ))}
               </div>
             </SectionBlock>
 
             <SectionBlock title="Topologia e Clocks" icon={CpuIcon}>
               <PropertyRow label="Modelo" value={`${d.manufacturer ?? ''} ${d.brand ?? ''}`} />
-              <PropertyRow label="Família / Model / Stepping" value={`${d.family ?? '—'} / ${d.model ?? '—'} / ${d.stepping ?? '—'}`} />
+              <PropertyRow label="Família / Model / Stepping" value={`${d.family ?? '--'} / ${d.model ?? '--'} / ${d.stepping ?? '--'}`} />
               <PropertyRow label="Soquete" value={d.socket} />
-              <PropertyRow label="Núcleos (Threads)" value={`${d.physicalCores ?? '—'} Físicos / ${d.cores ?? '—'} Lógicos`} />
-              <PropertyRow label="Frequência Base" value={d.speedBase ? `${d.speedBase} GHz` : '—'} />
-              <PropertyRow label="Frequência Turbo Max" value={d.speedMax ? `${d.speedMax} GHz` : '—'} />
+              <PropertyRow label="Núcleos (Threads)" value={`${d.physicalCores ?? '--'} Físicos / ${d.cores ?? '--'} Lógicos`} />
+              <PropertyRow label="Frequência Base" value={d.speedBase ? `${d.speedBase} GHz` : '--'} />
+              <PropertyRow label="Frequência Turbo Max" value={d.speedMax ? `${d.speedMax} GHz` : '--'} />
             </SectionBlock>
 
             <SectionBlock title="Hierarquia de Cache" icon={Server}>
-              <PropertyRow label="Cache L1 (Dados + Instrução)" value={d.cache?.l1d ? formatBytes(d.cache.l1d + (d.cache.l1i || 0)) : '—'} />
-              <PropertyRow label="Cache L2" value={d.cache?.l2 ? formatBytes(d.cache.l2) : '—'} />
-              <PropertyRow label="Cache L3" value={d.cache?.l3 ? formatBytes(d.cache.l3) : '—'} />
+              <PropertyRow label="Cache L1 (Dados + Instrução)" value={d.cache?.l1d ? formatBytes(d.cache.l1d + (d.cache.l1i || 0)) : '--'} />
+              <PropertyRow label="Cache L2" value={d.cache?.l2 ? formatBytes(d.cache.l2) : '--'} />
+              <PropertyRow label="Cache L3" value={d.cache?.l3 ? formatBytes(d.cache.l3) : '--'} />
             </SectionBlock>
           </div>
         );
@@ -507,13 +521,13 @@ const SystemMonitor = () => {
         const list = (categories.ram || categories.memory)?.data || [];
         const r = metrics?.ram?.values || {};
         return (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="space-y-4 animate-in">
              <SectionBlock title="Visão Geral de Memória" icon={Activity}>
-              <PropertyRow label="Uso em Tempo Real" value={r.percent?.value != null ? `${toFixedSafe(r.percent.value, 1)}% (${formatBytes(r.used?.value)} / ${formatBytes(r.total?.value)})` : '—'} />
-              <div className="px-3 pb-3">
-                 <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-purple-500 h-full transition-all duration-500" style={{ width: r.percent?.value ? `${r.percent.value}%` : '0%' }}></div>
-                  </div>
+              <PropertyRow label="Uso em Tempo Real" value={r.percent?.value != null ? `${toFixedSafe(r.percent.value, 1)}% (${formatBytes(r.used?.value)} / ${formatBytes(r.total?.value)})` : '--'} />
+              <div className="px-4 pb-3">
+                <div className="w-full bg-zinc-800 rounded-full h-[3px] overflow-hidden">
+                  <div className={`${Number(r.percent?.value) >= 90 ? 'bg-red-400' : Number(r.percent?.value) >= 80 ? 'bg-amber-400' : 'bg-blue-400'} h-full transition-all duration-500`} style={{ width: r.percent?.value ? `${r.percent.value}%` : '0%' }}></div>
+                </div>
               </div>
             </SectionBlock>
 
@@ -522,9 +536,9 @@ const SystemMonitor = () => {
                 <PropertyRow label="Fabricante" value={m.manufacturer || 'Desconhecido'} />
                 <PropertyRow label="Tipo de Memória" value={m.type || 'Desconhecido'} />
                 <PropertyRow label="Tamanho" value={formatBytes(m.size)} />
-                <PropertyRow label="Frequência Efetiva" value={m.clockSpeed ? `${m.clockSpeed} MHz` : '—'} />
-                <PropertyRow label="Formato (Form Factor)" value={m.formFactor || '—'} />
-                <PropertyRow label="Part Number" value={m.partNum || '—'} />
+                <PropertyRow label="Frequência Efetiva" value={m.clockSpeed ? `${m.clockSpeed} MHz` : '--'} />
+                <PropertyRow label="Formato (Form Factor)" value={m.formFactor || '--'} />
+                <PropertyRow label="Part Number" value={m.partNum || '--'} />
               </SectionBlock>
             ))}
           </div>
@@ -539,9 +553,11 @@ const SystemMonitor = () => {
         const realtimeList = metrics?.gpu?.values?.gpus || [];
 
         return (
-           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+           <div className="space-y-4 animate-in">
             {staticList.map((g: any, idx: number) => {
-              const rt = realtimeList.find((r: any) => r.index === idx) || {};
+              const gname = `${g.vendor || ''} ${g.model || ''}`;
+              const norm = (x: string) => String(x || '').toLowerCase().replace(/\(r\)|\(tm\)|graphics|corporation|nvidia|amd|ati|intel|radeon|geforce|[^a-z0-9]/g, '');
+              const rt = realtimeList.find((r: any) => { const a = norm(r.name), b = norm(gname); return a && b && (a === b || a.includes(b) || b.includes(a)); }) || {};
               const utilVal = rt.utilization?.value;
               const tempVal = rt.temperature?.value;
               const vramUsedVal = rt.vramUsed?.value;
@@ -549,31 +565,30 @@ const SystemMonitor = () => {
               return (
                 <div key={idx} className="space-y-4">
                   <SectionBlock title={`Adaptador Gráfico ${idx+1}: ${g.vendor || ''} ${g.model || ''}`} icon={Monitor}>
-                    <PropertyRow label="Uso de GPU" value={utilVal != null ? `${utilVal}%` : '—'} />
-                    <div className="px-3 pb-3 mb-2">
-                       <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                          <div className="bg-emerald-500 h-full transition-all" style={{ width: `${utilVal || 0}%` }}></div>
-                        </div>
+                    <PropertyRow label="Uso de GPU" value={utilVal != null ? `${utilVal}%` : '--'} />
+                    <div className="px-4 pb-3 border-b border-zinc-800/80">
+                      <div className="w-full bg-zinc-800 rounded-full h-[3px] overflow-hidden">
+                        <div className="bg-blue-400 h-full transition-all" style={{ width: `${utilVal || 0}%` }}></div>
+                      </div>
                     </div>
-                    <PropertyRow label="Temperatura da GPU" value={tempVal != null ? `${tempVal}°C` : '—'} status={rt.temperature?.status} />
-                    <PropertyRow label="VRAM Usada" value={vramUsedVal != null ? `${vramUsedVal} MB` : '—'} status={rt.vramUsed?.status} />
-                    <PropertyRow label="VRAM Total (Dedicada)" value={g.vram ? `${g.vram} MB` : '—'} />
-                    <PropertyRow label="VRAM Dinâmica" value={g.vramDynamic ? 'Sim (Integrada)' : 'Não (Dedicada)'} />
+                    <PropertyRow label="Temperatura da GPU" value={tempVal != null ? `${tempVal}°C` : '--'} status={rt.temperature?.status} />
+                    <PropertyRow label="VRAM Usada" value={vramUsedVal != null ? `${vramUsedVal} MB` : '--'} status={rt.vramUsed?.status} />
+                    <PropertyRow label="VRAM Total (Dedicada)" value={rt.vramTotal?.value != null ? `${rt.vramTotal.value} MB` : g.vram ? `${g.vram} MB` : '--'} />
                   </SectionBlock>
 
                   <SectionBlock title="Arquitetura & Detalhes do Driver" icon={ShieldCheck}>
-                    <PropertyRow label="Versão do Driver" value={g.driverVersion || '—'} />
-                    <PropertyRow label="Data do Driver" value={g.driverDate || '—'} />
-                    <PropertyRow label="Processador de Vídeo" value={g.videoProcessor || '—'} />
-                    <PropertyRow label="ID de Arquitetura (WMI)" value={g.architecture || '—'} />
-                    <PropertyRow label="Interface de Barramento" value={g.bus || '—'} />
-                    <PropertyRow label="Sub-Device ID" value={g.subDeviceId || '—'} />
-                    <PropertyRow label="Taxa de Atualização Atual" value={g.refreshRate ? `${g.refreshRate} Hz` : '—'} />
+                    <PropertyRow label="Versão do Driver" value={g.driverVersion || '--'} />
+                    <PropertyRow label="Data do Driver" value={g.driverDate || '--'} />
+                    <PropertyRow label="Processador de Vídeo" value={g.videoProcessor || '--'} />
+                    <PropertyRow label="ID de Arquitetura (WMI)" value={g.architecture || '--'} />
+                    <PropertyRow label="Interface de Barramento" value={g.bus || '--'} />
+                    <PropertyRow label="Sub-Device ID" value={g.subDeviceId || '--'} />
+                    <PropertyRow label="Taxa de Atualização Atual" value={g.refreshRate ? `${g.refreshRate} Hz` : '--'} />
                   </SectionBlock>
                 </div>
               );
             })}
-            {staticList.length === 0 && <p className="text-zinc-500 text-sm italic p-4">Nenhum adaptador gráfico detectado.</p>}
+            {staticList.length === 0 && <p className="text-[12.5px] text-zinc-500 py-6">Nenhum adaptador gráfico detectado.</p>}
           </div>
         );
       }
@@ -603,186 +618,151 @@ const SystemMonitor = () => {
           const status = sensor?.status || 'OK';
 
           if (status === 'Critical') {
-            return {
-              text: 'text-red-400',
-              bg: 'bg-red-500/10 border-red-500/20',
-              bar: 'bg-red-500',
-              label: t('monitor.temps.critical', 'Crítico')
-            };
+            return { text: 'text-red-300', bar: 'bg-red-400', label: t('monitor.temps.critical', 'Crítico'), labelTone: 'text-red-300' };
           }
           if (status === 'Hot') {
-            return {
-              text: 'text-amber-400',
-              bg: 'bg-amber-500/10 border-amber-500/20',
-              bar: 'bg-amber-500',
-              label: t('monitor.temps.warm', 'Quente')
-            };
+            return { text: 'text-amber-300', bar: 'bg-amber-400', label: t('monitor.temps.warm', 'Quente'), labelTone: 'text-amber-300' };
           }
-          return {
-            text: 'text-emerald-400',
-            bg: 'bg-emerald-500/10 border-emerald-500/20',
-            bar: 'bg-emerald-500',
-            label: t('monitor.temps.optimal', 'Ótimo')
-          };
+          return { text: 'text-zinc-50', bar: 'bg-blue-400', label: t('monitor.temps.optimal', 'Ótimo'), labelTone: 'text-zinc-500' };
         };
 
+        const primaryGpu = metrics?.gpu?.values?.gpus?.[0];
+        const gpuTempObj = probes.find((p: any) => p.category === 'gpu')?.temperature;
+        const gpuStyle = getTempStyle(gpuTempObj);
+
         return (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            {/* Warning if CPU temperature is unavailable */}
+          <div className="space-y-6 animate-in">
             {cpuTempUnavailable && (
-              <div className="p-4 border border-amber-500/30 bg-amber-500/10 rounded-xl flex items-start gap-3 text-amber-300">
-                <AlertTriangle size={20} className="text-amber-400 shrink-0 mt-0.5" />
-                <div className="text-sm">
-                  <p className="font-semibold text-amber-200">
+              <div role="note" className="rounded-lg border border-amber-500/25 bg-amber-500/[0.04] px-4 py-3 flex items-start gap-3">
+                <AlertTriangle size={15} className="text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-[12.5px] font-medium text-amber-200">
                     {t('monitor.temps.unavailableTitle', 'Temperatura da CPU indisponível')}
                   </p>
-                  <p className="text-xs text-amber-400/80 mt-1 leading-relaxed">
-                    {t('monitor.temps.unavailableDesc', 'O Windows não expõe a temperatura do processador por padrão via WMI nesta placa-mãe. Para monitorar as temperaturas com máxima precisão, você pode manter o LibreHardwareMonitor ou CoreTemp aberto em segundo plano.')}
+                  <p className="dh-help mt-1 max-w-[75ch]">
+                    {t('monitor.temps.unavailableDesc2', 'O Windows não expõe a temperatura do processador nesta placa-mãe. Ative os sensores avançados abaixo e instale o driver PawnIO para ler o sensor de cada núcleo.')}
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Main Temp Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-2xl flex items-center justify-between shadow-xl">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl border border-blue-500/20">
-                    <Cpu size={28} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-zinc-300">{t('monitor.temps.cpuPackage', 'CPU Package')}</h3>
-                    <p className="text-xs text-zinc-500 mt-0.5">{t('monitor.temps.cpuPackageDesc', 'Temperatura principal do processador')}</p>
-                  </div>
+            {/* Primary readings */}
+            <dl className="grid grid-cols-1 md:grid-cols-2 gap-px rounded-xl border border-zinc-800/80 bg-zinc-800/70 overflow-hidden">
+              <div className="bg-zinc-950 px-4 py-4 flex items-end justify-between gap-4">
+                <div className="min-w-0">
+                  <dt className="flex items-center gap-1.5 text-[12px] text-zinc-500"><Cpu size={14} /> {t('monitor.temps.cpuPackage', 'CPU Package')}</dt>
+                  <dd className="text-[11.5px] text-zinc-600 mt-1">{t('monitor.temps.cpuPackageDesc', 'Temperatura principal do processador')}</dd>
                 </div>
-                <div className="text-right">
-                  <span className={`text-3xl font-extrabold tracking-tight ${
-                    !cpuTempUnavailable ? getTempStyle(mainTemp).text : 'text-zinc-500'
-                  }`}>
-                    {!cpuTempUnavailable ? `${mainTemp.value.toFixed(1)}°C` : '—'}
+                <dd className="text-right shrink-0">
+                  <span className={`font-mono text-[28px] leading-none tabular-nums ${!cpuTempUnavailable ? getTempStyle(mainTemp).text : 'text-zinc-600'}`}>
+                    {!cpuTempUnavailable ? <>{mainTemp.value.toFixed(1)}<span className="text-[14px] text-zinc-500">°C</span></> : '--'}
                   </span>
-                  <div className="text-[10px] text-zinc-400 mt-1 font-mono uppercase">
-                    {t('monitor.temps.source', 'Fonte')}: <span className="text-zinc-300 font-semibold">{formatSource(mainTemp?.source)}</span>
+                  <div className="text-[11px] text-zinc-500 mt-1.5">
+                    {t('monitor.temps.source', 'Fonte')} <span className="font-mono text-zinc-400">{formatSource(mainTemp?.source)}</span>
                   </div>
-                </div>
+                </dd>
               </div>
 
-              {(() => {
-                const primaryGpu = metrics?.gpu?.values?.gpus?.[0];
-                const gpuTempObj = probes.find((p: any) => p.category === 'gpu')?.temperature;
-                const style = getTempStyle(gpuTempObj);
-                return (
-                  <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-2xl flex items-center justify-between shadow-xl">
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
-                        <Monitor size={28} />
+              <div className="bg-zinc-950 px-4 py-4 flex items-end justify-between gap-4">
+                <div className="min-w-0">
+                  <dt className="flex items-center gap-1.5 text-[12px] text-zinc-500"><Monitor size={14} /> {t('monitor.temps.primaryGpu', 'GPU Primária')}</dt>
+                  <dd className="text-[11.5px] text-zinc-600 mt-1 truncate">{primaryGpu?.name || 'Placa de Vídeo'}</dd>
+                </div>
+                <dd className="text-right shrink-0">
+                  {gpuTempObj?.availability === 'available' ? (
+                    <>
+                      <span className={`font-mono text-[28px] leading-none tabular-nums ${gpuStyle.text}`}>
+                        {gpuTempObj.value != null ? <>{gpuTempObj.value.toFixed(1)}<span className="text-[14px] text-zinc-500">°C</span></> : '--'}
+                      </span>
+                      <div className="text-[11px] text-zinc-500 mt-1.5">
+                        {t('monitor.temps.source', 'Fonte')} <span className="font-mono text-zinc-400">{formatSource(gpuTempObj.source)}</span>
                       </div>
-                      <div>
-                        <h3 className="text-sm font-medium text-zinc-300">{t('monitor.temps.primaryGpu', 'GPU Primária')}</h3>
-                        <p className="text-xs text-zinc-500 mt-0.5">{primaryGpu?.name || 'Placa de Vídeo'}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      {gpuTempObj?.availability === 'available' ? (
-                        <>
-                          <span className={`text-3xl font-extrabold tracking-tight ${style.text}`}>
-                            {gpuTempObj.value != null ? `${gpuTempObj.value.toFixed(1)}°C` : '—'}
-                          </span>
-                          <div className="text-[10px] text-zinc-400 mt-1 font-mono uppercase">
-                            {t('monitor.temps.source', 'Fonte')}: <span className="text-zinc-300 font-semibold">{formatSource(gpuTempObj.source)}</span>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <span className="text-sm font-semibold text-zinc-500 italic block py-1.5">
-                            {gpuTempObj?.availability === 'unsupported' ? 'Sem sensor' : 'Indisponível'}
-                          </span>
-                          <div className="text-[9px] text-zinc-600 font-mono uppercase">
-                            ADL / SMI Fallback
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="block text-[13px] text-zinc-500">
+                        {gpuTempObj?.availability === 'unsupported' ? 'Sem sensor' : 'Indisponível'}
+                      </span>
+                      <div className="text-[11px] text-zinc-500 mt-1">{t('monitor.temps.gpuNoSensor', 'Ative os sensores avançados')}</div>
+                    </>
+                  )}
+                </dd>
+              </div>
+            </dl>
+
+            <AdvancedSensorsPanel values={metrics?.temps?.values} gpuProbe={probes.find((p: any) => p.category === 'gpu')} />
 
             {/* Probe list categorized */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {Object.entries(categoriesGroup).map(([key, cat]) => {
-                if (cat.items.length === 0) return null;
-                const Icon = cat.icon;
-                return (
-                  <div key={key} className="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 shadow-lg space-y-4">
-                    <div className="flex items-center gap-2 pb-3 border-b border-zinc-800/80">
-                      <Icon size={18} className="text-indigo-400" />
-                      <h3 className="font-bold text-zinc-200 text-sm tracking-wide uppercase">{cat.title}</h3>
-                    </div>
+            {probes.length === 0 ? (
+              <p className="text-[12.5px] text-zinc-500">Nenhuma sonda de temperatura reportada ainda.</p>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {Object.entries(categoriesGroup).map(([key, cat]) => {
+                  if (cat.items.length === 0) return null;
+                  const Icon = cat.icon;
+                  return (
+                    <section key={key} className="dh-card overflow-hidden">
+                      <div className="flex items-center gap-2 px-4 h-10 border-b border-zinc-800/80">
+                        <Icon size={14} className="text-zinc-500" />
+                        <h3 className="dh-section-title">{cat.title}</h3>
+                        <span className="dh-tag ml-auto">{cat.items.length}</span>
+                      </div>
 
-                    <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
-                      {cat.items.map((item: any, idx: number) => {
-                        const tempObj = item.temperature;
-                        const style = getTempStyle(tempObj);
-                        const val = tempObj?.value;
+                      <ul className="max-h-[300px] overflow-y-auto custom-scrollbar divide-y divide-zinc-800/80">
+                        {cat.items.map((item: any, idx: number) => {
+                          const tempObj = item.temperature;
+                          const style = getTempStyle(tempObj);
+                          const val = tempObj?.value;
+                          const available = tempObj?.availability === 'available' && val != null;
 
-                        return (
-                          <div key={idx} className="bg-zinc-950 border border-zinc-900 p-3 rounded-xl flex flex-col gap-2 hover:border-zinc-800 transition-all">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs font-semibold text-zinc-300 truncate max-w-[200px]" title={item.name}>
-                                {item.name}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                {tempObj?.availability === 'available' && val != null ? (
-                                  <>
-                                    <span className={`text-xs font-semibold ${style.text}`}>
-                                      {val.toFixed(1)}°C
-                                    </span>
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider scale-90 ${style.bg} ${style.text}`}>
-                                      {style.label}
-                                    </span>
-                                  </>
-                                ) : tempObj?.availability === 'loading' ? (
-                                  <span className="text-[10px] text-zinc-500 italic flex items-center gap-1">
-                                    <Loader2 size={10} className="animate-spin" /> Lendo...
-                                  </span>
-                                ) : tempObj?.availability === 'error' ? (
-                                  <span className="text-[10px] text-red-400 font-semibold bg-red-950 px-2 py-0.5 rounded border border-red-900/30">
-                                    Erro
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] text-zinc-600 bg-zinc-900 px-2 py-0.5 rounded">
-                                    Não disponível
-                                  </span>
-                                )}
+                          return (
+                            <li key={idx} className="px-4 py-2.5 hover:bg-zinc-900/60 transition-colors">
+                              <div className="flex justify-between items-center gap-3">
+                                <span className="text-[12.5px] text-zinc-200 truncate" title={item.name}>
+                                  {item.name}
+                                </span>
+                                <div className="flex items-baseline gap-2 shrink-0">
+                                  {available ? (
+                                    <>
+                                      <span className={`text-[11px] ${style.labelTone}`}>{style.label}</span>
+                                      <span className={`font-mono text-[13px] tabular-nums ${style.text}`}>
+                                        {val.toFixed(1)}<span className="text-zinc-500">°C</span>
+                                      </span>
+                                    </>
+                                  ) : tempObj?.availability === 'loading' ? (
+                                    <Skel className="h-3 w-12" />
+                                  ) : tempObj?.availability === 'error' ? (
+                                    <span className="text-[11.5px] text-red-400">Erro</span>
+                                  ) : (
+                                    <span className="text-[11.5px] text-zinc-600">Não disponível</span>
+                                  )}
+                                </div>
                               </div>
-                            </div>
 
-                            {tempObj?.availability === 'available' && val != null && (
-                              <div className="w-full bg-zinc-900 h-1 rounded-full overflow-hidden border border-zinc-900">
-                                <div
-                                  className={`h-full ${style.bar} transition-all duration-500 rounded-full`}
-                                  style={{ width: `${Math.min(100, Math.max(5, (val / 100) * 100))}%` }}
-                                />
+                              {available && (
+                                <div className="mt-1.5 w-full bg-zinc-800 h-[3px] rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full ${style.bar} transition-all duration-500 rounded-full`}
+                                    style={{ width: `${Math.min(100, Math.max(5, (val / 100) * 100))}%` }}
+                                  />
+                                </div>
+                              )}
+
+                              <div className="flex justify-between gap-3 text-[10.5px] text-zinc-600 mt-1.5">
+                                <span>
+                                  {t('monitor.temps.quality', 'Qualidade')}: {tempObj?.quality === 'high' ? t('monitor.temps.high', 'Alta') : tempObj?.quality === 'medium' ? t('monitor.temps.medium', 'Média') : tempObj?.quality === 'low' ? t('monitor.temps.low', 'Baixa (zona ACPI, não o sensor do núcleo)') : t('monitor.temps.none', 'Nenhuma')}
+                                </span>
+                                <span className="font-mono truncate">{formatSource(tempObj?.source)}</span>
                               </div>
-                            )}
-
-                            <div className="flex justify-between text-[9px] text-zinc-500 mt-0.5">
-                              <span>
-                                {t('monitor.temps.quality', 'Qualidade')}: {tempObj?.quality === 'high' ? t('monitor.temps.high', 'Alta') : tempObj?.quality === 'medium' ? t('monitor.temps.medium', 'Média') : t('monitor.temps.none', 'Nenhuma')}
-                              </span>
-                              <span className="uppercase font-mono">
-                                {t('monitor.temps.source', 'Fonte')}: {formatSource(tempObj?.source)}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       }
@@ -792,44 +772,49 @@ const SystemMonitor = () => {
         const filteredCpu = topCpu.filter((p: any) => p.name.toLowerCase().includes(procSearch.toLowerCase()));
 
         return (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="flex gap-4">
-              <input
-                type="text"
-                placeholder={t('monitor.procs.search', 'Buscar processo...')}
-                value={procSearch}
-                onChange={e => setProcSearch(e.target.value)}
-                className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-sm text-zinc-200 outline-none focus:border-blue-500"
-              />
-            </div>
+          <div className="space-y-4 animate-in">
+            <input
+              type="search"
+              placeholder={t('monitor.procs.search', 'Buscar processo...')}
+              value={procSearch}
+              onChange={e => setProcSearch(e.target.value)}
+              className="dh-input w-full"
+            />
 
             <SectionBlock title={t('monitor.procs.topCpu', 'Top Processos (Por CPU)')} icon={Activity}>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="text-xs text-zinc-400 bg-zinc-900/50">
+                <table className="w-full text-[12.5px] text-left">
+                  <thead className="text-[11px] text-zinc-500 border-b border-zinc-800/80">
                     <tr>
-                      <th className="px-4 py-2 font-medium">{t('monitor.procs.name', 'Nome')}</th>
-                      <th className="px-4 py-2 font-medium">{t('monitor.procs.pid', 'PID')}</th>
-                      <th className="px-4 py-2 font-medium">{t('monitor.procs.cpu', 'CPU %')}</th>
-                      <th className="px-4 py-2 font-medium">{t('monitor.procs.ram', 'RAM')}</th>
+                      <th className="px-4 h-8 font-normal">{t('monitor.procs.name', 'Nome')}</th>
+                      <th className="px-4 h-8 font-normal text-right">{t('monitor.procs.pid', 'PID')}</th>
+                      <th className="px-4 h-8 font-normal text-right">{t('monitor.procs.cpu', 'CPU %')}</th>
+                      <th className="px-4 h-8 font-normal text-right">{t('monitor.procs.ram', 'RAM')}</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-zinc-800/60">
                     {filteredCpu.map((p: any) => (
-                      <tr key={p.pid} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                        <td className="px-4 py-2 text-zinc-300 font-medium">{p.name}</td>
-                        <td className="px-4 py-2 text-zinc-500 font-mono text-xs">{p.pid}</td>
-                        <td className="px-4 py-2 text-emerald-400 font-medium">{toFixedSafe(p.cpu, 1)}%</td>
-                        <td className="px-4 py-2 text-zinc-400">{formatBytes(p.memRss)}</td>
+                      <tr key={p.pid} className="hover:bg-zinc-900/60">
+                        <td className="px-4 py-2 text-zinc-200">{p.name}</td>
+                        <td className="px-4 py-2 text-zinc-500 font-mono text-right">{p.pid}</td>
+                        <td className={`px-4 py-2 font-mono text-right tabular-nums ${toneFor(p.cpu, 50, 85)}`}>{toFixedSafe(p.cpu, 1)}<span className="text-zinc-500">%</span></td>
+                        <td className="px-4 py-2 text-zinc-300 font-mono text-right">{formatBytes(p.memRss)}</td>
                       </tr>
                     ))}
-                    {filteredCpu.length === 0 && (
+                    {filteredCpu.length === 0 && (procSearch ? (
                       <tr>
-                        <td colSpan={4} className="px-4 py-6 text-center text-zinc-500 italic">
-                          {procSearch ? 'Nenhum processo correspondente encontrado.' : 'Carregando lista de processos ativos...'}
+                        <td colSpan={4} className="px-4 py-6 text-center text-zinc-500">
+                          Nenhum processo correspondente encontrado.
                         </td>
                       </tr>
-                    )}
+                    ) : Array.from({ length: 6 }).map((_, i) => (
+                      <tr key={i} aria-hidden="true">
+                        <td className="px-4 py-2.5"><Skel className="h-2.5 w-40" /></td>
+                        <td className="px-4 py-2.5 text-right"><Skel className="h-2.5 w-10" /></td>
+                        <td className="px-4 py-2.5 text-right"><Skel className="h-2.5 w-10" /></td>
+                        <td className="px-4 py-2.5 text-right"><Skel className="h-2.5 w-14" /></td>
+                      </tr>
+                    )))}
                   </tbody>
                 </table>
               </div>
@@ -845,20 +830,20 @@ const SystemMonitor = () => {
         const list = categories.storage?.data || [];
         const io = metrics?.diskIo?.values || {};
         return (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="space-y-4 animate-in">
              <SectionBlock title="Atividade Global de Discos" icon={Activity}>
-              <PropertyRow label="Leitura Direta" value={io.readBps?.value != null ? `${formatBytes(io.readBps.value)}/s` : '—'} />
-              <PropertyRow label="Escrita Direta" value={io.writeBps?.value != null ? `${formatBytes(io.writeBps.value)}/s` : '—'} />
-              <PropertyRow label="Uso do Controlador (Active Time)" value={io.activity?.value != null ? `${io.activity.value}%` : '—'} />
+              <PropertyRow label="Leitura Direta" value={io.readBps?.value != null ? `${formatBytes(io.readBps.value)}/s` : '--'} />
+              <PropertyRow label="Escrita Direta" value={io.writeBps?.value != null ? `${formatBytes(io.writeBps.value)}/s` : '--'} />
+              <PropertyRow label="Tempo ativo (como no Gerenciador de Tarefas)" value={io.activity?.value != null ? `${io.activity.value}%` : '--'} />
             </SectionBlock>
 
             {list.map((d: any, idx: number) => (
               <SectionBlock key={idx} title={`Disco: ${d.name || d.device}`} icon={HardDrive}>
                 <PropertyRow label="Tipo / Interface" value={`${d.type || 'N/A'} - ${d.interfaceType || 'N/A'}`} />
                 <PropertyRow label="Capacidade Bruta" value={formatBytes(d.size)} />
-                <PropertyRow label="Status SMART Global" value={d.smartStatus || 'OK'} status={d.smartStatus?.toLowerCase() === 'ok' ? 'OK' : undefined} />
+                <PropertyRow label="Status SMART Global" value={d.smartStatus || '--'} status={String(d.smartStatus || '').toLowerCase() === 'ok' ? 'OK' : undefined} />
                 <PropertyRow label="Desgaste Físico (Wear Level)" value={d.wearLevel != null ? `${d.wearLevel}%` : 'N/A'} />
-                <PropertyRow label="Temperatura do Disco" value={d.temperature != null ? `${d.temperature}°C` : '—'} />
+                <PropertyRow label="Temperatura do Disco" value={d.temperature != null ? `${d.temperature}°C` : '--'} />
               </SectionBlock>
             ))}
           </div>
@@ -871,17 +856,17 @@ const SystemMonitor = () => {
 
          const list = categories.monitors?.data || [];
          return (
-           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+           <div className="space-y-4 animate-in">
              {list.map((m: any, idx: number) => (
                <SectionBlock key={idx} title={`Monitor ${idx+1}: ${m.model || m.vendor || 'Desconhecido'}`} icon={Monitor}>
                  <PropertyRow label="Principal" value={m.main ? 'Sim' : 'Não'} />
                  <PropertyRow label="Resolução Nativa" value={`${m.resolutionx}x${m.resolutiony}`} />
                  <PropertyRow label="Resolução Atual" value={`${m.currentResX}x${m.currentResY}`} />
-                 <PropertyRow label="Taxa de Atualização" value={m.currentRefreshRate ? `${m.currentRefreshRate} Hz` : '—'} />
-                 <PropertyRow label="Conexão" value={m.connection || '—'} />
+                 <PropertyRow label="Taxa de Atualização" value={m.currentRefreshRate ? `${m.currentRefreshRate} Hz` : '--'} />
+                 <PropertyRow label="Conexão" value={m.connection || '--'} />
                </SectionBlock>
              ))}
-             {list.length === 0 && <p className="text-zinc-500 text-sm italic p-4">Nenhum monitor detectado via systeminformation.</p>}
+             {list.length === 0 && <p className="text-[12.5px] text-zinc-500 py-6">Nenhum monitor detectado via systeminformation.</p>}
            </div>
          );
       }
@@ -892,17 +877,17 @@ const SystemMonitor = () => {
 
         const d = (categories.mobo || categories.mainboard)?.data || {};
         return (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="space-y-4 animate-in">
             <SectionBlock title="Placa Principal (Baseboard)" icon={LayoutTemplate}>
-              <PropertyRow label="Fabricante" value={d.manufacturer || '—'} />
-              <PropertyRow label="Modelo" value={d.model || '—'} />
-              <PropertyRow label="Revisão (Versão)" value={d.version || '—'} />
-              <PropertyRow label="Número de Série" value={d.serial || '—'} />
+              <PropertyRow label="Fabricante" value={d.manufacturer || '--'} />
+              <PropertyRow label="Modelo" value={d.model || '--'} />
+              <PropertyRow label="Revisão (Versão)" value={d.version || '--'} />
+              <PropertyRow label="Número de Série" value={d.serial || '--'} />
             </SectionBlock>
             <SectionBlock title="Firmware (BIOS/UEFI)" icon={CpuIcon}>
-              <PropertyRow label="Fornecedor da BIOS" value={d.biosVendor || '—'} />
-              <PropertyRow label="Versão da BIOS" value={d.biosVersion || '—'} />
-              <PropertyRow label="Data de Lançamento" value={d.biosReleaseDate || '—'} />
+              <PropertyRow label="Fornecedor da BIOS" value={d.biosVendor || '--'} />
+              <PropertyRow label="Versão da BIOS" value={d.biosVersion || '--'} />
+              <PropertyRow label="Data de Lançamento" value={d.biosReleaseDate || '--'} />
             </SectionBlock>
           </div>
         );
@@ -919,31 +904,30 @@ const SystemMonitor = () => {
         const r = metrics?.network?.values || {};
 
         return (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="space-y-4 animate-in">
             <SectionBlock title="Tráfego Consolidado" icon={Activity}>
-              <PropertyRow label="Banda de Download" value={r.rxBps?.value != null ? `${formatBytes(r.rxBps.value)}/s` : '—'} />
-              <PropertyRow label="Banda de Upload" value={r.txBps?.value != null ? `${formatBytes(r.txBps.value)}/s` : '—'} />
+              <PropertyRow label="Banda de Download" value={r.rxBps?.value != null ? `${formatBytes(r.rxBps.value)}/s` : '--'} />
+              <PropertyRow label="Banda de Upload" value={r.txBps?.value != null ? `${formatBytes(r.txBps.value)}/s` : '--'} />
             </SectionBlock>
 
             {/* Filter Bar */}
-            <div className="flex items-center justify-between bg-zinc-950 p-3 rounded-xl border border-zinc-800">
+            <div className="flex items-center justify-between gap-3 px-1">
               <div className="flex items-center gap-2">
-                <Filter size={16} className="text-blue-400" />
-                <span className="text-xs text-zinc-300 font-medium">
+                <Filter size={14} className="text-zinc-500" />
+                <span className="text-[12.5px] text-zinc-300">
                   {t('monitor.network.filterLabel', 'Filtro de Adaptadores')}
                 </span>
                 {hiddenCount > 0 && filterVirtualNet && (
-                  <span className="text-[10px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded font-mono">
+                  <span className="dh-tag">
                     {hiddenCount} {t('monitor.network.virtualHidden', 'virtuais ocultos')}
                   </span>
                 )}
               </div>
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-400 hover:text-zinc-200">
+              <label className="flex items-center gap-2 cursor-pointer text-[12.5px] text-zinc-400 hover:text-zinc-200">
                 <input
                   type="checkbox"
                   checked={filterVirtualNet}
                   onChange={e => setFilterVirtualNet(e.target.checked)}
-                  className="rounded bg-zinc-900 border-zinc-700 text-blue-500 focus:ring-0"
                 />
                 <span>{t('monitor.network.filterVirtual', 'Apenas Físicos')}</span>
               </label>
@@ -953,23 +937,16 @@ const SystemMonitor = () => {
               const isVirt = isVirtualNet(n);
               return (
                 <SectionBlock key={idx} title={`Adaptador: ${n.ifaceName || n.iface}`} icon={Wifi}>
-                  <div className="px-3 py-1 flex items-center justify-between border-b border-zinc-800/60">
-                    <span className="text-xs text-zinc-500">Classificação</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded font-semibold uppercase ${
-                      isVirt ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                    }`}>
-                      {isVirt ? t('monitor.network.virtualTag', 'Virtual / VPN') : t('monitor.network.physicalTag', 'Físico')}
-                    </span>
-                  </div>
-                  <PropertyRow label="Status da Camada (Link)" value={n.speed ? `${n.speed} Mbps` : 'Desconectado'} status={n.speed ? 'OK' : undefined} />
-                  <PropertyRow label="Tipo de Adaptador" value={n.type || '—'} />
-                  <PropertyRow label="Endereço IPv4" value={n.ip4 || '—'} />
-                  <PropertyRow label="Endereço MAC" value={n.mac || '—'} />
+                  <PropertyRow label="Classificação" value={isVirt ? t('monitor.network.virtualTag', 'Virtual / VPN') : t('monitor.network.physicalTag', 'Físico')} />
+                  <PropertyRow label="Status da Camada (Link)" value={n.operstate === 'down' ? 'Desconectado' : n.speed ? `${n.speed} Mbps` : '--'} status={n.operstate !== 'down' && n.speed ? 'OK' : undefined} />
+                  <PropertyRow label="Tipo de Adaptador" value={n.type || '--'} />
+                  <PropertyRow label="Endereço IPv4" value={n.ip4 || '--'} />
+                  <PropertyRow label="Endereço MAC" value={n.mac || '--'} />
                 </SectionBlock>
               );
             })}
             {displayList.length === 0 && (
-              <p className="text-zinc-500 text-sm italic p-4 text-center">
+              <p className="text-[12.5px] text-zinc-500 py-6 text-center">
                 Nenhum adaptador encontrado com os filtros atuais.
               </p>
             )}
@@ -984,18 +961,32 @@ const SystemMonitor = () => {
         const d = categories.os?.data || {};
         const win = d.windowsDetails || {};
         return (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="space-y-4 animate-in">
             <SectionBlock title="Núcleo do Sistema" icon={FileDigit}>
               <PropertyRow label="Plataforma Base" value={`${d.platform || ''} (${d.arch || ''})`} />
-              <PropertyRow label="Distribuição" value={d.distro || '—'} />
-              <PropertyRow label="Lançamento (Kernel/Core)" value={d.release || '—'} />
+              <PropertyRow label="Distribuição" value={d.distro || '--'} />
+              <PropertyRow label="Lançamento (Kernel/Core)" value={d.release || '--'} />
             </SectionBlock>
             {Object.keys(win).length > 0 && (
               <SectionBlock title="Detalhes do Registro do Windows" icon={LayoutTemplate}>
-                <PropertyRow label="Versão de Exibição" value={win.DisplayVersion || '—'} />
-                <PropertyRow label="Build Principal" value={win.CurrentBuildNumber || d.build || '—'} />
-                <PropertyRow label="Revisão (UBR)" value={win.UBR || '—'} />
+                <PropertyRow label="Versão de Exibição" value={win.DisplayVersion || '--'} />
+                <PropertyRow label="Build Principal" value={win.CurrentBuildNumber || d.build || '--'} />
+                <PropertyRow label="Revisão (UBR)" value={win.UBR || '--'} />
               </SectionBlock>
+            )}
+          </div>
+        );
+      }
+
+      case 'sensors': {
+        const lhm = metrics?.temps?.values?.lhm;
+        return (
+          <div className="space-y-6 animate-in">
+            {lhm ? <LhmSensorTree lhm={lhm} /> : (
+              <>
+                <p className="dh-help max-w-[75ch]">{t('monitor.lhm.off', 'A lista completa (tensões, temperaturas, potência, clocks, uso, ventoinhas e SMART de cada componente) vem dos sensores avançados. Ative-os abaixo.')}</p>
+                <AdvancedSensorsPanel values={metrics?.temps?.values} />
+              </>
             )}
           </div>
         );
@@ -1013,90 +1004,97 @@ const SystemMonitor = () => {
         const intVal = r.interrupts?.value;
 
         let statusText = 'Lendo sensores...';
-        let statusColor = 'text-zinc-400 border-zinc-800';
-        let statusBg = 'bg-zinc-950/20';
+        let statusColor = 'text-zinc-400 border-zinc-800/80';
+        let statusBg = 'bg-zinc-900/40';
         let statusDesc = 'O WMI Daemon está iniciando a telemetria do kernel.';
 
         if (dpcVal != null) {
           if (dpcVal < 5000) {
             statusText = 'Excelente (Latência Ultra-baixa)';
-            statusColor = 'text-emerald-400 border-emerald-500/20';
-            statusBg = 'bg-emerald-500/5';
+            statusColor = 'text-emerald-300 border-emerald-500/25';
+            statusBg = 'bg-emerald-500/[0.04]';
             statusDesc = 'O sistema operacional está processando as chamadas DPC do kernel de forma extremamente rápida. Configuração ideal para jogos competitivos sem micro-engasgos (stuttering) e produção de áudio em tempo real.';
           } else if (dpcVal < 15000) {
             statusText = 'Moderado (Atividade Normal)';
-            statusColor = 'text-amber-400 border-amber-500/20';
-            statusBg = 'bg-amber-500/5';
+            statusColor = 'text-amber-300 border-amber-500/25';
+            statusBg = 'bg-amber-500/[0.04]';
             statusDesc = 'Há uma carga de trabalho típica do Windows no kernel. Isso é perfeitamente seguro e esperado para tarefas diárias. Para jogadores de eSports de altíssimo nível, pode introduzir pequenas latências de frametime.';
           } else {
             statusText = 'Alto Jitter (Sobrecarga de Interrupção)';
-            statusColor = 'text-rose-400 border-rose-500/20';
-            statusBg = 'bg-rose-500/5';
+            statusColor = 'text-red-300 border-red-500/25';
+            statusBg = 'bg-red-500/[0.04]';
             statusDesc = 'Indicador de gargalo de latência! Uma taxa elevada de DPCs/s pode induzir micro-travamentos repentinos nos jogos ou estalos no som (audio crackling). Considere verificar e atualizar os drivers de placa gráfica, adaptadores de rede ou desativar periféricos USB não utilizados.';
           }
         }
 
         return (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className={`p-5 rounded-xl border ${statusColor} ${statusBg} transition-all duration-300`}>
-              <div className="flex items-center gap-3 mb-2">
-                <Clock className="w-5 h-5" />
-                <span className="font-bold text-lg text-white">Status de Resposta do Kernel</span>
+          <div className="space-y-4 animate-in">
+            <div role="status" className={`px-4 py-3.5 rounded-xl border ${statusColor} ${statusBg} transition-colors duration-200`}>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Clock size={15} className="shrink-0" />
+                  <h2 className="dh-section-title">Status de Resposta do Kernel</h2>
+                </div>
+                <span className="font-mono text-[18px] leading-none text-zinc-50 tabular-nums shrink-0">
+                  {dpcVal != null ? <>{dpcVal.toLocaleString()}<span className="text-[12px] text-zinc-500"> DPC/s</span></> : <Skel className="h-4 w-20" />}
+                </span>
               </div>
-              <p className="text-sm font-semibold mb-1">{statusText}</p>
-              <p className="text-xs text-zinc-400 leading-relaxed">{statusDesc}</p>
+              <p className="text-[12.5px] font-medium mt-2">{statusText}</p>
+              <p className="dh-help mt-1 max-w-[75ch]">{statusDesc}</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <SectionBlock title="Telemetria de DPC" icon={Activity}>
-                <PropertyRow label="DPCs Enfileirados" value={dpcVal != null ? `${dpcVal.toLocaleString()} /s` : '—'} />
-                <PropertyRow label="Tempo Gasto com DPC" value={r.percentDpc?.value != null ? `${r.percentDpc.value}%` : '—'} />
+                <PropertyRow label="DPCs Enfileirados" value={dpcVal != null ? `${dpcVal.toLocaleString()} /s` : '--'} />
+                <PropertyRow label="Tempo Gasto com DPC" value={r.percentDpc?.value != null ? `${r.percentDpc.value}%` : '--'} />
                 {dpcHistory.length > 1 && (
-                  <div className="mt-4 p-2 bg-zinc-950/20 rounded-lg">
-                    <p className="text-xs text-zinc-500 mb-2 font-medium">Histórico de DPCs/s (Últimos 60s)</p>
-                    <div className="h-16 flex items-end">
-                      <Sparkline data={dpcHistory} min={0} max={25000} color="#3b82f6" />
+                  <div className="px-4 pt-3 pb-3 border-t border-zinc-800/80">
+                    <p className="text-[11px] text-zinc-500 mb-2">Histórico de DPCs/s (Últimos 60s)</p>
+                    <div className="h-14 flex items-end">
+                      <Sparkline data={dpcHistory} min={0} max={25000} color="var(--color-blue-400)" strokeWidth={1.25} />
                     </div>
                   </div>
                 )}
               </SectionBlock>
 
               <SectionBlock title="Telemetria de Interrupções (ISR)" icon={Cpu}>
-                <PropertyRow label="Interrupções de Hardware" value={intVal != null ? `${intVal.toLocaleString()} /s` : '—'} />
-                <PropertyRow label="Tempo Gasto com ISR" value={r.percentInt?.value != null ? `${r.percentInt.value}%` : '—'} />
+                <PropertyRow label="Interrupções de Hardware" value={intVal != null ? `${intVal.toLocaleString()} /s` : '--'} />
+                <PropertyRow label="Tempo Gasto com ISR" value={r.percentInt?.value != null ? `${r.percentInt.value}%` : '--'} />
               </SectionBlock>
             </div>
 
             <SectionBlock title={`Drivers de Kernel Ativos (${filteredDrivers.length} / ${drivers.length})`} icon={List}>
-              <div className="mb-4 px-4 pt-2">
+              <div className="px-4 py-3">
                 <input
-                  type="text"
+                  type="search"
                   placeholder="Pesquisar por driver (ex: amdkmdag, nvlddmkm)..."
                   value={driverSearch}
                   onChange={(e) => setDriverSearch(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-sm text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-blue-500 transition-colors"
+                  className="dh-input w-full"
                 />
               </div>
-              <div className="max-h-80 overflow-y-auto custom-scrollbar border-t border-zinc-800 bg-zinc-950/40">
-                <table className="w-full text-left border-collapse text-xs">
+              <div className="max-h-80 overflow-y-auto custom-scrollbar border-t border-zinc-800/80">
+                <table className="w-full text-left border-collapse text-[12px]">
                   <thead>
-                    <tr className="border-b border-zinc-800 bg-zinc-900 text-zinc-400 font-medium sticky top-0">
-                      <th className="p-3">Nome</th>
-                      <th className="p-3">Descrição (Display Name)</th>
-                      <th className="p-3">Caminho (.sys)</th>
+                    <tr className="border-b border-zinc-800/80 bg-zinc-900 text-[11px] text-zinc-500 sticky top-0">
+                      <th className="px-4 h-8 font-normal">Nome</th>
+                      <th className="px-4 h-8 font-normal">Descrição (Display Name)</th>
+                      <th className="px-4 h-8 font-normal">Caminho (.sys)</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-zinc-800/60">
                     {filteredDrivers.map((d: any, idx: number) => (
-                      <tr key={idx} className="border-b border-zinc-800/40 hover:bg-zinc-800/10 text-zinc-300 transition-colors">
-                        <td className="p-3 font-semibold text-blue-400">{d.Name}</td>
-                        <td className="p-3 text-zinc-400">{d.DisplayName || '—'}</td>
-                        <td className="p-3 font-mono text-zinc-500 break-all">{d.PathName || '—'}</td>
+                      <tr key={idx} className="hover:bg-zinc-900/60 transition-colors">
+                        <td className="px-4 py-2 font-mono text-zinc-100">{d.Name}</td>
+                        <td className="px-4 py-2 text-zinc-400">{d.DisplayName || '--'}</td>
+                        <td className="px-4 py-2 font-mono text-zinc-500 break-all">{d.PathName || '--'}</td>
                       </tr>
                     ))}
                     {filteredDrivers.length === 0 && (
                       <tr>
-                        <td colSpan={3} className="p-4 text-center text-zinc-500 italic">Nenhum driver ativo correspondente.</td>
+                        <td colSpan={3} className="px-4 py-6 text-center text-zinc-500">
+                          {drivers.length === 0 && !driverSearch ? 'Lendo drivers de kernel...' : 'Nenhum driver ativo correspondente.'}
+                        </td>
                       </tr>
                     )}
                   </tbody>
@@ -1104,16 +1102,16 @@ const SystemMonitor = () => {
               </div>
             </SectionBlock>
 
-            <div className="p-4 rounded-lg bg-zinc-950/20 border border-zinc-800 text-xs leading-relaxed space-y-2 text-zinc-400">
-              <p className="font-semibold text-zinc-200">ℹ️ O que é DPC e ISR?</p>
+            <div className="px-1 text-[12.5px] leading-relaxed space-y-2 text-zinc-400 max-w-[75ch]">
+              <h3 className="dh-section-title">O que é DPC e ISR?</h3>
               <p>
                 Quando um dispositivo físico (como placa de som, placa de rede ou placa de vídeo) precisa de atenção, ele envia uma <strong>Interrupção de Hardware (ISR)</strong> para o processador, que pausa instantaneamente o que está fazendo para atendê-lo.
               </p>
               <p>
                 Como as ISRs devem ser curtíssimas, tarefas mais pesadas de processamento secundário são enfileiradas como <strong>DPC (Deferred Procedure Call)</strong>. Se um driver mal programado demorar muito tempo para liberar o controle, a fila de DPCs se acumula, fazendo com que o processador demore para responder a outras tarefas. Isso gera latência perceptível nos jogos e estalos de som.
               </p>
-              <p className="text-blue-400">
-                <strong>Dica:</strong> Em sistemas Windows normais, picos esporádicos são comuns. Mas se a taxa se mantiver muito alta constantemente, recomenda-se desinstalar drivers de rede antigos, atualizar o driver da GPU utilizando ferramentas de instalação limpa (DDU) ou atualizar a BIOS da placa-mãe.
+              <p className="text-zinc-300">
+                <strong className="font-medium text-zinc-100">Dica:</strong> Em sistemas Windows normais, picos esporádicos são comuns. Mas se a taxa se mantiver muito alta constantemente, recomenda-se desinstalar drivers de rede antigos, atualizar o driver da GPU utilizando ferramentas de instalação limpa (DDU) ou atualizar a BIOS da placa-mãe.
               </p>
             </div>
           </div>
@@ -1123,36 +1121,36 @@ const SystemMonitor = () => {
   };
 
   return (
-    <div className="space-y-6 h-[calc(100vh-6rem)] flex flex-col relative">
+    <div className="h-[calc(100vh-6rem)] flex flex-col relative">
       {/* Toast Alert Banner */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl animate-in slide-in-from-bottom-2 duration-200 ${
-          toast.type === 'error' ? 'bg-rose-950/95 border-rose-600/50 text-rose-200' :
-          toast.type === 'success' ? 'bg-emerald-950/95 border-emerald-600/50 text-emerald-200' :
-          'bg-zinc-900/95 border-zinc-700 text-zinc-200'
+        <div role="status" className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 max-w-sm px-3.5 py-2.5 rounded-lg border bg-zinc-900 dh-raised shadow-2xl animate-in slide-in-from-bottom-2 ${
+          toast.type === 'error' ? 'border-red-500/40' : 'border-zinc-800'
         }`}>
-          {toast.type === 'error' ? <AlertTriangle size={18} className="text-rose-400 shrink-0" /> : <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />}
-          <span className="text-sm font-medium">{toast.message}</span>
+          {toast.type === 'error' ? <AlertTriangle size={15} className="text-red-400 shrink-0" /> : <CheckCircle2 size={15} className={`${toast.type === 'success' ? 'text-emerald-400' : 'text-zinc-400'} shrink-0`} />}
+          <span className={`text-[12.5px] ${toast.type === 'error' ? 'text-red-200' : 'text-zinc-200'}`}>{toast.message}</span>
         </div>
       )}
 
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <h1 className="text-2xl font-bold text-white">{t('monitor.title', 'Monitor de Sistema')}</h1>
-          <HelpTip
-            title={t('monitor.helpTitle', 'Sobre o Hardware Inspector')}
-            description={t('monitor.helpDesc', 'Plataforma avançada de diagnóstico de hardware modular com coletas de WMI, nvidia-smi e polling de kernel nativo.')}
-            sections={[]}
-            buttonLabel="Entendi"
-          />
-        </div>
-        <p className="text-zinc-400">{t('monitor.subtitle', 'Varredura profunda do sistema ao Ring-0.')}</p>
-      </div>
+      <PageHeader
+        title={
+          <span className="inline-flex items-center gap-2">
+            {t('monitor.title', 'Monitor de Sistema')}
+            <HelpTip
+              title={t('monitor.helpTitle', 'Sobre o Hardware Inspector')}
+              description={t('monitor.helpDesc', 'Plataforma avançada de diagnóstico de hardware modular com coletas de WMI, nvidia-smi e polling de kernel nativo.')}
+              sections={[]}
+              buttonLabel="Entendi"
+            />
+          </span>
+        }
+        subtitle={t('monitor.subtitle', 'Varredura profunda do sistema ao Ring-0.')}
+      />
 
       <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0">
         {renderTabs()}
 
-        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar bg-zinc-900/30 rounded-xl border border-zinc-800/50 p-6 shadow-inner">
+        <div className="flex-1 min-w-0 overflow-y-auto pr-1 custom-scrollbar">
           {renderContent()}
         </div>
       </div>

@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { visibleInterval } from '../utils/visibleInterval';
-import { APP_VERSION_LABEL } from '../appVersion';
 import {
-  Zap, Activity, Gamepad2, Cpu, ShieldCheck,
-  ArrowRight, CheckCircle2, Monitor,
-  Layers, Terminal, Flame, RefreshCw, Play,
-  Network, Wrench, ShieldAlert, FileText, Lock, ChevronRight, Sparkles
-} from 'lucide-react';
+  Zap, Activity, Gamepad2, Cpu, ArrowRight, Monitor, Flame, Play,
+  Network, Wrench, ChevronRight, Sparkles, Loader2, DarkHubMark, AlertTriangle
+} from '../components/icons';
 import { useI18n } from '../i18n/I18nProvider';
 
 interface HomeProps {
@@ -25,6 +22,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
   } | null>(null);
   const [pgeBusy, setPgeBusy] = useState(false);
   const [pgeMessage, setPgeMessage] = useState<string | null>(null);
+  const [genericGpu, setGenericGpu] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchInfo = async () => {
@@ -32,10 +30,12 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
         try {
           const info = await window.darkhub.system.getInfo();
           if (info) {
-            const totalGb = info.memory?.totalGb || (info.memory?.total ? (info.memory.total / (1024 ** 3)).toFixed(1) : '—');
-            const freeGb = info.memory?.freeGb || (info.memory?.free ? (info.memory.free / (1024 ** 3)).toFixed(1) : '—');
-            const cpuName = (info.cpu?.name || info.cpu?.brand || info.cpu?.model || '—').trim();
-            const osName = info.os?.platform === 'win32' ? `Windows ${info.os.release?.startsWith('10.0.22') || info.os.release?.startsWith('10.0.26') ? '11' : '10'} x64` : info.os?.platform || 'Windows';
+            const totalGb = info.memory?.totalGb || (info.memory?.total ? (info.memory.total / (1024 ** 3)).toFixed(1) : '-');
+            const freeGb = info.memory?.freeGb || (info.memory?.free ? (info.memory.free / (1024 ** 3)).toFixed(1) : '-');
+            const cpuName = (info.cpu?.name || info.cpu?.brand || info.cpu?.model || '-').trim();
+            // Windows 11 = build 22000 or newer (any channel); architecture from the OS, not assumed
+            const build = Number(String(info.os?.release || '').split('.')[2] || 0);
+            const osName = info.os?.platform === 'win32' ? `Windows ${build >= 22000 ? '11' : '10'} ${info.os?.arch || ''}`.trim() : info.os?.platform || 'Windows';
             setSysSummary({
               cpu: cpuName,
               ram: t('home.ramFree', '{free} GB livre de {total} GB').replace('{free}', String(freeGb)).replace('{total}', String(totalGb)),
@@ -50,6 +50,21 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
     };
     fetchInfo();
     return visibleInterval(fetchInfo, 10000);
+  }, []);
+
+  // GPU on Windows' generic driver (common right after a DarkOS install): tell the user where to fix it.
+  // Detected once per session; the Driver Center does the real work.
+  useEffect(() => {
+    let alive = true;
+    const cached = sessionStorage.getItem('dh.genericGpu');
+    if (cached !== null) { setGenericGpu(cached || null); return; }
+    window.darkhub?.driver?.detect?.().then((r) => {
+      const g = r?.ok ? r.adapters?.find((a) => a.genericDriver) : undefined;
+      const label = g ? ({ nvidia: 'NVIDIA', amd: 'AMD', intel: 'Intel' } as Record<string, string>)[g.vendor] ?? g.vendor : '';
+      try { sessionStorage.setItem('dh.genericGpu', label); } catch {}
+      if (alive) setGenericGpu(label || null);
+    }).catch(() => {});
+    return () => { alive = false; };
   }, []);
 
   const handleLaunchPGE = async (e: React.MouseEvent) => {
@@ -71,286 +86,171 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
     }
   };
 
+  // Live memory in use (same number as Task Manager), the bar and the figure show the same thing.
+  const [mem, setMem] = useState<{ total: number; used: number } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const read = () => window.darkhub?.system?.getMemory?.().then((m) => { if (alive && m?.ok) setMem(m); }).catch(() => {});
+    read();
+    const h = setInterval(read, 3000);
+    return () => { alive = false; clearInterval(h); };
+  }, []);
+  const usedPct = mem && mem.total > 0 ? Math.min(100, Math.max(0, Math.round((mem.used / mem.total) * 100))) : null;
+  const gb = (b: number) => (b / 1024 ** 3).toFixed(1);
+
+  const tools: { id: string; icon: React.ComponentType<{ size?: number; className?: string }>; title: string; desc: string; action: string; tag: string }[] = [
+    { id: 'darkpacer', icon: Activity, title: t('nav.darkpacer', 'DarkPacer (FPS Lock)'), desc: t('home.darkpacerDesc', 'Frame rate limiter and 1% Low stabilization with microsecond precision via VMT Hooking.'), action: t('home.configPacing', 'Configure Pacing'), tag: 'DXGI' },
+    { id: 'dlss5', icon: Sparkles, title: t('home.dlss5Title', 'DLSS 5 & Universal Upscaler'), desc: t('home.dlss5Desc', 'Upscaling neural com IA, Frame Generation universal para NVIDIA e AMD, ZLUDA HIP e rotas automáticas.'), action: t('home.openDlss5', 'Gerenciar DLSS 5'), tag: 'Frame Gen' },
+    { id: 'optiscaler', icon: Cpu, title: t('nav.optiscaler', 'OptiScaler Manager'), desc: t('home.optiscalerDesc', 'Universal upscaling management, DLL injection and backup snapshots with 1-click restore.'), action: t('home.manageGames', 'Manage Games'), tag: 'DLSS · FSR · XeSS' },
+    { id: 'setuphub', icon: Wrench, title: t('nav.setuphub', 'Post-Install Hub'), desc: t('home.setupHubDesc', 'Bulk installer with DDU, partitioners, benchmarks, Sysinternals and VC++ runtime packages.'), action: t('home.accessCatalog', 'Access Catalog'), tag: 'winget' }
+  ];
+
+  const shortcuts = [
+    { id: 'ultra-latency', icon: Flame, title: 'Ultra Low Latency', desc: t('home.ultraLatencyDesc', 'Timer Resolution & Kernel') },
+    { id: 'monitor', icon: Monitor, title: t('home.hardwareMonitor', 'Hardware Monitor'), desc: t('home.hardwareMonitorDesc', 'Real-time Sensors & Usage') },
+    { id: 'networktools', icon: Network, title: t('home.networkDiagnostics', 'Network Diagnostics'), desc: t('home.networkDiagnosticsDesc', 'Ping, DNS & Cloudflare Test') }
+  ];
+
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-3.5 p-1 md:p-2 animate-fadeIn">
-      {}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80">
-        <div>
-          <h1 className="text-lg font-bold text-zinc-100 tracking-tight flex items-center gap-2">
-            {t('home.title', 'Home Dashboard')}
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono font-normal">{APP_VERSION_LABEL}</span>
-          </h1>
-          <p className="text-xs text-zinc-400">{t('home.subtitle', 'Control Center, Kernel Optimization & Frame Pacing')}</p>
+    <div className="w-full max-w-6xl mx-auto space-y-7">
+      {/* Header + machine readout */}
+      <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-[22px] leading-tight font-semibold tracking-[-0.02em] text-zinc-50">{t('home.title', 'Home Dashboard')}</h1>
+          <p className="mt-1 text-[13px] text-zinc-400">{t('home.subtitle', 'Control Center, Kernel Optimization & Frame Pacing')}</p>
         </div>
 
-        {sysSummary && (
-          <div className="flex items-center gap-2.5 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-md text-xs text-zinc-300 shrink-0 font-mono">
-            <div className="flex items-center gap-1.5 text-zinc-200 font-medium truncate max-w-[210px]">
-              <Cpu size={13} className="text-blue-400 shrink-0" />
-              <span className="truncate">{sysSummary.cpu.split(' @')[0]}</span>
-            </div>
-            <span className="text-zinc-700">|</span>
-            <div className="text-zinc-400 text-[11px]">{sysSummary.freeGb} GB {t('home.freeOf', 'free of')} {sysSummary.totalGb} GB</div>
-            <span className="text-zinc-700">|</span>
-            <span className="text-emerald-400 flex items-center gap-1 text-[11px] font-sans font-medium shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> {t('common.active', 'Active')}
-            </span>
+        <dl className="grid grid-cols-3 rounded-lg border border-zinc-800/80 bg-zinc-900/40 divide-x divide-zinc-800/80 shrink-0 min-w-0 lg:w-[520px]">
+          <div className="px-3.5 py-2.5 min-w-0">
+            <dt className="text-[11px] text-zinc-500">CPU</dt>
+            <dd className="mt-0.5 text-[12.5px] text-zinc-100 truncate" title={sysSummary?.cpu}>
+              {sysSummary ? sysSummary.cpu.split(' @')[0] : <span className="inline-block h-3 w-28 rounded bg-zinc-800 align-middle" />}
+            </dd>
           </div>
-        )}
-      </div>
-
-      {}
-      {/* MAIN NAVIGATION CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-        {/* DarkPacer */}
-        <div
-          onClick={() => onNavigate('darkpacer')}
-          className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850 rounded-lg p-3.5 cursor-pointer transition-colors flex flex-col justify-between group"
-        >
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded text-emerald-400 shrink-0">
-                <Activity size={16} />
+          <div className="px-3.5 py-2.5 min-w-0">
+            <dt className="text-[11px] text-zinc-500">{t('home.memoryUsed', 'Memória em uso')}</dt>
+            <dd className="mt-0.5 font-mono text-[12.5px] text-zinc-100">
+              {mem ? <>{gb(mem.used)}<span className="text-zinc-500"> / {gb(mem.total)} GB</span></> : <span className="inline-block h-3 w-20 rounded bg-zinc-800 align-middle" />}
+            </dd>
+            {usedPct !== null && (
+              <div className="mt-1.5 h-[3px] rounded-full bg-zinc-800 overflow-hidden" role="meter" aria-valuenow={usedPct} aria-valuemin={0} aria-valuemax={100} aria-label={t('home.memoryUsed', 'Memória em uso')}>
+                <div className={`h-full rounded-full ${usedPct > 85 ? 'bg-amber-400' : 'bg-blue-400'}`} style={{ width: `${usedPct}%` }} />
               </div>
-              <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-750">
-                DXGI HOOK
-              </span>
-            </div>
-            <h2 className="text-sm font-semibold text-zinc-100 group-hover:text-emerald-400 transition-colors mb-1">
-              {t('nav.darkpacer', 'DarkPacer (FPS Lock)')}
-            </h2>
-            <p className="text-xs text-zinc-400 leading-relaxed mb-3">
-              {t('home.darkpacerDesc', 'Frame rate limiter and 1% Low stabilization with microsecond precision via VMT Hooking.')}
-            </p>
+            )}
           </div>
-          <div className="flex items-center text-xs font-medium text-emerald-400 pt-1">
-            <span>{t('home.configPacing', 'Configure Pacing')}</span>
-            <ChevronRight size={13} className="ml-1 group-hover:translate-x-0.5 transition-transform" />
+          <div className="px-3.5 py-2.5 min-w-0">
+            <dt className="text-[11px] text-zinc-500">{t('home.system', 'Sistema')}</dt>
+            <dd className="mt-0.5 text-[12.5px] text-zinc-100 truncate">
+              {sysSummary ? <>{sysSummary.os}{sysSummary.cores ? <span className="text-zinc-500 font-mono"> · {sysSummary.cores}c</span> : null}</> : <span className="inline-block h-3 w-24 rounded bg-zinc-800 align-middle" />}
+            </dd>
           </div>
-        </div>
+        </dl>
+      </header>
 
-        {/* DLSS 5 & Universal Upscaler */}
-        <div
-          onClick={() => onNavigate('dlss5')}
-          className="bg-zinc-900 border border-zinc-800 hover:border-purple-500/50 hover:bg-zinc-850 rounded-lg p-3.5 cursor-pointer transition-colors flex flex-col justify-between group"
-        >
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-1.5 bg-purple-500/10 border border-purple-500/20 rounded text-purple-400 shrink-0">
-                <Sparkles size={16} />
-              </div>
-              <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-purple-950/60 text-purple-300 border border-purple-800/60">
-                AI FRAME GEN
-              </span>
-            </div>
-            <h2 className="text-sm font-semibold text-zinc-100 group-hover:text-purple-400 transition-colors mb-1">
-              {t('home.dlss5Title', 'DLSS 5 & Universal Upscaler')}
-            </h2>
-            <p className="text-xs text-zinc-400 leading-relaxed mb-3">
-              {t('home.dlss5Desc', 'Upscaling neural com IA, Frame Generation universal para NVIDIA e AMD, ZLUDA HIP e rotas automáticas.')}
-            </p>
-          </div>
-          <div className="flex items-center text-xs font-medium text-purple-400 pt-1">
-            <span>{t('home.openDlss5', 'Gerenciar DLSS 5')}</span>
-            <ChevronRight size={13} className="ml-1 group-hover:translate-x-0.5 transition-transform" />
-          </div>
+      {genericGpu ? (
+        <div role="alert" className="flex items-center gap-3 rounded-xl border border-amber-300/30 bg-amber-300/[0.04] px-4 py-3">
+          <AlertTriangle size={16} className="text-amber-300 shrink-0" />
+          <p className="flex-1 min-w-0 text-[12.5px] text-zinc-200">
+            {t('home.genericGpu', 'Sua placa {vendor} está usando o driver genérico da Microsoft. Jogos e vídeos ficam limitados até instalar o driver oficial.').replace('{vendor}', genericGpu)}
+          </p>
+          <button type="button" onClick={() => onNavigate('driver')} className="dh-btn dh-btn-primary dh-btn-sm shrink-0">
+            {t('home.genericGpuCta', 'Resolver')}<ArrowRight size={13} />
+          </button>
         </div>
+      ) : null}
 
-        {/* OptiScaler Manager */}
-        <div
-          onClick={() => onNavigate('optiscaler')}
-          className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850 rounded-lg p-3.5 cursor-pointer transition-colors flex flex-col justify-between group"
-        >
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-1.5 bg-blue-500/10 border border-blue-500/20 rounded text-blue-400 shrink-0">
-                <Cpu size={16} />
-              </div>
-              <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-750">
-                DLSS / FSR / XeSS
-              </span>
-            </div>
-            <h2 className="text-sm font-semibold text-zinc-100 group-hover:text-blue-400 transition-colors mb-1">
-              {t('nav.optiscaler', 'OptiScaler Manager')}
-            </h2>
-            <p className="text-xs text-zinc-400 leading-relaxed mb-3">
-              {t('home.optiscalerDesc', 'Universal upscaling management, DLL injection and backup snapshots with 1-click restore.')}
-            </p>
-          </div>
-          <div className="flex items-center text-xs font-medium text-blue-400 pt-1">
-            <span>{t('home.manageGames', 'Manage Games')}</span>
-            <ChevronRight size={13} className="ml-1 group-hover:translate-x-0.5 transition-transform" />
-          </div>
-        </div>
-
-        {/* System Optimizer */}
-        <div
+      {/* Tools: one featured tile + four */}
+      <section className="grid grid-cols-1 lg:grid-cols-[1.15fr_2fr] gap-3" aria-label={t('home.tools', 'Ferramentas')}>
+        <button
+          type="button"
           onClick={() => onNavigate('optimizer')}
-          className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850 rounded-lg p-3.5 cursor-pointer transition-colors flex flex-col justify-between group"
+          className="group relative text-left overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 hover:bg-zinc-900 p-5 flex flex-col justify-between min-h-[236px] dh-raised"
         >
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-1.5 bg-amber-500/10 border border-amber-500/20 rounded text-amber-400 shrink-0">
-                <Zap size={16} />
-              </div>
-              <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-750">
-                KERNEL & REGISTRY
-              </span>
+          <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-10 text-blue-300/[0.06] transition-transform duration-500 group-hover:rotate-[30deg]">
+            <DarkHubMark size={220} strokeWidth={0.9} />
+          </div>
+          <div className="relative">
+            <div className="flex items-center gap-2 text-blue-300">
+              <Zap size={18} />
+              <span className="text-[11px] font-mono text-zinc-500">kernel · registry</span>
             </div>
-            <h2 className="text-sm font-semibold text-zinc-100 group-hover:text-amber-400 transition-colors mb-1">
-              {t('nav.optimizer', 'System Optimizer')}
-            </h2>
-            <p className="text-xs text-zinc-400 leading-relaxed mb-3">
+            <h2 className="mt-4 text-[19px] font-semibold tracking-[-0.015em] text-zinc-50">{t('nav.optimizer', 'System Optimizer')}</h2>
+            <p className="mt-2 text-[13px] leading-relaxed text-zinc-400 max-w-[42ch]">
               {t('home.optimizerDesc', 'Registry DeepTweaks, classic Win10 context menu, taskbar End Task button and debloat.')}
             </p>
           </div>
-          <div className="flex items-center text-xs font-medium text-amber-400 pt-1">
-            <span>{t('home.openTweaks', 'Open Tweaks')}</span>
-            <ChevronRight size={13} className="ml-1 group-hover:translate-x-0.5 transition-transform" />
+          <div className="relative mt-6 flex flex-wrap items-end justify-between gap-4">
+            <span className="dh-btn dh-btn-primary">
+              {t('home.openTweaks', 'Open Tweaks')}
+              <ArrowRight size={14} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+            </span>
+            <ul className="flex flex-wrap gap-x-3 gap-y-1 dh-tag" aria-label={t('home.optimizerAreas', 'Áreas')}>
+              {['privacy', 'power', 'network', 'services', 'memory', 'storage'].map((c) => <li key={c}>{c}</li>)}
+            </ul>
           </div>
-        </div>
+        </button>
 
-        {/* Post-Install Hub */}
-        <div
-          onClick={() => onNavigate('setuphub')}
-          className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850 rounded-lg p-3.5 cursor-pointer transition-colors flex flex-col justify-between group"
-        >
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-1.5 bg-violet-500/10 border border-violet-500/20 rounded text-violet-400 shrink-0">
-                <Wrench size={16} />
-              </div>
-              <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-750">
-                WINGET SUITE
-              </span>
-            </div>
-            <h2 className="text-sm font-semibold text-zinc-100 group-hover:text-violet-400 transition-colors mb-1">
-              {t('nav.setuphub', 'Post-Install Hub')}
-            </h2>
-            <p className="text-xs text-zinc-400 leading-relaxed mb-3">
-              {t('home.setupHubDesc', 'Bulk installer with DDU, partitioners, benchmarks, Sysinternals and VC++ runtime packages.')}
-            </p>
-          </div>
-          <div className="flex items-center text-xs font-medium text-violet-400 pt-1">
-            <span>{t('home.accessCatalog', 'Access Catalog')}</span>
-            <ChevronRight size={13} className="ml-1 group-hover:translate-x-0.5 transition-transform" />
-          </div>
-        </div>
-      </div>
-
-      {/* QUICK ACCESS UTILITIES */}
-      <div className="space-y-2 pt-1">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
-            {t('home.quickUtilities', 'Quick Utilities')}
-          </h3>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
-          {/* DLSS 5 Manager Quick */}
-          <div
-            onClick={() => onNavigate('dlss5')}
-            className="p-3 bg-zinc-900 border border-zinc-800 hover:border-purple-500/40 hover:bg-zinc-850 rounded-lg cursor-pointer transition-colors group flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="p-1.5 bg-purple-500/10 text-purple-400 rounded shrink-0">
-                <Sparkles size={16} />
-              </div>
-              <div className="min-w-0">
-                <h4 className="text-xs font-semibold text-zinc-200 group-hover:text-purple-400 transition-colors truncate">
-                  DLSS 5 Manager
-                </h4>
-                <p className="text-[10px] text-zinc-500 truncate">AI Frame Gen & Upscaling</p>
-              </div>
-            </div>
-            <ChevronRight size={14} className="text-zinc-600 group-hover:text-zinc-300 transition-colors shrink-0" />
-          </div>
-
-          {/* PGE Portable */}
-          <div
-            onClick={handleLaunchPGE}
-            className="p-3 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850 rounded-lg cursor-pointer transition-colors group flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="p-1.5 bg-purple-500/10 text-purple-400 rounded shrink-0">
-                <Gamepad2 size={16} />
-              </div>
-              <div className="min-w-0">
-                <h4 className="text-xs font-semibold text-zinc-200 group-hover:text-purple-400 transition-colors truncate">
-                  PGE Portable
-                </h4>
-                <p className="text-[10px] text-zinc-500 truncate">
-                  {pgeMessage ? pgeMessage : t('home.pgeDesc', 'Lossless Scaling & ReSwitch')}
-                </p>
-              </div>
-            </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {tools.map(({ id, icon: Icon, title, desc, action, tag }) => (
             <button
-              disabled={pgeBusy}
-              className="px-2 py-1 bg-zinc-800 hover:bg-zinc-750 text-zinc-300 rounded text-[11px] font-medium shrink-0 flex items-center gap-1"
+              key={id}
+              type="button"
+              onClick={() => onNavigate(id)}
+              className="group text-left rounded-xl border border-zinc-800/80 bg-zinc-900/30 hover:border-zinc-700 hover:bg-zinc-900/70 p-4 flex flex-col"
             >
-              <Play size={10} className="fill-zinc-300" />
-              <span>{pgeBusy ? '...' : (pgeMessage || t('home.open', 'Abrir'))}</span>
+              <div className="flex items-center justify-between">
+                <Icon size={17} className="text-zinc-400 group-hover:text-blue-300 transition-colors" />
+                <span className="text-[10.5px] font-mono text-zinc-600">{tag}</span>
+              </div>
+              <h3 className="mt-3 text-[14px] font-semibold tracking-[-0.01em] text-zinc-100">{title}</h3>
+              <p className="mt-1 text-[12.5px] leading-relaxed text-zinc-400 line-clamp-2">{desc}</p>
+              <span className="mt-auto pt-3 inline-flex items-center gap-1 text-[12px] font-medium text-zinc-300 group-hover:text-blue-300 transition-colors">
+                {action}
+                <ChevronRight size={13} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Shortcuts: one strip, not five cards */}
+      <section aria-labelledby="home-shortcuts">
+        <h2 id="home-shortcuts" className="text-[13px] font-medium text-zinc-400 mb-2.5">{t('home.quickUtilities', 'Quick Utilities')}</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 rounded-xl border border-zinc-800/80 bg-zinc-900/30 divide-y sm:divide-y-0 lg:divide-x divide-zinc-800/80 overflow-hidden">
+          {shortcuts.map(({ id, icon: Icon, title, desc }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onNavigate(id)}
+              className="group flex items-center gap-3 px-4 py-3 text-left hover:bg-zinc-900/80 min-w-0"
+            >
+              <Icon size={16} className="shrink-0 text-zinc-500 group-hover:text-blue-300 transition-colors" />
+              <span className="min-w-0">
+                <span className="block text-[12.5px] font-medium text-zinc-200 truncate">{title}</span>
+                <span className="block text-[11.5px] text-zinc-500 truncate">{desc}</span>
+              </span>
+            </button>
+          ))}
+          <div className="flex items-center gap-3 px-4 py-3 min-w-0">
+            <Gamepad2 size={16} className="shrink-0 text-zinc-500" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[12.5px] font-medium text-zinc-200 truncate">PGE Portable</span>
+              <span className="block text-[11.5px] text-zinc-500 truncate" role="status">
+                {pgeMessage ?? t('home.pgeDesc', 'Lossless Scaling & ReSwitch')}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={handleLaunchPGE}
+              disabled={pgeBusy}
+              className="shrink-0 inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border border-zinc-700 text-[12px] text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
+            >
+              {pgeBusy ? <Loader2 size={12} className="animate-spin" /> : <Play size={11} />}
+              {t('home.open', 'Abrir')}
             </button>
           </div>
-
-          {}
-          <div
-            onClick={() => onNavigate('ultra-latency')}
-            className="p-3 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850 rounded-lg cursor-pointer transition-colors group flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="p-1.5 bg-rose-500/10 text-rose-400 rounded shrink-0">
-                <Flame size={16} />
-              </div>
-              <div className="min-w-0">
-                <h4 className="text-xs font-semibold text-zinc-200 group-hover:text-rose-400 transition-colors truncate">
-                  Ultra Low Latency
-                </h4>
-                <p className="text-[10px] text-zinc-500 truncate">{t('home.ultraLatencyDesc', 'Timer Resolution & Kernel')}</p>
-              </div>
-            </div>
-            <ChevronRight size={14} className="text-zinc-600 group-hover:text-zinc-300 transition-colors shrink-0" />
-          </div>
-
-          {}
-          <div
-            onClick={() => onNavigate('monitor')}
-            className="p-3 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850 rounded-lg cursor-pointer transition-colors group flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="p-1.5 bg-sky-500/10 text-sky-400 rounded shrink-0">
-                <Monitor size={16} />
-              </div>
-              <div className="min-w-0">
-                <h4 className="text-xs font-semibold text-zinc-200 group-hover:text-sky-400 transition-colors truncate">
-                  {t('home.hardwareMonitor', 'Hardware Monitor')}
-                </h4>
-                <p className="text-[10px] text-zinc-500 truncate">{t('home.hardwareMonitorDesc', 'Real-time Sensors & Usage')}</p>
-              </div>
-            </div>
-            <ChevronRight size={14} className="text-zinc-600 group-hover:text-zinc-300 transition-colors shrink-0" />
-          </div>
-
-          {}
-          <div
-            onClick={() => onNavigate('networktools')}
-            className="p-3 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850 rounded-lg cursor-pointer transition-colors group flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded shrink-0">
-                <Network size={16} />
-              </div>
-              <div className="min-w-0">
-                <h4 className="text-xs font-semibold text-zinc-200 group-hover:text-emerald-400 transition-colors truncate">
-                  {t('home.networkDiagnostics', 'Network Diagnostics')}
-                </h4>
-                <p className="text-[10px] text-zinc-500 truncate">{t('home.networkDiagnosticsDesc', 'Ping, DNS & Cloudflare Test')}</p>
-              </div>
-            </div>
-            <ChevronRight size={14} className="text-zinc-600 group-hover:text-zinc-300 transition-colors shrink-0" />
-          </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 };

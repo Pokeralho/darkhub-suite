@@ -32,15 +32,46 @@ class HardwareService {
     this._handlersRegistered = true;
     Logger.info('HardwareService', 'Motor de telemetria ativado (daemons persistentes, zero spawn por ciclo).');
 
-    ipcMain.handle('hardware:startPolling', () => {
-      this.activeConsumers += 1;
-      if (this.activeConsumers === 1) this.start();
+    // Count consumers per renderer: a reload/crash never sends stopPolling, which
+    // used to leave the counter > 0 forever (sensors polled with no listener).
+    const perSender = new Map();
+    const recompute = () => {
+      let total = 0;
+      for (const n of perSender.values()) total += n;
+      const prev = this.activeConsumers;
+      this.activeConsumers = total;
+      if (prev === 0 && total > 0) this.start();
+      else if (prev > 0 && total === 0) this.stop();
+    };
+    const dropSender = (id) => {
+      if (perSender.delete(id)) recompute();
+    };
+
+    const hookedSenders = new Set();
+    ipcMain.handle('hardware:startPolling', (event) => {
+      const sender = event?.sender;
+      const id = sender?.id ?? 0;
+      if (!hookedSenders.has(id) && sender?.on) {
+        hookedSenders.add(id);
+        sender.once('destroyed', () => {
+          hookedSenders.delete(id);
+          dropSender(id);
+        });
+        sender.on('render-process-gone', () => dropSender(id));
+        // Full main-frame navigation (reload) — not fired for in-page routing.
+        sender.on('did-navigate', () => dropSender(id));
+      }
+      perSender.set(id, (perSender.get(id) || 0) + 1);
+      recompute();
       return { ok: true, activeConsumers: this.activeConsumers };
     });
 
-    ipcMain.handle('hardware:stopPolling', () => {
-      this.activeConsumers = Math.max(0, this.activeConsumers - 1);
-      if (this.activeConsumers === 0) this.stop();
+    ipcMain.handle('hardware:stopPolling', (event) => {
+      const id = event?.sender?.id ?? 0;
+      const n = (perSender.get(id) || 0) - 1;
+      if (n > 0) perSender.set(id, n);
+      else perSender.delete(id);
+      recompute();
       return { ok: true, activeConsumers: this.activeConsumers };
     });
   }

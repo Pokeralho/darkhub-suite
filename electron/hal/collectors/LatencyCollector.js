@@ -1,6 +1,6 @@
 import SensorBus from './SensorBus.js';
 import { BaseCollector } from './BaseCollector.js';
-import { createSensor, createUnavailableSensor } from '../models/SensorModel.js';
+import { createSensor, createUnavailableSensor, numOrNull } from '../models/SensorModel.js';
 import { runPowerShellJson } from '../../services/PowerShellRunner.js';
 import Logger from '../../services/LoggerService.js';
 
@@ -19,10 +19,10 @@ class LatencyCollector extends BaseCollector {
 
     SensorBus.on('data', (payload) => {
       if (payload.type !== 'latency') return;
-      this.dpcsQueued = Number(payload.dpcsQueued) || 0;
-      this.interrupts = Number(payload.interrupts) || 0;
-      this.percentDpc = Number(payload.percentDpc) || 0;
-      this.percentInt = Number(payload.percentInt) || 0;
+      this.dpcsQueued = numOrNull(payload.dpcsQueued);
+      this.interrupts = numOrNull(payload.interrupts);
+      this.percentDpc = numOrNull(payload.percentDpc);
+      this.percentInt = numOrNull(payload.percentInt);
       this.lastUpdate = Date.now();
     });
   }
@@ -83,10 +83,10 @@ class LatencyCollector extends BaseCollector {
         status: 'OK',
         timestamp: Date.now(),
         values: {
-          dpcsQueued: createSensor(this.dpcsQueued, 'DPCs/s', 'wmi'),
-          interrupts: createSensor(this.interrupts, 'Ints/s', 'wmi'),
-          percentDpc: createSensor(this.percentDpc, '%', 'wmi'),
-          percentInt: createSensor(this.percentInt, '%', 'wmi'),
+          dpcsQueued: createSensor(this.dpcsQueued, 'DPCs/s', 'pdh'),
+          interrupts: createSensor(this.interrupts, 'Ints/s', 'pdh'),
+          percentDpc: createSensor(this.percentDpc, '%', 'pdh'),
+          percentInt: createSensor(this.percentInt, '%', 'pdh'),
           drivers: this.runningDrivers
         }
       };

@@ -34,7 +34,8 @@ class CpuCollector {
         coresData.push({ idle: coreIdle, total: coreTotal });
       }
 
-      let currentLoad = 0;
+      // No previous sample (first poll, core count changed): load is unknown, not 0 %.
+      let currentLoad = null;
       const coresLoad = [];
 
       if (this.lastCpu && this.lastCores && this.lastCores.length === cpus.length) {
@@ -49,7 +50,7 @@ class CpuCollector {
           coresLoad.push(coreLoad);
         }
       } else {
-        coresData.forEach(() => coresLoad.push(0));
+        coresData.forEach(() => coresLoad.push(null));
       }
 
       this.lastCpu = { idle, total };
@@ -60,8 +61,8 @@ class CpuCollector {
         status: 'OK',
         timestamp: Date.now(),
         values: {
-          currentLoad: createSensor(Math.max(0, Math.min(100, currentLoad)), '%', 'node-os'),
-          coresLoad: coresLoad.map(l => createSensor(Math.max(0, Math.min(100, l)), '%', 'node-os'))
+          currentLoad: createSensor(currentLoad === null ? null : Math.max(0, Math.min(100, currentLoad)), '%', 'node-os'),
+          coresLoad: coresLoad.map(l => createSensor(l === null ? null : Math.max(0, Math.min(100, l)), '%', 'node-os'))
         }
       };
       return this.lastResult;

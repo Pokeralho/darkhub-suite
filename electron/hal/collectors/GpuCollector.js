@@ -2,28 +2,25 @@ import si from 'systeminformation';
 import SensorBus from './SensorBus.js';
 import NvidiaDaemon from './NvidiaDaemon.js';
 import { BaseCollector } from './BaseCollector.js';
-import { createSensor, createUnavailableSensor } from '../models/SensorModel.js';
+import { createSensor, createUnavailableSensor, numOrNull, sameGpu } from '../models/SensorModel.js';
 import Logger from '../../services/LoggerService.js';
 
-const NVIDIA_STALE_MS = 20000;
+const STALE_MS = 20000;
 
-const WMI_STALE_MS = 20000;
-
+/**
+ * One entry per real GPU. The adapter list comes from the native daemon (DXGI names + per-adapter PDH utilization
+ * and dedicated memory, the numbers Task Manager shows); nvidia-smi adds temperature, clocks, power and fan to the
+ * NVIDIA card it belongs to (matched by name, never by position). systeminformation is only the list of last resort.
+ */
 class GpuCollector extends BaseCollector {
   constructor() {
     super();
-
     this.cachedGpus = [];
-
     this.lastUpdate = 0;
-
     this._nvidiaGpus = [];
     this._nvidiaStamp = 0;
-
-    this._wmiUtilization = 0;
-    this._wmiMemoryUsed = 0;
-    this._wmiStamp = 0;
-
+    this._adapters = [];
+    this._adaptersStamp = 0;
     this._staticGpus = [];
     this._staticStamp = 0;
     this._staticStarted = false;
@@ -33,12 +30,10 @@ class GpuCollector extends BaseCollector {
       this._nvidiaGpus = payload.gpus;
       this._nvidiaStamp = Date.now();
     });
-
     SensorBus.on('data', (payload) => {
-      if (payload.type !== 'gpu') return;
-      this._wmiUtilization = Number(payload.utilization) || 0;
-      this._wmiMemoryUsed = Number(payload.memoryUsed) || 0;
-      this._wmiStamp = Date.now();
+      if (payload.type !== 'gpu' || !Array.isArray(payload.adapters)) return;
+      this._adapters = payload.adapters;
+      this._adaptersStamp = Date.now();
     });
   }
 
@@ -48,88 +43,52 @@ class GpuCollector extends BaseCollector {
     si.graphics()
       .then((graphics) => {
         if (!graphics || !Array.isArray(graphics.controllers)) return;
-        this._staticGpus = graphics.controllers.map(c => ({
-          vendor: c.vendor || '',
-          model: c.model || '',
-          vram: c.vram || 0
-        }));
+        this._staticGpus = graphics.controllers
+          .filter((c) => !/basic render|remote display|virtual/i.test(`${c.vendor} ${c.model}`))
+          .map((c) => ({ name: `${c.vendor || ''} ${c.model || ''}`.trim(), vram: c.vram || 0 }));
         this._staticStamp = Date.now();
-        Logger.info('GpuCollector', `Dados estáticos: ${this._staticGpus.length} GPU(s) detectada(s)`);
       })
-      .catch(err => Logger.warn('GpuCollector', 'Falha ao buscar dados estáticos de GPU', err.message));
+      .catch((err) => Logger.warn('GpuCollector', 'Falha ao buscar dados estáticos de GPU', err.message));
   }
 
   poll() {
     this._ensureStaticData();
-
     const now = Date.now();
-    const nvidiaFresh = this._nvidiaStamp > 0 && (now - this._nvidiaStamp) <= NVIDIA_STALE_MS;
-    const wmiFresh = this._wmiStamp > 0 && (now - this._wmiStamp) <= WMI_STALE_MS;
-
-    const key = [
-      nvidiaFresh ? this._nvidiaStamp : 0,
-      wmiFresh ? this._wmiStamp : 0,
-      this._staticStamp
-    ].join('|');
-
+    const nvidiaFresh = this._nvidiaStamp > 0 && now - this._nvidiaStamp <= STALE_MS;
+    const pdhFresh = this._adaptersStamp > 0 && now - this._adaptersStamp <= STALE_MS;
+    const key = [nvidiaFresh ? this._nvidiaStamp : 0, pdhFresh ? this._adaptersStamp : 0, this._staticStamp].join('|');
     return this._memo(key, () => {
-      const gpus = nvidiaFresh
-        ? this._buildNvidiaGpus()
-        : this._buildFallbackGpus(wmiFresh);
-
+      const base = pdhFresh && this._adapters.length
+        ? this._adapters.map((a) => ({ name: a.name, pdh: a }))
+        : this._staticGpus.map((g) => ({ name: g.name, vram: g.vram }));
+      // an NVIDIA card nvidia-smi sees but the base list missed is still listed
+      const nv = nvidiaFresh ? this._nvidiaGpus : [];
+      for (const g of nv) if (!base.some((b) => sameGpu(b.name, g.name))) base.push({ name: g.name });
+      const gpus = base.map((b, idx) => this._build(b, nv.find((g) => sameGpu(b.name, g.name)), idx));
       this.cachedGpus = gpus;
       this.lastUpdate = Date.now();
-
       return { status: 'OK', timestamp: this.lastUpdate, values: { gpus } };
     });
   }
 
-  _buildNvidiaGpus() {
-    const sensor = (value, unit) => createSensor(value, unit, 'nvidia-smi', { quality: 'high' });
-    return this._nvidiaGpus.map(g => ({
-      index: g.index,
-      name: g.name,
-      utilization: sensor(g.utilization, '%'),
-      temperature: sensor(g.temperature, '°C'),
-      vramUsed: sensor(g.vramUsed, 'MB'),
-      vramTotal: sensor(g.vramTotal, 'MB'),
-      clockCore: sensor(g.clockCore, 'MHz'),
-      clockMemory: sensor(g.clockMemory, 'MHz'),
-      powerDraw: sensor(g.powerDraw, 'W'),
-      fanSpeed: sensor(g.fanSpeed, '%'),
-      provider: 'nvidia-smi'
-    }));
-  }
-
-  _buildFallbackGpus(wmiFresh) {
-    const source = wmiFresh ? 'wmi' : 'si';
-
-    const template = (vendor, model, vram, idx) => ({
+  _build(b, nv, idx) {
+    const na = (unit, src) => createUnavailableSensor(unit, src, 'Unavailable');
+    const smi = (v, unit) => (nv && numOrNull(v) !== null ? createSensor(numOrNull(v), unit, 'nvidia-smi', { quality: 'high' }) : null);
+    const pdh = (v, unit) => (b.pdh && numOrNull(v) !== null ? createSensor(numOrNull(v), unit, 'pdh', { quality: 'high' }) : null);
+    return {
       index: idx,
-      name: `${vendor} ${model}`.trim() || `GPU ${idx + 1}`,
-
-      utilization: idx === 0 && wmiFresh
-        ? createSensor(this._wmiUtilization, '%', 'wmi', { quality: 'medium' })
-        : createUnavailableSensor('%', source, 'Unavailable'),
-      temperature: createUnavailableSensor('°C', source, 'Unavailable'),
-      vramUsed: idx === 0 && wmiFresh
-        ? createSensor(this._wmiMemoryUsed, 'MB', 'wmi', { quality: 'medium' })
-        : createUnavailableSensor('MB', source, 'Unavailable'),
-      vramTotal: vram > 0
-        ? createSensor(vram, 'MB', 'si', { quality: 'high' })
-        : createUnavailableSensor('MB', 'si', 'Unavailable'),
-      clockCore: createUnavailableSensor('MHz', source, 'Unavailable'),
-      clockMemory: createUnavailableSensor('MHz', source, 'Unavailable'),
-      powerDraw: createUnavailableSensor('W', source, 'Unavailable'),
-      fanSpeed: createUnavailableSensor('%', source, 'Unavailable'),
-      provider: wmiFresh ? 'wmi' : 'si'
-    });
-
-    if (this._staticGpus.length > 0) {
-      return this._staticGpus.map((g, i) => template(g.vendor, g.model, g.vram, i));
-    }
-
-    return [template('', 'GPU', 0, 0)];
+      name: b.name || `GPU ${idx + 1}`,
+      utilization: smi(nv?.utilization, '%') || pdh(b.pdh?.utilization, '%') || na('%', 'pdh'),
+      temperature: smi(nv?.temperature, '°C') || na('°C', 'none'),
+      vramUsed: smi(nv?.vramUsed, 'MB') || pdh(b.pdh?.memoryUsed, 'MB') || na('MB', 'pdh'),
+      vramTotal: smi(nv?.vramTotal, 'MB') || pdh(b.pdh?.memoryTotal, 'MB')
+        || (b.vram > 0 ? createSensor(b.vram, 'MB', 'si', { quality: 'medium' }) : na('MB', 'si')),
+      clockCore: smi(nv?.clockCore, 'MHz') || na('MHz', 'none'),
+      clockMemory: smi(nv?.clockMemory, 'MHz') || na('MHz', 'none'),
+      powerDraw: smi(nv?.powerDraw, 'W') || na('W', 'none'),
+      fanSpeed: smi(nv?.fanSpeed, '%') || na('%', 'none'),
+      provider: nv ? 'nvidia-smi' : b.pdh ? 'pdh' : 'si'
+    };
   }
 }
 

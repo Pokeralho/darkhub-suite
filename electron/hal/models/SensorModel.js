@@ -30,22 +30,6 @@ export function createUnavailableSensor(unit, source, reason = 'Unsupported') {
   });
 }
 
-export function createErrorSensor(source = 'unknown', unit = '') {
-  return createSensor(null, unit, source, {
-    quality: 'unavailable',
-    availability: 'error',
-    status: 'Error'
-  });
-}
-
-export function createLoadingSensor(unit, source) {
-  return createSensor(null, unit, source, {
-    quality: 'unavailable',
-    availability: 'loading',
-    status: 'Loading'
-  });
-}
-
 export function classifyTemperature(value, component = 'cpu') {
   if (value === null || value === undefined) return 'Unavailable';
   const limits = {
@@ -58,4 +42,18 @@ export function classifyTemperature(value, component = 'cpu') {
   if (value >= l.critical) return 'Critical';
   if (value >= l.hot) return 'Hot';
   return 'OK';
+}
+
+/** Daemon values: null/undefined/non-numeric stay null ("unavailable"), never become a measured 0. */
+export function numOrNull(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Loose GPU name match across providers (DXGI, nvidia-smi, WMI/systeminformation, LHM). */
+export function sameGpu(a, b) {
+  const n = (s) => String(s || '').toLowerCase().replace(/\(r\)|\(tm\)|graphics|corporation|nvidia|amd|ati|intel|radeon|geforce|[^a-z0-9]/g, '');
+  const x = n(a), y = n(b);
+  return Boolean(x && y && (x === y || x.includes(y) || y.includes(x)));
 }

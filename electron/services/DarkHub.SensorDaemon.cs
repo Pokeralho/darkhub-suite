@@ -38,11 +38,31 @@ public class DarkHubSensorDaemon {
         public uint uiCoreCnt;
         public uint uiCPUCnt;
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)] public float[] fTemp;
+        public float fVID;
+        public float fCPUSpeed;
+        public float fFSBSpeed;
+        public float fMultiplier;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 100)] public byte[] sCPUName;
+        public byte ucFahrenheit;
+        public byte ucDeltaToTjMax;
     }
 
     private const uint PDH_FMT_DOUBLE = 0x00000200;
     private const uint PDH_FMT_NOCAP100 = 0x00008000;
     private const uint PDH_MORE_DATA = 0x800007D2;
+
+    // PDH_FMT_COUNTERVALUE_ITEM_W = { LPWSTR szName; PDH_FMT_COUNTERVALUE FmtValue; }. FmtValue holds a
+    // double, so it is 8-aligned on x86 too: CStatus @8, value @16, stride 24 on BOTH x86 and x64.
+    // (The previous IntPtr.Size-based math gave stride 20 / offset 12 on a 32-bit build.)
+    private const int PDH_ITEM_STRIDE = 24;
+    private const int PDH_ITEM_STATUS_OFFSET = 8;
+    private const int PDH_ITEM_VALUE_OFFSET = 16;
+
+    // PDH_CSTATUS_VALID_DATA (0) / PDH_CSTATUS_NEW_DATA (1); anything else is not a real sample.
+    private static bool ItemValid(IntPtr item) {
+        uint st = (uint)Marshal.ReadInt32(item, PDH_ITEM_STATUS_OFFSET);
+        return st == 0 || st == 1;
+    }
 
     private static float ReadCoreTemp() {
         try {
@@ -53,9 +73,18 @@ public class DarkHubSensorDaemon {
                     GCHandle h = GCHandle.Alloc(b, GCHandleType.Pinned);
                     try {
                         CoreTempData d = (CoreTempData)Marshal.PtrToStructure(h.AddrOfPinnedObject(), typeof(CoreTempData));
-                        float max = 0;
-                        for (int i = 0; i < (int)d.uiCoreCnt && i < 256; i++) {
-                            if (d.fTemp[i] > max) max = d.fTemp[i];
+                        // CoreTemp can publish Fahrenheit or "distance to TjMax" instead of degrees C.
+                        float max = -1;
+                        int n = (int)Math.Min(256u, d.uiCoreCnt * Math.Max(1u, d.uiCPUCnt));
+                        for (int i = 0; i < n; i++) {
+                            float t = d.fTemp[i];
+                            if (d.ucDeltaToTjMax != 0) {
+                                uint tj = d.uiTjMax[Math.Min(127, i / (int)Math.Max(1u, d.uiCoreCnt))];
+                                if (tj == 0) continue;
+                                t = tj - t;
+                            }
+                            if (d.ucFahrenheit != 0) t = (t - 32f) * 5f / 9f;
+                            if (t > max) max = t;
                         }
                         return max;
                     } finally {
@@ -77,14 +106,14 @@ public class DarkHubSensorDaemon {
             return;
         }
 
-        IntPtr hDiskRead = IntPtr.Zero, hDiskWrite = IntPtr.Zero, hDiskTime = IntPtr.Zero;
+        IntPtr hDiskRead = IntPtr.Zero, hDiskWrite = IntPtr.Zero, hDiskIdle = IntPtr.Zero;
         IntPtr hDpcQ = IntPtr.Zero, hInts = IntPtr.Zero, hDpcPct = IntPtr.Zero, hIntPct = IntPtr.Zero;
         IntPtr hNetRx = IntPtr.Zero, hNetTx = IntPtr.Zero;
         IntPtr hGpuUtil = IntPtr.Zero, hGpuMem = IntPtr.Zero;
 
         PdhAddEnglishCounterW(query, "\\PhysicalDisk(_Total)\\Disk Read Bytes/sec", IntPtr.Zero, out hDiskRead);
         PdhAddEnglishCounterW(query, "\\PhysicalDisk(_Total)\\Disk Write Bytes/sec", IntPtr.Zero, out hDiskWrite);
-        PdhAddEnglishCounterW(query, "\\PhysicalDisk(_Total)\\% Disk Time", IntPtr.Zero, out hDiskTime);
+        PdhAddEnglishCounterW(query, "\\PhysicalDisk(_Total)\\% Idle Time", IntPtr.Zero, out hDiskIdle);
 
         PdhAddEnglishCounterW(query, "\\Processor(_Total)\\DPCs Queued/sec", IntPtr.Zero, out hDpcQ);
         PdhAddEnglishCounterW(query, "\\Processor(_Total)\\Interrupts/sec", IntPtr.Zero, out hInts);
@@ -96,6 +125,8 @@ public class DarkHubSensorDaemon {
 
         PdhAddEnglishCounterW(query, "\\GPU Engine(*engtype_3D)\\Utilization Percentage", IntPtr.Zero, out hGpuUtil);
         PdhAddEnglishCounterW(query, "\\GPU Adapter Memory(*)\\Dedicated Usage", IntPtr.Zero, out hGpuMem);
+
+        Dictionary<string, GpuAdapter> adapters = EnumerateAdapters();
 
         // Prime the query
         PdhCollectQueryData(query);
@@ -128,38 +159,37 @@ public class DarkHubSensorDaemon {
             // 1. Read singles: Disk & Latency
             double diskRead = ReadSingle(hDiskRead);
             double diskWrite = ReadSingle(hDiskWrite);
-            double diskTime = ReadSingle(hDiskTime);
-            long rd = (long)Math.Round(diskRead);
-            long wr = (long)Math.Round(diskWrite);
-            int act = (int)Math.Round(diskTime);
-            if (act > 100) act = 100;
-            Console.WriteLine(string.Format("{{\"type\":\"diskIo\",\"readBps\":{0},\"writeBps\":{1},\"activity\":{2}}}", rd, wr, act));
+            double diskIdle = ReadSingle(hDiskIdle);
+            double act = double.IsNaN(diskIdle) ? double.NaN : Math.Max(0.0, Math.Min(100.0, 100.0 - diskIdle));
+            // A counter that could not be read is sent as null, never as a measured 0.
+            Console.WriteLine("{\"type\":\"diskIo\",\"readBps\":" + Num(diskRead, "F0") + ",\"writeBps\":" + Num(diskWrite, "F0") + ",\"activity\":" + Num(act, "F0") + "}");
 
             double dpcQ = ReadSingle(hDpcQ);
             double ints = ReadSingle(hInts);
             double dpcPct = ReadSingle(hDpcPct);
             double intPct = ReadSingle(hIntPct);
-            Console.WriteLine(string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "{{\"type\":\"latency\",\"dpcsQueued\":{0},\"interrupts\":{1},\"percentDpc\":{2},\"percentInt\":{3}}}",
-                (long)Math.Round(dpcQ), (long)Math.Round(ints),
-                dpcPct.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
-                intPct.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)));
+            Console.WriteLine("{\"type\":\"latency\",\"dpcsQueued\":" + Num(dpcQ, "F0") + ",\"interrupts\":" + Num(ints, "F0") +
+                ",\"percentDpc\":" + Num(dpcPct, "F2") + ",\"percentInt\":" + Num(intPct, "F2") + "}");
 
             // 2. Read physical network ONLY (filtering virtual/loopback/tunnel)
             if (hNetRx != IntPtr.Zero || hNetTx != IntPtr.Zero) {
-                long rx = (long)Math.Round(ReadMultiFiltered(hNetRx));
-                long tx = (long)Math.Round(ReadMultiFiltered(hNetTx));
-                Console.WriteLine(string.Format("{{\"type\":\"network\",\"rxBps\":{0},\"txBps\":{1}}}", rx, tx));
+                double rx = ReadMultiFiltered(hNetRx);
+                double tx = ReadMultiFiltered(hNetTx);
+                Console.WriteLine("{\"type\":\"network\",\"rxBps\":" + Num(rx, "F0") + ",\"txBps\":" + Num(tx, "F0") + "}");
             }
 
             // 3. Read GPU
-            if (hGpuUtil != IntPtr.Zero || hGpuMem != IntPtr.Zero) {
-                double gpuUtil = ReadMultiMax(hGpuUtil);
-                double gpuMem = ReadMultiSum(hGpuMem);
-                int gu = (int)Math.Round(gpuUtil);
-                if (gu > 100) gu = 100;
-                long gm = (long)Math.Round(gpuMem / 1048576.0);
-                Console.WriteLine(string.Format("{{\"type\":\"gpu\",\"utilization\":{0},\"memoryUsed\":{1}}}", gu, gm));
+            if (adapters.Count > 0 && (hGpuUtil != IntPtr.Zero || hGpuMem != IntPtr.Zero)) {
+                Dictionary<string, double> util = ReadByLuid(hGpuUtil);
+                Dictionary<string, double> mem = ReadByLuid(hGpuMem);
+                List<string> items = new List<string>();
+                foreach (KeyValuePair<string, GpuAdapter> a in adapters) {
+                    double u = util == null ? double.NaN : (util.ContainsKey(a.Key) ? Math.Min(100.0, util[a.Key]) : 0.0);
+                    double m = mem == null || !mem.ContainsKey(a.Key) ? double.NaN : mem[a.Key] / 1048576.0;
+                    items.Add("{\"name\":\"" + EscapeJson(a.Value.Name) + "\",\"luid\":\"" + a.Key + "\",\"vendorId\":" + a.Value.VendorId +
+                        ",\"utilization\":" + Num(u, "F0") + ",\"memoryUsed\":" + Num(m, "F0") + ",\"memoryTotal\":" + a.Value.DedicatedMb + "}");
+                }
+                Console.WriteLine("{\"type\":\"gpu\",\"adapters\":[" + string.Join(",", items.ToArray()) + "]}");
             }
 
             // 4. CoreTemp check (every 5s)
@@ -173,8 +203,9 @@ public class DarkHubSensorDaemon {
 
             // 5. Processes: read ONLY when flag exists
             if ((tick % procsEvery) == 1 && File.Exists(procsFlagPath)) {
+                Process[] procs = null;
                 try {
-                    Process[] procs = Process.GetProcesses();
+                    procs = Process.GetProcesses();
                     DateTime now = DateTime.UtcNow;
                     double dt = (now - prevStamp).TotalSeconds;
                     if (dt <= 0) dt = 1.0;
@@ -243,6 +274,13 @@ public class DarkHubSensorDaemon {
                     Console.WriteLine(string.Format("{{\"type\":\"procs\",\"all\":{0},\"topCpu\":[{1}],\"topMem\":[{2}]}}",
                         procs.Length, string.Join(",", topCpuJson.ToArray()), string.Join(",", topMemJson.ToArray())));
                 } catch { }
+                finally {
+                    // TotalProcessorTime opens a process handle per Process; release them every cycle
+                    // instead of waiting for the finalizer (hundreds of handles per tick otherwise).
+                    if (procs != null) {
+                        foreach (Process p in procs) { try { p.Dispose(); } catch { } }
+                    }
+                }
             }
 
             Console.Out.Flush();
@@ -251,31 +289,34 @@ public class DarkHubSensorDaemon {
     }
 
     private static double ReadSingle(IntPtr hCounter) {
-        if (hCounter == IntPtr.Zero) return 0.0;
+        if (hCounter == IntPtr.Zero) return double.NaN;
         uint lpdwType;
         PDH_FMT_COUNTERVALUE pVal;
         uint rc = PdhGetFormattedCounterValue(hCounter, PDH_FMT_DOUBLE | PDH_FMT_NOCAP100, out lpdwType, out pVal);
-        return (rc == 0) ? pVal.doubleValue : 0.0;
+        if (rc != 0 || (pVal.CStatus != 0 && pVal.CStatus != 1)) return double.NaN;
+        double v = pVal.doubleValue;
+        return double.IsInfinity(v) ? double.NaN : v;
     }
 
     private static double ReadMultiFiltered(IntPtr hCounter) {
-        if (hCounter == IntPtr.Zero) return 0.0;
+        if (hCounter == IntPtr.Zero) return double.NaN;
         uint size = 0, count = 0;
         if (PdhGetFormattedCounterArrayW(hCounter, PDH_FMT_DOUBLE | PDH_FMT_NOCAP100, ref size, ref count, IntPtr.Zero) != PDH_MORE_DATA) {
-            return 0.0;
+            return double.NaN;
         }
-        if (size == 0) return 0.0;
+        if (size == 0) return double.NaN;
 
         IntPtr buf = Marshal.AllocHGlobal((int)size);
         try {
             if (PdhGetFormattedCounterArrayW(hCounter, PDH_FMT_DOUBLE | PDH_FMT_NOCAP100, ref size, ref count, buf) != 0) {
-                return 0.0;
+                return double.NaN;
             }
             double sum = 0.0;
-            int stride = IntPtr.Size + 16;
-            int valueOffset = IntPtr.Size + 8;
+            int stride = PDH_ITEM_STRIDE;
+            int valueOffset = PDH_ITEM_VALUE_OFFSET;
             for (int i = 0; i < count; i++) {
                 IntPtr item = new IntPtr(buf.ToInt64() + (long)i * stride);
+                if (!ItemValid(item)) continue;
                 IntPtr namePtr = Marshal.ReadIntPtr(item, 0);
                 if (namePtr != IntPtr.Zero) {
                     string name = Marshal.PtrToStringUni(namePtr);
@@ -302,52 +343,90 @@ public class DarkHubSensorDaemon {
         }
     }
 
-    private static double ReadMultiMax(IntPtr hCounter) {
-        if (hCounter == IntPtr.Zero) return 0.0;
+    /** Sums counter instances per adapter LUID ("..._luid_0xHHHHHHHH_0xLLLLLLLL_..."). null when the counter failed. */
+    private static Dictionary<string, double> ReadByLuid(IntPtr hCounter) {
+        if (hCounter == IntPtr.Zero) return null;
         uint size = 0, count = 0;
-        if (PdhGetFormattedCounterArrayW(hCounter, PDH_FMT_DOUBLE | PDH_FMT_NOCAP100, ref size, ref count, IntPtr.Zero) != PDH_MORE_DATA) return 0.0;
-        if (size == 0) return 0.0;
-
+        if (PdhGetFormattedCounterArrayW(hCounter, PDH_FMT_DOUBLE | PDH_FMT_NOCAP100, ref size, ref count, IntPtr.Zero) != PDH_MORE_DATA) return null;
+        if (size == 0) return null;
         IntPtr buf = Marshal.AllocHGlobal((int)size);
         try {
-            if (PdhGetFormattedCounterArrayW(hCounter, PDH_FMT_DOUBLE | PDH_FMT_NOCAP100, ref size, ref count, buf) != 0) return 0.0;
-            double max = 0.0;
-            int stride = IntPtr.Size + 16;
-            int valueOffset = IntPtr.Size + 8;
+            if (PdhGetFormattedCounterArrayW(hCounter, PDH_FMT_DOUBLE | PDH_FMT_NOCAP100, ref size, ref count, buf) != 0) return null;
+            Dictionary<string, double> sums = new Dictionary<string, double>();
             for (int i = 0; i < count; i++) {
-                IntPtr item = new IntPtr(buf.ToInt64() + (long)i * stride);
-                double val = BitConverter.Int64BitsToDouble(Marshal.ReadInt64(item, valueOffset));
+                IntPtr item = new IntPtr(buf.ToInt64() + (long)i * PDH_ITEM_STRIDE);
+                if (!ItemValid(item)) continue;
+                IntPtr namePtr = Marshal.ReadIntPtr(item, 0);
+                if (namePtr == IntPtr.Zero) continue;
+                string name = Marshal.PtrToStringUni(namePtr);
+                int at = name == null ? -1 : name.IndexOf("luid_0x", StringComparison.OrdinalIgnoreCase);
+                if (at < 0 || name.Length < at + 26) continue;
+                string luid = name.Substring(at + 5, 21).ToLowerInvariant(); // 0xHHHHHHHH_0xLLLLLLLL
+                double val = BitConverter.Int64BitsToDouble(Marshal.ReadInt64(item, PDH_ITEM_VALUE_OFFSET));
                 if (double.IsNaN(val) || double.IsInfinity(val)) continue;
-                if (val > max) max = val;
+                double cur;
+                sums.TryGetValue(luid, out cur);
+                sums[luid] = cur + val;
             }
-            return max;
+            return sums;
         } finally {
             Marshal.FreeHGlobal(buf);
         }
     }
 
-    private static double ReadMultiSum(IntPtr hCounter) {
-        if (hCounter == IntPtr.Zero) return 0.0;
-        uint size = 0, count = 0;
-        if (PdhGetFormattedCounterArrayW(hCounter, PDH_FMT_DOUBLE | PDH_FMT_NOCAP100, ref size, ref count, IntPtr.Zero) != PDH_MORE_DATA) return 0.0;
-        if (size == 0) return 0.0;
+    private class GpuAdapter { public string Name; public uint VendorId; public long DedicatedMb; }
 
-        IntPtr buf = Marshal.AllocHGlobal((int)size);
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct DXGI_ADAPTER_DESC1 {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string Description;
+        public uint VendorId, DeviceId, SubSysId, Revision;
+        public UIntPtr DedicatedVideoMemory, DedicatedSystemMemory, SharedSystemMemory;
+        public uint LuidLow;
+        public int LuidHigh;
+        public uint Flags;
+    }
+
+    [ComImport, Guid("29038f61-3839-4626-91fd-086879011a05"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IDXGIAdapter1 {
+        void SetPrivateData(); void SetPrivateDataInterface(); void GetPrivateData(); void GetParent();
+        void EnumOutputs(); void GetDesc(); void CheckInterfaceSupport();
+        [PreserveSig] int GetDesc1(out DXGI_ADAPTER_DESC1 desc);
+    }
+
+    [ComImport, Guid("770aae78-f26f-4dba-a829-253c83d1b387"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IDXGIFactory1 {
+        void SetPrivateData(); void SetPrivateDataInterface(); void GetPrivateData(); void GetParent();
+        void EnumAdapters(); void MakeWindowAssociation(); void GetWindowAssociation(); void CreateSwapChain(); void CreateSoftwareAdapter();
+        [PreserveSig] int EnumAdapters1(uint index, out IDXGIAdapter1 adapter);
+    }
+
+    [DllImport("dxgi.dll")]
+    private static extern int CreateDXGIFactory1([In] ref Guid riid, [MarshalAs(UnmanagedType.Interface)] out IDXGIFactory1 factory);
+
+    /** Hardware adapters by LUID, with their real names (the same source Task Manager uses). */
+    private static Dictionary<string, GpuAdapter> EnumerateAdapters() {
+        Dictionary<string, GpuAdapter> list = new Dictionary<string, GpuAdapter>();
         try {
-            if (PdhGetFormattedCounterArrayW(hCounter, PDH_FMT_DOUBLE | PDH_FMT_NOCAP100, ref size, ref count, buf) != 0) return 0.0;
-            double sum = 0.0;
-            int stride = IntPtr.Size + 16;
-            int valueOffset = IntPtr.Size + 8;
-            for (int i = 0; i < count; i++) {
-                IntPtr item = new IntPtr(buf.ToInt64() + (long)i * stride);
-                double val = BitConverter.Int64BitsToDouble(Marshal.ReadInt64(item, valueOffset));
-                if (double.IsNaN(val) || double.IsInfinity(val)) continue;
-                sum += val;
+            Guid iid = typeof(IDXGIFactory1).GUID;
+            IDXGIFactory1 f;
+            if (CreateDXGIFactory1(ref iid, out f) != 0 || f == null) return list;
+            for (uint i = 0; i < 16; i++) {
+                IDXGIAdapter1 a;
+                if (f.EnumAdapters1(i, out a) != 0 || a == null) break;
+                DXGI_ADAPTER_DESC1 d;
+                if (a.GetDesc1(out d) == 0 && (d.Flags & 2) == 0) { // skip the software (WARP) adapter
+                    string luid = ("0x" + ((uint)d.LuidHigh).ToString("x8") + "_0x" + d.LuidLow.ToString("x8"));
+                    list[luid] = new GpuAdapter { Name = d.Description, VendorId = d.VendorId, DedicatedMb = (long)(d.DedicatedVideoMemory.ToUInt64() / 1048576UL) };
+                }
+                Marshal.ReleaseComObject(a);
             }
-            return sum;
-        } finally {
-            Marshal.FreeHGlobal(buf);
-        }
+            Marshal.ReleaseComObject(f);
+        } catch { }
+        return list;
+    }
+
+    private static string Num(double v, string fmt) {
+        return double.IsNaN(v) || double.IsInfinity(v) ? "null" : v.ToString(fmt, System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private static string EscapeJson(string s) {

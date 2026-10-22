@@ -12,7 +12,8 @@ class SlowSensorDaemon extends EventEmitter {
     this._restarting = false;
     this._restartDelay = 10000;
 
-    this.procsEvery = 5;
+    // false while the advanced sensors (LibreHardwareMonitorLib) run: they read the same things directly
+    this.withTemps = true;
     this.tempsEvery = 15;
     this.storageEvery = 30;
 
@@ -31,108 +32,18 @@ class SlowSensorDaemon extends EventEmitter {
       '  $out.Flush()',
       '}',
 
-      `$procsEvery = ${this.procsEvery}`,
       `$tempsEvery = ${this.tempsEvery}`,
       `$storageEvery = ${this.storageEvery}`,
       `$diskTempsEvery = ${this.diskTempsEvery}`,
 
       '$ohmNamespace = $null',
       '$ohmProbed = $false',
-      'try {',
-      '  Add-Type @"',
-      '  using System;',
-      '  using System.IO.MemoryMappedFiles;',
-      '  using System.Runtime.InteropServices;',
-      '  public static class CoreTempReader {',
-      '    [StructLayout(LayoutKind.Sequential, Pack = 1)]',
-      '    public struct Data {',
-      '      [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)] public uint[] uiLoad;',
-      '      [MarshalAs(UnmanagedType.ByValArray, SizeConst = 128)] public uint[] uiTjMax;',
-      '      public uint uiCoreCnt;',
-      '      public uint uiCPUCnt;',
-      '      [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)] public float[] fTemp;',
-      '    }',
-      '    public static float GetMaxTemp() {',
-      '      try {',
-      '        using (var mmf = MemoryMappedFile.OpenExisting("CoreTempMapping")) {',
-      '          using (var a = mmf.CreateViewAccessor(0, Marshal.SizeOf(typeof(Data)))) {',
-      '            byte[] b = new byte[Marshal.SizeOf(typeof(Data))];',
-      '            a.ReadArray(0, b, 0, b.Length);',
-      '            GCHandle h = GCHandle.Alloc(b, GCHandleType.Pinned);',
-      '            Data d = (Data)Marshal.PtrToStructure(h.AddrOfPinnedObject(), typeof(Data));',
-      '            h.Free();',
-      '            float max = 0;',
-      '            for (int i=0; i < (int)d.uiCoreCnt && i < 256; i++) { if (d.fTemp[i] > max) max = d.fTemp[i]; }',
-      '            return max;',
-      '          }',
-      '        }',
-      '      } catch { return -1.0f; }',
-      '    }',
-      '  }',
-      '"@ -ErrorAction SilentlyContinue',
-      '} catch {}',
-      '',
-      '$cores = [Environment]::ProcessorCount',
-      'if ($cores -lt 1) { $cores = 1 }',
-      '$prevCpu = @{}',
-      '$prevStamp = [DateTime]::UtcNow',
-
+      `$withTemps = ${this.withTemps ? '$true' : '$false'}`,
       '$tick = 0',
       'while ($true) {',
       '  $tick++',
 
-      '  $procsFlag = Join-Path $env:TEMP "darkhub_procs_enabled.flag"',
-      '  if (($tick % $procsEvery) -eq 1 -and (Test-Path $procsFlag)) {',
-      '    try {',
-      '      $procs = Get-Process',
-      '      $now = [DateTime]::UtcNow',
-      '      $dt = ($now - $prevStamp).TotalSeconds',
-      '      if ($dt -le 0) { $dt = 1 }',
-      '      $curCpu = @{}',
-      '      $pct = @{}',
-      '      $byId = @{}',
-      '      foreach ($p in $procs) {',
-      '        $id = $p.Id',
-      '        $byId[$id] = $p',
-      '        $cpuSec = 0.0',
-      '        try { $cpuSec = $p.TotalProcessorTime.TotalSeconds } catch {}',
-      '        $curCpu[$id] = $cpuSec',
-      '        $val = 0.0',
-      '        if ($prevCpu.ContainsKey($id)) {',
-      '          $delta = $cpuSec - $prevCpu[$id]',
-      '          if ($delta -gt 0) { $val = [Math]::Round((($delta / $dt) / $cores) * 100, 1) }',
-      '          if ($val -gt 100) { $val = 100 }',
-      '        }',
-      '        $pct[$id] = $val',
-      '      }',
-      '      $prevCpu = $curCpu',
-      '      $prevStamp = $now',
-
-      '      $topCpuIds = @($pct.GetEnumerator() | Sort-Object -Property Value -Descending | Select-Object -First 15 | ForEach-Object { $_.Key })',
-      '      $topMemProcs = @($procs | Sort-Object -Property WorkingSet64 -Descending | Select-Object -First 15)',
-
-      '      $topCpu = New-Object System.Collections.ArrayList',
-      '      foreach ($id in $topCpuIds) {',
-      '        $p = $byId[$id]',
-      '        if ($null -eq $p) { continue }',
-      '        $null = $topCpu.Add([PSCustomObject]@{ name = $p.ProcessName; pid = $id; cpu = $pct[$id]; memRss = $p.WorkingSet64 })',
-      '      }',
-      '      $topMem = New-Object System.Collections.ArrayList',
-      '      foreach ($p in $topMemProcs) {',
-      '        $c = 0.0',
-      '        if ($pct.ContainsKey($p.Id)) { $c = $pct[$p.Id] }',
-      '        $null = $topMem.Add([PSCustomObject]@{ name = $p.ProcessName; pid = $p.Id; cpu = $c; memRss = $p.WorkingSet64 })',
-      '      }',
-      "      Emit ([PSCustomObject]@{ type = 'procs'; all = $procs.Count; topCpu = @($topCpu); topMem = @($topMem) })",
-      '    } catch {}',
-      '  }',
-
-      '  if (($tick % $tempsEvery) -eq 2) {',
-      '    $ctT = -1.0',
-      '    try { $ctT = [CoreTempReader]::GetMaxTemp() } catch {}',
-      '    if ($ctT -gt 20.0) {',
-      "      Emit ([PSCustomObject]@{ type = 'hwmonTemps'; source = 'CoreTemp'; cpuTempC = [Math]::Round($ctT, 1); gpuTempC = $null })",
-      '    }',
+      '  if ($withTemps -and ($tick % $tempsEvery) -eq 2) {',
       '    if (-not $ohmProbed) {',
       '      $ohmProbed = $true',
       "      foreach ($ns in @('root/LibreHardwareMonitor','root/OpenHardwareMonitor')) {",
@@ -147,9 +58,10 @@ class SlowSensorDaemon extends EventEmitter {
       "        $sensors = Get-CimInstance -Namespace $ohmNamespace -ClassName Sensor -ErrorAction Stop | Where-Object { $_.SensorType -eq 'Temperature' }",
       '        if ($sensors) {',
       '          $cpuT = $null; $gpuT = $null',
-      "          $cpuMatch = $sensors | Where-Object { $_.Name -like '*CPU*' -or $_.Name -like '*Package*' -or $_.Name -like '*Tdie*' } | Sort-Object Value -Descending | Select-Object -First 1",
+      // exact sensor names only: the largest "CPU*" value can be a "Distance to TjMax" margin or Hot Spot
+      "          $cpuMatch = $sensors | Where-Object { $_.Parent -match 'cpu' -and @('CPU Package','Core (Tctl/Tdie)','Core (Tctl)','Package') -contains $_.Name } | Select-Object -First 1",
       '          if ($cpuMatch) { $cpuT = $cpuMatch.Value }',
-      "          $gpuMatch = $sensors | Where-Object { $_.Name -like '*GPU*' -or $_.Name -like '*Radeon*' } | Sort-Object Value -Descending | Select-Object -First 1",
+      "          $gpuMatch = $sensors | Where-Object { $_.Parent -match 'gpu' -and $_.Name -eq 'GPU Core' } | Select-Object -First 1",
       '          if ($gpuMatch) { $gpuT = $gpuMatch.Value }',
       '          if ($null -ne $cpuT -or $null -ne $gpuT) {',
       "            Emit ([PSCustomObject]@{ type = 'hwmonTemps'; source = $ohmNamespace; cpuTempC = $cpuT; gpuTempC = $gpuT })",
@@ -201,7 +113,7 @@ class SlowSensorDaemon extends EventEmitter {
       '    } catch {}',
       '  }',
 
-      '  if (($tick % $diskTempsEvery) -eq 3) {',
+      '  if ($withTemps -and ($tick % $diskTempsEvery) -eq 3) {',
       '    try {',
       '      $physDisks = Get-PhysicalDisk -ErrorAction Stop',
       '      $diskTempList = New-Object System.Collections.ArrayList',
@@ -228,7 +140,7 @@ class SlowSensorDaemon extends EventEmitter {
     this._stopped = false;
     Logger.info(
       'SlowSensorDaemon',
-      `Iniciando coleta de baixa frequência (procs ${this.procsEvery}s | temps ${this.tempsEvery}s | storage ${this.storageEvery}s | diskTemps ${this.diskTempsEvery}s).`
+      `Iniciando coleta de baixa frequência (storage ${this.storageEvery}s${this.withTemps ? ` | temps ${this.tempsEvery}s | diskTemps ${this.diskTempsEvery}s` : ' | temperaturas pelos sensores avançados'}).`
     );
 
     const encoded = encodePowerShellScript(this._buildScript());
@@ -260,7 +172,10 @@ class SlowSensorDaemon extends EventEmitter {
       Logger.error('SlowSensorDaemon', 'Erro no processo PowerShell', err);
     });
 
+    const child = this.process;
     this.process.on('close', () => {
+      // stop()+start() can spawn a new child before this one exits; never clobber the new one.
+      if (this.process !== child) return;
       this.process = null;
       this.buffer = '';
       if (this._stopped || this._restarting) return;
