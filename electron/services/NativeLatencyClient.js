@@ -197,12 +197,26 @@ class NativeLatencyClient extends EventEmitter {
     return null
   }
 
-  async cleanRam(excludePid = -1) {
+  /** Trims working sets of processes above minMb; the foreground window's process is always skipped by the engine. */
+  async cleanRam(excludePid = -1, minMb = 100) {
     const res = await this.sendCommand({
       cmd: 'clean_ram',
-      exclude_pid: Number(excludePid)
+      exclude_pid: Number(excludePid),
+      min_mb: Number(minMb)
     }, 10000)
     return res?.ok ? res.data : null
+  }
+
+  /** {foregroundPid, processes:[{pid, name, wsMb}]} from one native call (~15 ms for 500 processes). */
+  async listProcesses() {
+    const res = await this.sendCommand({ cmd: 'list_processes' }, 5000)
+    if (!res?.ok || !Array.isArray(res.data?.rows)) return null
+    const processes = []
+    for (const row of res.data.rows) {
+      const [pid, name, ws] = String(row).split('|')
+      if (name) processes.push({ pid: Number(pid), name, wsMb: Number(ws) || 0 })
+    }
+    return { foregroundPid: Number(res.data.foreground_pid) || -1, processes }
   }
 
   dispose() {

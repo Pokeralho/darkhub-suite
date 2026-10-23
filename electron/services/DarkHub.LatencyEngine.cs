@@ -94,6 +94,22 @@ public class DarkHubLatencyEngine
     [DllImport("psapi.dll", SetLastError = true)]
     public static extern int EmptyWorkingSet(IntPtr hProcess);
 
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    // Process the user is looking at (a game, the editor...): never trimmed by the real-time optimizer.
+    private static int ForegroundPid()
+    {
+        uint pid;
+        IntPtr hwnd = GetForegroundWindow();
+        if (hwnd == IntPtr.Zero) return -1;
+        GetWindowThreadProcessId(hwnd, out pid);
+        return (int)pid;
+    }
+
     const uint PROCESS_SET_INFORMATION = 0x0200;
     const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
     const uint PROCESS_ALL_ACCESS = 0x1F0FFF;
@@ -280,7 +296,14 @@ public class DarkHubLatencyEngine
                 case "clean_ram":
                 {
                     int excludePid = GetJsonIntValue(json, "exclude_pid", -1);
-                    return HandleCleanRam(excludePid);
+                    int minMb = GetJsonIntValue(json, "min_mb", 100);
+                    if (minMb < 16) minMb = 16;
+                    return HandleCleanRam(excludePid, minMb);
+                }
+
+                case "list_processes":
+                {
+                    return HandleListProcesses();
                 }
 
                 case "exit":
@@ -509,9 +532,28 @@ public class DarkHubLatencyEngine
         }
     }
 
-    private static string HandleCleanRam(int excludePid)
+    private static string HandleListProcesses()
+    {
+        // Compact rows "pid|name|workingSetMB": one native call instead of tasklist or WMI.
+        var rows = new List<object>();
+        foreach (var p in Process.GetProcesses())
+        {
+            try { rows.Add(p.Id + "|" + p.ProcessName + "|" + (p.WorkingSet64 / (1024 * 1024))); }
+            catch {}
+            finally { try { p.Dispose(); } catch {} }
+        }
+        return FormatResponse(true, "processes", new Dictionary<string, object>
+        {
+            { "foreground_pid", ForegroundPid() },
+            { "rows", rows }
+        });
+    }
+
+    private static string HandleCleanRam(int excludePid, int minMb)
     {
         int count = 0;
+        long trimmed = 0;
+        int foreground = ForegroundPid();
         var critical = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
             "System", "Idle", "Registry", "smss", "csrss", "wininit", "winlogon", "services", "lsass", "dwm", "audiodg", "DarkHub", "DarkHub.LatencyEngine"
         };
@@ -521,12 +563,17 @@ public class DarkHubLatencyEngine
         {
             try
             {
-                if (p.Id == excludePid || p.Id <= 4) continue;
+                if (p.Id == excludePid || p.Id == foreground || p.Id <= 4) continue;
                 if (critical.Contains(p.ProcessName)) continue;
-                if (p.WorkingSet64 < 100 * 1024 * 1024) continue;
+                long before = p.WorkingSet64;
+                if (before < (long)minMb * 1024 * 1024) continue;
 
-                EmptyWorkingSet(p.Handle);
-                count++;
+                if (EmptyWorkingSet(p.Handle) != 0)
+                {
+                    count++;
+                    p.Refresh();
+                    trimmed += Math.Max(0, before - p.WorkingSet64);
+                }
             }
             catch {}
             finally {
@@ -536,7 +583,8 @@ public class DarkHubLatencyEngine
 
         return FormatResponse(true, "ram_cleaned", new Dictionary<string, object>
         {
-            { "processes_cleaned", count }
+            { "processes_cleaned", count },
+            { "trimmed_mb", trimmed / (1024 * 1024) }
         });
     }
 
@@ -715,6 +763,18 @@ public class DarkHubLatencyEngine
             return "\"" + ((string)obj).Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "") + "\"";
         if (obj is Dictionary<string, object>)
             return DictionaryToJson((Dictionary<string, object>)obj);
+        if (obj is List<object>)
+        {
+            var sb = new StringBuilder("[");
+            bool first = true;
+            foreach (var item in (List<object>)obj)
+            {
+                if (!first) sb.Append(",");
+                first = false;
+                sb.Append(ObjectToJson(item));
+            }
+            return sb.Append("]").ToString();
+        }
         return "\"" + obj.ToString() + "\"";
     }
 

@@ -14,6 +14,8 @@ class SecurityService {
     this.customPhishingDomains = [];
     this.customKeywords = [];
     this.customBrands = [];
+    this.customFileHashes = [];
+    this.onFileHashesChanged = null;
     this.communityRulesPath = null;
     this.phishingDomains = [
 
@@ -574,6 +576,7 @@ class SecurityService {
         }
         if (Array.isArray(parsed.keywords)) this.customKeywords = parsed.keywords.map(k => String(k).trim().toLowerCase()).filter(Boolean);
         if (Array.isArray(parsed.brands)) this.customBrands = parsed.brands;
+        this.customFileHashes = normalizeFileHashes(parsed.fileHashes);
         Logger.info('SecurityService', `Loaded ${this.customPhishingDomains.length} community phishing rules.`);
       }
     } catch (e) {
@@ -588,6 +591,7 @@ class SecurityService {
       customPhishingDomains: this.customPhishingDomains,
       customKeywords: this.customKeywords,
       customBrands: this.customBrands,
+      customFileHashes: this.customFileHashes.length,
       totalActivePhishingDomains: this.getAllPhishingDomains().length
     };
   }
@@ -598,7 +602,7 @@ class SecurityService {
 
   importCommunityRules(payload) {
     try {
-      const { phishingDomains = [], keywords = [], brands = [] } = payload || {};
+      const { phishingDomains = [], keywords = [], brands = [], fileHashes = [] } = payload || {};
       if (Array.isArray(phishingDomains)) {
         this.customPhishingDomains = Array.from(new Set([
           ...this.customPhishingDomains,
@@ -614,18 +618,23 @@ class SecurityService {
       if (Array.isArray(brands)) {
         this.customBrands = [...this.customBrands, ...brands];
       }
+      const hashesBefore = this.customFileHashes.length;
+      this.customFileHashes = normalizeFileHashes([...this.customFileHashes, ...(Array.isArray(fileHashes) ? fileHashes : [])]);
 
       const p = this._getRulesFilePath();
       fs.writeFileSync(p, JSON.stringify({
         phishingDomains: this.customPhishingDomains,
         keywords: this.customKeywords,
         brands: this.customBrands,
+        fileHashes: this.customFileHashes,
         updatedAt: new Date().toISOString()
       }, null, 2), 'utf8');
 
+      if (this.customFileHashes.length !== hashesBefore) this.onFileHashesChanged?.();
       return {
         ok: true,
         msg: `Regras da comunidade importadas com sucesso! Total de regras ativas: ${this.getAllPhishingDomains().length}`,
+        fileHashes: this.customFileHashes.length,
         total: this.getAllPhishingDomains().length
       };
     } catch (e) {
@@ -638,6 +647,8 @@ class SecurityService {
       this.customPhishingDomains = [];
       this.customKeywords = [];
       this.customBrands = [];
+      this.customFileHashes = [];
+      this.onFileHashesChanged?.();
       const p = this._getRulesFilePath();
       if (fs.existsSync(p)) fs.unlinkSync(p);
       return { ok: true, msg: 'Regras da comunidade redefinidas para o padrão de fábrica.' };
@@ -645,6 +656,17 @@ class SecurityService {
       return { ok: false, error: e.message };
     }
   }
+}
+
+/** Community malware hashes: [{sha256, name}] or plain hex strings; anything that is not a SHA-256 is dropped. */
+export function normalizeFileHashes(list) {
+  const out = new Map();
+  for (const item of Array.isArray(list) ? list : []) {
+    const sha256 = String(typeof item === 'string' ? item : item?.sha256 ?? '').trim().toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(sha256) || out.has(sha256)) continue;
+    out.set(sha256, { sha256, name: String((typeof item === 'object' && item?.name) || '').slice(0, 120) });
+  }
+  return [...out.values()].slice(0, 500000);
 }
 
 export default new SecurityService();
