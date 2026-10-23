@@ -27,7 +27,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 async function mainWindow() {
   for (let i = 0; i < 60; i++) {
-    const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && /localhost:5173|index\.html/.test(x.webContents.getURL()))
+    // the app window, not an overlay/widget window that also loads the renderer: the largest visible one
+    const w = BrowserWindow.getAllWindows()
+      .filter((x) => !x.isDestroyed() && x.isVisible() && /localhost:5173|index\.html/.test(x.webContents.getURL()))
+      .sort((a, b) => b.getBounds().width * b.getBounds().height - a.getBounds().width * a.getBounds().height)[0]
     if (w) return w
     await sleep(500)
   }

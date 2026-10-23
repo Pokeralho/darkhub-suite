@@ -21,6 +21,10 @@ export default defineConfig({
     strictProductionCsp
   ],
   base: './',
+  server: {
+    // build outputs and test scratch are not renderer sources: watching them crashes Vite on locked files (EBUSY)
+    watch: { ignored: ['**/scratch/**', '**/dist/**', '**/dist_release/**', '**/graphify-out/**', '**/docs/map/**'] }
+  },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version)
   },

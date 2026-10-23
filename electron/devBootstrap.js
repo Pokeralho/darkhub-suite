@@ -73,6 +73,8 @@ if (IS_DEV) {
     }
   }) }
 
+  // A covered window stops painting (native occlusion) and capturePage returns a stale frame: off for the self-test.
+  if (process.env.DARKHUB_SELFTEST) app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
   if (process.env.DARKHUB_SELFTEST) app.whenReady().then(() => import('./devSelfTest.js')).then((m) => m.run(listeners)).catch((e) => { console.error('[selftest]', e); app.exit(1) })
 
   // Remember the screen (#hash) so scripts/dev.mjs reopens it after an automatic restart.
