@@ -57,6 +57,20 @@ export function vendorFromPnpId(pnpId = '') {
   }
 }
 
+// PCI subsystem vendor IDs (PCI-SIG assignments, as listed in the public pci.ids database) of board partners and OEMs.
+const SUBSYSTEM_VENDORS = Object.freeze({
+  '1043': 'ASUS', '1462': 'MSI', '1458': 'Gigabyte', '1849': 'ASRock', '19DA': 'Zotac', '1569': 'Palit',
+  '10B0': 'Gainward', '196E': 'PNY', '3842': 'EVGA', '1682': 'XFX', '148C': 'PowerColor', '174B': 'Sapphire',
+  '1DA2': 'Sapphire', '7377': 'Colorful', '1B4C': 'Galax / KFA2', '10DE': 'NVIDIA', '1002': 'AMD', '8086': 'Intel',
+  '1028': 'Dell', '103C': 'HP', '17AA': 'Lenovo', '1025': 'Acer', '144D': 'Samsung', '1558': 'Clevo', '106B': 'Apple'
+});
+
+/** Board partner / OEM from the PCI subsystem id (PCI\VEN_10DE&DEV_2D05&SUBSYS_53711462: vendor 1462 = MSI). */
+export function boardPartnerFromPnpId(pnpId = '') {
+  const m = /SUBSYS_[0-9A-F]{4}([0-9A-F]{4})/i.exec(String(pnpId));
+  return m ? SUBSYSTEM_VENDORS[m[1].toUpperCase()] || null : null;
+}
+
 /** True when the adapter runs on Windows' generic display driver instead of the vendor driver. */
 export function isGenericDisplayDriver(name = '', provider = '') {
   return /microsoft basic (display|render)|basic display adapter|v[ií]deo b[aá]sico|adaptador de v[ií]deo b[aá]sico|standard vga/i.test(String(name))
@@ -100,6 +114,7 @@ export function normalizeAdapter(raw = {}) {
     vendor,
     genericDriver,
     deviceId: devId,
+    boardPartner: boardPartnerFromPnpId(pnpId),
     driverVersion: String(raw.driverVersion ?? '').trim(),
     driverDate: String(raw.driverDate ?? '').trim(),
     driverProvider: provider,

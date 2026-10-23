@@ -233,10 +233,11 @@ export default function DriverCenter() {
                   ) : null}
                 </div>
 
-                <dl className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 pl-[26px]">
+                <dl className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-4 pl-[26px]">
                   {field(t('driver.col.version', 'Driver version'), a.driverVersion || t('driver.unknownVersion', 'Unknown'))}
                   {field(t('driver.col.date', 'Driver date'), a.driverDate)}
                   {field(t('driver.col.provider', 'Provider'), a.driverProvider)}
+                  {a.boardPartner ? field(t('driver.col.boardPartner', 'Board maker'), a.boardPartner) : null}
                   {field(t('driver.col.vram', 'VRAM'), a.vramMb ? <>{a.vramMb}<span className="text-zinc-500"> MB</span></> : '-')}
                 </dl>
 

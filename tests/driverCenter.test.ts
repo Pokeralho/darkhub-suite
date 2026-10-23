@@ -176,3 +176,15 @@ describe('DriverCenter camera', () => {
     expect(r.error).toMatch(/administrador/);
   });
 });
+
+describe('DriverCenter board partner', () => {
+  it('reads the board maker from the PCI subsystem vendor id', () => {
+    expect(D.boardPartnerFromPnpId('PCI\\VEN_10DE&DEV_2D05&SUBSYS_53711462&REV_A1\\4&1C5D7D4&0&0009')).toBe('MSI');
+    expect(D.boardPartnerFromPnpId('PCI\\VEN_1002&DEV_73EF&SUBSYS_E445174B&REV_C1')).toBe('Sapphire');
+    expect(D.normalizeAdapter({ name: 'NVIDIA GeForce RTX', pnpId: 'PCI\\VEN_10DE&DEV_2D05&SUBSYS_88811043' }).boardPartner).toBe('ASUS');
+  });
+  it('returns null for unknown or missing subsystem ids (never guesses)', () => {
+    expect(D.boardPartnerFromPnpId('PCI\\VEN_10DE&DEV_2D05&SUBSYS_12349999')).toBeNull();
+    expect(D.boardPartnerFromPnpId('ROOT\\BasicDisplay')).toBeNull();
+  });
+});
