@@ -5,63 +5,51 @@ import path from 'node:path';
 import { messages } from '../src/i18n/messages';
 import Dlss5Service from '../electron/services/dlss5/Dlss5Service.js';
 
-function setup() {
+/** A game folder as the previous DarkHub DLSS 5 install left it (same manifest shape it wrote). */
+function legacyInstall() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-dlss5-'));
-  const userData = path.join(root, 'ud');
   const game = path.join(root, 'game');
-  const bundle = path.join(userData, 'OptiScaler', 'OptiScaler_DLSS5_Universal');
-  fs.mkdirSync(bundle, { recursive: true });
-  fs.mkdirSync(game, { recursive: true });
-  fs.writeFileSync(path.join(bundle, 'OptiScaler.dll'), 'opti');
-  fs.writeFileSync(path.join(bundle, 'nvngx_dlss.dll'), 'new');
+  const backupDir = path.join(game, 'DLSS5_Backups', 'backup_1');
+  fs.mkdirSync(backupDir, { recursive: true });
   fs.writeFileSync(path.join(game, 'game.exe'), 'MZ');
-  fs.writeFileSync(path.join(game, 'dxgi.dll'), 'orig-dxgi');
-  fs.writeFileSync(path.join(game, 'nvngx_dlss.dll'), 'orig-dlss');
-  return { root, userData, game };
+  fs.writeFileSync(path.join(backupDir, 'dxgi.dll'), 'orig-dxgi');
+  fs.writeFileSync(path.join(backupDir, 'nvngx_dlss.dll'), 'orig-dlss');
+  for (const f of ['dxgi.dll', 'OptiScaler.dll', 'OptiScaler.ini', 'nvngx_dlss.dll', 'nvngx_dlssnr.dll']) fs.writeFileSync(path.join(game, f), 'mod');
+  fs.writeFileSync(path.join(game, 'DarkHubDLSS5.json'), JSON.stringify({
+    appliedAt: 1, targetDir: game, backupDir, backedUp: ['dxgi.dll', 'nvngx_dlss.dll'], createdDirs: [],
+    injectedFiles: ['dxgi.dll', 'OptiScaler.dll', 'OptiScaler.ini', 'nvngx_dlss.dll', 'nvngx_dlssnr.dll'].map((file) => ({ file })), signatureBypass: null
+  }));
+  return { root, game };
 }
 
-describe('DLSS5 apply/revert lifecycle', () => {
-  it('restores originals and removes injected files, even after re-applying', async () => {
-    const { userData, game } = setup();
-    const svc: any = new (Dlss5Service as any)({ getPath: () => userData });
-    expect((await svc.apply({ targetDir: game, profile: 'nvidia' }, () => {})).ok).toBe(true);
-    expect((await svc.apply({ targetDir: game, profile: 'nvidia' }, () => {})).ok).toBe(true);
-    expect(fs.readFileSync(path.join(game, 'dxgi.dll'), 'utf8')).toBe('opti');
+describe('legacy DLSS 5 install removal', () => {
+  it('removes every injected file and restores the originals', async () => {
+    const { root, game } = legacyInstall();
+    const svc: any = new (Dlss5Service as any)({ getPath: () => path.join(root, 'ud') });
     const res = await svc.revert({ targetDir: game }, () => {});
     expect(res.ok).toBe(true);
+    expect(res.restoredCount).toBe(2);
     expect(fs.readFileSync(path.join(game, 'dxgi.dll'), 'utf8')).toBe('orig-dxgi');
     expect(fs.readFileSync(path.join(game, 'nvngx_dlss.dll'), 'utf8')).toBe('orig-dlss');
-    expect(fs.existsSync(path.join(game, 'OptiScaler.dll'))).toBe(false);
-    expect(fs.existsSync(path.join(game, 'DarkHubDLSS5.json'))).toBe(false);
+    for (const f of ['OptiScaler.dll', 'OptiScaler.ini', 'nvngx_dlssnr.dll', 'DarkHubDLSS5.json', 'DLSS5_Backups']) expect(fs.existsSync(path.join(game, f))).toBe(false);
+    expect(fs.existsSync(path.join(game, 'game.exe'))).toBe(true);
   });
 
-  it('refuses AMD Neural when the AMD-NR package is missing and when the game is not DX12', async () => {
-    const { userData, game } = setup();
-    const svc: any = new (Dlss5Service as any)({ getPath: () => userData });
-    svc.detectGpu = async () => ({ vendor: 'amd' });
-    const dx11 = await svc.apply({ targetDir: game, profile: 'amd', amdEngine: 'neural' }, () => {});
-    expect(dx11.ok).toBe(false);
+  it('refuses a folder without the DarkHub manifest', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-dlss5-'));
+    const svc: any = new (Dlss5Service as any)({ getPath: () => root });
+    expect((await svc.revert({ targetDir: root }, () => {})).ok).toBe(false);
   });
 
-  it('drops the previous proxy loader when re-applying with a different one', async () => {
-    const { userData, game } = setup();
-    fs.writeFileSync(path.join(game, 'winmm.dll'), 'orig-winmm');
-    const svc: any = new (Dlss5Service as any)({ getPath: () => userData });
-    expect((await svc.apply({ targetDir: game, profile: 'nvidia', loader: 'dxgi.dll' }, () => {})).ok).toBe(true);
-    expect((await svc.apply({ targetDir: game, profile: 'nvidia', loader: 'winmm.dll' }, () => {})).ok).toBe(true);
-    expect(fs.readFileSync(path.join(game, 'dxgi.dll'), 'utf8')).toBe('orig-dxgi');
-    expect(fs.readFileSync(path.join(game, 'winmm.dll'), 'utf8')).toBe('opti');
-    const res = await svc.revert({ targetDir: game }, () => {});
-    expect(res.ok).toBe(true);
-    expect(fs.readFileSync(path.join(game, 'dxgi.dll'), 'utf8')).toBe('orig-dxgi');
-    expect(fs.readFileSync(path.join(game, 'winmm.dll'), 'utf8')).toBe('orig-winmm');
-    expect(fs.existsSync(path.join(game, 'OptiScaler.dll'))).toBe(false);
+  it('no longer offers the install that never turned DLSS 5 on', () => {
+    const svc: any = new (Dlss5Service as any)({ getPath: () => os.tmpdir() });
+    for (const m of ['apply', 'generateNvngxIni', 'detectAutoRoute', 'downloadOptiScalerBundle']) expect(svc[m]).toBeUndefined();
   });
 
-  it('has AMD Neural i18n keys in both locales', () => {
-    for (const k of ['dlss5.amdEngineNeural', 'dlss5.amdEngineNeuralDesc', 'dlss5.neuralPasses', 'dlss5.amdNrPackageHint']) {
-      expect(messages['pt-BR'][k]).toBeTruthy();
-      expect(messages['en-US'][k]).toBeTruthy();
+  it('has the new DLSS screen strings in both languages', () => {
+    for (const k of ['dlss.title', 'dlss.updater', 'dlss5.title', 'dlss5.tier.none', 'dlss.legacyRemove']) {
+      expect(messages['pt-BR'][k], k).toBeTruthy();
+      expect(messages['en-US'][k], k).toBeTruthy();
     }
   });
 });

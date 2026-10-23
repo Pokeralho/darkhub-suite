@@ -1,256 +1,115 @@
 import { describe, it, expect } from 'vitest';
-import { messages } from '../src/i18n/messages';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import Dlss5Service from '../electron/services/dlss5/Dlss5Service.js';
+// @ts-ignore plain JS modules
+import { fileVersionFromBuffer, compareVersions, isPe64 } from '../electron/services/upscale/pe.js';
+// @ts-ignore
+import { DlssUpdater, scanGameFolder } from '../electron/services/upscale/DlssUpdater.js';
+import { dlss5Tier } from '../src/pages/Dlss5Manager';
 
-describe('DLSS 5 & Universal Neural Upscaler Manager Verification', () => {
-  it('should have all DLSS 5 translation keys defined in pt-BR and en-US', () => {
-    const requiredKeys = [
-      'nav.dlss5',
-      'dlss5.title',
-      'dlss5.subtitle',
-      'dlss5.badgeAi',
-      'dlss5.gpuCardTitle',
-      'dlss5.gpuProfile',
-      'dlss5.profileNvidia',
-      'dlss5.profileAmd',
-      'dlss5.amdWarningTitle',
-      'dlss5.amdWarningDesc',
-      'dlss5.gameSelectionTitle',
-      'dlss5.selectFolder',
-      'dlss5.selectExe',
-      'dlss5.engine',
-      'dlss5.injectionDir',
-      'dlss5.applyBtn',
-      'dlss5.revertBtn',
-      'dlss5.terminalTitle',
-      'dlss5.apiDetected',
-      'dlss5.provenanceTitle',
-      'dlss5.steamLibrary',
-      'dlss5.selectFromSteam',
-      'dlss5.routeLabel',
-      'dlss5.routeAutoRecommended',
-      'dlss5.neuralUpstream',
-      'dlss5.neuralUpstreamDesc',
-      'dlss5.remixWarningTitle',
-      'dlss5.bitness',
-      'dlss5.amdEngineLabel',
-      'dlss5.amdEngineZluda',
-      'dlss5.amdEngineFsr',
-      'dlss5.amdEngineZludaDesc',
-      'dlss5.amdEngineFsrDesc',
-      'dlss5.zludaCache',
-      'dlss5.zludaCacheDesc',
-      'dlss5.amdHipSdkTitle',
-      'dlss5.amdHipSdkDesc',
-      'dlss5.amdHipSdkLink'
-    ];
+/** Smallest buffer the version reader accepts: a VS_FIXEDFILEINFO with the given version. */
+function fixedInfo(a: number, b: number, c: number, d: number) {
+  const buf = Buffer.alloc(64);
+  buf.writeUInt32LE(0xfeef04bd, 8);
+  buf.writeUInt32LE(0x00010000, 12);
+  buf.writeUInt32LE((a << 16) | b, 16);
+  buf.writeUInt32LE((c << 16) | d, 20);
+  return buf;
+}
+/** A fake x64 PE (MZ + PE header + machine 0x8664) carrying a version resource. */
+function fakeDll(version: [number, number, number, number]) {
+  const head = Buffer.alloc(256);
+  head.write('MZ', 0, 'latin1');
+  head.writeUInt32LE(0x80, 0x3c);
+  head.writeUInt32LE(0x00004550, 0x80);
+  head.writeUInt16LE(0x8664, 0x84);
+  return Buffer.concat([head, fixedInfo(...version)]);
+}
 
-    for (const key of requiredKeys) {
-      expect(messages['pt-BR'][key], `Missing pt-BR key: ${key}`).toBeDefined();
-      expect(messages['en-US'][key], `Missing en-US key: ${key}`).toBeDefined();
-    }
+describe('DLSS runtime updater', () => {
+  it('reads file versions and compares them numerically', () => {
+    expect(fileVersionFromBuffer(fixedInfo(310, 9, 16, 0))).toBe('310.9.16.0');
+    expect(fileVersionFromBuffer(Buffer.from('no version here'))).toBeNull();
+    expect(compareVersions('3.7.20.0', '310.9.16')).toBeLessThan(0);
+    expect(compareVersions('310.9.16.0', '310.9.16')).toBe(0);
+    expect(compareVersions('310.10.0', '310.9.16')).toBeGreaterThan(0);
   });
 
-  it('should generate properly tuned nvngx.ini for NVIDIA profile with Neural Upstream', () => {
-    const service = new Dlss5Service();
-    const ini = service.generateNvngxIni('nvidia', {
-      enableFrameGen: true,
-      enableOverlay: true,
-      upscaler: 'dlss',
-      primaryApi: 'dx12',
-      neuralUpstream: true,
-      route: 'optiscaler'
-    });
-
-    expect(ini).toContain('PERFIL: NVIDIA GEFORCE (ESTÁVEL - NATIVO)');
-    expect(ini).toContain('Dx11Upscaler=dlss');
-    expect(ini).toContain('Dx12Upscaler=dlss');
-    expect(ini).toContain('VulkanUpscaler=dlss');
-    expect(ini).toContain('FGInput=dlssg');
-    expect(ini).toContain('FGOutput=dlssg');
-    expect(ini).toContain('OverlayMenu=true');
-    expect(ini).toContain('NeuralUpstream=true');
-    expect(ini).toContain('WorkResolution=render');
-    expect(ini).toContain('PassOrdering=pre_upscale');
-    expect(ini).toContain('Route=optiscaler');
+  it('finds the DLSS runtimes of a game and its anti-cheat folder', () => {
+    const game = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-dlssup-'));
+    fs.mkdirSync(path.join(game, 'Bin', 'Win64'), { recursive: true });
+    fs.mkdirSync(path.join(game, 'EasyAntiCheat'));
+    fs.writeFileSync(path.join(game, 'Bin', 'Win64', 'nvngx_dlss.dll'), fakeDll([3, 7, 20, 0]));
+    fs.writeFileSync(path.join(game, 'Bin', 'Win64', 'NVNGX_DLSSG.DLL'), fakeDll([310, 2, 1, 0]));
+    const r = scanGameFolder(game);
+    expect(r.anticheat).toBe('EasyAntiCheat');
+    expect(r.dlls.map((d: any) => [d.name, d.kind, d.version, d.x64]).sort()).toEqual([['nvngx_dlss.dll', 'sr', '3.7.20.0', true], ['nvngx_dlssg.dll', 'fg', '310.2.1.0', true]]);
   });
 
-  it('should generate properly tuned nvngx.ini for AMD profile with ZLUDA HIP Neural Engine & WMMA matrix acceleration', () => {
-    const service = new Dlss5Service();
-    const ini = service.generateNvngxIni('amd', {
-      amdEngine: 'zluda',
-      zludaCache: true,
-      enableFrameGen: true,
-      enableOverlay: true,
-      upscaler: 'fsr31',
-      primaryApi: 'dx12',
-      neuralUpstream: true,
-      route: 'optiscaler'
+  it('updates only what is behind, keeps the original, refuses anti-cheat unless forced, and restores', async () => {
+    const game = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-dlssup-'));
+    const cache = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-dlsscache-'));
+    const old = fakeDll([3, 7, 20, 0]);
+    fs.writeFileSync(path.join(game, 'nvngx_dlss.dll'), old);
+    fs.writeFileSync(path.join(game, 'nvngx_dlssd.dll'), fakeDll([310, 9, 16, 0]));
+    let downloads = 0;
+    const u = new DlssUpdater(cache, {
+      fetchJsonImpl: async () => ({ tag_name: 'v310.9.16' }),
+      download: async (_url: string, dest: string) => { downloads++; fs.writeFileSync(dest, fakeDll([310, 9, 16, 0])); },
+      verify: () => true
     });
+    const r = await u.update(game);
+    expect(r.ok).toBe(true);
+    expect(r.updated.map((x: any) => path.basename(x.file))).toEqual(['nvngx_dlss.dll']);
+    expect(r.files.every((f: any) => !f.behind)).toBe(true);
+    expect(fs.readFileSync(path.join(game, 'nvngx_dlss.dll.darkhub-original')).equals(old)).toBe(true);
+    expect((await u.update(game)).updated).toEqual([]);
+    expect(downloads).toBe(1);
+    u.restore(game);
+    expect(fs.readFileSync(path.join(game, 'nvngx_dlss.dll')).equals(old)).toBe(true);
+    expect(fs.existsSync(path.join(game, 'nvngx_dlss.dll.darkhub-original'))).toBe(false);
 
-    expect(ini).toContain('PERFIL: AMD RADEON (ZLUDA HIP WMMA ACCELERATED)');
-    expect(ini).toContain('Dx11Upscaler=fsr31');
-    expect(ini).toContain('Dx12Upscaler=fsr31');
-    expect(ini).toContain('VulkanUpscaler=fsr31');
-    expect(ini).toContain('FGInput=dlssg');
-    expect(ini).toContain('FGOutput=nukems');
-    expect(ini).toContain('[ZLUDA]');
-    expect(ini).toContain('Enable=true');
-    expect(ini).toContain('HipRuntime=true');
-    expect(ini).toContain('WmmaAcceleration=true');
-    expect(ini).toContain('Fp16Native=true');
-    expect(ini).toContain('ArchitectureTarget=rdna3_rdna4');
-    expect(ini).toContain('CacheCompilation=true');
-    expect(ini).toContain('ZludaBackend=true');
-    expect(ini).toContain('WmmaMatrixAccel=true');
-    expect(ini).toContain('NeuralUpstream=true');
+    fs.mkdirSync(path.join(game, 'BattlEye'));
+    expect((await u.update(game)).ok).toBe(false);
+    expect((await u.update(game, { force: true })).updated).toHaveLength(1);
   });
 
-  it('should generate properly tuned nvngx.ini for AMD profile with FSR 3.1 DirectCompute Fallback', () => {
-    const service = new Dlss5Service();
-    const ini = service.generateNvngxIni('amd', {
-      amdEngine: 'fsr',
-      enableFrameGen: true,
-      enableOverlay: true,
-      upscaler: 'fsr31',
-      primaryApi: 'dx12',
-      neuralUpstream: true,
-      route: 'feeder'
+  it('discards a download that is not a signed 64-bit DLL', async () => {
+    const game = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-dlssup-'));
+    fs.writeFileSync(path.join(game, 'nvngx_dlss.dll'), fakeDll([3, 7, 20, 0]));
+    const u = new DlssUpdater(fs.mkdtempSync(path.join(os.tmpdir(), 'dh-dlsscache-')), {
+      fetchJsonImpl: async () => ({ tag_name: 'v310.9.16' }),
+      download: async (_url: string, dest: string) => fs.writeFileSync(dest, fakeDll([310, 9, 16, 0])),
+      verify: () => false
     });
-
-    expect(ini).toContain('PERFIL: AMD RADEON (FSR 3.1 / DIRECTCOMPUTE)');
-    expect(ini).toContain('Dx11Upscaler=fsr31');
-    expect(ini).toContain('Dx12Upscaler=fsr31');
-    expect(ini).toContain('VulkanUpscaler=fsr31');
-    expect(ini).toContain('FGInput=dlssg');
-    expect(ini).toContain('FGOutput=nukems');
-    expect(ini).toContain('[ZLUDA]');
-    expect(ini).toContain('Enable=false');
-    expect(ini).toContain('ZludaBackend=false');
-    expect(ini).toContain('NeuralUpstream=true');
-    expect(ini).toContain('Route=feeder');
+    await expect(u.update(game)).rejects.toThrow(/signed by NVIDIA/);
+    expect(fileVersionFromBuffer(fs.readFileSync(path.join(game, 'nvngx_dlss.dll')))).toBe('3.7.20.0');
   });
 
-  it('should disable OverlayMenu on RTX Remix route to protect path-tracing runtime', () => {
-    const service = new Dlss5Service();
-    const ini = service.generateNvngxIni('nvidia', {
-      enableOverlay: true,
-      route: 'remix',
-      isRemix: true
-    });
-
-    expect(ini).toContain('OverlayMenu=false');
-    expect(ini).toContain('Route=remix');
+  it('rates DLSS 5 cost by card generation', () => {
+    expect(dlss5Tier('NVIDIA GeForce RTX 5070 Ti', true)).toBe('full');
+    expect(dlss5Tier('NVIDIA GeForce RTX 4060', true)).toBe('moderate');
+    expect(dlss5Tier('NVIDIA GeForce RTX 3080', true)).toBe('heavy');
+    expect(dlss5Tier('NVIDIA GeForce GTX 1660', true)).toBe('none');
+    expect(dlss5Tier('AMD Radeon RX 7900 XTX', false)).toBe('none');
   });
+});
 
-  it('should correctly map the 8-route DLSS5-Autopilot matrix based on API, DLSS presence, and bitness', () => {
-    const service = new Dlss5Service();
-
-    // 1. D3D12 with native DLSS -> optiscaler
-    const routeD3D12Dlss = service.detectAutoRoute({
-      graphicsApi: { primaryApi: 'dx12', hasD3D12: true },
-      hasDlss: true,
-      is64: true
-    });
-    expect(routeD3D12Dlss.recommendedRoute).toBe('optiscaler');
-
-    // 2. D3D11 with native DLSS -> dlss5-bridge
-    const routeD3D11Dlss = service.detectAutoRoute({
-      graphicsApi: { primaryApi: 'dx11', hasD3D11: true },
-      hasDlss: true,
-      is64: true
-    });
-    expect(routeD3D11Dlss.recommendedRoute).toBe('dlss5-bridge');
-
-    // 3. Vulkan with native DLSS -> dlss5-bridge
-    const routeVkDlss = service.detectAutoRoute({
-      graphicsApi: { primaryApi: 'vulkan', hasVulkan: true },
-      hasDlss: true,
-      is64: true
-    });
-    expect(routeVkDlss.recommendedRoute).toBe('dlss5-bridge');
-
-    // 4. Any game without DLSS -> feeder (DLSS5-Feeder)
-    const routeNoDlss = service.detectAutoRoute({
-      graphicsApi: { primaryApi: 'dx12', hasD3D12: true },
-      hasDlss: false,
-      is64: true
-    });
-    expect(routeNoDlss.recommendedRoute).toBe('feeder');
-
-    // 5. RTX Remix game -> remix
-    const routeRemix = service.detectAutoRoute({
-      graphicsApi: { primaryApi: 'dx9', hasD3D9: true },
-      hasDlss: false,
-      isRemix: true,
-      is64: true
-    });
-    expect(routeRemix.recommendedRoute).toBe('remix');
-
-    // 6. DX9 64-bit -> renodx-dlss
-    const routeDx9x64 = service.detectAutoRoute({
-      graphicsApi: { primaryApi: 'dx9', hasD3D9: true, hasD3D11: false, hasD3D12: false },
-      hasDlss: true,
-      is64: true
-    });
-    expect(routeDx9x64.recommendedRoute).toBe('renodx-dlss');
-
-    // 7. DX9 32-bit (x86 legacy) -> dx9-32bit
-    const routeDx9x86 = service.detectAutoRoute({
-      graphicsApi: { primaryApi: 'dx9', hasD3D9: true, hasD3D11: false, hasD3D12: false },
-      hasDlss: true,
-      is64: false
-    });
-    expect(routeDx9x86.recommendedRoute).toBe('dx9-32bit');
-
-    // 8. Pure OpenGL -> opengl-zink
-    const routeOpenGL = service.detectAutoRoute({
-      graphicsApi: { primaryApi: 'opengl', hasOpenGL: true, hasD3D11: false, hasD3D12: false, hasVulkan: false },
-      hasDlss: false,
-      is64: true
-    });
-    expect(routeOpenGL.recommendedRoute).toBe('opengl-zink');
-  });
-
-  it('should detect Graphics API and recommend appropriate loader proxy', async () => {
-    const service = new Dlss5Service();
-
-    // Test Windows Notepad PE headers
-    const notepadPath = 'C:\\Windows\\System32\\notepad.exe';
-    const apiResult = await service.detectGraphicsAPI(notepadPath, 'C:\\Windows\\System32', 'C:\\Windows');
-
-    expect(apiResult).toBeDefined();
+describe('game scan (shared with the OptiScaler screen)', () => {
+  it('detects the graphics API and loader from PE headers', async () => {
+    const service: any = new (Dlss5Service as any)();
+    const apiResult = await service.detectGraphicsAPI('C:\\Windows\\System32\\notepad.exe', 'C:\\Windows\\System32', 'C:\\Windows');
     expect(apiResult.primaryApi).toBeDefined();
     expect(apiResult.recommendedLoader).toBeDefined();
-    expect(apiResult.loaderReason).toBeDefined();
     expect(apiResult.is64).toBe(true);
-    expect(apiResult.bitness).toBe('64-bit');
+    expect(isPe64('C:\\Windows\\System32\\notepad.exe')).toBe(true);
   });
-
-  it('should return authentic provenance and verify upstream repositories', async () => {
-    const service = new Dlss5Service();
-    const prov = await service.getBinaryProvenance();
-
-    expect(prov.ok).toBe(true);
-    expect(prov.upstreamRepositories.length).toBeGreaterThanOrEqual(6);
-    expect(prov.upstreamRepositories.some(r => r.url.includes('RedDukeDev/dlss5-image-enhancer-zluda'))).toBe(true);
-    expect(prov.upstreamRepositories.some(r => r.url.includes('RedDukeDev/ZLUDA'))).toBe(true);
-    expect(prov.upstreamRepositories.some(r => r.url.includes('Kizzuwatnaa/DLSS5-Autopilot'))).toBe(true);
-    expect(prov.upstreamRepositories.some(r => r.url.includes('optiscaler'))).toBe(true);
-    expect(prov.upstreamRepositories.some(r => r.url.includes('dlssg-to-fsr3'))).toBe(true);
-    expect(prov.architecture).toContain('x86_64');
-  });
-
-  it('should retrieve installed Steam games safely without crashing', async () => {
-    const service = new Dlss5Service();
-    const steamGames = await service.getInstalledSteamGames();
-    expect(Array.isArray(steamGames)).toBe(true);
-  });
-
-  it('should handle scan on invalid paths gracefully', async () => {
-    const service = new Dlss5Service();
+  it('lists Steam games and rejects invalid paths without crashing', async () => {
+    const service: any = new (Dlss5Service as any)();
+    expect(Array.isArray(await service.getInstalledSteamGames())).toBe(true);
     const result = await service.scanGameDirectory('Z:\\NonExistentPath_Random_12345');
     expect(result.ok).toBe(false);
-    expect(result.error).toBeDefined();
   });
 });

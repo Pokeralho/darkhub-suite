@@ -11,13 +11,18 @@ import {
   parseJsonOutput
 } from './services/PowerShellRunner.js'
 
-import { downloadToFile, fetchJson, assetSha256 } from './services/SecureDownload.js'
+import { downloadToFile, fetchJson, assetSha256, SYSTEM_TAR } from './services/SecureDownload.js'
 
 const fs = fsRaw.promises
 const log = { info: (...a) => console.log(...a) }
 const execFileAsync = promisify(execFile)
 
-const RELEASE_FOLDER_NAME = 'Optiscaler_0.9.1-final.20260427._DSB'
+// The official release (optiscaler/OptiScaler) lives in userData/OptiScaler/Official, downloaded on first use and on
+// update. The folder pinned by older builds is still used if a user has it.
+const OFFICIAL_FOLDER = 'Official'
+const LEGACY_RELEASE_FOLDER = 'Optiscaler_0.9.1-final.20260427._DSB'
+const RELEASES_LATEST = 'https://api.github.com/repos/optiscaler/OptiScaler/releases/latest'
+const DLSS5_MANIFEST = 'DarkHubDLSS5.json'
 const SUPPORTED_LOADERS = ['dxgi.dll', 'winmm.dll', 'version.dll', 'dbghelp.dll', 'd3d12.dll', 'wininet.dll', 'winhttp.dll', 'OptiScaler.asi']
 const ROOT_EXCLUDES = new Set([
   'OptiScaler.dll',
@@ -43,22 +48,57 @@ async function getSourceVersion(app) {
       if (v) return v;
     }
   } catch {}
-  return RELEASE_FOLDER_NAME.replace(/^Optiscaler_/i, '');
+  return null;
 }
 
 function resolveReleaseDir(app) {
+  const hasDll = (dir) => fsRaw.existsSync(path.join(dir, 'OptiScaler.dll')) || fsRaw.existsSync(path.join(dir, 'nvngx.dll'))
+  const official = path.join(app.getPath('userData'), 'OptiScaler', OFFICIAL_FOLDER)
+  if (hasDll(official)) return official
+  const legacy = [path.join(app.getPath('userData'), 'OptiScaler', LEGACY_RELEASE_FOLDER)]
+  if (app.isPackaged) legacy.push(path.join(process.resourcesPath, LEGACY_RELEASE_FOLDER))
+  return legacy.find(hasDll) || official
+}
+
+/** Folder of an extracted release that holds OptiScaler.dll (the archive may wrap it in a subfolder). */
+async function findReleaseRoot(dir, depth = 0) {
+  const entries = await fs.readdir(dir, { withFileTypes: true })
+  if (entries.some((e) => e.isFile() && e.name.toLowerCase() === 'optiscaler.dll')) return dir
+  if (depth >= 2) return null
+  for (const e of entries) {
+    if (!e.isDirectory()) continue
+    const found = await findReleaseRoot(path.join(dir, e.name), depth + 1)
+    if (found) return found
+  }
+  return null
+}
+
+/** Downloads the latest official OptiScaler release (SHA-256 from GitHub) into the Official folder. */
+async function installOfficialRelease(app, expectedUrl = null) {
+  const json = await fetchJson(RELEASES_LATEST)
+  const asset = json.assets?.find((a) => /\.(zip|7z)$/i.test(a.name))
+  if (!asset?.browser_download_url) throw new Error('Nenhum ZIP/7Z encontrado no release oficial do OptiScaler.')
+  // never trust a renderer-provided URL: only the asset of the official release is accepted
+  if (expectedUrl && expectedUrl !== asset.browser_download_url) throw new Error('URL de atualizacao nao corresponde ao release oficial do OptiScaler.')
+  const version = json.tag_name || json.name || ''
+  const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'darkhub-optiscaler-'))
   try {
-    const userDir = path.join(app.getPath('userData'), 'OptiScaler', RELEASE_FOLDER_NAME);
-    if (fsRaw.existsSync(path.join(userDir, 'OptiScaler.dll')) || fsRaw.existsSync(path.join(userDir, 'nvngx.dll'))) {
-      return userDir;
-    }
-    if (app.isPackaged) {
-      const resDir = path.join(process.resourcesPath, RELEASE_FOLDER_NAME);
-      if (fsRaw.existsSync(resDir)) return resDir;
-      return userDir;
-    }
-  } catch {}
-  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', RELEASE_FOLDER_NAME);
+    const archive = path.join(workDir, `release${asset.name.toLowerCase().endsWith('.7z') ? '.7z' : '.zip'}`)
+    const extractDir = path.join(workDir, 'extracted')
+    await fs.mkdir(extractDir, { recursive: true })
+    await downloadToFile(asset.browser_download_url, archive, { expectedSha256: assetSha256(asset), maxBytes: 300 * 1024 * 1024, timeoutMs: 120000 })
+    await execFileAsync(SYSTEM_TAR, ['-xf', archive, '-C', extractDir], { windowsHide: true })
+    const root = await findReleaseRoot(extractDir)
+    if (!root) throw new Error('OptiScaler.dll nao encontrado no pacote oficial.')
+    const dest = path.join(app.getPath('userData'), 'OptiScaler', OFFICIAL_FOLDER)
+    await fs.rm(dest, { recursive: true, force: true })
+    await fs.mkdir(path.dirname(dest), { recursive: true })
+    await fs.cp(root, dest, { recursive: true })
+    await fs.writeFile(path.join(dest, 'version.txt'), version, 'utf8')
+    return { version, dir: dest }
+  } finally {
+    fs.rm(workDir, { recursive: true, force: true }).catch(() => {})
+  }
 }
 
 function normalizeWinPath(value) {
@@ -215,6 +255,7 @@ function detectUpscaleFiles(files) {
     files: byKind,
     hasDlss: kinds.has('DLSS') || kinds.has('Streamline') || kinds.has('DLSS-G'),
     hasDlssFg: kinds.has('DLSS-G'),
+    hasFsrFg: byKind.some((x) => /framegeneration|frameinterpolation/i.test(x.file)),
     hasXess: kinds.has('XeSS') || kinds.has('XeFG'),
     hasFsr: kinds.has('FSR') || kinds.has('FidelityFX'),
     hasFfx: kinds.has('FidelityFX'),
@@ -320,8 +361,11 @@ function normalizeChoice(value, allowed, fallback) {
   return allowed.includes(v) ? v : fallback
 }
 
-function buildIniPatch({ upscaler, inputApi, gpu, includeAgilitySdk }) {
+export function buildIniPatch({ upscaler, inputApi, gpu, includeAgilitySdk, frameGen = 'off', fgInput = 'upscaler' }) {
   const patch = []
+  // [FrameGen]: FGOutput is nofg | fsrfg | xefg | nukems; FGInput dlssg | fsrfg | upscaler (OptiScaler 0.9.x)
+  if (frameGen === 'off') patch.push(['FrameGen', 'Enabled', 'false'], ['FrameGen', 'FGOutput', 'nofg'])
+  else patch.push(['FrameGen', 'Enabled', 'true'], ['FrameGen', 'FGInput', fgInput], ['FrameGen', 'FGOutput', frameGen])
   const isFsr4Mode = upscaler === 'fsr4' || upscaler === 'fsr4_rdna3' || upscaler === 'fsr4_rdna2'
 
   if (upscaler === 'fsr22') {
@@ -404,7 +448,7 @@ function setIniValue(content, section, key, value) {
   return lines.join(eol)
 }
 
-function applyIniPatch(content, patch) {
+export function applyIniPatch(content, patch) {
   return patch.reduce((next, [section, key, value]) => setIniValue(next, section, key, value), content)
 }
 
@@ -509,10 +553,16 @@ async function buildAnalysis(app, payload = {}) {
   }
   if (selectedLoaderConflict) notes.push(`${requestedLoader} ja existe e nao parece ser OptiScaler. A aplicacao fara backup antes de sobrescrever.`)
 
-  const iniPatch = buildIniPatch({ upscaler, inputApi: resolvedInputApi, gpu, includeAgilitySdk })
+  const frameGen = normalizeChoice(payload?.frameGen ?? game?.optiscaler?.frameGen, ['off', 'fsrfg', 'xefg'], 'off')
+  // the game's own frame generation is the best FG source; without one, OptiScaler derives it from the upscaler
+  const fgInput = detected.hasDlssFg ? 'dlssg' : detected.hasFsrFg ? 'fsrfg' : 'upscaler'
+  if (frameGen !== 'off' && fgInput === 'upscaler') notes.push('Frame generation a partir do upscaler: o jogo nao tem FG proprio, entao o HUD pode piscar em alguns jogos (Hudfix no menu do OptiScaler, tecla Insert).')
+  if (frameGen === 'xefg' && gpu.vendor !== 'intel') notes.push('XeFG precisa do fakenvapi em GPUs NVIDIA/AMD; o FSR FG e a opcao mais compativel.')
+  const iniPatch = buildIniPatch({ upscaler, inputApi: resolvedInputApi, gpu, includeAgilitySdk, frameGen, fgInput })
 
   return {
     ok: true,
+    frameGen: { mode: frameGen, input: fgInput },
     source: {
       path: releaseDir,
       exists: sourceOk,
@@ -692,7 +742,7 @@ async function resolveFsr4Rdna2Path(app) {
     })
     log.info?.(`[OptiScaler] FSR4 RDNA2 baixado (sha256=${sha256}, verificado=${Boolean(assetSha256(asset))})`)
 
-    await execFileAsync('tar.exe', ['-xf', archivePath, '-C', targetDir], { windowsHide: true })
+    await execFileAsync(SYSTEM_TAR, ['-xf', archivePath, '-C', targetDir], { windowsHide: true })
     const subDll = path.join(targetDir, '4.1.1b', 'amd_fidelityfx_upscaler_dx12.dll')
     if (fsRaw.existsSync(subDll)) {
       await fs.copyFile(subDll, targetFile)
@@ -706,9 +756,16 @@ async function resolveFsr4Rdna2Path(app) {
 }
 
 async function applyOptiScaler(app, getLibraryStore, payload = {}) {
-  const analysis = await buildAnalysis(app, payload)
+  let analysis = await buildAnalysis(app, payload)
   if (!analysis.ok) return analysis
-  if (!analysis.source.exists) return { ok: false, error: `Release local do OptiScaler nao encontrada em: ${analysis.source.path}`, analysis }
+  if (await exists(path.join(analysis.game.targetDir, DLSS5_MANIFEST))) {
+    return { ok: false, error: 'Este jogo tem uma instalacao antiga do DLSS 5 do DarkHub. Remova-a na tela DLSS Manager antes de aplicar o OptiScaler.', analysis }
+  }
+  if (!analysis.source.exists) {
+    try { await installOfficialRelease(app) } catch (err) { return { ok: false, error: `Nao foi possivel baixar o OptiScaler oficial: ${err?.message ?? err}`, analysis } }
+    analysis = await buildAnalysis(app, payload)
+    if (!analysis.ok) return analysis
+  }
   if (isSameInstall(analysis, payload)) return { ok: true, skipped: true, reason: 'Instalacao ja esta atualizada.', analysis }
 
   const targetDir = analysis.game.targetDir
@@ -1216,78 +1273,24 @@ export function registerOptiScalerIPC({ app, ipcMain, getLibraryStore }) {
 
   ipcMain.handle('optiscaler:checkUpdate', async () => {
     try {
-      const json = await fetchJson('https://api.github.com/repos/optiscaler/OptiScaler/releases/latest')
+      const json = await fetchJson(RELEASES_LATEST)
       const version = json.tag_name || json.name
       const current = await getSourceVersion(app)
       const asset = json.assets?.find((a) => /\.(zip|7z)$/i.test(a.name))
       if (!asset) return { ok: false, error: 'Nenhum ZIP/7Z encontrado no release.' }
-      return {
-        ok: true,
-        hasUpdate: version !== current,
-        latestVersion: version,
-        currentVersion: current,
-        downloadUrl: asset.browser_download_url,
-        sha256: assetSha256(asset)
-      }
+      return { ok: true, hasUpdate: version !== current, latestVersion: version, currentVersion: current, downloadUrl: asset.browser_download_url, sha256: assetSha256(asset) }
     } catch (err) {
       return { ok: false, error: err?.message ?? String(err) }
     }
   })
 
   ipcMain.handle('optiscaler:downloadUpdate', async (_event, payload) => {
-    let workDir = null
     try {
-      // Never trust a renderer-provided URL: resolve the official asset again and
-      // only accept the same URL (or none).
-      const json = await fetchJson('https://api.github.com/repos/optiscaler/OptiScaler/releases/latest')
-      const asset = json.assets?.find((a) => /\.(zip|7z)$/i.test(a.name))
-      if (!asset?.browser_download_url) return { ok: false, error: 'Nenhum ZIP/7Z encontrado no release.' }
       const requested = typeof payload === 'string' ? payload : payload?.url
-      if (requested && requested !== asset.browser_download_url) {
-        return { ok: false, error: 'URL de atualizacao nao corresponde ao release oficial do OptiScaler.' }
-      }
-      const targetVersion = json.tag_name || json.name || ''
-
-      workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'darkhub-optiscaler-'))
-      const ext = asset.name.toLowerCase().endsWith('.7z') ? '.7z' : '.zip'
-      const archive = path.join(workDir, `release${ext}`)
-      const extractDir = path.join(workDir, 'extracted')
-      await fs.mkdir(extractDir, { recursive: true })
-
-      await downloadToFile(asset.browser_download_url, archive, {
-        expectedSha256: assetSha256(asset),
-        maxBytes: 300 * 1024 * 1024
-      })
-
-      let extracted = false
-      try {
-        await execFileAsync('tar.exe', ['-xf', archive, '-C', extractDir], { windowsHide: true })
-        extracted = true
-      } catch {}
-      if (!extracted && ext === '.zip') {
-        await execFileAsync('powershell.exe', [
-          '-NoProfile', '-NonInteractive', '-Command',
-          'Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force',
-          archive, extractDir
-        ], { windowsHide: true })
-        extracted = true
-      }
-      if (!extracted) return { ok: false, error: 'Nao foi possivel extrair o pacote (formato 7z requer tar.exe do Windows 10+).' }
-
-      const entries = await fs.readdir(extractDir, { recursive: true })
-      const hasDll = entries.some((f) => ['optiscaler.dll', 'nvngx.dll', 'dxgi.dll'].includes(path.basename(f).toLowerCase()))
-      if (!hasDll) return { ok: false, error: 'Atualizacao falhou: DLL principal nao encontrada no pacote extraido.' }
-
-      const destDir = path.join(app.getPath('userData'), 'OptiScaler', RELEASE_FOLDER_NAME)
-      await fs.mkdir(destDir, { recursive: true })
-      await fs.cp(extractDir, destDir, { recursive: true, force: true })
-      if (targetVersion) await fs.writeFile(path.join(destDir, 'version.txt'), targetVersion, 'utf8')
-
-      return { ok: true, version: targetVersion }
+      const r = await installOfficialRelease(app, requested || null)
+      return { ok: true, version: r.version }
     } catch (err) {
       return { ok: false, error: err?.message ?? String(err) }
-    } finally {
-      if (workDir) fs.rm(workDir, { recursive: true, force: true }).catch(() => {})
     }
   })
 }

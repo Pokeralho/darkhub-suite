@@ -137,6 +137,8 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
   const [selectedLoader, setSelectedLoader] = useState<string>('auto');
   const [customTargetDir, setCustomTargetDir] = useState<string>('');
   const [includeAgilitySdk, setIncludeAgilitySdk] = useState<boolean>(false);
+  const [frameGen, setFrameGen] = useState<'off' | 'fsrfg' | 'xefg'>('off');
+  const [release, setRelease] = useState<{ current: string | null; latest: string | null; busy: boolean; error?: string }>({ current: null, latest: null, busy: false });
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
   // Execution & Diagnostics
@@ -274,7 +276,8 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
       targetDir: effectiveTargetDir,
       loader: selectedLoader,
       upscaler: selectedPreset,
-      includeAgilitySdk
+      includeAgilitySdk,
+      frameGen
     };
   };
 
@@ -495,6 +498,18 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
     return games.filter((g) => g.name.toLowerCase().includes(q));
   }, [games, searchQuery]);
 
+  useEffect(() => {
+    window.darkhub?.optiscaler?.checkUpdate?.().then((r: any) => {
+      if (r?.ok) setRelease((x) => ({ ...x, current: r.currentVersion, latest: r.latestVersion }));
+    }).catch(() => {});
+  }, []);
+
+  const updateRelease = async () => {
+    setRelease((x) => ({ ...x, busy: true, error: undefined }));
+    const r = await window.darkhub?.optiscaler?.downloadUpdate?.({ url: '' }).catch((e: Error) => ({ ok: false, error: e.message }));
+    setRelease((x) => (r?.ok ? { ...x, busy: false, current: r.version } : { ...x, busy: false, error: r?.error || 'falhou' }));
+  };
+
   return (
     <div className="w-full text-zinc-100">
       <PageHeader
@@ -509,11 +524,10 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
               type="button"
               onClick={() => onNavigate('dlss5')}
               className="dh-btn dh-btn-ghost"
-              title="Acessar o módulo experimental DLSS 5 & Universal Neural Upscaler"
+              title={t('home.dlss5Desc', 'DLSS de cada jogo na versão mais nova da NVIDIA e DLSS 5 neural rendering pelo DLSS 5 Autopilot.')}
             >
               <Sparkles size={14} />
-              <span>DLSS 5 Manager</span>
-              <span className="dh-tag">exp</span>
+              <span>{t('nav.dlss5', 'DLSS Manager')}</span>
             </button>
           )}
           <button
@@ -868,6 +882,28 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
               <RotateCcw size={14} className={restoring ? 'animate-spin' : ''} />
               <span>{restoring ? 'Revertendo Arquivos...' : 'Reverter Jogo para Original'}</span>
             </button>
+          </div>
+
+          {/* Frame generation */}
+          <div className="border-t border-zinc-800/80 pt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] items-start">
+            <div className="min-w-0">
+              <span className="dh-label block mb-1.5">{t('optiscaler.fg', 'Frame Generation')}</span>
+              <select className="dh-input w-full md:w-72" value={frameGen} onChange={(e) => setFrameGen(e.target.value as 'off' | 'fsrfg' | 'xefg')}>
+                <option value="off">{t('optiscaler.fgOff', 'Desligado')}</option>
+                <option value="fsrfg">{t('optiscaler.fgFsr', 'FSR Frame Generation (qualquer GPU, DX12)')}</option>
+                <option value="xefg">{t('optiscaler.fgXe', 'XeSS Frame Generation (Intel; NVIDIA/AMD via fakenvapi)')}</option>
+              </select>
+              <p className="dh-help mt-1.5">{t('optiscaler.fgHelp', 'Usa o Frame Generation do próprio jogo (DLSS-G ou FSR 3) como fonte quando existe; senão gera a partir do upscaler. Ajuste fino na tecla Insert, dentro do jogo.')}</p>
+            </div>
+            <div className="text-[12px] text-zinc-500 md:text-right">
+              <p>OptiScaler {release.current || t('optiscaler.notDownloaded', 'não baixado (baixa ao aplicar)')}</p>
+              {release.latest && release.latest !== release.current ? (
+                <button type="button" className="dh-btn dh-btn-sm mt-1.5" disabled={release.busy} onClick={updateRelease}>
+                  <RotateCcw size={14} className={release.busy ? 'animate-spin' : ''} />{t('optiscaler.updateTo', 'Baixar {v}').replace('{v}', release.latest)}
+                </button>
+              ) : release.current ? <p className="text-zinc-600">{t('optiscaler.latest', 'versão mais recente')}</p> : null}
+              {release.error ? <p className="text-red-300 mt-1">{release.error}</p> : null}
+            </div>
           </div>
 
           {/* Advanced */}

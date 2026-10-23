@@ -1,6 +1,7 @@
 import https from 'node:https'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
+import path from 'node:path'
 
 export const GITHUB_HOSTS = Object.freeze([
   'github.com',
@@ -168,4 +169,10 @@ export function assetSha256(asset) {
   return match ? match[1].toLowerCase() : null
 }
 
-export default { downloadToFile, fetchJson, assetSha256, GITHUB_HOSTS }
+/**
+ * Windows' own bsdtar (reads zip/7z/tar). By absolute path: a bare "tar.exe" can resolve to Git's GNU tar, which reads
+ * "C:\..." as a remote host and fails.
+ */
+export const SYSTEM_TAR = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe')
+
+export default { downloadToFile, fetchJson, assetSha256, GITHUB_HOSTS, SYSTEM_TAR }
