@@ -1,4 +1,5 @@
 import { darkosMessages } from './darkosMessages';
+import { realtimeMessages } from './realtimeMessages';
 
 export type SupportedLang = 'pt-BR' | 'en-US' | 'es-ES' | 'de-DE' | 'fr-FR' | 'it-IT' | 'ru-RU' | 'zh-CN' | 'ja-JP';
 
@@ -3379,8 +3380,10 @@ export const messages: Record<string, Record<string, string>> = {
 
 };
 
-for (const [code, dict] of Object.entries(darkosMessages)) {
-  messages[code] = { ...(messages[code] || {}), ...dict };
+for (const extra of [darkosMessages, realtimeMessages]) {
+  for (const [code, dict] of Object.entries(extra)) {
+    messages[code] = { ...(messages[code] || {}), ...dict };
+  }
 }
 
 export function getTranslationTemplate(): string {

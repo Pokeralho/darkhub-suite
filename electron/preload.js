@@ -317,15 +317,27 @@ const darkhubApi = {
     checkUpdate: () => ipcRenderer.invoke('optiscaler:checkUpdate'),
     downloadUpdate: (url) => ipcRenderer.invoke('optiscaler:downloadUpdate', url)
   },
+  upscale: {
+    dlssLatest: () => ipcRenderer.invoke('upscale:dlssLatest'),
+    inspectGame: (dir) => ipcRenderer.invoke('upscale:inspectGame', { dir }),
+    updateGame: (dir, force) => ipcRenderer.invoke('upscale:updateGame', { dir, force: force === true }),
+    restoreGame: (dir) => ipcRenderer.invoke('upscale:restoreGame', { dir }),
+    scanLibrary: () => ipcRenderer.invoke('upscale:scanLibrary'),
+    autopilotStatus: () => ipcRenderer.invoke('upscale:autopilotStatus'),
+    autopilotInstall: () => ipcRenderer.invoke('upscale:autopilotInstall'),
+    autopilotLaunch: () => ipcRenderer.invoke('upscale:autopilotLaunch'),
+    onLog: (callback) => {
+      const handler = (_e, msg) => callback(msg)
+      ipcRenderer.on('upscale:log', handler)
+      return () => ipcRenderer.removeListener('upscale:log', handler)
+    }
+  },
   dlss5: {
     getSteamGames: () => ipcRenderer.invoke('dlss5:getSteamGames'),
     detectGpu: () => ipcRenderer.invoke('dlss5:detectGpu'),
     scanGame: (payload) => ipcRenderer.invoke('dlss5:scanGame', payload),
-    apply: (payload) => ipcRenderer.invoke('dlss5:apply', payload),
     revert: (payload) => ipcRenderer.invoke('dlss5:revert', payload),
     getRecentGames: () => ipcRenderer.invoke('dlss5:getRecentGames'),
-    getProvenance: () => ipcRenderer.invoke('dlss5:getProvenance'),
-    downloadBinaries: () => ipcRenderer.invoke('dlss5:downloadBinaries'),
     openFolder: (targetPath) => ipcRenderer.invoke('dlss5:openFolder', targetPath),
     onLog: (callback) => {
       const listener = (_event, msg) => callback(msg);
@@ -357,6 +369,39 @@ const darkhubApi = {
   },
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url)
+  },
+  share: {
+    state: () => ipcRenderer.invoke('share:state'),
+    setConfig: (patch) => ipcRenderer.invoke('share:setConfig', patch),
+    pickAndUpload: () => ipcRenderer.invoke('share:pickAndUpload'),
+    uploadFiles: (files) => ipcRenderer.invoke('share:uploadPaths', { paths: pathsOf(files) }),
+    uploadScreenshot: (file) => ipcRenderer.invoke('share:uploadFile', { file }),
+    cancel: (jobId) => ipcRenderer.invoke('share:cancel', { jobId }),
+    remove: (id) => ipcRenderer.invoke('share:delete', { id }),
+    copy: (text) => ipcRenderer.invoke('share:copy', { text }),
+    capture: () => ipcRenderer.invoke('share:capture'),
+    openFolder: () => ipcRenderer.invoke('share:openFolder'),
+    recentShots: () => ipcRenderer.invoke('share:recentShots'),
+    onEvent: (callback) => {
+      const handler = (_e, msg) => callback(msg)
+      ipcRenderer.on('share:event', handler)
+      return () => ipcRenderer.removeListener('share:event', handler)
+    }
+  },
+  realtime: {
+    status: () => ipcRenderer.invoke('realtime:status'),
+    setConfig: (patch) => ipcRenderer.invoke('realtime:setConfig', patch),
+    quarantineList: () => ipcRenderer.invoke('realtime:quarantineList'),
+    quarantineRestore: (id) => ipcRenderer.invoke('realtime:quarantineRestore', { id }),
+    quarantineDelete: (id) => ipcRenderer.invoke('realtime:quarantineDelete', { id }),
+    clamavInstall: () => ipcRenderer.invoke('realtime:clamavInstall'),
+    clamavUpdate: () => ipcRenderer.invoke('realtime:clamavUpdate'),
+    scanFiles: () => ipcRenderer.invoke('realtime:scanFiles'),
+    onEvent: (callback) => {
+      const handler = (_e, msg) => callback(msg)
+      ipcRenderer.on('realtime:event', handler)
+      return () => ipcRenderer.removeListener('realtime:event', handler)
+    }
   },
   hwsensors: {
     status: () => ipcRenderer.invoke('hwsensors:status'),

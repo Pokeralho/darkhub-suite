@@ -100,7 +100,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
 
   const tools: { id: string; icon: React.ComponentType<{ size?: number; className?: string }>; title: string; desc: string; action: string; tag: string }[] = [
     { id: 'darkpacer', icon: Activity, title: t('nav.darkpacer', 'DarkPacer (FPS Lock)'), desc: t('home.darkpacerDesc', 'Frame rate limiter and 1% Low stabilization with microsecond precision via VMT Hooking.'), action: t('home.configPacing', 'Configure Pacing'), tag: 'DXGI' },
-    { id: 'dlss5', icon: Sparkles, title: t('home.dlss5Title', 'DLSS 5 & Universal Upscaler'), desc: t('home.dlss5Desc', 'Upscaling neural com IA, Frame Generation universal para NVIDIA e AMD, ZLUDA HIP e rotas automáticas.'), action: t('home.openDlss5', 'Gerenciar DLSS 5'), tag: 'Frame Gen' },
+    { id: 'dlss5', icon: Sparkles, title: t('home.dlss5Title', 'DLSS Manager'), desc: t('home.dlss5Desc', 'DLSS de cada jogo na versão mais nova da NVIDIA e DLSS 5 neural rendering pelo DLSS 5 Autopilot.'), action: t('home.openDlss5', 'Abrir DLSS Manager'), tag: 'DLSS 5' },
     { id: 'optiscaler', icon: Cpu, title: t('nav.optiscaler', 'OptiScaler Manager'), desc: t('home.optiscalerDesc', 'Universal upscaling management, DLL injection and backup snapshots with 1-click restore.'), action: t('home.manageGames', 'Manage Games'), tag: 'DLSS · FSR · XeSS' },
     { id: 'setuphub', icon: Wrench, title: t('nav.setuphub', 'Post-Install Hub'), desc: t('home.setupHubDesc', 'Bulk installer with DDU, partitioners, benchmarks, Sysinternals and VC++ runtime packages.'), action: t('home.accessCatalog', 'Access Catalog'), tag: 'winget' }
   ];

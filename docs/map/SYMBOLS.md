@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-10-22T08:29:51. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-10-23T15:42:17. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -14,7 +14,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/devSelfTest.js`
 
-`short`:19, `withTimeout`:25, `sleep`:26, `mainWindow`:28, `run`:37, `call`:66, `callLong`:125
+`short`:19, `withTimeout`:25, `sleep`:26, `mainWindow`:28, `run`:40, `call`:69, `callLong`:128
 
 ## `electron/devSelfTestMutate.js`
 
@@ -116,6 +116,18 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `registerPowerShellIPC`:8, `handle`:11
 
+## `electron/ipc/realtimeIpc.js`
+
+`registerRealtimeIPC`:17, `getHashDb`:25, `broadcast`:28, `refreshClam`:47, `apply`:57, `defenderRunning`:81, `handle`:89, `status`:96
+
+## `electron/ipc/shareIpc.js`
+
+`readJson`:10, `writeJson`:11, `normalizeShareConfig`:15, `registerShareIPC`:26, `broadcast`:38, `notify`:39, `liveHistory`:40, `upload`:42, `publicEntry`:72, `capture`:74, `bindHotkey`:94, `handle`:108, `state`:115
+
+## `electron/ipc/upscaleIpc.js`
+
+`registerUpscaleIPC`:8, `send`:15, `serial`:16, `gameDir`:17, `handle`:22
+
 ## `electron/ipc/winToolsIpc.js`
 
 `registerWinToolsIPC`:4, `handle`:5
@@ -134,7 +146,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/main.js`
 
-`getSystemInformation`:102, `get`:108, `getSharp`:117, `createOcrWorker`:122, `getExiftool`:128, `getFfmpegPath`:136, `getLibraryStore`:168, `safeRegister`:175, `getYtDlpTools`:191, `isDev`:196, `normalizeAccessPath`:230, `isPathInside`:240, `grantFilePath`:246, `grantDirectoryPath`:251, `hasFileAccessGrant`:256, `assertOutputDirGranted`:268, `assertFileAccessGranted`:274, `assertFileAccessGrantedMany`:283, `psSingleQuote`:289, `normalizeWebhookUrl`:293, `loadRuntimeConfig`:312, `canSendDiscord`:338, `truncateDiscord`:352, `redactSensitive`:358, `normalizeTelemetryError`:369, `postDiscord`:378, `reportBugTelemetry`:406, `isAllowedExternalProtocol`:435, `getAllowedExternalUrl`:439, `openAllowedExternalUrlDetached`:449, `isEmbeddedExternalProtocol`:460, `handleEmbeddedExternalNavigation`:464, `isTrustedAppNavigation`:476, `getAppIconPath`:486, `showMainWindow`:501, `ensureTray`:514, `hideWindowToBackground`:541, `estimateDirectoryBytes`:546, `computeJunkEstimate`:590, `work`:604, `createMainWindow`:671, `kickWindowsPaint`:736, `showWhenReady`:803, `eventSender`:894, `measureLatency`:921, `getActiveAdapterName`:951, `getMainCpuLoad`:1187, `broadcastLibraryEvent`:1331, `scoreExecutable`:1400, `key`:1405, `scanDirectoryForBestExe`:1426, `walk`:1429, `findPgeBat`:1570, `launchPgeBat`:1590, `isStartupTaskEnabled`:1666, `setStartupTask`:1676, `refreshLiveCounts`:1820, `sendEvent`:2095, `findLibreOfficeSoffice`:2327, `toXml`:2419, `buildArgs`:2512, `vaultFilePath`:2784, `setVaultAutoLockMinutes`:2792, `clearVaultAutoLock`:2799, `scheduleVaultAutoLock`:2806, `touchVault`:2815, `vaultFileExists`:2819, `readVaultFile`:2828, `writeVaultFile`:2833, `lockVault`:2841, `ensureUnlocked`:2848, `loadVaultUsingWrapper`:2853, `persistVaultData`:2868, `getSecurityScoreV2`:3158, `add`:3163, `isValidHostname`:3340, `autoclickerConfigPath`:3479, `loadAutoClickerConfig`:3483, `saveAutoClickerConfig`:3503, `unregisterAutoClickerHotkey`:3514, `registerAutoClickerHotkey`:3520, `getClickEnginePath`:3537, `startAutoClicker`:3557, `stopAutoClicker`:3714, `isValidWingetId`:3884, `installGithubReleaseMsi`:3896, `progress`:3925, `tryInstall`:3953, `runDeferredStartup`:4020
+`getSystemInformation`:106, `get`:112, `getSharp`:121, `createOcrWorker`:126, `getExiftool`:132, `getFfmpegPath`:140, `getLibraryStore`:172, `safeRegister`:179, `getYtDlpTools`:198, `isDev`:203, `normalizeAccessPath`:237, `isPathInside`:247, `grantFilePath`:253, `grantDirectoryPath`:258, `hasFileAccessGrant`:263, `assertOutputDirGranted`:275, `assertFileAccessGranted`:281, `assertFileAccessGrantedMany`:290, `psSingleQuote`:296, `normalizeWebhookUrl`:300, `loadRuntimeConfig`:319, `canSendDiscord`:345, `truncateDiscord`:359, `redactSensitive`:365, `normalizeTelemetryError`:376, `postDiscord`:385, `reportBugTelemetry`:413, `isAllowedExternalProtocol`:442, `getAllowedExternalUrl`:446, `openAllowedExternalUrlDetached`:456, `isEmbeddedExternalProtocol`:467, `handleEmbeddedExternalNavigation`:471, `isTrustedAppNavigation`:483, `getAppIconPath`:493, `showMainWindow`:508, `ensureTray`:521, `hideWindowToBackground`:548, `estimateDirectoryBytes`:553, `computeJunkEstimate`:597, `work`:611, `createMainWindow`:678, `kickWindowsPaint`:743, `showWhenReady`:810, `eventSender`:901, `measureLatency`:928, `getActiveAdapterName`:958, `getMainCpuLoad`:1194, `broadcastLibraryEvent`:1338, `scoreExecutable`:1407, `key`:1412, `scanDirectoryForBestExe`:1433, `walk`:1436, `findPgeBat`:1577, `launchPgeBat`:1597, `isStartupTaskEnabled`:1673, `setStartupTask`:1683, `refreshLiveCounts`:1827, `sendEvent`:2102, `findLibreOfficeSoffice`:2334, `toXml`:2426, `buildArgs`:2519, `vaultFilePath`:2791, `setVaultAutoLockMinutes`:2799, `clearVaultAutoLock`:2806, `scheduleVaultAutoLock`:2813, `touchVault`:2822, `vaultFileExists`:2826, `readVaultFile`:2835, `writeVaultFile`:2840, `lockVault`:2848, `ensureUnlocked`:2855, `loadVaultUsingWrapper`:2860, `persistVaultData`:2875, `getSecurityScoreV2`:3165, `add`:3170, `isValidHostname`:3347, `autoclickerConfigPath`:3486, `loadAutoClickerConfig`:3490, `saveAutoClickerConfig`:3510, `unregisterAutoClickerHotkey`:3521, `registerAutoClickerHotkey`:3527, `getClickEnginePath`:3544, `startAutoClicker`:3564, `stopAutoClicker`:3721, `isValidWingetId`:3891, `installGithubReleaseMsi`:3903, `progress`:3932, `tryInstall`:3960, `runDeferredStartup`:4027
 
 ## `electron/networkIPC.js`
 
@@ -142,7 +154,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/optiscalerManager.js`
 
-`nowStamp`:31, `pad`:33, `getSourceVersion`:37, `resolveReleaseDir`:49, `normalizeWinPath`:64, `exists`:68, `readJsonIfExists`:77, `runPowerShellJson`:85, `classifyAmdArchitecture`:103, `getGpuInfo`:122, `getWindowsBuild`:150, `isWindows11OrNewer`:155, `walkFiles`:159, `walk`:164, `findUnrealExecutableCandidates`:187, `detectUpscaleFiles`:195, `add`:197, `fileContainsOptiScalerSignature`:229, `isOptiScalerLoader`:254, `detectInstalledLoaders`:271, `chooseLoader`:294, `chooseInputApi`:311, `normalizeChoice`:318, `buildIniPatch`:323, `setIniValue`:369, `applyIniPatch`:407, `getExePayload`:411, `buildAnalysis`:421, `backupPathIfExists`:560, `copySourceRootFiles`:576, `copySourceDirectory`:595, `makeUniqueBackupDir`:606, `rollbackApply`:616, `withMutationLock`:640, `isSameInstall`:646, `resolveFsr4Rdna2Path`:663, `applyOptiScaler`:708, `listBackups`:861, `isInsideDir`:897, `resolveBackupDir`:902, `restoreBackup`:913, `deleteBackup`:1113, `createManualBackup`:1132, `registerOptiScalerIPC`:1168
+`nowStamp`:36, `pad`:38, `getSourceVersion`:42, `resolveReleaseDir`:54, `hasDll`:55, `findReleaseRoot`:64, `installOfficialRelease`:77, `normalizeWinPath`:104, `exists`:108, `readJsonIfExists`:117, `runPowerShellJson`:125, `classifyAmdArchitecture`:143, `getGpuInfo`:162, `getWindowsBuild`:190, `isWindows11OrNewer`:195, `walkFiles`:199, `walk`:204, `findUnrealExecutableCandidates`:227, `detectUpscaleFiles`:235, `add`:237, `fileContainsOptiScalerSignature`:270, `isOptiScalerLoader`:295, `detectInstalledLoaders`:312, `chooseLoader`:335, `chooseInputApi`:352, `normalizeChoice`:359, `buildIniPatch`:364, `setIniValue`:413, `applyIniPatch`:451, `getExePayload`:455, `buildAnalysis`:465, `backupPathIfExists`:610, `copySourceRootFiles`:626, `copySourceDirectory`:645, `makeUniqueBackupDir`:656, `rollbackApply`:666, `withMutationLock`:690, `isSameInstall`:696, `resolveFsr4Rdna2Path`:713, `applyOptiScaler`:758, `listBackups`:918, `isInsideDir`:954, `resolveBackupDir`:959, `restoreBackup`:970, `deleteBackup`:1170, `createManualBackup`:1189, `registerOptiScalerIPC`:1225
 
 ## `electron/overlay.js`
 
@@ -150,7 +162,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:94, `listener`:156, `listener`:180, `handler`:241, `handler`:267, `handler`:273, `handler`:279, `handler`:285, `listener`:294, `listener`:305, `listener`:331, `listener`:348, `listener`:379, `handler`:432
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:94, `listener`:156, `listener`:180, `handler`:241, `handler`:267, `handler`:273, `handler`:279, `handler`:285, `listener`:294, `listener`:305, `handler`:330, `listener`:343, `listener`:360, `handler`:386, `handler`:401, `listener`:424, `handler`:477
 
 ## `electron/services/CoverProviderService.js`
 
@@ -178,7 +190,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/DarkHub.LatencyEngine.cs`
 
-`PROCESS_POWER_THROTTLING_STATE`:17 _class_, `DarkHubLatencyEngine`:24 _class_, `NtSetTimerResolution`:29, `NtQueryTimerResolution`:32, `TimeBeginPeriod`:35, `TimeEndPeriod`:38, `AvSetMmThreadCharacteristicsW`:41, `AvRevertMmThreadCharacteristics`:44, `OpenProcess`:47, `SetPriorityClass`:50, `SetProcessPriorityBoost`:53, `SetProcessAffinityMask`:56, `GetProcessAffinityMask`:59, `CloseHandle`:62, `GetCurrentProcess`:65, `GetCurrentThread`:68, `SetThreadPriority`:71, `SetProcessInformation`:74, `IcmpCreateFile`:77, `IcmpCloseHandle`:80, `IcmpSendEcho`:83, `EmptyWorkingSet`:95, `Main`:127, `NamedPipeServerWorker`:183, `HandleCommand`:213, `LockTimerResolution`:305, `UnlockTimerResolution`:329, `TimerWorkerLoop`:343, `QueryTimerResolutionInternal`:402, `HandleBoostProcess`:428, `HandleSetAffinity`:480, `HandleCleanRam`:512, `GetCpuTopologyInternal`:543, `HandlePingNative`:568, `IP_OPTION_INFORMATION`:655 _class_, `ICMP_ECHO_REPLY`:665 _class_, `SendJson`:676, `FormatResponse`:681, `DictionaryToJson`:692, `ObjectToJson`:708, `GetJsonStringValue`:721, `GetJsonIntValue`:733, `GetJsonBoolValue`:747
+`PROCESS_POWER_THROTTLING_STATE`:17 _class_, `DarkHubLatencyEngine`:24 _class_, `NtSetTimerResolution`:29, `NtQueryTimerResolution`:32, `TimeBeginPeriod`:35, `TimeEndPeriod`:38, `AvSetMmThreadCharacteristicsW`:41, `AvRevertMmThreadCharacteristics`:44, `OpenProcess`:47, `SetPriorityClass`:50, `SetProcessPriorityBoost`:53, `SetProcessAffinityMask`:56, `GetProcessAffinityMask`:59, `CloseHandle`:62, `GetCurrentProcess`:65, `GetCurrentThread`:68, `SetThreadPriority`:71, `SetProcessInformation`:74, `IcmpCreateFile`:77, `IcmpCloseHandle`:80, `IcmpSendEcho`:83, `EmptyWorkingSet`:95, `GetForegroundWindow`:98, `GetWindowThreadProcessId`:101, `ForegroundPid`:104, `Main`:143, `NamedPipeServerWorker`:199, `HandleCommand`:229, `LockTimerResolution`:328, `UnlockTimerResolution`:352, `TimerWorkerLoop`:366, `QueryTimerResolutionInternal`:425, `HandleBoostProcess`:451, `HandleSetAffinity`:503, `HandleListProcesses`:535, `HandleCleanRam`:552, `GetCpuTopologyInternal`:591, `HandlePingNative`:616, `IP_OPTION_INFORMATION`:703 _class_, `ICMP_ECHO_REPLY`:713 _class_, `SendJson`:724, `FormatResponse`:729, `DictionaryToJson`:740, `ObjectToJson`:756, `GetJsonStringValue`:781, `GetJsonIntValue`:793, `GetJsonBoolValue`:807
 
 ## `electron/services/DarkHub.SensorDaemon.cs`
 
@@ -190,7 +202,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/DriverCenterService.js`
 
-`classifyVendor`:35, `vendorFromPnpId`:48, `isGenericDisplayDriver`:61, `officialSourcesFor`:69, `isOfficialDriverUrl`:74, `normalizeAdapter`:88, `Step`:177, `cameraIssues`:225, `DriverCenterService`:243 _class_, `cameraStatus`:251, `repairCamera`:269, `detectAdapters`:286, `resolveOfficialUrl`:310
+`classifyVendor`:35, `vendorFromPnpId`:48, `boardPartnerFromPnpId`:69, `isGenericDisplayDriver`:75, `officialSourcesFor`:83, `isOfficialDriverUrl`:88, `normalizeAdapter`:102, `Step`:192, `cameraIssues`:240, `DriverCenterService`:258 _class_, `cameraStatus`:266, `repairCamera`:284, `detectAdapters`:301, `resolveOfficialUrl`:325
 
 ## `electron/services/FramePacerEngine.js`
 
@@ -214,7 +226,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/NativeLatencyClient.js`
 
-`NativeLatencyClient`:11 _class_, `getExecutablePath`:20, `ensureRunning`:35, `_rejectAllPending`:104, `sendCommand`:112, `lockTimer`:144, `unlockTimer`:149, `queryTimer`:154, `boostProcess`:159, `setAffinity`:169, `getCpuTopology`:178, `pingNative`:188, `cleanRam`:200, `dispose`:208, `killSync`:230, `registerExitKill`:245
+`NativeLatencyClient`:11 _class_, `getExecutablePath`:20, `ensureRunning`:35, `_rejectAllPending`:104, `sendCommand`:112, `lockTimer`:144, `unlockTimer`:149, `queryTimer`:154, `boostProcess`:159, `setAffinity`:169, `getCpuTopology`:178, `pingNative`:188, `cleanRam`:201, `listProcesses`:211, `dispose`:222, `killSync`:244, `registerExitKill`:259
 
 ## `electron/services/PowerShellRunner.js`
 
@@ -226,11 +238,11 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/SecureDownload.js`
 
-`assertAllowedUrl`:15, `downloadToFile`:35, `cleanupAndReject`:48, `unlink`:52, `attempt`:61, `fetchJson`:134, `assetSha256`:165
+`assertAllowedUrl`:16, `downloadToFile`:36, `cleanupAndReject`:49, `unlink`:53, `attempt`:62, `fetchJson`:135, `assetSha256`:166
 
 ## `electron/services/SecurityService.js`
 
-`SecurityService`:11 _class_, `init`:38, `_getShieldPrefPath`:92, `_readShieldPref`:96, `_writeShieldPref`:104, `autoShieldBoot`:112, `runPowerShell`:127, `calculateEntropy`:141, `scanRunningProcesses`:188, `scanUrl`:286, `enablePhishingShield`:388, `disablePhishingShield`:431, `getPhishingShieldStatus`:459, `getLiveNetworkConnections`:476, `checkRansomwareArmor`:514, `enableRansomwareArmor`:536, `_getRulesFilePath`:557, `loadCommunityRules`:564, `getCommunityRules`:584, `getAllPhishingDomains`:595, `importCommunityRules`:599, `resetCommunityRules`:636
+`SecurityService`:11 _class_, `init`:40, `_getShieldPrefPath`:94, `_readShieldPref`:98, `_writeShieldPref`:106, `autoShieldBoot`:114, `runPowerShell`:129, `calculateEntropy`:143, `scanRunningProcesses`:190, `scanUrl`:288, `enablePhishingShield`:390, `disablePhishingShield`:433, `getPhishingShieldStatus`:461, `getLiveNetworkConnections`:478, `checkRansomwareArmor`:516, `enableRansomwareArmor`:538, `_getRulesFilePath`:559, `loadCommunityRules`:566, `getCommunityRules`:587, `getAllPhishingDomains`:599, `importCommunityRules`:603, `resetCommunityRules`:645, `normalizeFileHashes`:662
 
 ## `electron/services/UpdateService.js`
 
@@ -262,7 +274,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/dlss5/Dlss5Service.js`
 
-`inspectPeExecutable`:27, `rvaToFileOffset`:61, `computeSha256`:106, `Dlss5Service`:115 _class_, `getHistoryFilePath`:120, `getRecentGames`:129, `saveRecentGame`:141, `getSteamPath`:158, `getLibraryPaths`:195, `getInstalledSteamGames`:214, `detectGpu`:264, `detectGraphicsAPI`:325, `detectAutoRoute`:451, `scanGameDirectory`:511, `findCandidates`:541, `resolveOptiScalerSource`:664, `getBinaryProvenance`:696, `extractArchive`:785, `generateNvngxIni`:862, `getUserDataDir`:1056, `resolveAmdNrSource`:1064, `isPackage`:1068, `_resolveFsr4Rdna2`:1081, `_readManifest`:1090, `applySignatureCheckBypass`:1102, `restoreSignatureCheckBypass`:1127, `insideTarget`:1203, `ensureBackedUp`:1208, `place`:1221, `placeContent`:1234, `placeDir`:1240, `inside`:1437, `registerDlss5IPC`:1518, `serialized`:1523, `onLog`:1557, `onLog`:1570, `onLog`:1600
+`inspectPeExecutable`:23, `rvaToFileOffset`:57, `computeSha256`:102, `Dlss5Service`:111 _class_, `getHistoryFilePath`:116, `getRecentGames`:125, `saveRecentGame`:137, `getSteamPath`:154, `getLibraryPaths`:191, `getInstalledSteamGames`:210, `detectGpu`:260, `detectGraphicsAPI`:312, `scanGameDirectory`:435, `findCandidates`:465, `getUserDataDir`:582, `_readManifest`:591, `restoreSignatureCheckBypass`:600, `inside`:626, `registerDlss5IPC`:707, `serialized`:712, `onLog`:747
 
 ## `electron/services/downloads/DownloadManager.js`
 
@@ -348,6 +360,50 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `featureById`:46, `summarizeFeatureState`:51, `parseFeatureLines`:60, `featureReadScript`:71, `launch`:82, `finish`:85, `WindowsToolsEngine`:95 _class_, `listFeatures`:101, `setFeature`:108, `openPanel`:147, `run`:154, `resetWindowsUpdate`:161, `repairWinget`:178, `cleanupComponentStore`:194, `removeEdge`:206, `installEdge`:219, `decryptSystemDrive`:229, `autologon`:248
 
+## `electron/services/realtime/ClamAv.js`
+
+`parseClamscan`:13, `freshclamConf`:22, `run`:27, `ClamAv`:47 _class_, `find`:54, `clamscan`:63, `freshclam`:64, `hasDatabase`:66, `databaseAge`:73, `status`:77, `install`:81, `update`:88, `scan`:98
+
+## `electron/services/realtime/HashDb.js`
+
+`HashDb`:8 _class_, `lookup`:27
+
+## `electron/services/realtime/Quarantine.js`
+
+`xorStream`:11, `transcode`:23, `Quarantine`:29 _class_, `paths`:32, `add`:38, `public`:55, `list`:60, `restore`:72, `remove`:85
+
+## `electron/services/realtime/RealtimeOptimizer.js`
+
+`shouldTrim`:17, `nextCooldownMin`:23, `planRuleActions`:28, `RealtimeOptimizer`:41 _class_, `running`:54, `start`:56, `stop`:69, `status`:76, `record`:81, `memoryTick`:88, `rulesTick`:111
+
+## `electron/services/realtime/RealtimeProtection.js`
+
+`isScanCandidate`:26, `sha256File`:32, `RealtimeProtection`:39 _class_, `running`:55, `start`:57, `stop`:72, `status`:82, `scanNow`:87, `record`:91, `changed`:99, `settle`:108, `enqueue`:122, `drain`:129, `scanOne`:139, `flushClam`:160, `markClean`:175, `detected`:180
+
+## `electron/services/realtime/realtimeConfig.js`
+
+`clamp`:7, `normalizeRule`:11, `normalizeFolder`:17, `defaults`:22, `normalize`:45, `ConfigStore`:75 _class_, `read`:82, `update`:86
+
+## `electron/services/susuya/Screenshot.js`
+
+`pad`:7, `screenshotName`:8, `physicalSize`:13, `captureScreen`:18
+
+## `electron/services/susuya/SusuyaClient.js`
+
+`mimeOf`:20, `links`:22, `json`:24, `readChunk`:30, `SusuyaClient`:41 _class_, `config`:48, `worker`:74, `remove`:104
+
+## `electron/services/upscale/Autopilot.js`
+
+`findExe`:14, `Autopilot`:24 _class_, `installed`:30, `latest`:41, `status`:50, `launch`:74
+
+## `electron/services/upscale/DlssUpdater.js`
+
+`RAW`:13, `scanGameFolder`:23, `walk`:26, `safe`:44, `verifySignature`:46, `DlssUpdater`:56 _class_, `latest`:64, `officialDll`:75, `inspect`:91, `restore`:123, `record`:136
+
+## `electron/services/upscale/pe.js`
+
+`readRange`:7, `fileVersionFromBuffer`:14, `peFileVersion`:26, `isPe64`:38, `compareVersions`:52
+
 ## `electron/vaultCrypto.js`
 
 `toB64`:3, `fromB64`:7, `derivePasswordFromRecoveryWords`:11, `generateRecoveryWords`:21, `buildDefaultWordList`:34, `scryptKey`:143, `aesGcmEncrypt`:164, `aesGcmDecrypt`:172, `buildKdf`:181, `wrapVaultKeyWithPassword`:193, `unwrapVaultKeyWithPassword`:199, `encryptVaultData`:205, `decryptVaultData`:211
@@ -370,7 +426,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/App.tsx`
 
-`pageFromHash`:41, `PageLoading`:46 _component_, `App`:61 _component_, `onHash`:72, `report`:78, `onError`:94, `onRejection`:100, `reportRenderError`:115, `renderPage`:130
+`pageFromHash`:43, `PageLoading`:48 _component_, `App`:63 _component_, `onHash`:74, `report`:80, `onError`:96, `onRejection`:102, `reportRenderError`:117, `renderPage`:132
 
 ## `src/components/DetailedHardwareInfo.tsx`
 
@@ -506,11 +562,11 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/i18n/messages.ts`
 
-`SupportedLang`:3 _type_, `LanguageOption`:5 _type_, `getTranslationTemplate`:3386
+`SupportedLang`:4 _type_, `LanguageOption`:6 _type_, `getTranslationTemplate`:3389
 
 ## `src/layouts/MainLayout.tsx`
 
-`MainLayoutProps`:15 _type_, `NavSection`:21 _type_, `MainLayout`:31 _component_, `handleMenuClick`:125, `handleNavKeyDown`:148, `navButton`:163, `rail`:169
+`MainLayoutProps`:15 _type_, `NavSection`:21 _type_, `MainLayout`:31 _component_, `handleMenuClick`:127, `handleNavKeyDown`:150, `navButton`:165, `rail`:171
 
 ## `src/pages/AdvancedSecurity.tsx`
 
@@ -542,7 +598,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/Dlss5Manager.tsx`
 
-`SteamGame`:34 _type_, `GpuInfo`:42 _type_, `GraphicsApiInfo`:51 _type_, `RouteInfo`:71 _type_, `ScannedGame`:82 _type_, `RecentGame`:100 _type_, `Dlss5Manager`:113 _component_, `refreshSteamGames`:164, `init`:182, `handleProfileChange`:231, `handleScanGame`:243, `handleSelectFolder`:289, `handleSelectExe`:306, `handleDragOver`:324, `handleDragLeave`:330, `handleDrop`:336, `handleOpenFolder`:348, `handleApply`:360, `handleRevert`:411, `toggleRow`:471
+`up`:7, `legacy`:8, `GameRow`:10 _type_, `Tier`:11 _type_, `dlss5Tier`:14, `Dlss5Manager`:27 _component_, `run`:47, `scan`:60, `replaceRow`:65, `update`:66, `restore`:71, `addFolder`:77, `updateAll`:89
 
 ## `src/pages/Downloads.tsx`
 
@@ -590,7 +646,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/OptiScalerManager.tsx`
 
-`OptiScalerConfig`:31 _type_, `GameItem`:43 _type_, `Choice`:57 _type_, `dirnameFromPath`:114, `basename`:118, `OptiScalerManagerProps`:122 _type_, `OptiScalerManager`:126 _component_, `refreshLibraryAndSteam`:177, `makePayload`:260, `runAnalyzeForGame`:296, `handleSelectExe`:343, `handleRemoveManualGame`:386, `handleCreateManualBackup`:400, `handleDeleteBackup`:418, `handleApply`:435, `handleRestore`:467
+`OptiScalerConfig`:31 _type_, `GameItem`:43 _type_, `Choice`:57 _type_, `dirnameFromPath`:114, `basename`:118, `OptiScalerManagerProps`:122 _type_, `OptiScalerManager`:126 _component_, `refreshLibraryAndSteam`:179, `makePayload`:262, `runAnalyzeForGame`:299, `handleSelectExe`:346, `handleRemoveManualGame`:389, `handleCreateManualBackup`:403, `handleDeleteBackup`:421, `handleApply`:438, `handleRestore`:470, `updateRelease`:507
 
 ## `src/pages/Optimizer.tsx`
 
@@ -604,6 +660,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `PolicyResult`:10 _type_, `ScriptItem`:11 _type_, `RunResult`:12 _type_, `api`:14, `PowerShellTools`:24 _component_, `runScript`:76, `openElevated`:92, `sigLabel`:110, `policyNote`:111, `skeletonRows`:135
 
+## `src/pages/Realtime.tsx`
+
+`api`:7, `Switch`:12 _component_, `Stat`:21 _component_, `gb`:28, `time`:29, `Realtime`:31 _component_, `update`:61, `run`:66, `addRule`:91, `addFolder`:98, `describe`:103
+
 ## `src/pages/Settings.tsx`
 
 `SettingsPage`:9 _component_, `saveTelemetry`:74, `saveLiveServices`:92, `saveWindowBehavior`:111, `saveStartupBehavior`:132, `Status`:418 _type_, `StatusLine`:420 _component_, `SettingsGroup`:430 _component_, `SettingRow`:442 _component_, `ResourceUsageSection`:464 _component_, `UpdateManagerSection`:517 _component_, `loadStatus`:527, `handleCheck`:558
@@ -611,6 +671,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `src/pages/SetupHub.tsx`
 
 `SetupHub`:232 _component_, `toggleApp`:252, `toggleCategory`:258, `applyPreset`:268, `handleInstallApps`:331, `detectHardware`:360, `toggleOpen`:466, `joinParts`:719, `HardwareCard`:721 _component_, `getGpuDriverLinks`:762, `getCpuChipsetLinks`:780, `getMoboDriverLinks`:793
+
+## `src/pages/Share.tsx`
+
+`api`:7, `fmtBytes`:10, `acceleratorOf`:13, `Share`:24 _component_, `setConfig`:56, `copy`:61, `report`:65, `onDrop`:70, `expiresIn`:74, `capture`:78
 
 ## `src/pages/SpaceSniffer/TreemapCanvas.tsx`
 
@@ -664,9 +728,13 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `file`:15, `ok`:18, `build`:61
 
+## `tests/dlss5.test.ts`
+
+`fixedInfo`:13, `fakeDll`:22
+
 ## `tests/dlss5Lifecycle.test.ts`
 
-`setup`:8
+`legacyInstall`:9
 
 ## `tests/downloads.test.ts`
 
@@ -686,11 +754,19 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `tests/optiscaler.test.ts`
 
-`isRdna2`:27, `mockGetLibraryStore`:48
+`isRdna2`:16, `mockGetLibraryStore`:37, `sectionKeys`:67
 
 ## `tests/powershellTools.test.ts`
 
 `make`:37
+
+## `tests/realtime.test.ts`
+
+`tmp`:19, `sha`:20, `waitFor`:21
+
+## `tests/susuya.test.ts`
+
+`fakeSusuya`:19, `send`:26, `tmpFile`:62
 
 ## `tests/templateBackslash.test.ts`
 

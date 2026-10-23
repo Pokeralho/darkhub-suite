@@ -5,7 +5,7 @@ import {
   PlaySquare, ScanText, ShieldAlert, Lock, Image as ImageIcon,
   Edit3, MousePointerClick, LibraryBig, Gamepad2, Film,
   Download, Fingerprint, Network, Code, ChevronLeft, ChevronRight,
-  Cpu, Crosshair, Activity, Flame, Sparkles, Minus, Square, X, LifeBuoy,
+  Cpu, Crosshair, Activity, Flame, Sparkles, Minus, Square, X, LifeBuoy, Gauge, UploadCloud,
   MonitorCog, Terminal, DarkHubMark
 } from '../components/icons';
 import { useI18n } from '../i18n/I18nProvider';
@@ -72,6 +72,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
       items: [
         { id: 'home', label: t('nav.home', 'Home'), icon: HomeIcon },
         { id: 'dashboard', label: t('nav.dashboard', 'Dashboard'), icon: LayoutGrid },
+        { id: 'realtime', label: t('nav.realtime', 'Real-time'), icon: Gauge },
         // Always listed: on DarkOS it is the management/recovery center; elsewhere it shows an
         // explanatory empty state (nothing can run, the main process refuses without manifest.json).
         { id: 'darkos', label: isDarkOS ? t('nav.darkos', 'DarkOS') : t('darkos.win.title', 'DarkOS Mods'), icon: LifeBuoy, badge: isDarkOS ? 'ON' : undefined }
@@ -82,7 +83,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
       items: [
         { id: 'darkpacer', label: t('nav.darkpacer', 'DarkPacer (FPS Lock)'), icon: Activity, badge: 'DXGI' },
         { id: 'optiscaler', label: t('nav.optiscaler', 'OptiScaler Manager'), icon: Cpu },
-        { id: 'dlss5', label: t('nav.dlss5', 'DLSS 5 Manager'), icon: Sparkles, badge: 'EXP' },
+        { id: 'dlss5', label: t('nav.dlss5', 'DLSS Manager'), icon: Sparkles },
         { id: 'pge-portable', label: 'PGE Portable', icon: Gamepad2 },
         { id: 'optimizer', label: t('nav.optimizer', 'System Optimizer'), icon: Zap },
         { id: 'ultra-latency', label: t('nav.ultralatency', 'Ultra Low Latency'), icon: Flame },
@@ -108,6 +109,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
         { id: 'decryption', label: t('nav.decryption', 'Decryption'), icon: Fingerprint },
         { id: 'converter', label: t('nav.converter', 'File Converter'), icon: FileText },
         { id: 'downloads', label: t('nav.downloads', 'Download Manager'), icon: Download },
+        { id: 'share', label: t('nav.share', 'Susuya'), icon: UploadCloud },
         { id: 'youtube', label: t('nav.youtube', 'Video Downloader'), icon: PlaySquare },
         { id: 'ocr', label: t('nav.ocr', 'Image OCR'), icon: ScanText },
         { id: 'metadata', label: t('nav.metadata', 'EXIF Editor'), icon: ImageIcon },

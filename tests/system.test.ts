@@ -36,11 +36,11 @@ describe('DarkHub Suite Core Verification', () => {
     expect(storageEngine._isProtectedPath('random_temp_junk_123.tmp')).toBe(false);
   });
 
-  it('should include HAGS and DLSS 5 translations and navigation keys', () => {
-    expect(messages['pt-BR']['nav.dlss5']).toBe('DLSS 5 Manager');
-    expect(messages['en-US']['nav.dlss5']).toBe('DLSS 5 Manager');
-    expect(messages['pt-BR']['home.dlss5Title']).toBe('DLSS 5 & Universal Upscaler');
-    expect(messages['en-US']['home.dlss5Title']).toBe('DLSS 5 & Universal Upscaler');
+  it('should include HAGS and DLSS Manager translations and navigation keys', () => {
+    expect(messages['pt-BR']['nav.dlss5']).toBe('DLSS Manager');
+    expect(messages['en-US']['nav.dlss5']).toBe('DLSS Manager');
+    expect(messages['pt-BR']['home.dlss5Title']).toBe('DLSS Manager');
+    expect(messages['en-US']['home.dlss5Title']).toBe('DLSS Manager');
     expect(messages['pt-BR']['optimizer.hags.title']).toBeDefined();
     expect(messages['en-US']['optimizer.hags.title']).toBeDefined();
     expect(messages['pt-BR']['optimizer.hags.revertBtn']).toBeDefined();

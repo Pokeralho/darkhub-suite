@@ -57,8 +57,23 @@ sensors need it. It updates itself from GitHub releases (the download is checked
   (Balanced / Competitive gaming / Maximum performance), gaming and latency first.
 - **Ultra Low Latency**: timer resolution, MMCSS, interrupt and input-path tuning, bound to hotkeys.
 - **DarkPacer**: frame limiter with precise pacing and a frametime overlay.
-- **OptiScaler and DLSS 5 managers**: detect games, inject and roll back upscaler DLLs (DLSS, FSR, XeSS).
+- **DLSS Manager**: keeps every game's DLSS, Ray Reconstruction and Frame Generation on NVIDIA's newest build
+  (official NVIDIA DLLs, signature checked, originals kept), and brings DLSS 5 neural rendering to games that do not
+  ship it through DLSS 5 Autopilot.
+- **OptiScaler Manager**: the official OptiScaler release with FSR 4 / FSR 3.1 / XeSS / DLSS upscaling and FSR or XeSS
+  frame generation, with backups and one-click revert.
 - **PGE Portable**: Lossless Scaling and ReSwitch bundled.
+
+### Real-time (off by default)
+- **Real-time optimizer**: frees memory only under real pressure (never the window in focus) and lowers the priority
+  of, or closes, the background apps you list. Runs in the tray at almost no cost.
+- **Real-time protection**: watches Downloads, Desktop and any folder you add; checks new executables, scripts and
+  archives against a hash database and, optionally, ClamAV; quarantine with restore.
+
+### Sharing
+- **Susuya**: upload files up to 600 MB to [Susuya](https://susuya.darkhub.ink) and get a direct download link.
+- **Screenshots**: native-resolution lossless PNG with a global shortcut, also in exclusive-fullscreen games, with
+  optional upload to Susuya.
 
 ### Hardware
 - **System Monitor**: CPU per core, RAM, GPU per adapter (DXGI), disk active time, network, DPC rate, processes.

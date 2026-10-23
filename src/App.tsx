@@ -12,6 +12,8 @@ const FileConverter = lazy(() => import('./pages/FileConverter'));
 const YoutubeDownloader = lazy(() => import('./pages/YoutubeDownloader'));
 const ImageTextExtractor = lazy(() => import('./pages/ImageTextExtractor'));
 const AdvancedSecurity = lazy(() => import('./pages/AdvancedSecurity'));
+const Realtime = lazy(() => import('./pages/Realtime'));
+const Share = lazy(() => import('./pages/Share'));
 const PasswordManager = lazy(() => import('./pages/PasswordManager'));
 const MetaDataEditor = lazy(() => import('./pages/MetaDataEditor'));
 const TextEditor = lazy(() => import('./pages/TextEditor'));
@@ -143,6 +145,10 @@ ${componentStack}` : ''}`
         return <PowerShellTools />;
       case 'monitor':
         return <SystemMonitor />;
+      case 'realtime':
+        return <Realtime />;
+      case 'share':
+        return <Share />;
       case 'security':
         return <AdvancedSecurity />;
       case 'passwords':

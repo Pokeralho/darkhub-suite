@@ -4,6 +4,48 @@ All notable changes to the DarkHub Suite project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-10-23
+
+### Added
+- Real-time screen (Overview > Real-time). Both services are off by default and keep running with DarkHub in the tray.
+  - Real-time optimizer: reads available memory every 5 s with no process spawned; under real pressure it trims the
+    working sets of background processes through the native engine, never the foreground window, and backs off
+    exponentially when a trim frees little. User process rules (lower priority / close) run from one native process list
+    every 20 s (~15 ms for 500 processes); system processes are refused.
+  - Real-time protection: folders watched with ReadDirectoryChangesW (no polling); only risky file types, once a
+    download stops growing; SHA-256 looked up in a sorted binary hash set (EICAR test signature + community
+    `fileHashes`); optional ClamAV (official winget package and freshclam signatures) scanned in batches at low
+    priority, without the resident clamd daemon. Detections go to an XOR-encoded quarantine with restore (restored files
+    become trusted) and raise a notification.
+- Community rules accept `fileHashes` (SHA-256 with a detection name), documented in SECURITY_RULES.md.
+- Driver Center shows the board maker (ASUS, MSI, Sapphire...) from the PCI subsystem vendor id.
+- Native latency engine: `list_processes` and a `clean_ram` that skips the foreground window and reports what it trimmed.
+
+- Susuya (susuya.darkhub.ink) built in: drop or pick files (up to 600 MB, 8 MB chunks, 3 in parallel, retried) and get a
+  direct download link (/d/:id) on the clipboard; active links with copy and delete. Same protocol as the site.
+- Native-resolution screenshots: the monitor under the mouse at its physical pixel size, lossless PNG, global shortcut
+  (Ctrl+Shift+F12 by default), optional upload to Susuya with the direct link copied.
+- DLSS Manager rebuilt:
+  - DLSS updater: finds nvngx_dlss / dlssd / dlssg in each game (Steam library or any folder), compares with NVIDIA's
+    newest SDK release and swaps in NVIDIA's own DLLs (NVIDIA/DLSS repository, 64-bit and Authenticode-checked), keeping
+    the game's file for restore; anti-cheat games are left out of "update all".
+  - DLSS 5 neural rendering through DLSS 5 Autopilot (MIT), installed from its official release (SHA-256 checked) and
+    launched from DarkHub, with the card's DLSS 5 tier (RTX 50 / 40 / 20-30 / unsupported).
+- OptiScaler Manager: frame generation (FSR FG or XeFG; the game's own DLSS-G/FSR 3 FG as source when present) and the
+  installed/latest OptiScaler version with one-click update.
+
+### Fixed
+- OptiScaler Manager could never apply: it looked for a pinned release folder that is not shipped. It now downloads the
+  official latest release (SHA-256 checked) on first use.
+- DLSS 5 Manager installed files that never enabled DLSS 5: an OptiScaler.ini with sections and values OptiScaler does not
+  have ([DLSSNR], [ZLUDA], FGOutput=dlssg, a preset that is not current), eight "routes" that all installed the same thing,
+  and an RTX 20/30 neural build for every card. That installer is removed; old installs can be removed from the screen.
+- GPU detection no longer reports an RTX card when WMI fails.
+- Archives were extracted with whatever tar.exe came first in PATH; Git's GNU tar reads "C:" as a remote host and failed.
+  Windows' own tar is now used by absolute path (file converter, OptiScaler, DLSS 5 Autopilot).
+- Self-test screenshots were stale when another window covered the test window (native occlusion disabled for it) and
+  could target an overlay window instead of the app window.
+
 ## [0.6.0] - 2026-10-21
 
 ### Fixed (startup)

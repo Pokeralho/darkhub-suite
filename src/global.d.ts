@@ -361,8 +361,19 @@ export interface DarkHubAPI {
     checkUpdate: () => Promise<any>;
     downloadUpdate: (payload: string | { url: string; version?: string }) => Promise<any>;
   };
+  upscale: {
+    dlssLatest: () => Promise<{ ok: boolean; error?: string; tag?: string; version?: string }>;
+    inspectGame: (dir: string) => Promise<DlssGameInfo & { ok: boolean; error?: string; dir?: string }>;
+    updateGame: (dir: string, force?: boolean) => Promise<DlssGameInfo & { ok: boolean; error?: string; updated?: { file: string; from: string | null; to: string }[] }>;
+    restoreGame: (dir: string) => Promise<{ ok: boolean; error?: string; restored?: string[] }>;
+    scanLibrary: () => Promise<{ ok: boolean; error?: string; latest?: string; games?: (DlssGameInfo & { name: string; dir: string; appId?: string })[] }>;
+    autopilotStatus: () => Promise<{ ok: boolean; error?: string; installed: { tag: string; exe: string } | null; latest: string | null; updateAvailable?: boolean; notesUrl?: string }>;
+    autopilotInstall: () => Promise<{ ok: boolean; error?: string; installed?: { tag: string; exe: string } | null }>;
+    autopilotLaunch: () => Promise<{ ok: boolean; error?: string; tag?: string }>;
+    onLog: (callback: (msg: { dir: string; line: string }) => void) => () => void;
+  };
   dlss5: {
-    detectGpu: () => Promise<{ ok: boolean; vendor: 'nvidia' | 'amd' | 'intel' | 'other'; model: string; driverVersion: string; isRtx: boolean; isAmd: boolean; isIntel: boolean; defaultProfile: 'nvidia' | 'amd' }>;
+    detectGpu: () => Promise<{ ok: boolean; error?: string; vendor: 'nvidia' | 'amd' | 'intel' | 'other' | 'unknown'; model: string; driverVersion: string; isRtx: boolean; isAmd: boolean; isIntel: boolean; defaultProfile: 'nvidia' | 'amd' }>;
     scanGame: (payload: string | { path: string }) => Promise<{
       ok: boolean;
       gameName?: string;
@@ -389,16 +400,6 @@ export interface DarkHubAPI {
         loaderReason: string;
         compatibilityNote: string;
       };
-      routeInfo?: {
-        recommendedRoute: string;
-        routeName: string;
-        routeBadge: string;
-        routeDescription: string;
-        allowedRoutes: Array<{ id: string; name: string; description: string }>;
-        isRemix: boolean;
-        is64: boolean;
-        neuralUpstreamRecommended: boolean;
-      };
       dlssDetected?: boolean;
       existingDlls?: string[];
       installed?: boolean;
@@ -406,32 +407,6 @@ export interface DarkHubAPI {
       installedLoader?: string | null;
       manifest?: any;
       error?: string;
-    }>;
-    apply: (payload: {
-      gamePath?: string;
-      targetDir?: string;
-      profile: 'nvidia' | 'amd' | 'intel';
-      loader?: string;
-      route?: string;
-      neuralUpstream?: boolean;
-      enableFrameGen?: boolean;
-      upscaleQuality?: string;
-      enableOverlay?: boolean;
-      upscaler?: string;
-      signatureBypass?: boolean;
-      amdEngine?: 'neural' | 'zluda' | 'fsr';
-      zludaCache?: boolean;
-      neuralPasses?: 1 | 2 | 3;
-    }) => Promise<{
-      ok: boolean;
-      msg?: string;
-      error?: string;
-      targetDir?: string;
-      profile?: string;
-      loader?: string;
-      route?: string;
-      neuralUpstream?: boolean;
-      injectedFiles?: Array<{ file: string; sha256?: string }>;
     }>;
     revert: (payload: string | { gamePath?: string; targetDir?: string }) => Promise<{ ok: boolean; msg?: string; error?: string; restoredCount?: number }>;
     getSteamGames: () => Promise<Array<{
@@ -442,19 +417,6 @@ export interface DarkHubAPI {
       isApplied: boolean;
     }>>;
     getRecentGames: () => Promise<Array<{ gameName: string; targetDir: string; exePath?: string | null; profile: string; loader: string; route?: string; neuralUpstream?: boolean; engine?: string; graphicsApi?: any; lastAppliedAt?: number }>>;
-    getProvenance: () => Promise<{
-      ok: boolean;
-      title: string;
-      version: string;
-      architecture: string;
-      hasBinaries: boolean;
-      sourceDir: string;
-      filesCount: number;
-      files: Array<{ name: string; size: number; sha256?: string; isBinary: boolean }>;
-      upstreamRepositories: Array<{ name: string; url: string; role: string }>;
-      guarantee: string;
-    }>;
-    downloadBinaries: () => Promise<any>;
     openFolder: (targetPath: string) => Promise<{ ok: boolean; error?: string }>;
     onLog: (callback: (message: string) => void) => () => void;
   };
@@ -471,6 +433,31 @@ export interface DarkHubAPI {
     getTrace: () => Promise<DevTraceEntry[]>;
     clearTrace: () => Promise<{ ok: boolean }>;
     onIpcTrace: (callback: (entry: DevTraceEntry) => void) => () => void;
+  };
+  share: {
+    state: () => Promise<ShareState>;
+    setConfig: (patch: Partial<ShareConfig>) => Promise<ShareState>;
+    pickAndUpload: () => Promise<{ ok: boolean; error?: string; results?: ShareUploadResult[] }>;
+    uploadFiles: (files: FileList | File[]) => Promise<{ ok: boolean; error?: string; results?: ShareUploadResult[] }>;
+    uploadScreenshot: (file: string) => Promise<ShareUploadResult>;
+    cancel: (jobId: string) => Promise<{ ok: boolean }>;
+    remove: (id: string) => Promise<ShareState>;
+    copy: (text: string) => Promise<{ ok: boolean; error?: string }>;
+    capture: () => Promise<{ ok: boolean; error?: string; file?: string; width?: number; height?: number; bytes?: number; ms?: number; entry?: ShareEntry; uploadError?: string }>;
+    openFolder: () => Promise<{ ok: boolean; error?: string }>;
+    recentShots: () => Promise<{ ok: boolean; error?: string; files?: { file: string; name: string; bytes: number; at: number }[] }>;
+    onEvent: (callback: (e: ShareEvent) => void) => () => void;
+  };
+  realtime: {
+    status: () => Promise<RealtimeStatus>;
+    setConfig: (patch: { optimizer?: Partial<RealtimeConfig['optimizer']>; protection?: Partial<RealtimeConfig['protection']> }) => Promise<RealtimeStatus>;
+    quarantineList: () => Promise<{ ok: boolean; error?: string; items?: QuarantineItem[] }>;
+    quarantineRestore: (id: string) => Promise<{ ok: boolean; error?: string; restoredTo?: string }>;
+    quarantineDelete: (id: string) => Promise<{ ok: boolean; error?: string }>;
+    clamavInstall: () => Promise<{ ok: boolean; error?: string; status?: ClamAvStatus }>;
+    clamavUpdate: () => Promise<{ ok: boolean; error?: string; status?: ClamAvStatus }>;
+    scanFiles: () => Promise<{ ok: boolean; error?: string; queued?: number }>;
+    onEvent: (callback: (e: RealtimeEvent) => void) => () => void;
   };
   hwsensors: {
     status: () => Promise<HwSensorsStatus>;
@@ -518,6 +505,7 @@ export interface DarkHubAPI {
         isDedicated: boolean;
         genericDriver?: boolean;
         deviceId?: string;
+        boardPartner?: string | null;
         officialSources: { manual: string; autoDetect: string; app: string } | null;
       }>;
     }>;
@@ -560,6 +548,41 @@ declare global {
   interface Window {
     darkhub: DarkHubAPI;
   }
+}
+
+export interface DlssFile { file: string; name: string; kind: 'sr' | 'rr' | 'fg'; version: string | null; hasOriginal: boolean; x64: boolean; behind: boolean }
+export interface DlssGameInfo { latest?: string; tag?: string; anticheat?: string | null; files?: DlssFile[] }
+export interface ShareConfig { hotkey: string; folder: string; autoUpload: boolean; copyImage: boolean; ttl: number }
+export interface ShareEntry { id: string; name: string; size: number; kind?: string; createdAt: number; expiresAt: number; pageUrl: string; directUrl: string; origin?: string }
+export interface ShareUploadResult { ok: boolean; error?: string; entry?: ShareEntry }
+export interface ShareState { ok: boolean; error?: string; config: ShareConfig; hotkeyActive: boolean; history: ShareEntry[]; uploading: number }
+export type ShareEvent =
+  | { type: 'start'; jobId: string; name: string; origin: string }
+  | { type: 'progress'; jobId: string; sent: number; total: number }
+  | { type: 'done'; jobId: string; entry: ShareEntry }
+  | { type: 'error'; jobId: string; name: string; error: string }
+  | { type: 'screenshot'; file: string; width: number; height: number; bytes: number; ms: number };
+export interface RealtimeRule { name: string; action: 'lower' | 'close' }
+export interface RealtimeConfig {
+  optimizer: { enabled: boolean; memory: boolean; memoryThresholdPct: number; minProcessMb: number; cooldownMin: number; rules: RealtimeRule[] };
+  protection: { enabled: boolean; folders: string[]; clamav: boolean; autoQuarantine: boolean; maxFileMb: number; allowHashes: string[] };
+}
+export interface RealtimeEvent {
+  source?: 'optimizer' | 'protection';
+  at: number;
+  level: 'info' | 'action' | 'error' | 'threat';
+  event: string;
+  [k: string]: unknown;
+}
+export interface ClamAvStatus { installed: boolean; database: boolean; databaseAgeMs: number | null }
+export interface QuarantineItem { id: string; originalPath: string; at: number; sha256?: string; size?: number; engine?: string; detection?: string }
+export interface RealtimeStatus {
+  ok: boolean;
+  error?: string;
+  config: RealtimeConfig;
+  optimizer: { running: boolean; stats: { trims: number; freedMb: number; lowered: number; closed: number; since: number }; memory: { availMb: number; totalMb: number }; nextTrimAt: number; log: RealtimeEvent[] };
+  protection: { running: boolean; folders: number; queue: number; stats: { scanned: number; detections: number; quarantined: number; since: number }; log: RealtimeEvent[]; hashes: number; clamav: ClamAvStatus; defender: boolean | null };
+  quarantine: number;
 }
 
 export interface HwSensorsStatus { ok: boolean; error?: string | null; enabled?: boolean; available?: boolean; running?: boolean; pawnio?: boolean; lastSample?: number }

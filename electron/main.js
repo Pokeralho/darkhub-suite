@@ -1,6 +1,6 @@
 // Must stay the first import: dev profile + IPC trace (no-op when packaged).
 import { devStartPage } from './devBootstrap.js'
-import { app, BrowserWindow, dialog, ipcMain, shell, protocol, clipboard, globalShortcut, Menu, Tray, screen, session } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell, protocol, clipboard, globalShortcut, Menu, Tray, screen, session, Notification } from 'electron'
 import log from 'electron-log'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -55,6 +55,10 @@ import ServicesEngine from './services/optimizer/ServicesEngine.js'
 import DnsEngine from './services/optimizer/DnsEngine.js'
 import StorageEngine from './services/optimizer/StorageEngine.js'
 import FramePacerEngine from './services/FramePacerEngine.js'
+import { registerRealtimeIPC } from './ipc/realtimeIpc.js'
+import { registerShareIPC } from './ipc/shareIpc.js'
+import { registerUpscaleIPC } from './ipc/upscaleIpc.js'
+import { SYSTEM_TAR } from './services/SecureDownload.js'
 import { createFramePacerOverlay, closeFramePacerOverlay, toggleFramePacerOverlay, setOverlayClickThrough, setOverlayConfig, getOverlayStatus } from './services/FramePacerOverlay.js'
 protocol.registerSchemesAsPrivileged([
   { scheme: 'local-resource', privileges: { bypassCSP: true, secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }
@@ -187,6 +191,9 @@ safeRegister('powershell', () => registerPowerShellIPC({ ipcMain, logger: Logger
 safeRegister('wintools', () => registerWinToolsIPC({ ipcMain, logger: Logger }))
 safeRegister('diskscan', () => registerDiskScanIPC({ ipcMain, dialog, shell, BrowserWindow, logger: Logger }))
 safeRegister('hwsensors', () => registerHwSensorsIPC({ ipcMain, logger: Logger }))
+safeRegister('realtime', () => registerRealtimeIPC({ app, ipcMain, dialog, BrowserWindow, Notification, logger: Logger }))
+safeRegister('upscale', () => registerUpscaleIPC({ app, ipcMain, BrowserWindow, logger: Logger }))
+safeRegister('share', () => registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globalShortcut, BrowserWindow, Notification, logger: Logger }))
 
 async function getYtDlpTools() {
   ytdlpToolsPromise ||= import('./ytdlp.js')
@@ -2469,7 +2476,7 @@ ipcMain.handle('files:archiveOperation', async (_event, payload) => {
     assertOutputDirGranted(path.dirname(outputArchive), inputFiles)
     const args = ['-a', '-c', '-f', outputArchive, ...inputFiles.map(f => path.basename(f))]
     const cwd = path.dirname(inputFiles[0])
-    const { code, stderr } = await runCommand('tar.exe', args, { cwd, timeoutMs: 10 * 60 * 1000 })
+    const { code, stderr } = await runCommand(SYSTEM_TAR, args, { cwd, timeoutMs: 10 * 60 * 1000 })
     if (code !== 0) throw new Error(stderr || `tar exited with code ${code}`)
     return { ok: true, outputArchive }
   } else if (action === 'extract') {
@@ -2478,7 +2485,7 @@ ipcMain.handle('files:archiveOperation', async (_event, payload) => {
     assertOutputDirGranted(extractDir, inputFiles)
     await fs.mkdir(extractDir, { recursive: true })
     const args = ['-x', '-f', inputFiles[0], '-C', extractDir]
-    const { code, stderr } = await runCommand('tar.exe', args, { timeoutMs: 10 * 60 * 1000 })
+    const { code, stderr } = await runCommand(SYSTEM_TAR, args, { timeoutMs: 10 * 60 * 1000 })
     if (code !== 0) throw new Error(stderr || `tar exited with code ${code}`)
     return { ok: true, extractDir }
   }
