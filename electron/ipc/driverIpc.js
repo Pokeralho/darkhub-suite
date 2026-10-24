@@ -1,4 +1,5 @@
 import { DriverCenterService } from '../services/DriverCenterService.js'
+import { DriverInstallService } from '../services/drivers/DriverInstallService.js'
 
 /**
  * Registers the `driver:*` IPC surface. Every handler returns { ok, ... } and never throws.
@@ -26,6 +27,20 @@ export function registerDriverIPC({ ipcMain, shell, logger, service, elevatedRun
   // On DarkOS, first undo (through the DarkOS module, so it stays reversible) the catalog items that block the camera.
   handle('driver:repairCamera', () => svc.repairCamera({
     darkosRevert: darkos?.isDarkOS?.() ? (ids) => darkos.revertChange({ ids }) : undefined
+  }))
+
+  // ---------------------------------------------------------------- automatic install (missing drivers)
+  const installer = new DriverInstallService({ elevatedRunner })
+  handle('driver:scanMissing', () => installer.scan())
+  handle('driver:findDrivers', (payload) => installer.findDrivers({ allowUnlock: payload?.allowUnlock === true }))
+  // Long job: progress goes to the window that asked (driver:installEvent); the result comes back at the end.
+  handle('driver:install', (payload, event) => installer.install({
+    ids: Array.isArray(payload?.ids) ? payload.ids.slice(0, 200).map(String) : [],
+    restorePoint: payload?.restorePoint === true,
+    allowUnlock: payload?.allowUnlock === true,
+    clean: payload?.clean === true
+  }, (ev) => {
+    try { if (!event?.sender?.isDestroyed?.()) event.sender.send('driver:installEvent', ev) } catch { /* window closed */ }
   }))
 
   handle('driver:openOfficial', async (payload) => {

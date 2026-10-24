@@ -74,3 +74,10 @@ export async function captureRegion(folder, pick) {
   if (!rect) return null
   return saveShot(folder, image.crop(rect), started)
 }
+
+/** Region selection without saving a file (e.g. OCR of a screen area). Resolves the cropped image, or null on cancel. */
+export async function grabRegionImage(pick) {
+  const { display, image } = await grabDisplay()
+  const rect = cropRect(await pick(display, image), display.size, image.getSize())
+  return rect ? image.crop(rect) : null
+}

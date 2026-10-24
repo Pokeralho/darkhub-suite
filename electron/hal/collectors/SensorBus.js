@@ -10,6 +10,7 @@ class SensorBus extends EventEmitter {
     this.setMaxListeners(0);
     this._wired = false;
     this._running = false;
+    this._keepAdvanced = false;
   }
 
   _wire() {
@@ -51,12 +52,23 @@ class SensorBus extends EventEmitter {
     }
   }
 
+  /**
+   * Starts only the advanced sensors with the app, so the CPU temperature is already read when a screen opens
+   * (LibreHardwareMonitor needs a few seconds for its first sample). ~44 MB, ~0.06% CPU; the other daemons still
+   * start only while a screen shows sensors.
+   */
+  prewarmAdvanced() {
+    this._wire();
+    this._keepAdvanced = true;
+    HwSensorsDaemon.start();
+  }
+
   stop() {
     if (!this._running) return;
     this._running = false;
     FastSensorDaemon.stop();
     SlowSensorDaemon.stop();
-    HwSensorsDaemon.stop();
+    if (!this._keepAdvanced) HwSensorsDaemon.stop();
   }
 
   /** Advanced sensors on: they replace the WMI / ACPI / storage-reliability temperature queries of the slow daemon. */

@@ -1,11 +1,18 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  CheckCircle, FileCode, Loader2, Lock, Play, RefreshCw,
-  ShieldAlert, ShieldCheck, Terminal, XCircle
+  CheckCircle, Code, Cpu, FileCode, FolderOpen, HardDrive, Home, Loader2, Lock, Network, Package, Play, RefreshCw,
+  ShieldAlert, ShieldCheck, Terminal, Wrench, XCircle
 } from '../components/icons';
 import { useI18n } from '../i18n/I18nProvider';
 import { DarkOSConfirmDialog } from '../components/darkos/DarkOSConfirmDialog';
 import PageHeader from '../components/ui/PageHeader';
+import ToolCategory from '../components/pstools/ToolCategory';
+import CustomScriptRunner from '../components/pstools/CustomScriptRunner';
+import { PS_SCHEMA } from '../components/pstools/psSchema';
+
+type TabId = 'overview' | 'system' | 'apps' | 'disk' | 'network' | 'maintenance' | 'custom';
+const TAB_ICONS: Record<TabId, typeof Home> = { overview: Home, system: Cpu, apps: Package, disk: HardDrive, network: Network, maintenance: Wrench, custom: Code };
+const TAB_KEY = 'darkhub.pstools.tab';
 
 type PolicyResult = Awaited<ReturnType<Window['darkhub']['powershell']['getPolicies']>>;
 type ScriptItem = NonNullable<Awaited<ReturnType<Window['darkhub']['powershell']['listScripts']>>['scripts']>[number];
@@ -35,6 +42,13 @@ export default function PowerShellTools() {
   const [elevating, setElevating] = useState(false);
   // Script awaiting the user's explicit confirmation before it runs.
   const [pending, setPending] = useState<ScriptItem | null>(null);
+  const [tab, setTab] = useState<TabId>(() => {
+    try { const v = localStorage.getItem(TAB_KEY) as TabId | null; return v && v in TAB_ICONS ? v : 'overview'; } catch { return 'overview'; }
+  });
+  const [termPath, setTermPath] = useState('');
+  const [termShell, setTermShell] = useState<'powershell' | 'pwsh'>('powershell');
+  const [termProfile, setTermProfile] = useState(false);
+  const selectTab = (id: TabId) => { setTab(id); try { localStorage.setItem(TAB_KEY, id); } catch { /* storage blocked */ } };
   const mounted = useRef(true);
   const elevatedTimer = useRef<number | null>(null);
 
@@ -94,7 +108,7 @@ export default function PowerShellTools() {
     setElevated(null);
     if (elevatedTimer.current !== null) window.clearTimeout(elevatedTimer.current);
     try {
-      const r = await api()?.openElevatedTerminal({});
+      const r = await api()?.openElevatedTerminal({ startingPath: termPath.trim() || undefined, shell: termShell, loadProfile: termProfile });
       if (!mounted.current) return;
       setElevated(r?.ok ? { ok: true, message: t('pstools.elevated.ok', 'Elevated terminal opened.') } : { ok: false, message: r?.error || t('pstools.elevated.error', '') });
     } catch (e: any) {
@@ -122,8 +136,8 @@ export default function PowerShellTools() {
   const header = (
     <PageHeader
       title={t('pstools.title', 'PowerShell Tools')}
-      subtitle={t('pstools.subtitle', '')}
-      actions={(
+      subtitle={t('psx.subtitle', 'Política de execução, scripts do DarkOS, relatórios do sistema, ferramentas de disco e rede, manutenção e scripts personalizados.')}
+      actions={tab !== 'overview' ? undefined : (
         <button onClick={load} disabled={loading} className="dh-btn">
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           {t('pstools.refresh', 'Refresh')}
@@ -146,12 +160,38 @@ export default function PowerShellTools() {
     </div>
   );
 
+  const tabs: Array<{ id: TabId; label: string }> = [
+    { id: 'overview', label: t('psx.tab.overview', 'Visão geral') },
+    ...PS_SCHEMA.categories.map((c) => ({ id: c.id as TabId, label: t(`psx.tab.${c.id}`, c.label) })),
+    { id: 'custom', label: t('psx.tab.custom', 'Script personalizado') }
+  ];
+
   return (
-    <div className="w-full max-w-5xl pb-16 space-y-8">
+    <div className="w-full max-w-6xl pb-16 space-y-8">
       {header}
 
+      <div role="tablist" aria-label={t('pstools.title', 'PowerShell Tools')} className="-mt-3 flex gap-5 border-b border-zinc-800/80 overflow-x-auto overflow-y-hidden custom-scrollbar">
+        {tabs.map(({ id, label }) => {
+          const Icon = TAB_ICONS[id];
+          const active = tab === id;
+          return (
+            <button
+              key={id} role="tab" aria-selected={active} onClick={() => selectTab(id)}
+              className={`relative h-9 inline-flex items-center gap-2 text-[13px] whitespace-nowrap border-b-2 -mb-px transition-colors ${active ? 'border-blue-400 text-zinc-50' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+            >
+              <Icon size={15} className={active ? 'text-blue-300' : 'text-zinc-500'} />{label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === 'custom' ? <CustomScriptRunner /> : null}
+      {tab !== 'overview' && tab !== 'custom' ? <ToolCategory key={tab} category={tab} /> : null}
+
+      {tab === 'overview' ? (<>
+
       {error ? (
-        <div role="alert" className="-mt-2 flex items-start gap-2 border-l-2 border-red-400 pl-3 py-1 text-[12.5px] text-red-300 break-words">
+        <div role="alert" className="-mt-4 flex items-start gap-2 border-l-2 border-red-400 pl-3 py-1 text-[12.5px] text-red-300 break-words">
           <XCircle size={14} className="shrink-0 mt-0.5" />
           <span className="min-w-0">{error}</span>
           <button onClick={load} disabled={loading} className="ml-1 underline underline-offset-2 text-red-200 hover:text-red-100 shrink-0">{t('pstools.refresh', 'Refresh')}</button>
@@ -293,6 +333,23 @@ export default function PowerShellTools() {
             <span className="inline-flex items-center gap-1 text-[11.5px] font-normal text-amber-300/90"><Lock size={12} />{t('pstools.adminNote', 'Requires administrator')}</span>
           </h2>
           <p className="mt-1 dh-help">{t('pstools.elevated.desc', '')}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input
+              className="dh-input w-72 max-w-full font-mono" spellCheck={false} value={termPath} onChange={(e) => setTermPath(e.target.value)}
+              placeholder={root} aria-label={t('psx.term.folder', 'Pasta inicial')}
+            />
+            <button className="dh-btn" onClick={async () => { const r = await api()?.pickFolder?.({}); if (r?.ok && r.path) setTermPath(r.path); }}>
+              <FolderOpen size={14} />{t('psx.form.choose', 'Escolher')}
+            </button>
+            <select className="dh-input" value={termShell} onChange={(e) => setTermShell(e.target.value as 'powershell' | 'pwsh')} aria-label={t('psx.term.shell', 'Shell')}>
+              <option value="powershell">Windows PowerShell 5.1</option>
+              <option value="pwsh">PowerShell 7 (pwsh)</option>
+            </select>
+            <label className="inline-flex items-center gap-2 text-[12.5px] text-zinc-300 cursor-pointer select-none">
+              <input type="checkbox" className="accent-blue-400" checked={termProfile} onChange={(e) => setTermProfile(e.target.checked)} />
+              {t('psx.term.profile', 'Carregar perfil ($PROFILE)')}
+            </label>
+          </div>
           {elevated ? (
             <p role="status" className={`mt-2 text-[12.5px] flex items-center gap-1.5 ${elevated.ok ? 'text-emerald-400' : 'text-red-300'}`}>
               {elevated.ok ? <CheckCircle size={14} /> : <XCircle size={14} />}{elevated.message}
@@ -304,6 +361,7 @@ export default function PowerShellTools() {
           {elevating ? t('pstools.elevated.opening', 'Waiting for UAC...') : t('pstools.elevated.open', 'Open elevated terminal')}
         </button>
       </section>
+      </>) : null}
     </div>
   );
 }

@@ -1,16 +1,16 @@
 import { useI18n } from '../i18n/I18nProvider';
 import React, { useState } from 'react';
-import { Activity, Server, ShieldCheck, Zap, Play, Search, Network, RefreshCw, Wifi, Info, Route, Loader2 } from '../components/icons';
+import { Activity, Server, ShieldCheck, Zap, Play, Search, Network, RefreshCw, Wifi, Info, Route, Loader2, Gauge, Globe, Sliders, AlertTriangle } from '../components/icons';
 import PageHeader from '../components/ui/PageHeader';
+import { LiveLatencyPanel, RouteMtuPanel, BufferbloatPanel, DnsBenchPanel, LatencyTweaksPanel } from '../components/network/LatencyLab';
 
 const NetworkTools = () => {
   const { t } = useI18n();
-  const [activeTab, setActiveTab] = useState<'ping' | 'ports' | 'speed' | 'diag'>('ping');
+  const [activeTab, setActiveTab] = useState<'ping' | 'live' | 'route' | 'bloat' | 'dns' | 'tweaks' | 'ports' | 'speed' | 'diag'>('ping');
 
   const [pingHost, setPingHost] = useState('8.8.8.8');
   const [pingLog, setPingLog] = useState<string>('');
   const [pinging, setPinging] = useState(false);
-  const [mtu, setMtu] = useState(1500);
 
   const [portHost, setPortHost] = useState('127.0.0.1');
   const [portList, setPortList] = useState('80, 443, 8080, 3306, 21, 22');
@@ -25,6 +25,7 @@ const NetworkTools = () => {
   const [diagLog, setDiagLog] = useState('');
   const [diagBusy, setDiagBusy] = useState('');
   const [tracertHost, setTracertHost] = useState('8.8.8.8');
+  const [confirmReset, setConfirmReset] = useState(false);
 
   const runPing = async () => {
     if (!pingHost) return;
@@ -34,9 +35,6 @@ const NetworkTools = () => {
       const res = await window.darkhub?.network?.ping?.(pingHost);
       if (res?.ok) {
         setPingLog(prev => prev + res.output + `\nLatência Média: ${res.latency}ms\n`);
-        if (res.latency > 0) {
-          setMtu(res.latency < 50 ? 1500 : 1492);
-        }
       } else {
         setPingLog(prev => prev + `Erro: ${res?.error || res?.output || 'Desconhecido'}\n`);
       }
@@ -137,6 +135,7 @@ const NetworkTools = () => {
       label: 'Resetar TCP/IP & Winsock',
       icon: Zap,
       desc: 'netsh int ip reset + winsock reset',
+      confirm: true,
       fn: () => window.darkhub?.network?.resetTcp?.()
     },
     {
@@ -157,6 +156,11 @@ const NetworkTools = () => {
 
   const tabs = [
     { id: 'ping' as const, icon: Activity, label: t('net.tab.ping', 'Ping & Latência') },
+    { id: 'live' as const, icon: Activity, label: t('netx.tab.live', 'Monitor ao vivo') },
+    { id: 'route' as const, icon: Route, label: t('netx.tab.route', 'Rota & MTU') },
+    { id: 'bloat' as const, icon: Gauge, label: t('netx.tab.bloat', 'Bufferbloat') },
+    { id: 'dns' as const, icon: Globe, label: t('netx.tab.dns', 'DNS') },
+    { id: 'tweaks' as const, icon: Sliders, label: t('netx.tab.tweaks', 'Ajustes de latência') },
     { id: 'ports' as const, icon: Server, label: t('net.tab.ports', 'Scanner de Portas') },
     { id: 'speed' as const, icon: Zap, label: t('net.tab.speed', 'Teste de Velocidade') },
     { id: 'diag' as const, icon: ShieldCheck, label: t('net.tab.diag', 'Diagnósticos') },
@@ -205,9 +209,9 @@ const NetworkTools = () => {
             </div>
 
             <div className="border-t border-zinc-800/80 pt-4">
-              <p className="dh-label">{t('net.optimizedMtu', 'MTU Otimizado')}</p>
-              <p className="mt-1 font-mono text-[24px] leading-none text-zinc-50">{mtu}<span className="ml-1 text-[12px] text-zinc-500">bytes</span></p>
-              <p className="dh-help mt-1.5">{t('net.mtuDesc', 'Sugestão baseada na latência atual')}</p>
+              <p className="dh-label">MTU</p>
+              <p className="dh-help mt-1.5">{t('netx.mtuMoved', 'A latência não indica o MTU. Meça o MTU real do caminho (ping com "não fragmentar") na aba Rota & MTU.')}</p>
+              <button className="dh-btn dh-btn-sm mt-2" onClick={() => setActiveTab('route')}><Route size={12} />{t('netx.tab.route', 'Rota & MTU')}</button>
             </div>
           </div>
           <div className={`${consoleCls} h-[420px]`} aria-live="polite">
@@ -215,6 +219,12 @@ const NetworkTools = () => {
           </div>
         </div>
       )}
+
+      {activeTab === 'live' && <LiveLatencyPanel />}
+      {activeTab === 'route' && <RouteMtuPanel />}
+      {activeTab === 'bloat' && <BufferbloatPanel />}
+      {activeTab === 'dns' && <DnsBenchPanel />}
+      {activeTab === 'tweaks' && <LatencyTweaksPanel />}
 
       {activeTab === 'ports' && (
         <div className="grid grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] gap-6 animate-in">
@@ -332,7 +342,7 @@ const NetworkTools = () => {
                 return (
                   <li key={action.id}>
                     <button
-                      onClick={() => runDiag(action.label, action.fn)}
+                      onClick={() => ((action as any).confirm ? setConfirmReset(true) : runDiag(action.label, action.fn))}
                       disabled={!!diagBusy}
                       className="group w-full text-left flex items-start gap-3 py-3 px-1 hover:bg-zinc-900/60 rounded-md disabled:opacity-50 transition-colors"
                     >
@@ -346,6 +356,17 @@ const NetworkTools = () => {
                 );
               })}
             </ul>
+
+            {confirmReset ? (
+              <div role="alertdialog" aria-labelledby="netx-reset-title" className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+                <p id="netx-reset-title" className="text-[13px] font-medium text-amber-200 flex items-center gap-2"><AlertTriangle size={14} />{t('netx.resetTitle', 'Redefinir Winsock e TCP/IP?')}</p>
+                <p className="dh-help">{t('netx.resetBody', 'Volta a pilha de rede ao padrão de fábrica: remove LSPs de terceiros (alguns VPNs/antivírus precisam ser reinstalados) e pode apagar IP fixo configurado no adaptador. Não pode ser desfeito, pede administrador e só vale depois de REINICIAR o Windows. Use apenas se a internet estiver quebrada.')}</p>
+                <div className="flex gap-2">
+                  <button className="dh-btn dh-btn-sm dh-btn-danger" onClick={() => { setConfirmReset(false); const a = diagActions.find((x) => x.id === 'reset')!; runDiag(a.label, a.fn); }}>{t('netx.resetConfirm', 'Redefinir e reiniciar depois')}</button>
+                  <button className="dh-btn dh-btn-sm" onClick={() => setConfirmReset(false)}>{t('netx.cancel', 'Cancelar')}</button>
+                </div>
+              </div>
+            ) : null}
 
             <div>
               <label htmlFor="tracert-host" className="dh-label flex items-center gap-2 mb-1.5"><Route size={14} className="text-zinc-500" /> Traceroute</label>

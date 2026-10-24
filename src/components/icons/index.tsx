@@ -149,6 +149,8 @@ export const Cpu = icon('Cpu', [cut(6, 6, 12, 12, 2), cut(9.5, 9.5, 5, 5, 1), 'M
 export const CpuIcon = Cpu;
 export const MemoryStick = icon('MemoryStick', [cut(3, 6, 18, 10, 1.5), 'M7 9.5v3M10.5 9.5v3M14 9.5v3M17.5 9.5v3', 'M6 16v3M10 16v3M14 16v3M18 16v3']);
 export const HardDrive = icon('HardDrive', [cut(3, 13, 18, 7, 2), 'M5.5 13L8 5h8l2.5 8', ['dot', 'M7 16.5v.01'], 'M11 16.5h6']);
+// USB trident: trunk with a round end, a square branch and a circle branch
+export const Usb = icon('Usb', ['M12 3v14', 'M9.5 5.5L12 3l2.5 2.5', 'M12 14l-4.5-3V8', 'M12 12l4.5-2.5V7', 'M15.5 5.5h2v2h-2z', ['c', 7.5, 7, 1.3], ['c', 12, 19, 2]]);
 export const Server = icon('Server', [cut(3.5, 3.5, 17, 7, 1.5), cut(3.5, 13.5, 17, 7, 1.5), ['dot', 'M7 7v.01'], ['dot', 'M7 17v.01'], 'M11 7h6M11 17h6']);
 export const Monitor = icon('Monitor', [cut(2.5, 4, 19, 12.5, 2), 'M8.5 20.5h7M12 16.5v4']);
 export const MonitorCog = icon('MonitorCog', [cut(2.5, 4, 19, 12.5, 2), 'M8.5 20.5h7M12 16.5v4', ['c', 12, 10.2, 1.7], 'M12 6.6v1.2M12 12.6v1.2M8.6 10.2h1.2M14.2 10.2h1.2']);

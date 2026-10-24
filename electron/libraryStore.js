@@ -188,8 +188,11 @@ export function upsertGamesBulk(app, inputsArray) {
 async function upsertGamesBulkUnsafe(app, inputsArray) {
   const lib = await loadLibrary(app)
   const games = Array.isArray(lib.games) ? lib.games.slice() : []
+  const sameExe = (a, b) => a && b && a.toLowerCase() === b.toLowerCase()
   for (const input of inputsArray) {
     const next = sanitizeGame(input)
+    // importing a game that is already in the library (same exe) keeps the existing entry and its stats
+    if (!input?.id && games.some((g) => sameExe(g.exePath, next.exePath))) continue
     const idx = games.findIndex((g) => g.id === next.id)
     if (idx >= 0) games[idx] = { ...games[idx], ...next, updatedAt: Date.now() }
     else games.unshift({ ...next, createdAt: Date.now(), updatedAt: Date.now() })

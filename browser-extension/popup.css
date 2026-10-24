@@ -1,0 +1,24 @@
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; width: 320px; background: #09090b; color: #e4e4e7; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #27272a; }
+header .host { margin-left: auto; color: #71717a; font-size: 11px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+main { padding: 10px 12px; min-height: 80px; }
+footer { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-top: 1px solid #27272a; font-size: 12px; color: #a1a1aa; }
+.muted { color: #a1a1aa; margin: 4px 0; }
+.err { color: #fca5a5; margin: 4px 0; }
+.code { font: 600 22px/1 ui-monospace, Consolas, monospace; letter-spacing: 2px; color: #f4f4f5; text-align: center; padding: 12px 0; }
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #18181b; }
+.list .who { flex: 1; min-width: 0; }
+.list .user { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list .sub { color: #71717a; font-size: 11px; }
+button { font: inherit; }
+.btn { background: #27272a; color: #f4f4f5; border: 1px solid #3f3f46; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+.btn:hover { border-color: #60a5fa; }
+.btn.primary { background: #2563eb; border-color: #2563eb; }
+.btn:disabled { opacity: .5; cursor: default; }
+.row { display: flex; gap: 8px; margin-top: 8px; }
+.card { border: 1px solid #27272a; border-radius: 8px; padding: 8px 10px; margin-top: 10px; background: #111113; }
+.link { background: none; border: 0; color: #a1a1aa; text-decoration: underline; cursor: pointer; padding: 0; }
+.toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; }

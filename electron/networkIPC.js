@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import net from 'net';
 import os from 'os';
 import { runCommand } from './services/PowerShellRunner.js';
+import NetLatencyService from './services/NetLatencyService.js';
 
 const SAFE_HOST_RE = /^[A-Za-z0-9_.:-]{1,253}$/;
 
@@ -108,14 +109,25 @@ export function registerNetworkIPC() {
     return runCmd('ipconfig', ['/flushdns']);
   });
 
+  // Needs administrator (the old non-elevated netsh calls failed without elevation); asks UAC and requires a reboot.
   ipcMain.handle('network:resetTcp', async () => {
-    const r1 = await runCmd('netsh', ['int', 'ip', 'reset']);
-    const r2 = await runCmd('netsh', ['winsock', 'reset']);
-    return {
-      ok: r1.ok || r2.ok,
-      output: '[Reset IP]\n' + r1.output + '\n[Reset Winsock]\n' + r2.output
-    };
+    try { return await NetLatencyService.resetStack(); }
+    catch (err) { return { ok: false, output: err?.message ?? String(err) }; }
   });
+
+  // ---- latency lab (diagnostics are read-only; tweaks snapshot the previous value and offer Restore)
+  const safe = (fn) => async (_event, payload) => {
+    try { return await fn(payload ?? {}); }
+    catch (err) { return { ok: false, error: err?.message ?? String(err) }; }
+  };
+  ipcMain.handle('network:latencyPresets', safe(() => ({ ok: true, presets: NetLatencyService.getPresets() })));
+  ipcMain.handle('network:probe', safe((p) => NetLatencyService.probe({ host: p.host, mode: p.mode })));
+  ipcMain.handle('network:traceHops', safe((p) => NetLatencyService.traceroute({ host: p.host, maxHops: p.maxHops })));
+  ipcMain.handle('network:bufferbloat', safe((p) => NetLatencyService.bufferbloat({ host: p.host, seconds: p.seconds })));
+  ipcMain.handle('network:mtuDiscover', safe((p) => NetLatencyService.mtu({ host: p.host })));
+  ipcMain.handle('network:latencyState', safe(() => NetLatencyService.getState()));
+  ipcMain.handle('network:applyLatencyTweak', safe((p) => NetLatencyService.applyTweak({ id: p.id, value: p.value, exe: p.exe })));
+  ipcMain.handle('network:restoreLatencyTweak', safe((p) => NetLatencyService.restoreTweak({ id: p.id })));
 
   ipcMain.handle('network:dnsInfo', async () => {
     return runCmd('ipconfig', ['/all']);

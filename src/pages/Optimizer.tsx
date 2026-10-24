@@ -32,6 +32,8 @@ type TweakItem = {
   applied: boolean | null;
   partial: boolean;
   recommended: boolean;
+  /** Original (backend) id + name + description, so search works in both languages. */
+  altText: string;
 };
 
 const api = () => (window.darkhub?.optimizer as any);
@@ -553,7 +555,8 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
         revertId: op.revertId || null,
         applied: isApplied,
         partial: Boolean(op.partial || opPartial[op.id]),
-        recommended: false
+        recommended: false,
+        altText: `${op.id} ${op.name || ''} ${op.description || ''}`
       });
     }
     for (const dt of deepTweaks) {
@@ -572,7 +575,8 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
         revertId: null,
         applied: tweakStatus[dt.id] !== undefined ? Boolean(tweakStatus[dt.id]) : null,
         partial: Boolean(tweakPartial[dt.id]),
-        recommended: dt.recommended === true
+        recommended: dt.recommended === true,
+        altText: `${dt.id} ${dt.title || ''} ${dt.description || ''}`
       });
     }
     return list;
@@ -582,7 +586,7 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
   const filteredTweaks = useMemo(() => {
     const q = searchQuery.toLowerCase();
     return allTweaksList.filter((it) => {
-      const matchesSearch = it.title.toLowerCase().includes(q) || it.description.toLowerCase().includes(q);
+      const matchesSearch = !q || it.title.toLowerCase().includes(q) || it.description.toLowerCase().includes(q) || it.altText.toLowerCase().includes(q);
       const matchesCat =
         categoryFilter === 'all' ||
         it.category === categoryFilter ||
@@ -602,6 +606,49 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
     { id: 'power', label: t('optimizer.audit.cat.power', 'Energia & CPU') },
     { id: 'system', label: t('optimizer.audit.cat.system', 'Sistema & Segurança') }
   ];
+
+  const CATEGORY_DESC: Record<string, string> = {
+    customization: t('optui.catDesc.customization', 'Aparência e comportamento do Windows: menus, barra de tarefas, explorador.'),
+    privacy: t('optui.catDesc.privacy', 'Reduz telemetria, rastreamento e recursos de IA que enviam dados.'),
+    gaming: t('optui.catDesc.gaming', 'Ajustes para mais FPS e menos latência em jogos.'),
+    storage: t('optui.catDesc.storage', 'Libera espaço removendo arquivos temporários e lixo do sistema.'),
+    memory: t('optui.catDesc.memory', 'Libera e gerencia a memória RAM.'),
+    network: t('optui.catDesc.network', 'Melhora a conexão: latência, DNS e parâmetros de rede.'),
+    power: t('optui.catDesc.power', 'Plano de energia e comportamento do processador.'),
+    system: t('optui.catDesc.system', 'Serviços, segurança e ajustes gerais do sistema.')
+  };
+
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const forceOpen = searchQuery.trim() !== '' || categoryFilter !== 'all';
+
+  const groupedTweaks = useMemo(() => {
+    const order = categories.filter((c) => c.id !== 'all').map((c) => c.id);
+    const map = new Map<string, TweakItem[]>();
+    for (const it of filteredTweaks) {
+      const key = it.category === 'security' ? 'system' : it.category;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(it);
+    }
+    const keys = [...order.filter((k) => map.has(k)), ...[...map.keys()].filter((k) => !order.includes(k))];
+    return keys.map((k) => {
+      const items = map.get(k)!;
+      return {
+        id: k,
+        label: categories.find((c) => c.id === k)?.label || k,
+        items,
+        applied: items.filter((i) => i.applied === true).length
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredTweaks, t]);
+
+  const toggleGroup = (id: string) =>
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const needsConfirm = (it: TweakItem) => Boolean(it.warning) || it.risk === 'advanced' || it.securityRelated;
 
@@ -1409,7 +1456,39 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
               emptyRow(t('optimizer.audit.noMatch', 'Nenhum ajuste corresponde à busca ou à categoria escolhida.'))
             ) : (
               <div className="divide-y divide-zinc-800/80">
-                {filteredTweaks.map((tweak) => {
+                <div className="flex items-center justify-between gap-2 px-4 py-2 text-[11.5px] text-zinc-500">
+                  <span>{fmt(t('optui.summary', '{shown} ajustes em {groups} categorias'), { shown: filteredTweaks.length, groups: groupedTweaks.length })}</span>
+                  {!forceOpen && (
+                    <span className="flex items-center gap-1">
+                      <button onClick={() => setExpandedGroups(new Set(groupedTweaks.map((g) => g.id)))} className="dh-btn dh-btn-ghost dh-btn-sm">{t('optui.expandAll', 'Expandir tudo')}</button>
+                      <button onClick={() => setExpandedGroups(new Set())} className="dh-btn dh-btn-ghost dh-btn-sm">{t('optui.collapseAll', 'Recolher tudo')}</button>
+                    </span>
+                  )}
+                </div>
+                {groupedTweaks.map((group) => {
+                  const open = forceOpen || expandedGroups.has(group.id);
+                  return (
+                  <div key={group.id}>
+                    <button
+                      type="button"
+                      aria-expanded={open}
+                      onClick={() => toggleGroup(group.id)}
+                      className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left bg-zinc-900/40 hover:bg-zinc-900/70 transition-colors duration-150"
+                    >
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-2 text-[13px] font-medium text-zinc-100">
+                          <span className={`inline-block text-zinc-500 transition-transform duration-150 ${open ? 'rotate-90' : ''}`}>›</span>
+                          {group.label}
+                        </span>
+                        <span className="block text-[12px] text-zinc-500 mt-0.5 ml-4 leading-snug">{CATEGORY_DESC[group.id] || ''}</span>
+                      </span>
+                      <span className="text-[11.5px] font-mono text-zinc-400 shrink-0">
+                        {fmt(t('optui.groupCount', '{applied} de {total} ativos'), { applied: group.applied, total: group.items.length })}
+                      </span>
+                    </button>
+                    {open && (
+                    <div className="divide-y divide-zinc-800/80">
+                {group.items.map((tweak) => {
                   const isSelected = selectedTweakIds.has(tweak.id);
                   const isRunningThis = optimizingId === tweak.id;
                   const rb = riskBadge(tweak.risk);
@@ -1491,6 +1570,11 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
                         )}
                       </div>
                     </div>
+                  );
+                })}
+                    </div>
+                    )}
+                  </div>
                   );
                 })}
               </div>

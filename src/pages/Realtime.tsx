@@ -107,6 +107,8 @@ export default function Realtime() {
       case 'process-closed': return t('rt.ev.closed', 'Processo fechado: {name}').replace('{name}', String(e.name));
       case 'quarantined': return t('rt.ev.quarantined', 'Ameaça em quarentena: {d} em {f}').replace('{d}', String(e.detection)).replace('{f}', String(e.file));
       case 'detected': return t('rt.ev.detected', 'Ameaça detectada: {d} em {f}').replace('{d}', String(e.detection)).replace('{f}', String(e.file));
+      case 'clamav-setup': return t('rt.ev.clamSetup', 'Instalando o ClamAV e baixando as assinaturas em segundo plano…');
+      case 'clamav-ready': return e.error ? t('rt.ev.clamFail', 'ClamAV não pôde ser instalado: {e}').replace('{e}', String(e.error)) : t('rt.ev.clamReady', 'ClamAV pronto e ativado');
       default: return `${e.event}${e.error ? `: ${String(e.error)}` : ''}`;
     }
   };
@@ -141,6 +143,13 @@ export default function Realtime() {
           </dl>
 
           <div className="space-y-2.5 text-[12.5px]">
+            <label className="flex items-start gap-2.5 text-zinc-300">
+              <input type="checkbox" className="mt-0.5" checked={o.smart} onChange={(e) => update({ optimizer: { smart: e.target.checked } })} />
+              <span>
+                {t('rt.opt.smart', 'Modo inteligente')}
+                <span className="block dh-help">{t('rt.opt.smartHelp', 'Tira prioridade de atualizadores e apps de fundo (Edge/Google/Adobe Update, OneDrive, Widgets, Phone Link, Game Bar, pesquisa) e fecha só a telemetria do Windows (CompatTelRunner, DeviceCensus). Nunca fecha os seus programas.')}</span>
+              </span>
+            </label>
             <label className="flex items-center gap-2.5 text-zinc-300">
               <input type="checkbox" checked={o.memory} onChange={(e) => update({ optimizer: { memory: e.target.checked } })} />
               {t('rt.opt.memory', 'Liberar memória sob pressão')}

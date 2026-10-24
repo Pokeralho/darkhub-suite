@@ -7,7 +7,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { DownloadManager } from '../electron/services/downloads/DownloadManager.js';
 import {
-  sanitizeFileName, planPieces, isInsideWindow, safeJoin, categoryForFile, Throttle, validateDownloadUrl, parseContentDisposition, uniquePath
+  sanitizeFileName, planPieces, isInsideWindow, safeJoin, categoryForFile, Throttle, validateDownloadUrl, parseContentDisposition, uniquePath, autoConnections
 } from '../electron/services/downloads/downloadUtils.js';
 
 const sha = (b: Buffer) => crypto.createHash('sha256').update(b).digest('hex');
@@ -203,5 +203,17 @@ describe('registerDownloadsIPC startup', () => {
     const svc = registerDownloadsIPC({ app, ipcMain, dialog: {}, shell: {}, BrowserWindow: { getAllWindows: () => [] }, logger: null });
     expect(svc).toBeTruthy();
     await svc?.shutdown?.();
+  });
+});
+
+describe('automatic connections', () => {
+  it('picks connections from the file size, nothing to configure', () => {
+    const MB = 1024 * 1024;
+    expect(autoConnections(500 * 1024)).toBe(1);
+    expect(autoConnections(10 * MB)).toBe(4);
+    expect(autoConnections(100 * MB)).toBe(8);
+    expect(autoConnections(1024 * MB)).toBe(12);
+    expect(autoConnections(8192 * MB)).toBe(16);
+    expect(autoConnections(0)).toBe(4);
   });
 });

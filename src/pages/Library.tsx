@@ -13,6 +13,7 @@ export default function Library() {
   const [games, setGames] = useState<Game[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   const [editing, setEditing] = useState<Game | null>(null)
 
@@ -91,7 +92,8 @@ export default function Library() {
     }))
     try {
       if (window.darkhub?.library?.upsertBulk) {
-        await window.darkhub.library.upsertBulk({ games: gamesToUpsert })
+        const res = await window.darkhub.library.upsertBulk({ games: gamesToUpsert })
+        if (!res?.ok) setError(res?.error ?? t('library.error.save', 'Falha ao salvar.'))
       } else {
         for (const game of gamesToUpsert) {
           await window.darkhub?.library?.upsert?.({ game })
@@ -158,6 +160,7 @@ export default function Library() {
     if (!window.darkhub?.latency) return
     setLaunchingId(g.id)
     setError(null)
+    setNotice(null)
     try {
       if (g.optiscaler?.enabled && g.optiscaler?.applyOnLaunch && window.darkhub?.optiscaler) {
         const opti = await window.darkhub.optiscaler.apply({
@@ -184,6 +187,15 @@ export default function Library() {
         profile
       })
       if (!res?.ok) setError(res?.error ?? t('library.error.launch', 'Falha ao iniciar jogo.'))
+      else if (res.applyError) setError(`${t('library.apply.failed', 'O jogo abriu, mas as otimizações falharam')}: ${res.applyError}`)
+      else if (res.applied) {
+        const items = Object.entries(res.applied as Record<string, { status: string; error?: string }>)
+        const ok = items.filter(([, v]) => v.status === 'ok').length
+        const failed = items.filter(([, v]) => v.status === 'failed')
+        setNotice(t('library.apply.done', '{name}: {ok} otimizações aplicadas{failed}')
+          .replace('{name}', g.name).replace('{ok}', String(ok))
+          .replace('{failed}', failed.length ? ` · ${t('library.apply.failedN', '{n} falharam').replace('{n}', String(failed.length))} (${failed.map(([k]) => k).join(', ')})` : ''))
+      }
     } catch (e: any) {
       setError(e?.message ?? String(e))
     } finally {
@@ -191,26 +203,24 @@ export default function Library() {
     }
   }
 
-  const pickExeForEditor = async () => {
-    if (!window.darkhub?.dialog || !editing) return
+  // The modal owns the game being edited: pickers return a patch that the modal merges into its own copy.
+  const pickExeForEditor = async (current: Game): Promise<Partial<Game> | null> => {
+    if (!window.darkhub?.dialog) return null
     const res = await window.darkhub.dialog.selectFiles({
       title: t('library.dialog.exe', 'Selecione o executável do jogo'),
       filters: [{ name: 'Executável', extensions: ['exe'] }]
     })
-    if (!res?.canceled && res?.filePaths?.[0]) {
-      const path = res.filePaths[0]
-      const name = editing.name || path.split(/[\\/]/).pop()?.replace(/\.exe$/i, '') || ''
-      const workingDir = editing.workingDir || path.split(/[\\/]/).slice(0, -1).join('\\')
-      setEditing({ ...editing, exePath: path, name, workingDir })
-    }
+    if (res?.canceled || !res?.filePaths?.[0]) return null
+    const path = res.filePaths[0]
+    const name = current.name || path.split(/[\\/]/).pop()?.replace(/\.exe$/i, '') || ''
+    const workingDir = current.workingDir || path.split(/[\\/]/).slice(0, -1).join('\\')
+    return { exePath: path, name, workingDir }
   }
 
-  const pickWorkingDirForEditor = async () => {
-    if (!window.darkhub?.dialog || !editing) return
+  const pickWorkingDirForEditor = async (): Promise<Partial<Game> | null> => {
+    if (!window.darkhub?.dialog) return null
     const res = await window.darkhub.dialog.selectFolder({ title: t('library.dialog.dir', 'Selecione a pasta de trabalho (opcional)') })
-    if (!res?.canceled && res?.folderPath) {
-      setEditing({ ...editing, workingDir: res.folderPath })
-    }
+    return !res?.canceled && res?.folderPath ? { workingDir: res.folderPath } : null
   }
 
   const showSkeleton = loading && games.length === 0
@@ -269,6 +279,13 @@ export default function Library() {
           </button>
         </div>
       </PageHeader>
+
+      {notice && !error && (
+        <div role="status" className="mb-5 flex items-start justify-between gap-3 text-[12.5px] text-emerald-300">
+          <span className="break-words">{notice}</span>
+          <button type="button" onClick={() => setNotice(null)} className="dh-btn dh-btn-ghost dh-btn-sm shrink-0">{t('common.close', 'Fechar')}</button>
+        </div>
+      )}
 
       {error && (
         <div role="alert" className="mb-5 flex items-start justify-between gap-3 text-[12.5px] text-red-300">
@@ -338,7 +355,8 @@ export default function Library() {
         <GameEditorModal
           game={editing}
           onSave={saveEditing}
-          onCancel={() => setEditing(null)}
+          error={error}
+          onCancel={() => { setEditing(null); setError(null) }}
           onPickExe={pickExeForEditor}
           onPickWorkingDir={pickWorkingDirForEditor}
           onRemove={() => removeGame(editing.id)}

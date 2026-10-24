@@ -1,6 +1,10 @@
 // Strings for the Real-time screen (optimizer + protection) and the Susuya / screenshots screen. Merged into `messages` (see messages.ts).
 export const realtimeMessages: Record<'pt-BR' | 'en-US', Record<string, string>> = {
   'pt-BR': {
+    'rt.opt.smart': 'Modo inteligente',
+    'rt.opt.smartHelp': 'Tira prioridade de atualizadores e apps de fundo (Edge/Google/Adobe Update, OneDrive, Widgets, Phone Link, Game Bar, pesquisa) e fecha só a telemetria do Windows (CompatTelRunner, DeviceCensus). Nunca fecha os seus programas.',
+    'downloads.auto': 'Auto',
+    'downloads.autoHelp': 'Vazio = automático pelo tamanho do arquivo (1 a 16 conexões)',
     'share.qrHelp': 'Aponte a câmera do celular para abrir o arquivo direto, sem digitar nada.',
     'share.qrMaking': 'gerando...',
     'share.qrAlt': 'QR code do link',
@@ -105,6 +109,9 @@ export const realtimeMessages: Record<'pt-BR' | 'en-US', Record<string, string>>
     'rt.ev.closed': 'Processo fechado: {name}',
     'rt.ev.quarantined': 'Ameaça em quarentena: {d} em {f}',
     'rt.ev.detected': 'Ameaça detectada: {d} em {f}',
+    'rt.ev.clamSetup': 'Instalando o ClamAV e baixando as assinaturas em segundo plano…',
+    'rt.ev.clamReady': 'ClamAV pronto e ativado',
+    'rt.ev.clamFail': 'ClamAV não pôde ser instalado: {e}',
     'rt.opt.title': 'Otimizador em tempo real',
     'rt.opt.desc': 'Libera memória quando ela realmente falta e aplica as regras de processos. Nunca mexe na janela em primeiro plano nem em processos do Windows.',
     'rt.opt.available': 'Memória disponível',
@@ -152,6 +159,10 @@ export const realtimeMessages: Record<'pt-BR' | 'en-US', Record<string, string>>
     'rt.log.empty': 'Nada aconteceu ainda. As ações e detecções aparecem aqui.'
   },
   'en-US': {
+    'rt.opt.smart': 'Smart mode',
+    'rt.opt.smartHelp': 'Lowers the priority of updaters and background apps (Edge/Google/Adobe Update, OneDrive, Widgets, Phone Link, Game Bar, search) and closes only Windows\' telemetry runners (CompatTelRunner, DeviceCensus). Never closes your programs.',
+    'downloads.auto': 'Auto',
+    'downloads.autoHelp': 'Empty = automatic from the file size (1 to 16 connections)',
     'share.qrHelp': 'Point a phone\'s camera at it to open the file directly, without typing anything.',
     'share.qrMaking': 'generating...',
     'share.qrAlt': 'QR code of the link',
@@ -256,6 +267,9 @@ export const realtimeMessages: Record<'pt-BR' | 'en-US', Record<string, string>>
     'rt.ev.closed': 'Process closed: {name}',
     'rt.ev.quarantined': 'Threat quarantined: {d} in {f}',
     'rt.ev.detected': 'Threat detected: {d} in {f}',
+    'rt.ev.clamSetup': 'Installing ClamAV and downloading its signatures in the background…',
+    'rt.ev.clamReady': 'ClamAV ready and switched on',
+    'rt.ev.clamFail': 'ClamAV could not be installed: {e}',
     'rt.opt.title': 'Real-time optimizer',
     'rt.opt.desc': 'Frees memory when it is actually short and applies the process rules. Never touches the foreground window or Windows processes.',
     'rt.opt.available': 'Available memory',

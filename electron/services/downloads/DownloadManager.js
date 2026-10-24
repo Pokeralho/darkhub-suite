@@ -7,8 +7,7 @@ import crypto from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import {
   sanitizeFileName, parseContentDisposition, fileNameFromUrl, validateDownloadUrl, planPieces,
-  categoryForFile, uniquePath, safeJoin, Throttle, isInsideWindow, clampInt
-} from './downloadUtils.js'
+  categoryForFile, uniquePath, safeJoin, Throttle, isInsideWindow, clampInt, autoConnections } from './downloadUtils.js'
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) DarkHubDownloads/1.0'
 const MAX_REDIRECTS = 8
@@ -17,7 +16,8 @@ const PART_EXT = '.dhpart'
 export const DEFAULT_SETTINGS = Object.freeze({
   downloadDir: '',
   maxConcurrent: 3,
-  defaultConnections: 8,
+  // 0 = automatic: chosen from the file size once the server answers (autoConnections)
+  defaultConnections: 0,
   maxConnections: 32,
   globalSpeedLimitKBps: 0,
   retries: 5,
@@ -118,7 +118,7 @@ export class DownloadManager extends EventEmitter {
     if (typeof patch.downloadDir === 'string' && patch.downloadDir.trim()) s.downloadDir = path.resolve(patch.downloadDir.trim())
     if (patch.maxConcurrent !== undefined) s.maxConcurrent = clampInt(patch.maxConcurrent, 1, 10, s.maxConcurrent)
     if (patch.maxConnections !== undefined) s.maxConnections = clampInt(patch.maxConnections, 1, 64, s.maxConnections)
-    if (patch.defaultConnections !== undefined) s.defaultConnections = clampInt(patch.defaultConnections, 1, s.maxConnections, s.defaultConnections)
+    if (patch.defaultConnections !== undefined) s.defaultConnections = clampInt(patch.defaultConnections, 0, s.maxConnections, s.defaultConnections)
     s.defaultConnections = Math.min(s.defaultConnections, s.maxConnections)
     if (patch.globalSpeedLimitKBps !== undefined) s.globalSpeedLimitKBps = clampInt(patch.globalSpeedLimitKBps, 0, 10_000_000, 0)
     if (patch.retries !== undefined) s.retries = clampInt(patch.retries, 0, 20, s.retries)
@@ -183,6 +183,11 @@ export class DownloadManager extends EventEmitter {
     }
   }
 
+  /** Connections for a download: the user's number, or automatic from the size (capped by maxConnections). */
+  _connectionsFor(rec, size) {
+    return Math.min(this.settings.maxConnections, rec.connections > 0 ? rec.connections : autoConnections(size))
+  }
+
   // --------------------------------------------------------------------------- public API
   list() {
     return [...this.items.values()].map((r) => this._toPublic(r)).sort((a, b) => b.created - a.created)
@@ -204,7 +209,7 @@ export class DownloadManager extends EventEmitter {
       partPath: null,
       size: 0,
       resumable: false,
-      connections: clampInt(connections, 1, maxConn, this.settings.defaultConnections),
+      connections: connections ? clampInt(connections, 1, maxConn, 0) : this.settings.defaultConnections,
       speedLimitKBps: clampInt(speedLimitKBps, 0, 10_000_000, 0),
       sha256: typeof sha256 === 'string' && /^[0-9a-f]{64}$/i.test(sha256.trim()) ? sha256.trim().toLowerCase() : null,
       referer: typeof referer === 'string' && /^https?:\/\//i.test(referer) ? referer : null,
@@ -488,7 +493,7 @@ export class DownloadManager extends EventEmitter {
     await this._prepareFiles(rec, probe)
 
     if (!rec.pieces.length) {
-      rec.pieces = probe.resumable ? planPieces(probe.size, rec.connections) : [{ start: 0, end: probe.size > 0 ? probe.size - 1 : -1, done: 0 }]
+      rec.pieces = probe.resumable ? planPieces(probe.size, this._connectionsFor(rec, probe.size)) : [{ start: 0, end: probe.size > 0 ? probe.size - 1 : -1, done: 0 }]
       rec.downloaded = 0
     }
     task.lastSampleBytes = rec.downloaded
@@ -502,7 +507,7 @@ export class DownloadManager extends EventEmitter {
 
     const maxTries = this.settings.retries + 1
     const queue = rec.pieces.filter((p) => p.end < p.start || p.done < p.end - p.start + 1)
-    const workers = probe.resumable ? Math.min(rec.connections, Math.max(1, queue.length)) : 1
+    const workers = probe.resumable ? Math.min(this._connectionsFor(rec, probe.size), Math.max(1, queue.length)) : 1
     let failure = null
 
     const persistTimer = setInterval(() => this._scheduleSave(), 1500)

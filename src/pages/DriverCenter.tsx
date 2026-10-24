@@ -3,10 +3,10 @@ import {
   AlertTriangle, Camera, CheckCircle2, Cpu, DownloadCloud, ExternalLink, Info, Loader2, RefreshCw, ShieldCheck, Wrench, XCircle
 } from '../components/icons';
 import PageHeader from '../components/ui/PageHeader';
+import MissingDrivers from '../components/drivers/MissingDrivers';
 import { useI18n } from '../i18n/I18nProvider';
 
 type CameraState = Awaited<ReturnType<NonNullable<Window['darkhub']['driver']>['cameraStatus']>> & { steps?: string[] };
-const VENDOR_NAME: Record<string, string> = { nvidia: 'NVIDIA', amd: 'AMD', intel: 'Intel' };
 
 type Adapter = NonNullable<Awaited<ReturnType<NonNullable<Window['darkhub']['driver']>['detect']>>['adapters']>[number];
 
@@ -88,7 +88,7 @@ export default function DriverCenter() {
   const header = (
     <PageHeader
       title={t('driver.title', 'Driver Center')}
-      subtitle={t('driver.subtitle', '')}
+      subtitle={t('drvx.pageSubtitle', '')}
       actions={(
         <button onClick={load} disabled={loading || busy} className="dh-btn">
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
@@ -105,46 +105,21 @@ export default function DriverCenter() {
     </div>
   );
 
-  // A GPU on Windows' generic driver is the one thing a regular user must fix: it gets the page's primary action.
-  const generic = adapters.find((a) => a.genericDriver && a.officialSources);
-  const vendorName = generic ? (VENDOR_NAME[generic.vendor] ?? generic.vendor) : '';
-  // Otherwise the primary action is the official download for the first adapter that has one.
-  const primaryIndex = generic ? -1 : adapters.findIndex((a) => Boolean(a.officialSources));
+  // The official download of the first adapter that has one is the page's primary action.
+  const primaryIndex = adapters.findIndex((a) => Boolean(a.officialSources));
 
   return (
     <div className="w-full max-w-5xl pb-16">
       {header}
 
-      {generic ? (
-        <section role="alert" className="dh-card p-5 mb-5 border-amber-300/30">
-          <div className="flex items-start gap-3">
-            <AlertTriangle size={18} className="text-amber-300 shrink-0 mt-0.5" />
-            <div className="min-w-0 flex-1">
-              <h2 className="dh-section-title">
-                {t('driver.generic.title', 'Sua placa {vendor} está sem o driver oficial').replace('{vendor}', vendorName)}
-              </h2>
-              <p className="mt-1 dh-help max-w-[70ch]">
-                {t('driver.generic.body', 'O Windows está usando o Vídeo Básico da Microsoft: sem aceleração, jogos e vídeos rodam mal e a resolução pode ficar limitada. Instale o aplicativo oficial do fabricante: ele detecta a placa, instala o driver certo e mantém atualizado.')}
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button disabled={busy} onClick={() => openOfficial(generic.vendor, 'app')} className="dh-btn dh-btn-primary">
-                  <DownloadCloud size={14} />
-                  {t('driver.generic.cta', 'Baixar o app oficial da {vendor}').replace('{vendor}', vendorName)}
-                </button>
-                <button disabled={busy} onClick={() => openOfficial(generic.vendor, 'manual')} className="dh-btn">
-                  {t('driver.official.manual', 'Official site')}<ExternalLink size={12} />
-                </button>
-              </div>
-              {generic.deviceId ? <p className="mt-3 text-[11px] font-mono text-zinc-500">{generic.deviceId}</p> : null}
-            </div>
-          </div>
-        </section>
-      ) : null}
+      <MissingDrivers onInstalled={load} />
+
+      {/* a GPU on the generic driver is handled by MissingDrivers above (find + install) */}
 
       <div className="space-y-2 mb-5">
         <p className="flex items-start gap-2 text-[12.5px] text-zinc-400 max-w-[75ch]">
           <ShieldCheck size={14} className="shrink-0 mt-0.5 text-zinc-500" />
-          <span>{t('driver.handoffNote', '')}</span>
+          <span>{t('drvx.handoffNote', '')}</span>
         </p>
 
         {rebootPending ? (

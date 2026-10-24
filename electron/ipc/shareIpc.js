@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import QRCode from 'qrcode'
 import path from 'node:path'
 import { SusuyaClient, SUSUYA_ORIGIN } from '../services/susuya/SusuyaClient.js'
-import { captureScreen, captureRegion } from '../services/susuya/Screenshot.js'
+import { captureScreen, captureRegion, grabRegionImage } from '../services/susuya/Screenshot.js'
 import { makeRegionPicker } from '../services/susuya/RegionPicker.js'
 
 const HISTORY_MAX = 100
@@ -176,6 +176,19 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globa
   })
   handle('share:capture', () => capture())
   handle('share:captureRegion', () => capture(true))
+  // Screen area → PNG data URL for another screen (OCR). DarkHub steps aside so it is not in the picture.
+  handle('share:grabRegion', async (_p, event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    win?.minimize()
+    await new Promise((r) => setTimeout(r, 350))
+    try {
+      const img = await grabRegionImage(pickRegion)
+      return img ? { ok: true, dataUrl: img.toDataURL(), width: img.getSize().width, height: img.getSize().height } : { ok: true, cancelled: true }
+    } finally {
+      win?.restore()
+      win?.focus()
+    }
+  })
   handle('share:openFolder', async () => { fs.mkdirSync(config.folder, { recursive: true }); await shell.openPath(config.folder); return { ok: true } })
   handle('share:uploadFile', async ({ file }) => {
     const f = String(file || '')

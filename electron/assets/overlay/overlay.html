@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; font: 600 13px/1.25 "Segoe UI", system-ui, sans-serif; color: #f4f4f5; user-select: none; }
+  #box { position: absolute; padding: 6px 9px; border-radius: 6px; background: rgba(9, 9, 11, var(--bg, 0.55)); transform-origin: top left; min-width: 120px; }
+  .row { display: flex; justify-content: space-between; gap: 14px; white-space: nowrap; }
+  .k { color: #a1a1aa; font-weight: 500; }
+  .v { font-variant-numeric: tabular-nums; }
+  .fps { font-size: 22px; line-height: 1; }
+  .warn { color: #fbbf24; } .bad { color: #f87171; } .good { color: #4ade80; }
+  canvas { display: block; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div id="box"></div>
+<script>
+  // The main process calls window.__overlay(data) with already-formatted values; nothing here talks to Node.
+  const box = document.getElementById('box')
+  const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+  window.__overlay = (d) => {
+    const s = d.settings
+    box.style.setProperty('--bg', String(s.background))
+    box.style.opacity = String(s.opacity)
+    box.style.transform = `scale(${s.scale})`
+    const right = s.position.endsWith('r'), bottom = s.position.startsWith('b')
+    box.style.left = right ? '' : '0'; box.style.right = right ? '0' : ''
+    box.style.top = bottom ? '' : '0'; box.style.bottom = bottom ? '0' : ''
+    box.style.transformOrigin = `${bottom ? 'bottom' : 'top'} ${right ? 'right' : 'left'}`
+    const rows = d.rows.map((r) => r.big
+      ? `<div class="row"><span class="v fps ${r.tone || ''}">${esc(r.value)}</span><span class="k">${esc(r.label)}</span></div>`
+      : `<div class="row"><span class="k">${esc(r.label)}</span><span class="v ${r.tone || ''}">${esc(r.value)}</span></div>`).join('')
+    box.innerHTML = rows + (d.graph ? '<canvas id="g" width="150" height="34"></canvas>' : '')
+    if (d.graph) {
+      const c = document.getElementById('g').getContext('2d')
+      const g = d.graph, max = Math.max(33.4, ...g)
+      c.strokeStyle = '#60a5fa'; c.lineWidth = 1.5; c.beginPath()
+      g.forEach((v, i) => { const x = (i / Math.max(1, g.length - 1)) * 150, y = 34 - (v / max) * 32; i ? c.lineTo(x, y) : c.moveTo(x, y) })
+      c.stroke()
+    }
+  }
+</script>
+</body>
+</html>

@@ -23,9 +23,11 @@ import {
   RefreshCw,
   Network,
   Headphones,
-  MemoryStick
+  MemoryStick,
+  RotateCcw
 } from '../components/icons';
 import PageHeader from '../components/ui/PageHeader';
+import RestoreComponentsPanel from '../components/setup/RestoreComponentsPanel';
 
 const appCatalog: Record<string, { id: string, name: string, desc?: string }[]> = {
   'Drivers & Desinstaladores Limpos': [
@@ -229,9 +231,9 @@ const CATEGORY_KEYS: Record<string, string> = {
   'Desenvolvimento': 'setuphub.cat.dev'
 };
 
-const SetupHub = () => {
+const SetupHub = ({ onNavigate }: { onNavigate?: (page: string) => void } = {}) => {
   const { t } = useI18n();
-  const [activeTab, setActiveTab] = useState<'apps' | 'drivers'>('apps');
+  const [activeTab, setActiveTab] = useState<'apps' | 'drivers' | 'restore'>('apps');
 
   const [selectedApps, setSelectedApps] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -392,6 +394,7 @@ const SetupHub = () => {
           {([
             ['apps', Package, t('setuphub.tab.winget', 'Post-Install (Winget)')],
             ['drivers', Cpu, t('setuphub.tab.drivers', 'Drivers & Hardware')],
+            ['restore', RotateCcw, t('rstx.tab', 'Restore Windows components')],
           ] as const).map(([id, Icon, label]) => {
             const active = activeTab === id;
             return (
@@ -409,6 +412,20 @@ const SetupHub = () => {
           })}
         </div>
       </PageHeader>
+
+      {onNavigate ? (
+        <div className="mb-5 flex items-center justify-between gap-3 flex-wrap border-l-2 border-blue-400/60 pl-3 py-1">
+          <div className="min-w-0">
+            <p className="text-[12.5px] font-medium text-zinc-100">{t('drvx.setuphub.title', 'Fresh install with no display driver?')}</p>
+            <p className="dh-help max-w-[75ch]">{t('drvx.setuphub.body', '')}</p>
+          </div>
+          <button onClick={() => onNavigate('driver')} className="dh-btn dh-btn-sm shrink-0">
+            <Cpu size={14} />{t('drvx.setuphub.cta', 'Open the Driver Center')}
+          </button>
+        </div>
+      ) : null}
+
+      {activeTab === 'restore' && <RestoreComponentsPanel />}
 
       {activeTab === 'apps' && (
         <div className="space-y-5 animate-in">

@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DiskMapDrive, DiskMapInfo, DiskMapNode, DiskMapStatus, DiskMapTag } from '../../global';
 import {
-  AlertTriangle, ArrowRight, ChevronRight, Clipboard, Download, ExternalLink, FolderOpen, HardDrive, HelpCircle, Home,
-  LayoutGrid, Loader2, RefreshCw, Search, Trash2, X, XCircle
+  AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Clipboard, Download, ExternalLink, FolderOpen, HardDrive, HelpCircle, Home,
+  LayoutGrid, Loader2, Lock, RefreshCw, Search, Sparkles, Trash2, X, XCircle
 } from '../../components/icons';
 import PageHeader from '../../components/ui/PageHeader';
 import { useI18n } from '../../i18n/I18nProvider';
 import TreemapCanvas, { CLASS_COLOR, TAG_COLOR } from './TreemapCanvas';
 import { formatBytes } from './treemap';
+import { CATEGORIES, CATEGORY_COLOR, DiskCategory, categoryFill, classifyPath, joinPath } from './diskCategories';
 
 const api = () => window.darkhub?.diskscan;
 const TAGS: DiskMapTag[] = ['red', 'yellow', 'green', 'blue'];
@@ -17,6 +18,9 @@ const PRESETS = ['>1gb', 'm<1day', ':class:video', '*.iso;*.zip;*.rar;*.7z', '|:
 const fmtDate = (ms: number | null | undefined) => (ms ? new Date(ms).toLocaleString() : '-');
 const fmtInt = (n: number | undefined) => (n ?? 0).toLocaleString();
 const fmtTime = (ms: number) => (ms < 60000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.floor(ms / 60000)} min ${Math.round((ms % 60000) / 1000)} s`);
+const LIST_PAGE = 40;
+type ColorMode = 'category' | 'type';
+const readMode = (): ColorMode => { try { return localStorage.getItem('diskmap.colorMode') === 'type' ? 'type' : 'category'; } catch { return 'category'; } };
 const ATTRS: Array<[number, string]> = [[0x2, 'hidden'], [0x4, 'system'], [0x1, 'readonly'], [0x800, 'compressed'], [0x4000, 'encrypted'], [0x400, 'link'], [0x1000, 'offline']];
 
 export default function DiskMap() {
@@ -39,6 +43,12 @@ export default function DiskMap() {
   const [showHelp, setShowHelp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [version, setVersion] = useState(0);
+  const [colorMode, setColorModeState] = useState<ColorMode>(readMode);
+  const [highlight, setHighlight] = useState<DiskCategory | null>(null);
+  const [back, setBack] = useState<string[]>([]);
+  const [forward, setForward] = useState<string[]>([]);
+  const [listLimit, setListLimit] = useState(LIST_PAGE);
+  const crumbsRef = useRef<HTMLElement>(null);
   const area = useRef({ w: 1200, h: 600 });
   const [areaTick, setAreaTick] = useState(0);
 
@@ -89,7 +99,7 @@ export default function DiskMap() {
   }, []);
 
   const start = async (root: string) => {
-    setNotice(null); setSelected(null); setViewId('d0'); setTree(null); setFilterText(''); setFilter('');
+    setNotice(null); setSelected(null); setViewId('d0'); setTree(null); setFilterText(''); setFilter(''); setBack([]); setForward([]); setHighlight(null);
     const r = await api()?.start({ root });
     if (!r?.ok) { setNotice({ ok: false, text: r?.error || t('diskmap.startFail', 'Could not start the scan.') }); return; }
     setStatus(await api()!.status());
@@ -107,13 +117,41 @@ export default function DiskMap() {
     return n.name;
   }, [t]);
 
-  const zoomInto = useCallback((n: DiskMapNode) => {
-    if (n.kind === 'dir' && n.id !== viewId) { setViewId(n.id); setSelected(null); }
+  const setColorMode = (m: ColorMode) => { setColorModeState(m); try { localStorage.setItem('diskmap.colorMode', m); } catch { /* per-viewer convenience only */ } };
+
+  /** Every move goes through here so Back / Forward know where we were. */
+  const go = useCallback((id: string) => {
+    if (id === viewId) return;
+    setBack((b) => [...b.slice(-49), viewId]);
+    setForward([]);
+    setViewId(id); setSelected(null); setListLimit(LIST_PAGE);
   }, [viewId]);
 
+  const zoomInto = useCallback((n: DiskMapNode) => {
+    if (n.kind === 'dir' && n.id !== viewId) go(n.id);
+  }, [viewId, go]);
+
   const goUp = useCallback(() => {
-    if (trail.length > 1) { setViewId(trail[trail.length - 2].id); setSelected(null); }
-  }, [trail]);
+    if (trail.length > 1) go(trail[trail.length - 2].id);
+  }, [trail, go]);
+
+  const goBack = useCallback(() => {
+    if (!back.length) { goUp(); return; }
+    const prev = back[back.length - 1];
+    setBack((b) => b.slice(0, -1));
+    setForward((f) => [viewId, ...f].slice(0, 50));
+    setViewId(prev); setSelected(null); setListLimit(LIST_PAGE);
+  }, [back, viewId, goUp]);
+
+  const goForward = useCallback(() => {
+    if (!forward.length) return;
+    const next = forward[0];
+    setForward((f) => f.slice(1));
+    setBack((b) => [...b.slice(-49), viewId]);
+    setViewId(next); setSelected(null); setListLimit(LIST_PAGE);
+  }, [forward, viewId]);
+
+  const goHome = useCallback(() => go('d0'), [go]);
 
   const act = async (fn: () => Promise<any>, okText?: string) => {
     setBusy(true); setNotice(null);
@@ -139,24 +177,110 @@ export default function DiskMap() {
     if (r?.ok) { setSelected(null); setVersion((v) => v + 1); }
   };
 
-  // Keyboard: Backspace up, Enter opens, Delete asks to trash, Ctrl+1..4 tags.
+  const viewNode = tree;
+
+  // Category of every node in the drawn view (<= maxNodes), from the path rebuilt out of the trail + names.
+  const catIndex = useMemo(() => {
+    const m = new Map<string, DiskCategory>();
+    if (!tree) return m;
+    const base = trail.length && trail[trail.length - 1].id === tree.id
+      ? trail.slice(1).reduce((p, c) => joinPath(p, c.name), trail[0].name)
+      : tree.name;
+    const walk = (n: DiskMapNode, path: string, parent: DiskCategory) => {
+      let cat: DiskCategory;
+      if (n.kind === 'dir' || n.kind === 'file') cat = classifyPath(path, n.kind === 'dir');
+      else if (n.kind === 'rest') cat = parent;
+      else return;
+      m.set(n.id, cat);
+      if (n.children) for (const c of n.children) walk(c, joinPath(path, c.name), cat);
+    };
+    walk(tree, base, 'other');
+    return m;
+  }, [tree, trail]);
+
+  // Totals per category for the current folder: sum of the drawn leaves (a folder's size is the sum of its children).
+  const catTotals = useMemo(() => {
+    const totals = Object.fromEntries(CATEGORIES.map((c) => [c, 0])) as Record<DiskCategory, number>;
+    let sum = 0;
+    const walk = (n: DiskMapNode) => {
+      if (n.children && n.children.length) { for (const c of n.children) walk(c); return; }
+      const cat = catIndex.get(n.id);
+      if (cat) { totals[cat] += n.size; sum += n.size; }
+    };
+    if (tree) walk(tree);
+    return { totals, sum };
+  }, [tree, catIndex]);
+
+  // List: the largest children here, or (with a category highlighted) the largest items of that category anywhere in the view.
+  const allListItems = useMemo(() => {
+    if (!viewNode) return [] as DiskMapNode[];
+    if (!highlight) return (viewNode.children || []).filter((c) => c.kind !== 'rest');
+    const out: DiskMapNode[] = [];
+    const walk = (n: DiskMapNode) => {
+      if ((n.kind === 'dir' || n.kind === 'file') && n !== viewNode && catIndex.get(n.id) === highlight) { out.push(n); return; }
+      if (n.children) for (const c of n.children) walk(c);
+    };
+    walk(viewNode);
+    return out.sort((a, b) => b.size - a.size);
+  }, [viewNode, highlight, catIndex]);
+  const listItems = useMemo(() => allListItems.slice(0, listLimit), [allListItems, listLimit]);
+
+  const catLabel = useCallback((c: DiskCategory) => t(`diskmap.cat.${c}`, c), [t]);
+  const catHint = useCallback((c: DiskCategory) => (
+    c === 'junk' ? t('diskmap.cat.junkHint', 'Geralmente seguro de limpar: o Windows ou o app recria quando precisar.')
+      : c === 'system' ? t('diskmap.cat.systemHint', 'Do Windows: não apague por aqui.')
+        : ''
+  ), [t]);
+  const fillOf = useCallback((n: DiskMapNode, depth: number) => {
+    if (colorMode !== 'category' || (n.kind !== 'dir' && n.kind !== 'file')) return null;
+    const cat = catIndex.get(n.id);
+    return cat ? categoryFill(cat, n.kind === 'dir', depth) : null;
+  }, [colorMode, catIndex]);
+  const dimOf = useCallback((n: DiskMapNode) => (highlight ? catIndex.get(n.id) !== highlight : false), [highlight, catIndex]);
+  const lockedOf = useCallback((n: DiskMapNode) => colorMode === 'category' && n.kind !== 'rest' && catIndex.get(n.id) === 'system', [colorMode, catIndex]);
+  const tipOf = useCallback((n: DiskMapNode) => {
+    const cat = n.kind === 'dir' || n.kind === 'file' ? catIndex.get(n.id) : undefined;
+    if (!cat) return null;
+    return { label: catLabel(cat), color: CATEGORY_COLOR[cat], hint: catHint(cat) || undefined, warn: cat === 'junk' };
+  }, [catIndex, catLabel, catHint]);
+
+  const selectedCat: DiskCategory | null = info ? classifyPath(info.path, info.kind === 'dir') : null;
+
+  // Long paths: keep the current folder in view at the end of the breadcrumb strip.
+  useEffect(() => { const el = crumbsRef.current; if (el) el.scrollLeft = el.scrollWidth; }, [trail]);
+
+  // Keyboard: Backspace / Alt+Up up, Alt+Left back, Alt+Right forward, Up/Down walk the list,
+  // Enter opens, Delete asks to trash, Escape clears, Ctrl+1..4 tags.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || !active) return;
-      if (e.key === 'Backspace') { e.preventDefault(); goUp(); }
-      else if (e.key === 'Enter' && selected) zoomInto(selected);
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !active) return;
+      if (e.key === 'Backspace' || (e.altKey && e.key === 'ArrowUp')) { e.preventDefault(); goUp(); }
+      else if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); goBack(); }
+      else if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); goForward(); }
+      else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.altKey) {
+        const pickable = listItems.filter((c) => c.kind === 'dir' || c.kind === 'file');
+        if (!pickable.length) return;
+        e.preventDefault();
+        const i = selected ? pickable.findIndex((c) => c.id === selected.id) : -1;
+        const next = e.key === 'ArrowDown' ? Math.min(pickable.length - 1, i + 1) : i < 0 ? pickable.length - 1 : Math.max(0, i - 1);
+        setSelected(pickable[next]);
+        document.getElementById(`dm-item-${pickable[next].id}`)?.scrollIntoView({ block: 'nearest' });
+      }
+      else if (e.key === 'Enter' && selected) {
+        // Enter on an ordinary button keeps its own meaning; on the map or a list row it opens the selected folder.
+        if (tag === 'BUTTON' && !(e.target as HTMLElement).closest('[role="option"]')) return;
+        e.preventDefault(); zoomInto(selected);
+      }
       else if (e.key === 'Delete' && selected && selected.id !== 'd0' && ['dir', 'file'].includes(selected.kind)) setConfirmTrash(true);
-      else if (e.key === 'Escape') { setSelected(null); setConfirmTrash(false); }
+      else if (e.key === 'Escape') { setSelected(null); setConfirmTrash(false); setHighlight(null); }
       else if (e.ctrlKey && /^[1-4]$/.test(e.key) && selected) { e.preventDefault(); setTag(TAGS[Number(e.key) - 1]); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const viewNode = tree;
   const scanned = status?.done;
-  const topItems = useMemo(() => (viewNode?.children || []).filter((c) => c.kind !== 'rest').slice(0, 8), [viewNode]);
 
   const headerActions = active ? (
     <>
@@ -265,17 +389,25 @@ export default function DiskMap() {
 
       {/* navigation + filter */}
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={goUp} disabled={trail.length <= 1} className="dh-btn dh-btn-sm" title={t('diskmap.up', 'Up one level (Backspace)')} aria-label={t('diskmap.up', 'Up one level')}>
-          <ArrowRight size={14} className="-rotate-90" />
-        </button>
-        <button onClick={() => { setViewId('d0'); setSelected(null); }} disabled={viewId === 'd0'} className="dh-btn dh-btn-sm" title={t('diskmap.home', 'Back to the start')} aria-label={t('diskmap.home', 'Back to the start')}>
-          <Home size={14} />
-        </button>
-        <nav aria-label={t('diskmap.path', 'Path')} className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] font-mono text-[12px]">
+        <div className="flex items-center gap-1">
+          <button onClick={goBack} disabled={!back.length && trail.length <= 1} className="dh-btn dh-btn-sm" title={t('diskmap.back', 'Voltar (Alt+Esquerda)')} aria-label={t('diskmap.back', 'Voltar (Alt+Esquerda)')}>
+            <ChevronLeft size={14} />
+          </button>
+          <button onClick={goForward} disabled={!forward.length} className="dh-btn dh-btn-sm" title={t('diskmap.forward', 'Avançar (Alt+Direita)')} aria-label={t('diskmap.forward', 'Avançar (Alt+Direita)')}>
+            <ChevronRight size={14} />
+          </button>
+          <button onClick={goUp} disabled={trail.length <= 1} className="dh-btn dh-btn-sm" title={t('diskmap.up', 'Up one level (Backspace)')} aria-label={t('diskmap.up', 'Up one level')}>
+            <ArrowRight size={14} className="-rotate-90" />
+          </button>
+          <button onClick={goHome} disabled={viewId === 'd0'} className="dh-btn dh-btn-sm" title={t('diskmap.home', 'Back to the start')} aria-label={t('diskmap.home', 'Back to the start')}>
+            <Home size={14} />
+          </button>
+        </div>
+        <nav ref={crumbsRef} aria-label={t('diskmap.path', 'Path')} className="flex min-w-[12rem] flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] font-mono text-[12px]">
           {trail.map((c, i) => (
             <React.Fragment key={c.id}>
               {i > 0 ? <ChevronRight size={12} className="text-zinc-600 shrink-0" /> : null}
-              <button onClick={() => { setViewId(c.id); setSelected(null); }} className={`shrink-0 rounded px-1.5 py-0.5 transition-colors ${i === trail.length - 1 ? 'text-zinc-100' : 'text-zinc-400 hover:text-zinc-100'}`}>
+              <button onClick={() => go(c.id)} aria-current={i === trail.length - 1 ? 'location' : undefined} className={`shrink-0 rounded px-1.5 py-0.5 transition-colors ${i === trail.length - 1 ? 'text-zinc-100' : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60'}`}>
                 {c.name}
               </button>
             </React.Fragment>
@@ -334,15 +466,16 @@ export default function DiskMap() {
       <div className="flex flex-col lg:flex-row gap-3">
         <div className="min-w-0 flex-1 h-[calc(100vh-300px)] min-h-[420px]">
           {viewNode ? (
-            <TreemapCanvas tree={viewNode} minPx={minPx} selectedId={selected?.id ?? null} labelFor={labelFor} onSelect={setSelected} onOpen={zoomInto} onSize={onSize} dim={busy} filesWord={t('diskmap.files', 'files')} />
+            <TreemapCanvas tree={viewNode} minPx={minPx} selectedId={selected?.id ?? null} labelFor={labelFor} onSelect={setSelected} onOpen={zoomInto} onSize={onSize} dim={busy} filesWord={t('diskmap.files', 'files')}
+              fillOf={fillOf} dimOf={dimOf} lockedOf={lockedOf} tipOf={tipOf} />
           ) : (
             <div className="h-full rounded-xl bg-zinc-900 animate-pulse" role="status" aria-label={t('diskmap.loading', 'Loading')} />
           )}
         </div>
 
-        <aside className="lg:w-72 shrink-0 dh-card p-4 space-y-4 self-start" aria-label={t('diskmap.details', 'Details')}>
+        <aside className="lg:w-80 shrink-0 space-y-3 self-start" aria-label={t('diskmap.details', 'Details')}>
           {selected && info ? (
-            <>
+            <section className="dh-card p-4 space-y-4">
               <div>
                 <div className="text-[13.5px] font-semibold text-zinc-100 break-words">{info.isRoot ? info.path : info.name}</div>
                 <div className="mt-1 font-mono text-[11px] text-zinc-500 break-all">{info.path}</div>
@@ -370,6 +503,18 @@ export default function DiskMap() {
                   </>
                 ) : null}
               </dl>
+              {selectedCat ? (
+                <div className={`flex items-start gap-2 rounded-md px-2.5 py-2 text-[12px] ${selectedCat === 'junk' ? 'bg-amber-400/10 text-amber-100' : 'bg-zinc-800/50 text-zinc-300'}`}>
+                  {selectedCat === 'junk' ? <Sparkles size={14} className="shrink-0 mt-px text-amber-300" />
+                    : selectedCat === 'system' ? <Lock size={14} className="shrink-0 mt-px text-zinc-400" />
+                      : <span className="w-2.5 h-2.5 rounded-sm shrink-0 mt-[3px]" style={{ background: CATEGORY_COLOR[selectedCat] }} />}
+                  <div className="min-w-0">
+                    <div className="font-medium">{catLabel(selectedCat)}</div>
+                    {selectedCat === 'junk' ? <div className="mt-0.5 text-amber-200/80">{t('diskmap.cat.junkHintLong', 'Geralmente seguro de limpar: temporários, caches e relatórios que o Windows ou o app recria. Nada é apagado automaticamente.')}</div> : null}
+                    {selectedCat === 'system' ? <div className="mt-0.5 text-zinc-400">{t('diskmap.cat.systemHintLong', 'Faz parte do Windows. Apagar por aqui pode quebrar o sistema; use a Limpeza de Disco do Windows.')}</div> : null}
+                  </div>
+                </div>
+              ) : null}
               <div className="flex items-center gap-2">
                 <span className="text-[12px] text-zinc-500 mr-1">{t('diskmap.tag', 'Tag')}</span>
                 {TAGS.map((c, i) => (
@@ -389,6 +534,7 @@ export default function DiskMap() {
                   confirmTrash ? (
                     <div className="mt-1 space-y-2 border-l-2 border-red-400 pl-3 py-1">
                       <p className="text-[12px] text-red-200 inline-flex items-start gap-1.5"><AlertTriangle size={14} className="shrink-0 mt-px" />{t('diskmap.trashConfirm', 'Move to the Recycle Bin?')} <span className="font-mono">{formatBytes(info.size)}</span></p>
+                      {selectedCat === 'system' ? <p className="text-[12px] text-red-300 font-medium">{t('diskmap.cat.systemTrashWarn', 'Item do sistema: removê-lo pode impedir o Windows ou programas de funcionar. Só continue se tiver certeza.')}</p> : null}
                       <div className="flex gap-1.5">
                         <button onClick={trash} disabled={busy} className="dh-btn dh-btn-sm dh-btn-danger">{t('diskmap.trashYes', 'Move')}</button>
                         <button onClick={() => setConfirmTrash(false)} className="dh-btn dh-btn-sm dh-btn-ghost">{t('diskmap.cancel', 'Cancel')}</button>
@@ -399,33 +545,112 @@ export default function DiskMap() {
                   )
                 ) : null}
               </div>
-            </>
-          ) : (
-            <>
-              <div>
-                <h2 className="dh-section-title">{t('diskmap.largest', 'Largest here')}</h2>
-                <p className="mt-1 dh-help">{t('diskmap.hint', 'Click to select, double-click a folder to open it.')}</p>
+            </section>
+          ) : null}
+
+          {/* categories: legend, totals for this folder and highlight filter */}
+          <section className="dh-card p-4 space-y-3" aria-label={t('diskmap.cat.title', 'Categorias')}>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="dh-section-title">{t('diskmap.cat.title', 'Categorias')}</h2>
+              <div role="group" aria-label={t('diskmap.colorBy', 'Colorir por')} className="flex rounded-md border border-zinc-800 p-0.5 text-[11px]">
+                {(['category', 'type'] as ColorMode[]).map((m) => (
+                  <button key={m} onClick={() => setColorMode(m)} aria-pressed={colorMode === m}
+                    className={`rounded px-2 py-0.5 transition-colors ${colorMode === m ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500 hover:text-zinc-200'}`}>
+                    {m === 'category' ? t('diskmap.colorByCategory', 'Categoria') : t('diskmap.colorByType', 'Tipo de arquivo')}
+                  </button>
+                ))}
               </div>
-              {viewNode ? (
-                <ul className="space-y-1">
-                  {topItems.map((c) => (
-                    <li key={c.id}>
-                      <button onClick={() => (c.kind === 'dir' || c.kind === 'file' ? setSelected(c) : undefined)} onDoubleClick={() => zoomInto(c)} className="w-full flex items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-zinc-800/60 transition-colors">
-                        <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: c.kind === 'file' ? CLASS_COLOR[c.cls || 'other'] : c.kind === 'free' ? 'oklch(0.30 0.035 160)' : 'oklch(0.45 0.012 255)' }} />
-                        <span className="min-w-0 flex-1 truncate text-[12.5px] text-zinc-200">{labelFor(c)}</span>
-                        <span className="font-mono text-[11.5px] text-zinc-400">{formatBytes(c.size)}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
+            </div>
+            {catTotals.sum > 0 ? (
+              <div className="flex h-2 overflow-hidden rounded-full bg-zinc-800" aria-hidden="true">
+                {CATEGORIES.filter((c) => catTotals.totals[c] > 0).map((c) => (
+                  <div key={c} style={{ width: `${(catTotals.totals[c] / catTotals.sum) * 100}%`, background: CATEGORY_COLOR[c], opacity: highlight && highlight !== c ? 0.3 : 1 }} />
+                ))}
+              </div>
+            ) : null}
+            <ul className="space-y-0.5">
+              {CATEGORIES.filter((c) => catTotals.totals[c] > 0).sort((x, y) => catTotals.totals[y] - catTotals.totals[x]).map((c) => {
+                const on = highlight === c;
+                const pct = catTotals.sum > 0 ? (catTotals.totals[c] / catTotals.sum) * 100 : 0;
+                return (
+                  <li key={c}>
+                    <button onClick={() => { setHighlight(on ? null : c); setListLimit(LIST_PAGE); }} aria-pressed={on}
+                      title={catHint(c) || undefined}
+                      className={`w-full flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-[12px] transition-colors ${on ? 'bg-zinc-800 ring-1 ring-zinc-600' : 'hover:bg-zinc-800/60'} ${highlight && !on ? 'opacity-55' : ''}`}>
+                      {c === 'system' ? <Lock size={11} className="shrink-0" style={{ color: 'oklch(0.62 0.02 255)' }} />
+                        : <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: CATEGORY_COLOR[c] }} />}
+                      <span className={`min-w-0 flex-1 truncate ${c === 'junk' ? 'text-amber-200' : 'text-zinc-200'}`}>{catLabel(c)}</span>
+                      <span className="font-mono text-[11px] text-zinc-500">{pct < 0.1 ? '<0.1' : pct.toFixed(pct < 10 ? 1 : 0)}%</span>
+                      <span className="w-16 text-right font-mono text-[11.5px] text-zinc-300">{formatBytes(catTotals.totals[c])}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            {highlight === 'junk' ? (
+              <p className="flex items-start gap-1.5 text-[11.5px] text-amber-200/90"><Sparkles size={13} className="shrink-0 mt-px" />{t('diskmap.cat.junkHint', 'Geralmente seguro de limpar: o Windows ou o app recria quando precisar.')}</p>
+            ) : null}
+            {highlight ? (
+              <button onClick={() => setHighlight(null)} className="dh-btn dh-btn-sm dh-btn-ghost"><X size={13} />{t('diskmap.cat.showAll', 'Mostrar todas')}</button>
+            ) : (
+              <p className="dh-help">{t('diskmap.cat.help', 'Clique numa categoria para destacá-la no mapa e listar os maiores itens dela.')}</p>
+            )}
+            {colorMode === 'type' ? (
               <div className="border-t border-zinc-800/80 pt-3 flex flex-wrap gap-x-3 gap-y-1">
                 {CLASSES.map((c) => (
                   <span key={c} className="inline-flex items-center gap-1.5 text-[11px] text-zinc-500"><span className="w-2 h-2 rounded-sm" style={{ background: CLASS_COLOR[c] }} />{t(`diskmap.cls.${c}`, c)}</span>
                 ))}
               </div>
-            </>
-          )}
+            ) : null}
+          </section>
+
+          {/* largest items: always visible, capped and paged so huge folders stay responsive */}
+          <section className="dh-card p-4 space-y-2">
+            <div>
+              <h2 className="dh-section-title">{highlight ? `${t('diskmap.cat.largestOf', 'Maiores itens')}: ${catLabel(highlight)}` : t('diskmap.largest', 'Largest here')}</h2>
+              <p className="mt-1 dh-help">{t('diskmap.navHint', 'Clique para selecionar; duplo clique ou Enter abre a pasta. ↑/↓ percorre a lista, Backspace sobe, Alt+←/→ volta e avança.')}</p>
+            </div>
+            {viewNode ? (
+              listItems.length ? (
+                <ul className="space-y-0.5 max-h-[min(50vh,420px)] overflow-y-auto [scrollbar-width:thin] pr-0.5" role="listbox" aria-label={t('diskmap.largest', 'Largest here')}>
+                  {listItems.map((c) => {
+                    const cat = catIndex.get(c.id);
+                    const isSel = selected?.id === c.id;
+                    const pct = viewSize > 0 ? Math.min(100, (c.size / viewSize) * 100) : 0;
+                    const swatch = c.kind === 'free' ? 'oklch(0.30 0.035 160)' : c.kind === 'unknown' ? 'oklch(0.24 0.012 255)'
+                      : colorMode === 'category' && cat ? CATEGORY_COLOR[cat] : c.kind === 'file' ? CLASS_COLOR[c.cls || 'other'] : 'oklch(0.45 0.012 255)';
+                    return (
+                      <li key={c.id} id={`dm-item-${c.id}`} role="option" aria-selected={isSel} className="group flex items-center gap-1">
+                        <button onClick={() => (c.kind === 'dir' || c.kind === 'file' ? setSelected(c) : undefined)} onDoubleClick={() => zoomInto(c)}
+                          title={cat ? `${catLabel(cat)}${catHint(cat) ? ` · ${catHint(cat)}` : ''}` : undefined}
+                          className={`min-w-0 flex-1 rounded-md px-1.5 py-1 text-left transition-colors ${isSel ? 'bg-zinc-800' : 'hover:bg-zinc-800/60'}`}>
+                          <span className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: swatch }} />
+                            <span className={`min-w-0 flex-1 truncate text-[12.5px] ${cat === 'junk' ? 'text-amber-100' : 'text-zinc-200'}`}>{labelFor(c)}</span>
+                            {cat === 'system' ? <Lock size={11} className="shrink-0 text-zinc-500" /> : null}
+                            <span className="font-mono text-[11.5px] text-zinc-400">{formatBytes(c.size)}</span>
+                          </span>
+                          <span className="mt-1 block h-0.5 rounded-full bg-zinc-800/80 overflow-hidden"><span className="block h-full" style={{ width: `${pct}%`, background: swatch }} /></span>
+                        </button>
+                        {c.kind === 'dir' ? (
+                          <button onClick={() => zoomInto(c)} className="p-1 rounded text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800/60 opacity-60 group-hover:opacity-100 focus:opacity-100" aria-label={`${t('diskmap.openIn', 'Abrir no mapa')}: ${labelFor(c)}`} title={t('diskmap.openIn', 'Abrir no mapa')}>
+                            <ChevronRight size={14} />
+                          </button>
+                        ) : <span className="w-[22px] shrink-0" />}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="text-[12px] text-zinc-500">{highlight ? t('diskmap.cat.none', 'Nada desta categoria nesta pasta.') : t('diskmap.empty', 'Pasta vazia.')}</p>
+              )
+            ) : null}
+            {allListItems.length > listLimit ? (
+              <button onClick={() => setListLimit((n) => n + LIST_PAGE)} className="dh-btn dh-btn-sm dh-btn-ghost w-full justify-center">
+                {t('diskmap.showMore', 'Mostrar mais')} ({fmtInt(allListItems.length - listLimit)})
+              </button>
+            ) : null}
+          </section>
         </aside>
       </div>
     </div>

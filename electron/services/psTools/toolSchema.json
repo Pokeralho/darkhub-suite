@@ -1,0 +1,199 @@
+{
+  "version": 1,
+  "categories": [
+    { "id": "system", "label": "Sistema" },
+    { "id": "apps", "label": "Programas" },
+    { "id": "disk", "label": "Disco e arquivos" },
+    { "id": "network", "label": "Rede" },
+    { "id": "maintenance", "label": "Manutenção" }
+  ],
+  "tools": [
+    {
+      "id": "sysinfo", "category": "system", "output": "table",
+      "name": "Relatório do sistema", "desc": "Windows, CPU, memória, GPU, BIOS, discos e tempo ligado. Exporte em CSV, JSON ou texto.",
+      "params": []
+    },
+    {
+      "id": "startupItems", "category": "system", "output": "table",
+      "name": "Itens de inicialização", "desc": "Programas que iniciam com o Windows (registro e pastas de inicialização).",
+      "params": [
+        { "key": "filter", "type": "text", "default": "", "maxLength": 100, "label": "Filtrar por nome ou comando" }
+      ]
+    },
+    {
+      "id": "scheduledTasks", "category": "system", "output": "table",
+      "name": "Tarefas agendadas", "desc": "Lista as tarefas do Agendador com última e próxima execução.",
+      "params": [
+        { "key": "hideMicrosoft", "type": "bool", "default": true, "label": "Ocultar tarefas da Microsoft (\\Microsoft\\*)" },
+        { "key": "state", "type": "select", "default": "All", "label": "Estado",
+          "options": [{ "value": "All", "label": "Todos" }, { "value": "Ready", "label": "Pronta" }, { "value": "Running", "label": "Em execução" }, { "value": "Disabled", "label": "Desativada" }] },
+        { "key": "filter", "type": "text", "default": "", "maxLength": 100, "label": "Filtrar por nome, pasta ou ação" }
+      ]
+    },
+    {
+      "id": "services", "category": "system", "output": "table",
+      "name": "Serviços", "desc": "Serviços do Windows com estado, tipo de inicialização, conta e executável.",
+      "params": [
+        { "key": "filter", "type": "text", "default": "", "maxLength": 100, "label": "Filtrar por nome" },
+        { "key": "state", "type": "select", "default": "All", "label": "Estado",
+          "options": [{ "value": "All", "label": "Todos" }, { "value": "Running", "label": "Em execução" }, { "value": "Stopped", "label": "Parado" }] },
+        { "key": "startMode", "type": "select", "default": "All", "label": "Inicialização",
+          "options": [{ "value": "All", "label": "Todas" }, { "value": "Auto", "label": "Automática" }, { "value": "Manual", "label": "Manual" }, { "value": "Disabled", "label": "Desativada" }] },
+        { "key": "hideWindows", "type": "bool", "default": false, "label": "Ocultar serviços com executável em C:\\Windows" }
+      ]
+    },
+    {
+      "id": "eventLog", "category": "system", "output": "table",
+      "name": "Eventos críticos e erros", "desc": "Últimos eventos críticos, de erro ou de aviso do log escolhido.",
+      "params": [
+        { "key": "log", "type": "select", "default": "System", "label": "Log",
+          "options": [{ "value": "System", "label": "Sistema" }, { "value": "Application", "label": "Aplicativo" }, { "value": "Setup", "label": "Instalação" }] },
+        { "key": "level", "type": "select", "default": "error", "label": "Gravidade mínima",
+          "options": [{ "value": "critical", "label": "Somente críticos" }, { "value": "error", "label": "Críticos e erros" }, { "value": "warning", "label": "Críticos, erros e avisos" }] },
+        { "key": "hours", "type": "number", "default": 24, "min": 1, "max": 720, "label": "Últimas horas" },
+        { "key": "max", "type": "number", "default": 100, "min": 1, "max": 1000, "label": "Máximo de eventos" }
+      ]
+    },
+    {
+      "id": "envVars", "category": "system", "output": "table",
+      "name": "Variáveis de ambiente", "desc": "Variáveis do processo, do usuário e da máquina (somente leitura).",
+      "params": [
+        { "key": "scope", "type": "select", "default": "All", "label": "Escopo",
+          "options": [{ "value": "All", "label": "Usuário e máquina" }, { "value": "User", "label": "Usuário" }, { "value": "Machine", "label": "Máquina" }, { "value": "Process", "label": "Processo do app" }] },
+        { "key": "filter", "type": "text", "default": "", "maxLength": 100, "label": "Filtrar por nome ou valor" }
+      ]
+    },
+    {
+      "id": "installedApps", "category": "apps", "output": "table",
+      "name": "Programas instalados", "desc": "Programas registrados no Windows (máquina e usuário), com versão, editor e tamanho.",
+      "params": [
+        { "key": "filter", "type": "text", "default": "", "maxLength": 100, "label": "Filtrar por nome ou editor" },
+        { "key": "includeSystem", "type": "bool", "default": false, "label": "Incluir componentes do sistema e atualizações" }
+      ]
+    },
+    {
+      "id": "wingetUpgrades", "category": "apps", "output": "table", "rowAction": "wingetUpgrade",
+      "name": "Atualizações do winget", "desc": "Lista os programas com atualização disponível (somente leitura). Atualizar exige um clique e confirmação.",
+      "params": [
+        { "key": "includeUnknown", "type": "bool", "default": false, "label": "Incluir programas com versão desconhecida" }
+      ]
+    },
+    {
+      "id": "wingetUpgrade", "category": "apps", "output": "text", "hidden": true, "mutating": true,
+      "name": "Atualizar com winget", "desc": "Atualiza um programa (ou todos) com o winget.",
+      "params": [
+        { "key": "id", "type": "text", "default": "", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._+\\-]*$", "label": "ID do pacote" },
+        { "key": "all", "type": "bool", "default": false, "label": "Atualizar todos" }
+      ]
+    },
+    {
+      "id": "diskHealth", "category": "disk", "output": "table",
+      "name": "Saúde dos discos", "desc": "Estado físico (Get-PhysicalDisk) e contadores de confiabilidade: temperatura, desgaste, erros e horas ligadas.",
+      "adminWhen": { "key": "asAdmin", "equals": true },
+      "params": [
+        { "key": "asAdmin", "type": "bool", "default": false, "label": "Ler contadores como administrador (temperatura e desgaste costumam exigir)" }
+      ]
+    },
+    {
+      "id": "largeFiles", "category": "disk", "output": "table",
+      "name": "Arquivos grandes", "desc": "Os maiores arquivos de uma pasta, com filtros de tamanho, idade e padrão.",
+      "params": [
+        { "key": "folder", "type": "folder", "default": "", "required": true, "label": "Pasta" },
+        { "key": "minSizeMB", "type": "number", "default": 500, "min": 1, "max": 1048576, "label": "Tamanho mínimo (MB)" },
+        { "key": "top", "type": "number", "default": 100, "min": 1, "max": 2000, "label": "Mostrar os N maiores" },
+        { "key": "olderThanDays", "type": "number", "default": 0, "min": 0, "max": 36500, "label": "Sem modificação há pelo menos (dias, 0 = qualquer)" },
+        { "key": "include", "type": "patterns", "default": "", "maxLength": 400, "label": "Incluir (ex.: *.iso; *.mp4)" },
+        { "key": "exclude", "type": "patterns", "default": "", "maxLength": 400, "label": "Excluir caminhos contendo (ex.: node_modules; *\\.git\\*)" },
+        { "key": "recurse", "type": "bool", "default": true, "label": "Incluir subpastas" },
+        { "key": "depth", "type": "number", "default": 32, "min": 1, "max": 64, "label": "Profundidade máxima" }
+      ]
+    },
+    {
+      "id": "duplicates", "category": "disk", "output": "table",
+      "name": "Arquivos duplicados", "desc": "Agrupa arquivos idênticos por hash SHA-256 (só relatório, nada é apagado).",
+      "params": [
+        { "key": "folder", "type": "folder", "default": "", "required": true, "label": "Pasta" },
+        { "key": "minSizeKB", "type": "number", "default": 1024, "min": 1, "max": 10485760, "label": "Tamanho mínimo (KB)" },
+        { "key": "include", "type": "patterns", "default": "", "maxLength": 400, "label": "Incluir (ex.: *.jpg; *.png)" },
+        { "key": "exclude", "type": "patterns", "default": "", "maxLength": 400, "label": "Excluir caminhos contendo" },
+        { "key": "recurse", "type": "bool", "default": true, "label": "Incluir subpastas" },
+        { "key": "maxFiles", "type": "number", "default": 20000, "min": 10, "max": 100000, "label": "Máximo de arquivos analisados" }
+      ]
+    },
+    {
+      "id": "cleanOldFiles", "category": "disk", "output": "table",
+      "name": "Limpar arquivos antigos", "desc": "Encontra arquivos sem modificação há N dias numa pasta e, se você confirmar, envia para a Lixeira. A pré-visualização vem ligada.",
+      "mutatingWhen": { "key": "dryRun", "equals": false },
+      "params": [
+        { "key": "folder", "type": "folder", "default": "%TEMP%", "required": true, "label": "Pasta (%TEMP% = temporários do usuário)" },
+        { "key": "olderThanDays", "type": "number", "default": 7, "min": 1, "max": 3650, "label": "Sem modificação há pelo menos (dias)" },
+        { "key": "include", "type": "patterns", "default": "", "maxLength": 400, "label": "Incluir só (ex.: *.tmp; *.log)" },
+        { "key": "exclude", "type": "patterns", "default": "", "maxLength": 400, "label": "Excluir caminhos contendo" },
+        { "key": "recurse", "type": "bool", "default": true, "label": "Incluir subpastas" },
+        { "key": "dryRun", "type": "bool", "default": true, "label": "Só pré-visualizar (não apaga nada)" }
+      ]
+    },
+    {
+      "id": "openPorts", "category": "network", "output": "table",
+      "name": "Portas abertas", "desc": "Portas TCP/UDP locais com o processo dono.",
+      "params": [
+        { "key": "protocol", "type": "select", "default": "both", "label": "Protocolo",
+          "options": [{ "value": "both", "label": "TCP e UDP" }, { "value": "tcp", "label": "TCP" }, { "value": "udp", "label": "UDP" }] },
+        { "key": "listenOnly", "type": "bool", "default": true, "label": "Só portas em escuta (TCP)" },
+        { "key": "port", "type": "number", "default": 0, "min": 0, "max": 65535, "label": "Porta (0 = todas)" },
+        { "key": "process", "type": "text", "default": "", "maxLength": 100, "label": "Filtrar por processo" }
+      ]
+    },
+    {
+      "id": "wifiProfiles", "category": "network", "output": "table", "rowAction": "wifiKey",
+      "name": "Perfis de Wi-Fi", "desc": "Redes Wi-Fi salvas. A senha só aparece quando você clica em revelar numa rede.",
+      "params": []
+    },
+    {
+      "id": "hosts", "category": "network", "output": "hosts",
+      "name": "Arquivo hosts", "desc": "Veja e edite o arquivo hosts. Salvar faz um backup antes e pede administrador.",
+      "params": []
+    },
+    {
+      "id": "updateHistory", "category": "maintenance", "output": "table",
+      "name": "Histórico do Windows Update", "desc": "Atualizações instaladas ou com falha, com data, resultado e KB.",
+      "params": [
+        { "key": "count", "type": "number", "default": 100, "min": 1, "max": 1000, "label": "Quantidade" },
+        { "key": "hideDefender", "type": "bool", "default": true, "label": "Ocultar atualizações de definição do Defender" }
+      ]
+    },
+    {
+      "id": "sfc", "category": "maintenance", "output": "text", "admin": true,
+      "mutatingWhen": { "key": "mode", "equals": "scannow" },
+      "name": "Verificação SFC", "desc": "Verifica os arquivos protegidos do Windows. Reparar exige confirmação.",
+      "params": [
+        { "key": "mode", "type": "select", "default": "verifyonly", "label": "Modo",
+          "options": [{ "value": "verifyonly", "label": "Só verificar (/verifyonly)" }, { "value": "scannow", "label": "Verificar e reparar (/scannow)" }] }
+      ]
+    },
+    {
+      "id": "dism", "category": "maintenance", "output": "text", "admin": true,
+      "mutatingWhen": { "key": "mode", "equals": "restore" },
+      "name": "Saúde da imagem (DISM)", "desc": "Checa a imagem do Windows. Restaurar baixa arquivos do Windows Update e exige confirmação.",
+      "params": [
+        { "key": "mode", "type": "select", "default": "check", "label": "Modo",
+          "options": [{ "value": "check", "label": "Checagem rápida (/CheckHealth)" }, { "value": "scan", "label": "Varredura completa (/ScanHealth)" }, { "value": "restore", "label": "Reparar (/RestoreHealth)" }] }
+      ]
+    },
+    {
+      "id": "batteryReport", "category": "maintenance", "output": "file",
+      "name": "Relatório de bateria", "desc": "Gera o relatório HTML do powercfg (capacidade, ciclos, histórico). Precisa de bateria.",
+      "params": [
+        { "key": "outputPath", "type": "savePath", "ext": "html", "default": "", "required": true, "label": "Salvar em" }
+      ]
+    },
+    {
+      "id": "energyReport", "category": "maintenance", "output": "file", "admin": true,
+      "name": "Relatório de energia", "desc": "Observa o sistema por alguns segundos e aponta problemas de consumo (powercfg /energy).",
+      "params": [
+        { "key": "outputPath", "type": "savePath", "ext": "html", "default": "", "required": true, "label": "Salvar em" },
+        { "key": "duration", "type": "number", "default": 60, "min": 5, "max": 300, "label": "Duração da observação (segundos)" }
+      ]
+    }
+  ]
+}

@@ -10,6 +10,7 @@ import { CpuLoadTracker } from './services/CpuLoadTracker.js'
 import ManagedProcessRegistry from './services/ManagedProcessRegistry.js'
 import { encodePowerShellScript, powerShellArgsForEncodedScript } from './services/PowerShellRunner.js'
 import nativeLatencyClient from './services/NativeLatencyClient.js'
+import appEvents from './services/appEvents.js'
 
 const PROCESS_OWNER = 'latencyGuardian'
 
@@ -1280,14 +1281,6 @@ public static class Psapi {
         timestamp: Date.now()
       })
 
-      if (profile.enableUltraOnLaunch) {
-        try {
-          await ultraEnable(true)
-        } catch (e) {
-          state.lastError = String(e?.message ?? e)
-        }
-      }
-
       proc.on('exit', async () => {
         const g = launchedGame
         launchedGame = null
@@ -1304,6 +1297,7 @@ public static class Psapi {
               const { loadLibrary } = await getLibraryStore()
               const lib = await loadLibrary(app)
 
+              appEvents.emit('gameStopped', { gameId: g.gameId, gameName: g.gameName ?? '', exePath: g.exePath, durationSeconds })
               broadcastEvent('library:gameStopped', {
                 gameId: g.gameId,
                 gameName: g.gameName ?? '',
@@ -1342,7 +1336,26 @@ public static class Psapi {
         } catch {}
       })
 
-      return { ok: true, pid: proc.pid, exePath, args, workingDir }
+      // Per-process tweaks (priority etc.) need the game running: launchers start it a few seconds later,
+      // so wait up to 15 s for the process before applying, and report what was applied.
+      let applied = null
+      let applyError = null
+      if (profile.enableUltraOnLaunch) {
+        for (let i = 0; i < 15 && !(await findGameProcess()) && launchedGame?.proc === proc; i++) {
+          await new Promise((r) => setTimeout(r, 1000))
+          processSnapshotCache = { ts: 0, list: [] }
+        }
+        // the exit handler undoes the tweaks: if the game already closed, there is nothing to apply
+        if (launchedGame?.proc === proc) {
+          try {
+            applied = (await ultraEnable(true))?.applied ?? state.lastApplied ?? null
+          } catch (e) {
+            applyError = state.lastError = String(e?.message ?? e)
+          }
+        }
+      }
+
+      return { ok: true, pid: proc.pid, exePath, args, workingDir, applied, applyError }
     } catch (e) {
       config = prevConfig
       await saveConfig().catch(() => {})

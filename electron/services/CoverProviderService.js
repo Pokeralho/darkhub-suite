@@ -79,7 +79,13 @@ export class CoverProviderService {
           const json = JSON.parse(data)
           const appId = Number(json?.items?.[0]?.id)
           if (Number.isInteger(appId) && appId > 0) {
-            resolve(`https://steamcdn-a.akamaihd.net/steam/apps/${appId}/library_600x900.jpg`)
+            // portrait art first (not every game has it), then the store header as a last resort
+            resolve([
+              `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900_2x.jpg`,
+              `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900.jpg`,
+              `https://steamcdn-a.akamaihd.net/steam/apps/${appId}/library_600x900.jpg`,
+              `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`
+            ])
           } else {
             resolve(null)
           }
@@ -155,10 +161,9 @@ export class CoverProviderService {
 
     for (const provider of this.providers) {
       try {
-        const imageUrl = await provider(gameName)
-        if (imageUrl) {
-          const success = await this.downloadImage(imageUrl, localPath)
-          if (success) {
+        const found = await provider(gameName)
+        for (const imageUrl of [].concat(found || [])) {
+          if (await this.downloadImage(imageUrl, localPath)) {
             return { ok: true, source: 'network', path: `local-resource://${localPath}` }
           }
         }

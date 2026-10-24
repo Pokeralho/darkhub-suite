@@ -11,6 +11,8 @@ function lostEscapes(file: string, src: string): string[] {
   const out: string[] = [];
   const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
   const visit = (n: ts.Node) => {
+    // String.raw`...` keeps every backslash as written: exactly what PowerShell scripts need, nothing to flag
+    if (ts.isTaggedTemplateExpression(n) && n.tag.getText(sf) === 'String.raw') return;
     if (ts.isNoSubstitutionTemplateLiteral(n) || ts.isTemplateHead(n) || ts.isTemplateMiddle(n) || ts.isTemplateTail(n)) {
       const raw = n.getText(sf).replace(VALID, '');
       const m = /\\(.)/.exec(raw);
@@ -26,6 +28,8 @@ describe('template literals sent to PowerShell keep their backslashes', () => {
   it('catches a dropped escape and accepts valid ones', () => {
     expect(lostEscapes('a.js', 'const s = `HKLM:\\SYSTEM`')).toHaveLength(1);
     expect(lostEscapes('a.js', 'const s = `HKLM:\\\\SYSTEM\\n${x.replace(/\\s+/g, "")}`')).toHaveLength(0);
+    expect(lostEscapes('a.js', 'const s = String.raw`HKLM:\\SYSTEM ${x}\\Run`')).toHaveLength(0);
+    expect(lostEscapes('a.js', 'const s = other`HKLM:\\SYSTEM`')).toHaveLength(1);
   });
   it('electron/**/*.js has no silently dropped escapes', () => {
     const bad: string[] = [];

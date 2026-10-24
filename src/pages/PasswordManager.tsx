@@ -3,6 +3,8 @@ import { AlertTriangle, Check, ChevronRight, Copy, Download, Eye, EyeOff, KeyRou
 import PageHeader from '../components/ui/PageHeader'
 import { useI18n } from '../i18n/I18nProvider'
 import { HelpTip } from '../components/HelpTip'
+import BrowserExtensionSection from '../components/vault/BrowserExtensionSection'
+import VaultTransferSection from '../components/vault/VaultTransferSection'
 
 type VaultEntry = {
   id: string
@@ -833,6 +835,9 @@ export default function PasswordManager() {
           </aside>
         </div>
       ) : null}
+
+      {showUnlocked ? <BrowserExtensionSection /> : null}
+      <VaultTransferSection unlocked={Boolean(showUnlocked)} onReceived={() => { void refreshStatus() }} />
     </div>
   )
 }

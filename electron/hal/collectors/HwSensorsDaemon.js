@@ -20,7 +20,8 @@ export function isPawnIoInstalled(execFileSync = cp.execFileSync, maxAgeMs = 100
   let value = false;
   try {
     execFileSync('reg.exe', ['query', 'HKLM\\SYSTEM\\CurrentControlSet\\Services\\PawnIO'], { stdio: 'ignore', windowsHide: true });
-    value = true;
+    // the service key outlives an uninstall until the next reboot: the program folder must exist too
+    value = fs.existsSync(path.join(process.env.ProgramFiles || 'C:\\Program Files', 'PawnIO'));
   } catch { value = false; }
   pawnCache = { at: Date.now(), value };
   return value;

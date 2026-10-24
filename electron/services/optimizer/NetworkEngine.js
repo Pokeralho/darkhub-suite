@@ -101,7 +101,8 @@ if ($LASTEXITCODE -ne 0) { throw 'netsh winsock reset falhou' }
 $names = @(${names.map(psQuote).join(',')})
 $out = @()
 foreach ($n in $names) {
-  $p = Get-NetAdapterAdvancedProperty -Name $n -RegistryKeyword '*EEE' -ErrorAction SilentlyContinue
+  # -RegistryKeyword is a wildcard ('*EEE' also matches AdvancedEEE): filter on the exact keyword
+  $p = Get-NetAdapterAdvancedProperty -Name $n -AllProperties -ErrorAction SilentlyContinue | Where-Object { $_.RegistryKeyword -eq '*EEE' } | Select-Object -First 1
   if ($p) { $out += [pscustomobject]@{ name = $n; value = [string]$p.RegistryValue } }
 }
 ConvertTo-Json -InputObject @($out) -Compress`;
@@ -137,7 +138,7 @@ ConvertTo-Json -InputObject @($out) -Compress`;
 
     const eeeTargets = eeeBefore.filter((e) => String(e.value) !== '0');
     const eeeScript = eeeTargets.length
-      ? `$ErrorActionPreference = 'Continue'\r\n${eeeTargets.map((e) => `Set-NetAdapterAdvancedProperty -Name ${psQuote(e.name)} -RegistryKeyword '*EEE' -RegistryValue 0`).join('\r\n')}`
+      ? `$ErrorActionPreference = 'Continue'\r\n${eeeTargets.map((e) => `Get-NetAdapterAdvancedProperty -Name ${psQuote(e.name)} -AllProperties -ErrorAction SilentlyContinue | Where-Object { $_.RegistryKeyword -eq '*EEE' } | Set-NetAdapterAdvancedProperty -RegistryValue 0`).join('\r\n')}`
       : null;
 
     const res = await DeepTweaksEngine.applyChangeSet({
@@ -177,7 +178,7 @@ ConvertTo-Json -InputObject @($out) -Compress`;
     if (snap?.adapters?.length) {
       const lines = ["$ErrorActionPreference = 'Continue'"];
       for (const e of snap.adapters) {
-        if (/^\d+$/.test(String(e.value))) lines.push(`Set-NetAdapterAdvancedProperty -Name ${psQuote(e.name)} -RegistryKeyword '*EEE' -RegistryValue ${Number(e.value)}`);
+        if (/^\d+$/.test(String(e.value))) lines.push(`Get-NetAdapterAdvancedProperty -Name ${psQuote(e.name)} -AllProperties -ErrorAction SilentlyContinue | Where-Object { $_.RegistryKeyword -eq '*EEE' } | Set-NetAdapterAdvancedProperty -RegistryValue ${Number(e.value)}`);
       }
       const r = await ElevationHelper.runElevatedPowerShell(lines.join('\r\n'));
       if (r.code === 0) { DeepTweaksEngine.clearExtra(EEE_SNAPSHOT); eeeNote = ' Energy-Efficient Ethernet restaurado.'; }

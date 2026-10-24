@@ -23,6 +23,9 @@ export function GameCard({
   const [coverUrl, setCoverUrl] = useState<string | null>(game.coverPath || null)
   const [imageError, setImageError] = useState(false)
 
+  // A stored cover that fails to load (file deleted, old path) is fetched again once; the main process saves it.
+  const [refetched, setRefetched] = useState(false)
+
   useEffect(() => {
     let mounted = true
     if (game.coverPath) {
@@ -33,14 +36,9 @@ export function GameCard({
     const fetchCover = async () => {
       if (game.coverPath || !window.darkhub?.library) return
       try {
-        const res = await window.darkhub.library.fetchCover({ gameName: game.name })
-        if (res?.ok && res?.path && mounted) {
-          setCoverUrl(res.path)
-
-          window.darkhub.library.upsert({ game: { ...game, coverPath: res.path } }).catch(() => {})
-        } else if (mounted) {
-          setImageError(true)
-        }
+        const res = await window.darkhub.library.fetchCover({ gameName: game.name, gameId: game.id })
+        if (res?.ok && res?.path && mounted) setCoverUrl(res.path)
+        else if (mounted) setImageError(true)
       } catch {
         if (mounted) setImageError(true)
       }
@@ -48,6 +46,17 @@ export function GameCard({
     fetchCover()
     return () => { mounted = false }
   }, [game.name, game.coverPath])
+
+  const onImageError = async () => {
+    setImageError(true)
+    if (refetched || !window.darkhub?.library) return
+    setRefetched(true)
+    const res = await window.darkhub.library.fetchCover({ gameName: game.name, gameId: game.id, forceRefresh: true }).catch(() => null)
+    if (res?.ok && res?.path) {
+      setCoverUrl(`${res.path}${res.path.includes('?') ? '&' : '?'}r=${Date.now()}`)
+      setImageError(false)
+    }
+  }
 
   const formatTime = (seconds: number) => {
     if (!seconds) return null
@@ -66,7 +75,7 @@ export function GameCard({
             alt=""
             loading="lazy"
             decoding="async"
-            onError={() => setImageError(true)}
+            onError={onImageError}
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
           />
         ) : (

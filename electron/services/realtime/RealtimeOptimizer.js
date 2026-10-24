@@ -6,6 +6,7 @@
 //           lowered to below-normal priority or closed. System processes and the foreground window are never touched.
 import { EventEmitter } from 'node:events'
 import os from 'node:os'
+import { effectiveRules } from './realtimeConfig.js'
 
 const MEMORY_TICK_MS = 5000
 const RULES_TICK_MS = 20000
@@ -109,7 +110,7 @@ export class RealtimeOptimizer extends EventEmitter {
   }
 
   async #rulesTick() {
-    const { rules } = this.getConfig()
+    const rules = effectiveRules(this.getConfig())
     if (!rules.length) return
     const list = await this.native.listProcesses().catch(() => null)
     if (!list) return

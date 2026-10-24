@@ -171,7 +171,7 @@ const Downloads: React.FC = () => {
           <label className="dh-label flex items-center gap-2">
             {t('downloads.connections', 'Conexões')}
             <input type="number" min={1} max={maxConn} value={connections}
-              placeholder={String(settings?.defaultConnections ?? 8)}
+              placeholder={settings?.defaultConnections ? String(settings.defaultConnections) : t('downloads.auto', 'Auto')}
               onChange={(e) => setConnections(e.target.value === '' ? '' : Number(e.target.value))}
               className="dh-input w-16 font-mono" />
           </label>
@@ -212,7 +212,7 @@ const Downloads: React.FC = () => {
             <label className="flex items-center justify-between gap-3">{t('downloads.maxConcurrent', 'Downloads simultâneos')}
               <input type="number" min={1} max={10} value={settings.maxConcurrent} onChange={(e) => saveSettings({ maxConcurrent: Number(e.target.value) })} className="dh-input w-20 font-mono" /></label>
             <label className="flex items-center justify-between gap-3">{t('downloads.defaultConnections', 'Conexões por download (padrão)')}
-              <input type="number" min={1} max={settings.maxConnections} value={settings.defaultConnections} onChange={(e) => saveSettings({ defaultConnections: Number(e.target.value) })} className="dh-input w-20 font-mono" /></label>
+              <input type="number" min={0} max={settings.maxConnections} value={settings.defaultConnections || ''} placeholder={t('downloads.auto', 'Auto')} title={t('downloads.autoHelp', 'Vazio = automático pelo tamanho do arquivo (1 a 16 conexões)')} onChange={(e) => saveSettings({ defaultConnections: e.target.value === '' ? 0 : Number(e.target.value) })} className="dh-input w-20 font-mono" /></label>
             <label className="flex items-center justify-between gap-3">{t('downloads.maxConnections', 'Máximo de conexões permitido')}
               <input type="number" min={1} max={64} value={settings.maxConnections} onChange={(e) => saveSettings({ maxConnections: Number(e.target.value) })} className="dh-input w-20 font-mono" /></label>
             <label className="flex items-center justify-between gap-3">{t('downloads.globalLimit', 'Limite global de velocidade (KB/s, 0 = sem limite)')}

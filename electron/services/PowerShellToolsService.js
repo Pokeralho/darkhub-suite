@@ -41,6 +41,16 @@ export function isUnderDarkOS(p, root = DARKOS_ROOT) {
   }
 }
 
+/**
+ * Starting folder for the elevated terminal: any plain absolute drive path (it is only passed to
+ * Set-Location as a single-quoted literal). UNC/device paths, wildcards and ADS are refused.
+ */
+export function isStartFolder(p) {
+  if (typeof p !== 'string') return false
+  const raw = p.trim()
+  return !!raw && raw.length <= 260 && /^[A-Za-z]:\\/.test(raw) && raw.indexOf(':', 2) === -1 && !/[\u0000-\u001f*?"<>|]/.test(raw)
+}
+
 /** Normalizes the parsed `Get-ExecutionPolicy -List` output into [{ scope, policy }]. */
 export function normalizeScopes(data) {
   const list = Array.isArray(data) ? data : (data ? [data] : [])
@@ -96,6 +106,14 @@ export class PowerShellToolsService {
     if (typeof this._fs.realpathSync !== 'function') return true
     try {
       return isUnderDarkOS(this._fs.realpathSync(p.trim()), this._fs.realpathSync(this._root))
+    } catch {
+      return false
+    }
+  }
+
+  _isDirectory(p) {
+    try {
+      return typeof this._fs.statSync === 'function' ? this._fs.statSync(p).isDirectory() : this._fs.existsSync(p)
     } catch {
       return false
     }
@@ -202,13 +220,15 @@ ConvertTo-Json -InputObject @($out) -Depth 3 -Compress
    * Opens a real elevated PowerShell window (UAC prompt) at the DarkOS root. If the user cancels the
    * UAC prompt, Start-Process throws and this returns ok:false.
    */
-  async openElevatedTerminal({ startingPath } = {}) {
+  async openElevatedTerminal({ startingPath, shell, loadProfile } = {}) {
     if (process.platform !== 'win32') return { ok: false, error: 'Disponível apenas no Windows.' }
     let startIn = this._root
-    if (startingPath && this._isTrustedPath(startingPath) && this._fs.existsSync(startingPath)) startIn = startingPath.trim()
+    if (startingPath && isStartFolder(startingPath) && this._isDirectory(startingPath.trim())) startIn = startingPath.trim()
     if (!this._fs.existsSync(startIn)) startIn = process.env.SystemRoot || 'C:\\'
+    const exe = shell === 'pwsh' ? 'pwsh.exe' : 'powershell.exe'
     const inner = `Set-Location -LiteralPath ${psQuote(startIn)}`
-    const launcher = `try { Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList @('-NoExit','-NoProfile','-Command',${psQuote(inner)}); 'DH_LAUNCHED' } catch { Write-Error $_.Exception.Message; exit 1 }`
+    const args = ['-NoExit', ...(loadProfile === true ? [] : ['-NoProfile']), '-Command', inner].map(psQuote).join(',')
+    const launcher = `try { Start-Process -FilePath ${psQuote(exe)} -Verb RunAs -ArgumentList @(${args}); 'DH_LAUNCHED' } catch { Write-Error $_.Exception.Message; exit 1 }`
     const res = await this._cmd('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', launcher], { timeoutMs: 20000, trim: true })
     const launched = res?.code === 0 && String(res?.stdout ?? '').includes('DH_LAUNCHED')
     return launched

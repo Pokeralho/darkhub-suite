@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Image as ImageIcon, Loader2, Copy, UploadCloud, Clipboard, Check, X, RefreshCw } from '../components/icons';
+import { Image as ImageIcon, Loader2, Copy, UploadCloud, Clipboard, Check, X, RefreshCw, ScanText } from '../components/icons';
 import { useI18n } from '../i18n/I18nProvider';
 import PageHeader from '../components/ui/PageHeader';
 
@@ -10,7 +10,10 @@ export default function ImageTextExtractor() {
   const [extractedText, setExtractedText] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [lang, setLang] = useState<'eng+por' | 'eng' | 'por'>('eng+por');
+  const [lang, setLang] = useState('eng+por');
+  // Tesseract page segmentation mode (see ocr:extractText)
+  const [psm, setPsm] = useState(3);
+  const [confidence, setConfidence] = useState<number | null>(null);
   const [preprocess, setPreprocess] = useState(true);
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,7 +47,7 @@ export default function ImageTextExtractor() {
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [lang, preprocess]);
+  }, [lang, preprocess, psm]);
 
   const handleSelectImage = async () => {
     if (window.darkhub?.dialog?.selectFiles) {
@@ -120,8 +123,10 @@ export default function ImageTextExtractor() {
       const res = await window.darkhub.ocr.extractText({
         ...payload,
         lang,
-        preprocess
+        preprocess,
+        psm
       });
+      setConfidence(res.ok && res.text?.trim() ? Math.round(res.confidence) : null);
       if (res.ok) {
         setExtractedText(res.text || 'Nenhum texto detectado na imagem.');
       } else {
@@ -163,6 +168,15 @@ export default function ImageTextExtractor() {
     }).catch(() => {});
   };
 
+  const captureArea = async () => {
+    const r = await window.darkhub?.share?.grabRegion?.().catch(() => null);
+    if (!r?.ok || !r.dataUrl) return;
+    setImagePreview(r.dataUrl);
+    setImagePath(null);
+    setExtractedText('');
+    triggerOcr({ base64: r.dataUrl });
+  };
+
   const rerunOcr = () => {
     if (imagePath) triggerOcr({ imagePath });
     else if (imagePreview) triggerOcr({ base64: imagePreview });
@@ -190,6 +204,10 @@ export default function ImageTextExtractor() {
         subtitle={<>{t('ocr.subtitle', 'Extraia texto de imagens totalmente offline.')} <span className="dh-tag ml-1">tesseract</span></>}
         actions={
           <>
+            <button onClick={captureArea} className="dh-btn" title={t('ocr.captureHelp', 'Selecione um pedaço da tela (o DarkHub sai da frente) e o texto é lido na hora')}>
+              <ScanText size={16} className="text-zinc-400" />
+              {t('ocr.capture', 'Capturar área da tela')}
+            </button>
             <button onClick={handlePasteFromClipboard} className="dh-btn">
               <Clipboard size={16} className="text-zinc-400" />
               {t('ocr.pasteHint', 'Colar Screenshot (Ctrl+V)')}
@@ -208,12 +226,31 @@ export default function ImageTextExtractor() {
           <span className="dh-label">{t('ocr.language', 'Idioma')}</span>
           <select
             value={lang}
-            onChange={(e) => setLang(e.target.value as any)}
+            onChange={(e) => setLang(e.target.value)}
             className="dh-input"
           >
             <option value="eng+por">{t('ocr.langPorEng', 'Português + Inglês')}</option>
             <option value="por">{t('ocr.langPor', 'Apenas Português')}</option>
             <option value="eng">{t('ocr.langEng', 'Apenas Inglês')}</option>
+            <option value="spa+eng">{t('ocr.langSpa', 'Espanhol + Inglês')}</option>
+            <option value="fra+eng">{t('ocr.langFra', 'Francês + Inglês')}</option>
+            <option value="deu+eng">{t('ocr.langDeu', 'Alemão + Inglês')}</option>
+            <option value="ita+eng">{t('ocr.langIta', 'Italiano + Inglês')}</option>
+            <option value="rus+eng">{t('ocr.langRus', 'Russo + Inglês')}</option>
+            <option value="jpn+eng">{t('ocr.langJpn', 'Japonês + Inglês')}</option>
+            <option value="chi_sim+eng">{t('ocr.langChi', 'Chinês simplificado + Inglês')}</option>
+            <option value="kor+eng">{t('ocr.langKor', 'Coreano + Inglês')}</option>
+          </select>
+        </label>
+
+        <label className="flex items-center gap-2">
+          <span className="dh-label">{t('ocr.layout', 'Layout')}</span>
+          <select value={psm} onChange={(e) => setPsm(Number(e.target.value))} className="dh-input">
+            <option value={3}>{t('ocr.psm.auto', 'Automático')}</option>
+            <option value={4}>{t('ocr.psm.column', 'Uma coluna')}</option>
+            <option value={6}>{t('ocr.psm.block', 'Bloco único')}</option>
+            <option value={7}>{t('ocr.psm.line', 'Uma linha')}</option>
+            <option value={11}>{t('ocr.psm.sparse', 'Texto espalhado (prints, jogos)')}</option>
           </select>
         </label>
 
@@ -284,7 +321,14 @@ export default function ImageTextExtractor() {
         {/* Right: Extracted Text Workspace */}
         <div className="border border-zinc-800/80 rounded-xl bg-zinc-950 flex flex-col overflow-hidden">
           <div className="h-11 px-3 border-b border-zinc-800/80 flex items-center justify-between">
-            <h2 className="dh-section-title">{t('ocr.extractedTitle', 'Texto Reconhecido')}</h2>
+            <h2 className="dh-section-title">
+              {t('ocr.extractedTitle', 'Texto Reconhecido')}
+              {confidence != null && !isExtracting && (
+                <span className={`ml-2 text-[11px] font-normal ${confidence >= 80 ? 'text-emerald-400' : confidence >= 60 ? 'text-amber-300' : 'text-red-400'}`} title={t('ocr.confidenceHelp', 'Confiança média do reconhecimento. Abaixo de 60%, tente outro layout ou idioma.')}>
+                  {t('ocr.confidence', 'confiança {n}%').replace('{n}', String(confidence))}
+                </span>
+              )}
+            </h2>
             <button
               onClick={handleCopyText}
               disabled={!extractedText.trim()}

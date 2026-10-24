@@ -51,6 +51,20 @@ export function validateDownloadUrl(rawUrl) {
  * Splits [0,size) into pieces consumed by a pool of `connections` workers. Several pieces per
  * connection keep every connection busy until the end even if some pieces are slower.
  */
+/**
+ * Automatic connections by size: one is enough below 4 MB (parallel ranges only add handshakes); large files get
+ * more ranges in flight, up to 16, which saturates typical home links without tripping per-IP server limits.
+ */
+export function autoConnections(size) {
+  if (!Number.isFinite(size) || size <= 0) return 4
+  const MB = 1024 * 1024
+  if (size < 4 * MB) return 1
+  if (size < 32 * MB) return 4
+  if (size < 256 * MB) return 8
+  if (size < 2048 * MB) return 12
+  return 16
+}
+
 export function planPieces(size, connections) {
   if (!Number.isFinite(size) || size <= 0) return []
   const MIN = 512 * 1024

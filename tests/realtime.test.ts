@@ -153,3 +153,18 @@ describe('freshclam config', () => {
     expect(conf).not.toMatch(/NotifyClamd|Example/);
   });
 });
+
+describe('real-time smart mode', () => {
+  it('is on by default and never closes user programs, only Windows telemetry runners', async () => {
+    // @ts-ignore
+    const { normalize, effectiveRules, SMART_RULES } = await import('../electron/services/realtime/realtimeConfig.js');
+    const c = normalize({});
+    expect(c.optimizer.smart).toBe(true);
+    const closes = SMART_RULES.filter((r: any) => r.action === 'close').map((r: any) => r.name);
+    expect(closes).toEqual(['compattelrunner.exe', 'devicecensus.exe']);
+    // user rules override the built-in list, and smart mode off leaves only the user's
+    const mine = effectiveRules({ smart: true, rules: [{ name: 'onedrive.exe', action: 'close' }] });
+    expect(mine.find((r: any) => r.name === 'onedrive.exe').action).toBe('close');
+    expect(effectiveRules({ smart: false, rules: [] })).toEqual([]);
+  });
+});

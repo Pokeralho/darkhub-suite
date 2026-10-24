@@ -185,6 +185,83 @@ const darkhubApi = {
   ocr: {
     extractText: (payload) => ipcRenderer.invoke('ocr:extractText', payload)
   },
+  usb: {
+    list: () => ipcRenderer.invoke('usb:list'),
+    setDeviceEnabled: (payload) => ipcRenderer.invoke('usb:setDeviceEnabled', payload),
+    keepDisabled: (payload) => ipcRenderer.invoke('usb:keepDisabled', payload),
+    setStorageBlocked: (payload) => ipcRenderer.invoke('usb:setStorageBlocked', payload),
+    setWriteProtect: (payload) => ipcRenderer.invoke('usb:setWriteProtect', payload),
+    setSelectiveSuspend: (payload) => ipcRenderer.invoke('usb:setSelectiveSuspend', payload),
+    eject: (payload) => ipcRenderer.invoke('usb:eject', payload)
+  },
+  restore: {
+    status: () => ipcRenderer.invoke('restore:status'),
+    install: (payload) => ipcRenderer.invoke('restore:install', payload)
+  },
+  overlay: {
+    status: () => ipcRenderer.invoke('overlay:status'),
+    show: (payload) => ipcRenderer.invoke('overlay:show', payload),
+    hide: () => ipcRenderer.invoke('overlay:hide'),
+    setSettings: (payload) => ipcRenderer.invoke('overlay:setSettings', payload),
+    processes: () => ipcRenderer.invoke('overlay:processes'),
+    pickLogFolder: () => ipcRenderer.invoke('overlay:pickLogFolder'),
+    onEvent: (callback) => {
+      const handler = (_e, data) => callback(data)
+      ipcRenderer.on('overlay:event', handler)
+      return () => ipcRenderer.removeListener('overlay:event', handler)
+    }
+  },
+  saves: {
+    scan: (payload) => ipcRenderer.invoke('saves:scan', payload),
+    backup: (payload) => ipcRenderer.invoke('saves:backup', payload),
+    backupAll: () => ipcRenderer.invoke('saves:backupAll'),
+    versions: (payload) => ipcRenderer.invoke('saves:versions', payload),
+    previewRestore: (payload) => ipcRenderer.invoke('saves:previewRestore', payload),
+    restore: (payload) => ipcRenderer.invoke('saves:restore', payload),
+    removeVersion: (payload) => ipcRenderer.invoke('saves:removeVersion', payload),
+    setSettings: (payload) => ipcRenderer.invoke('saves:setSettings', payload),
+    pickFolder: () => ipcRenderer.invoke('saves:pickFolder'),
+    addCustom: (payload) => ipcRenderer.invoke('saves:addCustom', payload),
+    removeCustom: (payload) => ipcRenderer.invoke('saves:removeCustom', payload),
+    openFolder: (payload) => ipcRenderer.invoke('saves:openFolder', payload),
+    onEvent: (callback) => {
+      const handler = (_e, data) => callback(data)
+      ipcRenderer.on('saves:event', handler)
+      return () => ipcRenderer.removeListener('saves:event', handler)
+    }
+  },
+  maint: {
+    state: () => ipcRenderer.invoke('maint:state'),
+    setTask: (payload) => ipcRenderer.invoke('maint:setTask', payload),
+    runNow: (payload) => ipcRenderer.invoke('maint:runNow', payload),
+    onEvent: (callback) => {
+      const handler = (_e, data) => callback(data)
+      ipcRenderer.on('maint:event', handler)
+      return () => ipcRenderer.removeListener('maint:event', handler)
+    }
+  },
+  bench: {
+    run: (payload) => ipcRenderer.invoke('bench:run', payload),
+    cancel: () => ipcRenderer.invoke('bench:cancel'),
+    history: () => ipcRenderer.invoke('bench:history'),
+    compare: (payload) => ipcRenderer.invoke('bench:compare', payload),
+    remove: (payload) => ipcRenderer.invoke('bench:remove', payload),
+    onEvent: (callback) => {
+      const handler = (_e, data) => callback(data)
+      ipcRenderer.on('bench:event', handler)
+      return () => ipcRenderer.removeListener('bench:event', handler)
+    }
+  },
+  startup: {
+    list: () => ipcRenderer.invoke('startup:list'),
+    setEnabled: (payload) => ipcRenderer.invoke('startup:setEnabled', payload),
+    undo: (payload) => ipcRenderer.invoke('startup:undo', payload)
+  },
+  code: {
+    runtimes: (payload) => ipcRenderer.invoke('code:runtimes', payload),
+    run: (payload) => ipcRenderer.invoke('code:run', payload),
+    cancel: () => ipcRenderer.invoke('code:cancel')
+  },
   vault: {
     status: () => ipcRenderer.invoke('vault:status'),
     setAutoLockMinutes: (minutes) => ipcRenderer.invoke('vault:setAutoLockMinutes', minutes),
@@ -201,7 +278,22 @@ const darkhubApi = {
     changeMasterPassword: (payload) => ipcRenderer.invoke('vault:changeMasterPassword', payload),
     regenerateRecoveryWords: () => ipcRenderer.invoke('vault:regenerateRecoveryWords'),
     export: (payload) => ipcRenderer.invoke('vault:export', payload),
-    import: (payload) => ipcRenderer.invoke('vault:import', payload)
+    import: (payload) => ipcRenderer.invoke('vault:import', payload),
+    transferSend: () => ipcRenderer.invoke('vault:transferSend'),
+    transferCancel: () => ipcRenderer.invoke('vault:transferCancel'),
+    transferReceive: (payload) => ipcRenderer.invoke('vault:transferReceive', payload),
+    // browser extension bridge
+    bridgeStatus: () => ipcRenderer.invoke('vaultx:bridgeStatus'),
+    registerBrowserHost: (browser) => ipcRenderer.invoke('vaultx:registerHost', browser),
+    unregisterBrowserHost: (browser) => ipcRenderer.invoke('vaultx:unregisterHost', browser),
+    revokeBrowserClient: (clientId) => ipcRenderer.invoke('vaultx:revokeClient', clientId),
+    openExtensionFolder: () => ipcRenderer.invoke('vaultx:openExtensionFolder'),
+    setBridgeLanguage: (lang) => ipcRenderer.invoke('vaultx:setLanguage', lang),
+    onBridgeChanged: (callback) => {
+      const listener = () => callback()
+      ipcRenderer.on('vaultx:changed', listener)
+      return () => ipcRenderer.removeListener('vaultx:changed', listener)
+    }
   },
   security: {
     scanProcesses: () => ipcRenderer.invoke('security:scanProcesses'),
@@ -223,7 +315,19 @@ const darkhubApi = {
     enableRansomwareArmor: () => ipcRenderer.invoke('security:enableRansomwareArmor'),
     getCommunityRules: () => ipcRenderer.invoke('security:getCommunityRules'),
     importCommunityRules: (payload) => ipcRenderer.invoke('security:importCommunityRules', payload),
-    resetCommunityRules: () => ipcRenderer.invoke('security:resetCommunityRules')
+    resetCommunityRules: () => ipcRenderer.invoke('security:resetCommunityRules'),
+    advStatus: () => ipcRenderer.invoke('security:advStatus'),
+    advSetFeedEnabled: (payload) => ipcRenderer.invoke('security:advSetFeedEnabled', payload),
+    advUpdateFeeds: (payload) => ipcRenderer.invoke('security:advUpdateFeeds', payload),
+    advApplyHosts: () => ipcRenderer.invoke('security:advApplyHosts'),
+    advRestoreHosts: () => ipcRenderer.invoke('security:advRestoreHosts'),
+    advApplyFirewall: () => ipcRenderer.invoke('security:advApplyFirewall'),
+    advRestoreFirewall: () => ipcRenderer.invoke('security:advRestoreFirewall'),
+    advApplyHashes: () => ipcRenderer.invoke('security:advApplyHashes'),
+    advRestoreHashes: () => ipcRenderer.invoke('security:advRestoreHashes'),
+    advHardeningStatus: () => ipcRenderer.invoke('security:advHardeningStatus'),
+    advHardeningApply: (payload) => ipcRenderer.invoke('security:advHardeningApply', payload),
+    advHardeningRestore: (payload) => ipcRenderer.invoke('security:advHardeningRestore', payload)
   },
   fs: {
     readFile: (path) => ipcRenderer.invoke('fs:readFile', path),
@@ -367,6 +471,12 @@ const darkhubApi = {
     remove: (payload) => ipcRenderer.invoke('metadata:remove', payload),
     update: (payload) => ipcRenderer.invoke('metadata:update', payload)
   },
+  metax: {
+    read: (path) => ipcRenderer.invoke('metax:read', path),
+    write: (payload) => ipcRenderer.invoke('metax:write', payload),
+    setFileProps: (payload) => ipcRenderer.invoke('metax:setFileProps', payload),
+    removeStream: (payload) => ipcRenderer.invoke('metax:removeStream', payload)
+  },
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url)
   },
@@ -382,6 +492,7 @@ const darkhubApi = {
     qr: (text) => ipcRenderer.invoke('share:qr', { text }),
     capture: () => ipcRenderer.invoke('share:capture'),
     captureRegion: () => ipcRenderer.invoke('share:captureRegion'),
+    grabRegion: () => ipcRenderer.invoke('share:grabRegion'),
     openFolder: () => ipcRenderer.invoke('share:openFolder'),
     recentShots: () => ipcRenderer.invoke('share:recentShots'),
     onEvent: (callback) => {
@@ -438,14 +549,45 @@ const darkhubApi = {
     detect: () => ipcRenderer.invoke('driver:detect'),
     openOfficial: (payload) => ipcRenderer.invoke('driver:openOfficial', payload),
     cameraStatus: () => ipcRenderer.invoke('driver:cameraStatus'),
-    repairCamera: () => ipcRenderer.invoke('driver:repairCamera')
+    repairCamera: () => ipcRenderer.invoke('driver:repairCamera'),
+    scanMissing: () => ipcRenderer.invoke('driver:scanMissing'),
+    findDrivers: (payload) => ipcRenderer.invoke('driver:findDrivers', payload),
+    install: (payload) => ipcRenderer.invoke('driver:install', payload),
+    onInstallEvent: (callback) => {
+      const listener = (_event, payload) => callback(payload)
+      ipcRenderer.on('driver:installEvent', listener)
+      return () => ipcRenderer.removeListener('driver:installEvent', listener)
+    }
   },
   powershell: {
     getPolicies: () => ipcRenderer.invoke('powershell:getPolicies'),
     listScripts: () => ipcRenderer.invoke('powershell:listScripts'),
     getSignature: (payload) => ipcRenderer.invoke('powershell:getSignature', payload),
     runScript: (payload) => ipcRenderer.invoke('powershell:runScript', payload),
-    openElevatedTerminal: (payload) => ipcRenderer.invoke('powershell:openElevatedTerminal', payload)
+    openElevatedTerminal: (payload) => ipcRenderer.invoke('powershell:openElevatedTerminal', payload),
+    previewTool: (payload) => ipcRenderer.invoke('powershell:previewTool', payload),
+    runTool: (payload) => ipcRenderer.invoke('powershell:runTool', payload),
+    pickFolder: (payload) => ipcRenderer.invoke('powershell:pickFolder', payload),
+    pickSavePath: (payload) => ipcRenderer.invoke('powershell:pickSavePath', payload),
+    exportResult: (payload) => ipcRenderer.invoke('powershell:export', payload),
+    revealFile: (payload) => ipcRenderer.invoke('powershell:revealFile', payload),
+    openReport: (payload) => ipcRenderer.invoke('powershell:openReport', payload),
+    wifiKey: (payload) => ipcRenderer.invoke('powershell:wifiKey', payload),
+    hostsRead: () => ipcRenderer.invoke('powershell:hostsRead'),
+    hostsBackup: (payload) => ipcRenderer.invoke('powershell:hostsBackup', payload),
+    hostsPreview: (payload) => ipcRenderer.invoke('powershell:hostsPreview', payload),
+    hostsWrite: (payload) => ipcRenderer.invoke('powershell:hostsWrite', payload),
+    customStart: (payload) => ipcRenderer.invoke('powershell:customStart', payload),
+    customStop: () => ipcRenderer.invoke('powershell:customStop'),
+    customStatus: () => ipcRenderer.invoke('powershell:customStatus'),
+    onCustomEvent: (callback) => {
+      const listener = (_event, payload) => callback(payload)
+      ipcRenderer.on('powershell:customEvent', listener)
+      return () => ipcRenderer.removeListener('powershell:customEvent', listener)
+    },
+    snippetsList: () => ipcRenderer.invoke('powershell:snippetsList'),
+    snippetSave: (payload) => ipcRenderer.invoke('powershell:snippetSave', payload),
+    snippetDelete: (payload) => ipcRenderer.invoke('powershell:snippetDelete', payload)
   },
   discord: {
     sendMessage: (payload) => ipcRenderer.invoke('discord:sendMessage', payload),
@@ -465,7 +607,15 @@ const darkhubApi = {
     dnsInfo: () => ipcRenderer.invoke('network:dnsInfo'),
     tracert: (host) => ipcRenderer.invoke('network:tracert', host),
     adapterInfo: () => ipcRenderer.invoke('network:adapterInfo'),
-    renewIp: () => ipcRenderer.invoke('network:renewIp')
+    renewIp: () => ipcRenderer.invoke('network:renewIp'),
+    latencyPresets: () => ipcRenderer.invoke('network:latencyPresets'),
+    probe: (payload) => ipcRenderer.invoke('network:probe', payload),
+    traceHops: (payload) => ipcRenderer.invoke('network:traceHops', payload),
+    bufferbloat: (payload) => ipcRenderer.invoke('network:bufferbloat', payload),
+    mtuDiscover: (payload) => ipcRenderer.invoke('network:mtuDiscover', payload),
+    latencyState: () => ipcRenderer.invoke('network:latencyState'),
+    applyLatencyTweak: (payload) => ipcRenderer.invoke('network:applyLatencyTweak', payload),
+    restoreLatencyTweak: (payload) => ipcRenderer.invoke('network:restoreLatencyTweak', payload)
   },
 }
 

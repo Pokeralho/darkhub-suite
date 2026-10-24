@@ -266,5 +266,9 @@ if ($u) { $cmd = if ($u.QuietUninstallString) { $u.QuietUninstallString } else {
       })
     }
   }
+
+  // features added in 0.8 (startup, USB, maintenance, saves, benchmark, security, network, drivers, overlay)
+  const { runMutations2 } = await import('./devSelfTestMutate2.js')
+  await runMutations2(call, step, okOf)
   return rows
 }

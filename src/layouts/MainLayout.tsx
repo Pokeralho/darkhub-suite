@@ -6,7 +6,7 @@ import {
   Edit3, MousePointerClick, LibraryBig, Gamepad2, Film,
   Download, Fingerprint, Network, Code, ChevronLeft, ChevronRight,
   Cpu, Crosshair, Activity, Flame, Sparkles, Minus, Square, X, LifeBuoy, Gauge, UploadCloud,
-  MonitorCog, Terminal, DarkHubMark
+  MonitorCog, Terminal, DarkHubMark, Archive, Layers, Rocket, Usb, History
 } from '../components/icons';
 import { useI18n } from '../i18n/I18nProvider';
 
@@ -87,7 +87,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
         { id: 'pge-portable', label: 'PGE Portable', icon: Gamepad2 },
         { id: 'optimizer', label: t('nav.optimizer', 'System Optimizer'), icon: Zap },
         { id: 'ultra-latency', label: t('nav.ultralatency', 'Ultra Low Latency'), icon: Flame },
-        { id: 'dll-injector', label: t('nav.dllinjector', 'DLL Injector'), icon: Crosshair }
+        { id: 'dll-injector', label: t('nav.dllinjector', 'DLL Injector'), icon: Crosshair },
+        { id: 'benchmark', label: t('nav.benchmark', 'Before/after benchmark'), icon: Gauge },
+        { id: 'overlay', label: t('nav.overlay', 'In-game overlay'), icon: Layers },
+        { id: 'savebackup', label: t('nav.savebackup', 'Save backup'), icon: Archive }
       ]
     },
     {
@@ -96,7 +99,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
         { id: 'monitor', label: t('nav.monitor', 'System Monitor'), icon: Monitor },
         { id: 'driver', label: t('nav.driver', 'Driver Center'), icon: MonitorCog },
         { id: 'networktools', label: t('nav.networktools', 'Network & Latency'), icon: Network },
-        { id: 'setuphub', label: t('nav.setuphub', 'Post-Install Hub'), icon: Zap }
+        { id: 'setuphub', label: t('nav.setuphub', 'Post-Install Hub'), icon: Zap },
+        { id: 'maintenance', label: t('nav.maintenance', 'Scheduled maintenance'), icon: History },
+        { id: 'usb', label: t('nav.usb', 'USB ports'), icon: Usb },
+        { id: 'startup', label: t('nav.startup', 'Startup manager'), icon: Rocket }
       ]
     },
     {

@@ -14,6 +14,32 @@ export function normalizeRule(rule) {
   return { name: name.toLowerCase(), action: rule?.action === 'close' ? 'close' : 'lower' }
 }
 
+/**
+ * Smart mode: background work nobody looks at. Updaters and helper apps only lose CPU priority (they keep running);
+ * only Windows' compatibility telemetry runners, which restart on their own schedule, are closed. The user's own
+ * programs are never closed by smart mode; their own rules override these.
+ */
+export const SMART_RULES = Object.freeze([
+  { name: 'compattelrunner.exe', action: 'close' },
+  { name: 'devicecensus.exe', action: 'close' },
+  { name: 'microsoftedgeupdate.exe', action: 'lower' },
+  { name: 'googleupdate.exe', action: 'lower' },
+  { name: 'adobearm.exe', action: 'lower' },
+  { name: 'jusched.exe', action: 'lower' },
+  { name: 'onedrive.exe', action: 'lower' },
+  { name: 'phoneexperiencehost.exe', action: 'lower' },
+  { name: 'widgets.exe', action: 'lower' },
+  { name: 'gamebarpresencewriter.exe', action: 'lower' },
+  { name: 'searchapp.exe', action: 'lower' }
+])
+
+/** Rules the optimizer applies: smart mode's list, overridden by the user's own rules. Pure. */
+export function effectiveRules(optimizer) {
+  const byName = new Map((optimizer?.smart ? SMART_RULES : []).map((r) => [r.name, r]))
+  for (const r of optimizer?.rules || []) byName.set(r.name, r)
+  return [...byName.values()]
+}
+
 export function normalizeFolder(p) {
   const s = String(p ?? '').trim()
   return path.isAbsolute(s) && s.length < 260 ? path.normalize(s) : null
@@ -23,6 +49,8 @@ export function defaults(home = '') {
   return {
     optimizer: {
       enabled: false,
+      // smart mode: built-in list of background updaters/telemetry (see SMART_RULES)
+      smart: true,
       memory: true,
       // act when available memory drops below this share of the total
       memoryThresholdPct: 15,
@@ -55,6 +83,7 @@ export function normalize(input = {}, home = '') {
   return {
     optimizer: {
       enabled: o.enabled === true,
+      smart: o.smart !== false,
       memory: o.memory !== false,
       memoryThresholdPct: clamp(o.memoryThresholdPct, 5, 40, d.optimizer.memoryThresholdPct),
       minProcessMb: clamp(o.minProcessMb, 50, 2000, d.optimizer.minProcessMb),

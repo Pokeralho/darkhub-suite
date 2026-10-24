@@ -35,6 +35,12 @@ const DllInjector = lazy(() => import('./pages/DllInjector'));
 const FramePacer = lazy(() => import('./pages/FramePacer'));
 const Home = lazy(() => import('./pages/Home'));
 const SpaceSniffer = lazy(() => import('./pages/SpaceSniffer'));
+const Maintenance = lazy(() => import('./pages/Maintenance'));
+const UsbControl = lazy(() => import('./pages/UsbControl'));
+const StartupManager = lazy(() => import('./pages/StartupManager'));
+const Benchmark = lazy(() => import('./pages/Benchmark'));
+const GameOverlay = lazy(() => import('./pages/GameOverlay'));
+const SaveBackup = lazy(() => import('./pages/SaveBackup'));
 // Dev-only IPC trace panel (tree-shaken out of production builds).
 const DevTracePanel = import.meta.env.DEV ? lazy(() => import('./components/DevTracePanel')) : null;
 const IconSheet = import.meta.env.DEV ? lazy(() => import('./components/icons/IconSheet')) : null;
@@ -191,7 +197,7 @@ ${componentStack}` : ''}`
       case 'devtools':
         return <DevTools />;
       case 'setuphub':
-        return <SetupHub />;
+        return <SetupHub onNavigate={(p: string) => setCurrentPage(p)} />;
       case 'spacesniffer':
         return <SpaceSniffer />;
       case 'dll-injector':
@@ -199,6 +205,18 @@ ${componentStack}` : ''}`
       case 'dev-icons':
         if (IconSheet) return <IconSheet />;
         return <Home onNavigate={(p: string) => setCurrentPage(p)} />;
+      case 'savebackup':
+        return <SaveBackup />;
+      case 'overlay':
+        return <GameOverlay />;
+      case 'benchmark':
+        return <Benchmark />;
+      case 'startup':
+        return <StartupManager />;
+      case 'usb':
+        return <UsbControl />;
+      case 'maintenance':
+        return <Maintenance />;
       case 'settings':
         return <SettingsPage />;
       default:

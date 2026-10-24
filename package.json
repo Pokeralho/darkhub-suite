@@ -13,7 +13,7 @@
     "dev:legacy": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\"",
     "dev:renderer": "vite",
     "dev:electron": "wait-on http://localhost:5173 && electron .",
-    "build:native": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.LatencyEngine.exe electron\\services\\DarkHub.LatencyEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.FrameLimiter.exe electron\\services\\DarkHub.FrameLimiter.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.ClickEngine.exe electron\\services\\DarkHub.ClickEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.SensorDaemon.exe electron\\services\\DarkHub.SensorDaemon.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.DiskScan.exe electron\\services\\DarkHub.DiskScan.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\hwsensors\\DarkHub.HwSensors.exe /r:electron\\services\\hwsensors\\LibreHardwareMonitorLib.dll /r:System.Management.dll electron\\services\\hwsensors\\DarkHub.HwSensors.cs\"",
+    "build:native": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.LatencyEngine.exe electron\\services\\DarkHub.LatencyEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.FrameLimiter.exe electron\\services\\DarkHub.FrameLimiter.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.ClickEngine.exe electron\\services\\DarkHub.ClickEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.SensorDaemon.exe electron\\services\\DarkHub.SensorDaemon.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.DiskScan.exe electron\\services\\DarkHub.DiskScan.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\hwsensors\\DarkHub.HwSensors.exe /r:electron\\services\\hwsensors\\LibreHardwareMonitorLib.dll /r:System.Management.dll electron\\services\\hwsensors\\DarkHub.HwSensors.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:anycpu /optimize+ /out:electron\\services\\DarkHub.VaultBridgeHost.exe electron\\services\\DarkHub.VaultBridgeHost.cs\"",
     "build:renderer": "vite build",
     "build:pacer": "cargo build --release --manifest-path native_pacer/Cargo.toml && powershell -NoProfile -Command \"Copy-Item native_pacer/target/release/DarkHub_PacerHook.dll electron/services/DarkHub.PacerHook.dll -Force\"",
     "test:pacer": "cargo test --manifest-path native_pacer/Cargo.toml -- --test-threads=1",
@@ -37,11 +37,13 @@
     "exifr": "^7.1.3",
     "exiftool-vendored": "^30.3.0",
     "ffmpeg-static": "^5.2.0",
+    "js-yaml": "^4.1.1",
     "pdf-parse": "^2.4.5",
     "qrcode": "1.5.4",
     "sharp": "^0.34.3",
     "systeminformation": "^5.27.7",
-    "tesseract.js": "^7.0.0"
+    "tesseract.js": "^7.0.0",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@fontsource-variable/geist": "^5.3.0",
@@ -100,7 +102,8 @@
       "electron/services/fsr4_rdna2/**",
       "node_modules/sharp/**",
       "node_modules/@img/**",
-      "node_modules/ffmpeg-static/**"
+      "node_modules/ffmpeg-static/**",
+      "node_modules/exiftool-vendored.exe/**"
     ],
     "extraResources": [
       {
@@ -111,6 +114,14 @@
           "!**/Static/**",
           "!**/Static.zip"
         ]
+      },
+      {
+        "from": "browser-extension",
+        "to": "browser-extension"
+      },
+      {
+        "from": "build/deps",
+        "to": "deps"
       }
     ],
     "win": {
@@ -132,7 +143,8 @@
       "uninstallerIcon": "build/icon.ico",
       "uninstallDisplayName": "DarkHub Suite",
       "include": "build/installer.nsh",
-      "differentialPackage": false
+      "differentialPackage": false,
+      "perMachine": true
     },
     "portable": {
       "artifactName": "${productName} ${version}-portable.${ext}",

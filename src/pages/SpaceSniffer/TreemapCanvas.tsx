@@ -40,9 +40,17 @@ interface Props {
   onSize?: (w: number, h: number) => void;
   dim?: boolean;
   filesWord?: string;
+  /** Overrides the default fill (folders ink, files by type), e.g. colour by category. */
+  fillOf?: (node: DiskMapNode, depth: number) => string | null;
+  /** Items drawn faded (legend highlight). */
+  dimOf?: (node: DiskMapNode) => boolean;
+  /** Items drawn with a fine "locked" stripe (system). */
+  lockedOf?: (node: DiskMapNode) => boolean;
+  /** Extra tooltip line: category name, swatch and an optional hint. */
+  tipOf?: (node: DiskMapNode) => { label: string; color: string; hint?: string; warn?: boolean } | null;
 }
 
-export default function TreemapCanvas({ tree, minPx, selectedId, labelFor, onSelect, onOpen, onSize, dim, filesWord = 'files' }: Props) {
+export default function TreemapCanvas({ tree, minPx, selectedId, labelFor, onSelect, onOpen, onSize, dim, filesWord = 'files', fillOf, dimOf, lockedOf, tipOf }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const baseRef = useRef<HTMLCanvasElement | null>(null);
@@ -76,8 +84,15 @@ export default function TreemapCanvas({ tree, minPx, selectedId, labelFor, onSel
     ctx.textBaseline = 'middle';
     for (const c of cells) {
       const { node, x, y, w, h, depth } = c;
-      ctx.fillStyle = fill(node, depth);
+      ctx.fillStyle = fillOf?.(node, depth) || fill(node, depth);
       ctx.fillRect(x, y, w, h);
+      if (lockedOf?.(node) && !c.open) {
+        // fine horizontal stripes: protected system data
+        ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+        ctx.fillStyle = 'oklch(1 0 0 / 0.045)';
+        for (let s = y + 2; s < y + h; s += 4) ctx.fillRect(x, s, w, 1);
+        ctx.restore();
+      }
       if (node.kind === 'free' || node.kind === 'rest' || node.kind === 'unknown') {
         // quiet diagonal hatch: not real files
         ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
@@ -89,8 +104,15 @@ export default function TreemapCanvas({ tree, minPx, selectedId, labelFor, onSel
       ctx.strokeStyle = 'oklch(0.158 0.010 255)';
       ctx.lineWidth = 1;
       ctx.strokeRect(x + 0.5, y + 0.5, Math.max(0, w - 1), Math.max(0, h - 1));
+      const faded = dimOf?.(node) ?? false;
+      if (faded) {
+        // children are drawn after their parent, so a matching child of a faded folder still shows in full colour
+        ctx.fillStyle = 'oklch(0.158 0.010 255 / 0.72)';
+        ctx.fillRect(x, y, w, c.open ? HEADER : h);
+        if (c.open) { ctx.fillRect(x, y + HEADER, 2, h - HEADER); ctx.fillRect(x + w - 2, y + HEADER, 2, h - HEADER); ctx.fillRect(x, y + h - 2, w, 2); }
+      }
 
-      if (w > 34 && h > 14) {
+      if (w > 34 && h > 14 && !(faded && !c.open)) {
         const label = labelFor(node);
         const sizeText = formatBytes(node.size);
         ctx.font = '500 11px Geist Variable, Geist, system-ui, sans-serif';
@@ -121,7 +143,7 @@ export default function TreemapCanvas({ tree, minPx, selectedId, labelFor, onSel
         }
       }
     }
-  }, [cells, size, labelFor]);
+  }, [cells, size, labelFor, fillOf, dimOf, lockedOf]);
 
   // Composite: static layer + hover/selection outlines.
   useEffect(() => {
@@ -146,7 +168,7 @@ export default function TreemapCanvas({ tree, minPx, selectedId, labelFor, onSel
       ctx.strokeStyle = 'oklch(0.975 0.004 255 / 0.85)'; ctx.lineWidth = 1;
       ctx.strokeRect(hover.cell.x + 0.5, hover.cell.y + 0.5, Math.max(0, hover.cell.w - 1), Math.max(0, hover.cell.h - 1));
     }
-  }, [cells, size, hover, selectedId]);
+  }, [cells, size, hover, selectedId, labelFor, fillOf, dimOf, lockedOf]); // same inputs as the static layer, so a recolour shows at once
 
   const pick = (e: React.MouseEvent) => {
     const r = canvasRef.current?.getBoundingClientRect();
@@ -157,6 +179,7 @@ export default function TreemapCanvas({ tree, minPx, selectedId, labelFor, onSel
   };
 
   const hn = hover?.cell.node;
+  const tip = hn && tipOf ? tipOf(hn) : null;
   const tipLeft = hover ? Math.min(hover.x + 14, Math.max(0, size.w - 260)) : 0;
   const tipTop = hover ? (hover.y + 90 > size.h ? hover.y - 70 : hover.y + 16) : 0;
 
@@ -180,6 +203,12 @@ export default function TreemapCanvas({ tree, minPx, selectedId, labelFor, onSel
             {tree && tree.size > 0 ? <span className="text-zinc-500">{((hn.size / tree.size) * 100).toFixed(1)}%</span> : null}
             {hn.kind === 'dir' && hn.files ? <span className="text-zinc-500 truncate">{hn.files.toLocaleString()} {filesWord}</span> : null}
           </div>
+          {tip ? (
+            <div className="mt-1 text-[11.5px]">
+              <span className="inline-flex items-center gap-1.5 text-zinc-300"><span className="w-2 h-2 rounded-sm" style={{ background: tip.color }} />{tip.label}</span>
+              {tip.hint ? <div className={`mt-0.5 ${tip.warn ? 'text-amber-300/90' : 'text-zinc-500'}`}>{tip.hint}</div> : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

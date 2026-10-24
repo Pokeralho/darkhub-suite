@@ -8,8 +8,9 @@ interface GameEditorModalProps {
   game: Game
   onSave: (game: Game) => void
   onCancel: () => void
-  onPickExe: () => void
-  onPickWorkingDir: () => void
+  onPickExe: (current: Game) => Promise<Partial<Game> | null>
+  onPickWorkingDir: (current: Game) => Promise<Partial<Game> | null>
+  error?: string | null
   onRemove?: () => void
 }
 
@@ -19,7 +20,8 @@ export function GameEditorModal({
   onCancel,
   onPickExe,
   onPickWorkingDir,
-  onRemove
+  onRemove,
+  error
 }: GameEditorModalProps) {
   const { t } = useI18n()
   const [editing, setEditing] = useState<Game>(initialGame)
@@ -73,6 +75,11 @@ export function GameEditorModal({
     const defaultId = editing.defaultProfileId === activeProfileId ? next[0]?.id : editing.defaultProfileId
     setEditing({ ...editing, profiles: next, defaultProfileId: defaultId })
     setActiveProfileId(defaultId || next[0]?.id)
+  }
+
+  const pick = async (picker: (current: Game) => Promise<Partial<Game> | null>) => {
+    const patch = await picker(editing).catch(() => null)
+    if (patch) setEditing(prev => ({ ...prev, ...patch }))
   }
 
   const handleSave = () => {
@@ -136,7 +143,7 @@ export function GameEditorModal({
                       onChange={(e) => setEditing({ ...editing, exePath: e.target.value })}
                       className="dh-input flex-1 min-w-0 font-mono"
                     />
-                    <button onClick={onPickExe} type="button" className="dh-btn px-2.5">
+                    <button onClick={() => pick(onPickExe)} type="button" className="dh-btn px-2.5">
                       <FolderOpen size={14} />
                     </button>
                   </div>
@@ -149,7 +156,7 @@ export function GameEditorModal({
                       onChange={(e) => setEditing({ ...editing, workingDir: e.target.value })}
                       className="dh-input flex-1 min-w-0 font-mono"
                     />
-                    <button onClick={onPickWorkingDir} type="button" className="dh-btn px-2.5">
+                    <button onClick={() => pick(onPickWorkingDir)} type="button" className="dh-btn px-2.5">
                       <FolderOpen size={14} />
                     </button>
                   </div>
@@ -345,6 +352,7 @@ export function GameEditorModal({
               </button>
             )}
           </div>
+          {error && <p role="alert" className="flex-1 min-w-0 px-3 text-[12px] text-red-300 truncate" title={error}>{error}</p>}
           <div className="flex gap-2">
             <button
               type="button"

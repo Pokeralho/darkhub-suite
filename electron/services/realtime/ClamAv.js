@@ -1,5 +1,6 @@
-// ClamAV (Cisco Talos, GPL-2.0) as an optional scan engine. DarkHub never ships its binaries: they come from the
-// official package (winget Cisco.ClamAV) and the signatures from the official mirror through freshclam.
+// ClamAV (Cisco Talos, GPL-2.0) as an optional scan engine. DarkHub never ships its binaries: the setup (build/deps/
+// install-deps.ps1) or the app downloads the official MSI pinned below, and the signatures come from the official
+// mirror through freshclam.
 // No clamd daemon (it keeps ~1 GB of signatures resident): clamscan runs on demand at low priority, one batch of files
 // per run, so the signatures are loaded once per batch and released right after.
 import cp from 'node:child_process'
@@ -8,6 +9,13 @@ import os from 'node:os'
 import path from 'node:path'
 
 const FOUND_RE = /^(.*): (.+) FOUND$/
+
+/** Official release, same pin as build/deps/install-deps.ps1. The MSI is not Authenticode-signed: the hash is the check. */
+export const CLAMAV = Object.freeze({
+  version: '1.5.4',
+  url: 'https://github.com/Cisco-Talos/clamav/releases/download/clamav-1.5.4/clamav-1.5.4.win.x64.msi',
+  sha256: 'a025fa23a4b9d64fce448d5a211afcf30dc26ba6528186e6223d1b945f9d95d6'
+})
 
 /** Detections from `clamscan --infected --no-summary` output: [{file, signature}]. Pure. */
 export function parseClamscan(stdout) {
@@ -80,8 +88,18 @@ export class ClamAv {
 
   async install() {
     if (this.clamscan) return { ok: true }
-    const r = await run('winget', ['install', '-e', '--id', 'Cisco.ClamAV', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity'], { timeoutMs: 15 * 60000, lowPriority: false })
-    return this.clamscan ? { ok: true } : { ok: false, error: (r.stderr || r.stdout || `winget exit ${r.code}`).trim().slice(-300) }
+    // the pinned official MSI (works without winget, e.g. on DarkOS); DarkHub runs as administrator, so msiexec /qn is enough
+    const { downloadToFile } = await import('../SecureDownload.js')
+    const msi = path.join(os.tmpdir(), `darkhub-clamav-${CLAMAV.version}.msi`)
+    try {
+      await downloadToFile(CLAMAV.url, msi, { expectedSha256: CLAMAV.sha256, maxBytes: 400 * 1024 * 1024, timeoutMs: 30 * 60000 })
+      const r = await run('msiexec.exe', ['/i', msi, '/qn', '/norestart'], { timeoutMs: 15 * 60000, lowPriority: false })
+      return this.clamscan ? { ok: true } : { ok: false, error: `msiexec exit ${r.code}` }
+    } catch (e) {
+      return { ok: false, error: String(e?.message ?? e) }
+    } finally {
+      try { fs.rmSync(msi, { force: true }) } catch { /* in use */ }
+    }
   }
 
   /** Downloads or refreshes the official signatures (~110 MB the first time, then small daily diffs). */

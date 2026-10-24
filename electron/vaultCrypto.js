@@ -147,12 +147,17 @@ export async function scryptKey(password, saltB64, params) {
   const r = params?.r ?? 8
   const p = params?.p ?? 1
 
+  // Refuse absurd parameters from a tampered file (memory/CPU exhaustion) and plain-weak ones.
+  if (!Number.isInteger(N) || N < 1024 || N > 2 ** 20 || (N & (N - 1)) !== 0) throw new Error('Invalid KDF parameters')
+  if (!Number.isInteger(r) || r < 1 || r > 32 || !Number.isInteger(p) || p < 1 || p > 16) throw new Error('Invalid KDF parameters')
+  if (keyLen !== 32 || salt.length < 16) throw new Error('Invalid KDF parameters')
+
   return await new Promise((resolve, reject) => {
     crypto.scrypt(
       password,
       salt,
       keyLen,
-      { N, r, p, maxmem: 128 * 1024 * 1024 },
+      { N, r, p, maxmem: Math.max(128 * 1024 * 1024, 256 * N * r) },
       (err, derivedKey) => {
         if (err) reject(err)
         else resolve(derivedKey)
@@ -173,19 +178,23 @@ export function aesGcmDecrypt(key, payload) {
   const iv = fromB64(payload.ivB64)
   const tag = fromB64(payload.tagB64)
   const data = fromB64(payload.dataB64)
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv)
+  // A truncated tag would weaken GCM authentication: only accept the full 16-byte tag and a 12-byte IV.
+  if (iv.length !== 12 || tag.length !== 16) throw new Error('Invalid cipher payload')
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv, { authTagLength: 16 })
   decipher.setAuthTag(tag)
   return Buffer.concat([decipher.update(data), decipher.final()])
 }
 
+// scrypt N=2^16, r=8, p=2: same work as OWASP's N=2^17/r=8/p=1 recommendation (8x the old N=2^14/p=1 default) while
+// keeping memory at 64 MiB, so vault files upgraded by this version still open in older app versions (128 MiB cap).
 export function buildKdf() {
   const salt = crypto.randomBytes(16)
   return {
     name: 'scrypt',
     saltB64: toB64(salt),
-    N: 16384,
+    N: 65536,
     r: 8,
-    p: 1,
+    p: 2,
     keyLen: 32
   }
 }

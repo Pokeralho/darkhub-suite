@@ -33,6 +33,8 @@ import { registerDiskScanIPC } from './ipc/diskScanIpc.js'
 import { registerHwSensorsIPC } from './ipc/hwSensorsIpc.js'
 import { registerDriverIPC } from './ipc/driverIpc.js'
 import { registerPowerShellIPC } from './ipc/powershellIpc.js'
+import { registerVaultBridgeIPC } from './ipc/vaultBridgeIpc.js'
+import { upgradeWrapperIfWeak, backupVaultFile } from './services/vaultBridge/vaultHardening.js'
 import Logger from './services/LoggerService.js'
 import { runCommand, runPowerShell, runPowerShellJson, stripBom, encodePowerShellScript, powerShellArgsForEncodedScript } from './services/PowerShellRunner.js'
 import { CpuLoadTracker } from './services/CpuLoadTracker.js'
@@ -56,8 +58,17 @@ import DnsEngine from './services/optimizer/DnsEngine.js'
 import StorageEngine from './services/optimizer/StorageEngine.js'
 import FramePacerEngine from './services/FramePacerEngine.js'
 import { registerRealtimeIPC } from './ipc/realtimeIpc.js'
+import { registerCodeRunnerIPC } from './ipc/codeRunnerIpc.js'
+import { registerStartupIPC } from './ipc/startupIpc.js'
+import { registerBenchmarkIPC } from './ipc/benchmarkIpc.js'
+import { registerMaintenanceIPC } from './ipc/maintenanceIpc.js'
+import { registerSaveBackupIPC } from './ipc/saveBackupIpc.js'
+import { registerOverlayIPC } from './ipc/overlayIpc.js'
+import { registerUsbIPC } from './ipc/usbIpc.js'
+import { registerRestoreIPC } from './ipc/restoreIpc.js'
 import { registerShareIPC } from './ipc/shareIpc.js'
 import { registerUpscaleIPC } from './ipc/upscaleIpc.js'
+import { registerMetadataIPC } from './ipc/metadataIpc.js'
 import { SYSTEM_TAR } from './services/SecureDownload.js'
 import { createFramePacerOverlay, closeFramePacerOverlay, toggleFramePacerOverlay, setOverlayClickThrough, setOverlayConfig, getOverlayStatus } from './services/FramePacerOverlay.js'
 protocol.registerSchemesAsPrivileged([
@@ -123,10 +134,28 @@ async function getSharp() {
   return sharpPromise
 }
 
-async function createOcrWorker(lang) {
-  tesseractPromise ||= import('tesseract.js')
-  const mod = await tesseractPromise
-  return mod.createWorker(lang)
+// One worker per language set, kept warm for a while: creating one (and loading its traineddata) costs seconds.
+// Language data is cached in userData/tessdata, so after the first use OCR works offline.
+const ocrWorkers = new Map()
+const OCR_IDLE_MS = 3 * 60 * 1000
+async function getOcrWorker(lang) {
+  let entry = ocrWorkers.get(lang)
+  if (!entry) {
+    tesseractPromise ||= import('tesseract.js')
+    const mod = await tesseractPromise
+    const cachePath = path.join(app.getPath('userData'), 'tessdata')
+    await fs.mkdir(cachePath, { recursive: true }).catch(() => {})
+    entry = { worker: mod.createWorker(lang, 1, { cachePath }), timer: null, queue: Promise.resolve() }
+    ocrWorkers.set(lang, entry)
+    entry.worker.catch(() => ocrWorkers.delete(lang))
+  }
+  clearTimeout(entry.timer)
+  entry.timer = setTimeout(() => {
+    ocrWorkers.delete(lang)
+    entry.worker.then((w) => w.terminate()).catch(() => {})
+  }, OCR_IDLE_MS)
+  entry.timer.unref?.()
+  return entry
 }
 
 async function getExiftool() {
@@ -190,10 +219,19 @@ safeRegister('driver', () => registerDriverIPC({
 safeRegister('powershell', () => registerPowerShellIPC({ ipcMain, logger: Logger }))
 safeRegister('wintools', () => registerWinToolsIPC({ ipcMain, logger: Logger }))
 safeRegister('diskscan', () => registerDiskScanIPC({ ipcMain, dialog, shell, BrowserWindow, logger: Logger }))
-safeRegister('hwsensors', () => registerHwSensorsIPC({ ipcMain, logger: Logger }))
+safeRegister('hwsensors', () => registerHwSensorsIPC({ app, ipcMain, logger: Logger }))
 safeRegister('realtime', () => registerRealtimeIPC({ app, ipcMain, dialog, BrowserWindow, Notification, logger: Logger }))
+safeRegister('code', () => registerCodeRunnerIPC({ ipcMain, logger: Logger }))
+safeRegister('startup', () => registerStartupIPC({ app, ipcMain, logger: Logger }))
+safeRegister('benchmark', () => registerBenchmarkIPC({ app, ipcMain, BrowserWindow, logger: Logger }))
+safeRegister('maintenance', () => registerMaintenanceIPC({ app, ipcMain, BrowserWindow, Notification, logger: Logger }))
+safeRegister('saves', () => registerSaveBackupIPC({ app, ipcMain, BrowserWindow, dialog, shell, logger: Logger }))
+safeRegister('overlay', () => registerOverlayIPC({ app, ipcMain, BrowserWindow, screen, globalShortcut, dialog, logger: Logger }))
+safeRegister('usb', () => registerUsbIPC({ ipcMain, logger: Logger }))
+safeRegister('restore', () => registerRestoreIPC({ ipcMain, logger: Logger }))
 safeRegister('upscale', () => registerUpscaleIPC({ app, ipcMain, BrowserWindow, logger: Logger }))
 safeRegister('share', () => registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globalShortcut, BrowserWindow, Notification, logger: Logger }))
+safeRegister('metadata', () => registerMetadataIPC({ ipcMain, assertFileAccessGranted, hasFileAccessGrant, getFfmpegPath, logger: Logger }))
 
 async function getYtDlpTools() {
   ytdlpToolsPromise ||= import('./ytdlp.js')
@@ -1396,7 +1434,14 @@ ipcMain.handle('library:fetchCover', async (_event, payload) => {
   try {
     const { CoverProviderService } = await import('./services/CoverProviderService.js')
     const service = new CoverProviderService(app)
-    return await service.fetchCover(payload?.gameName, payload?.forceRefresh)
+    const res = await service.fetchCover(payload?.gameName, payload?.forceRefresh)
+    // store only the cover on the current record, so a cover arriving late never overwrites the user's edits
+    if (res?.ok && typeof payload?.gameId === 'string' && payload.gameId) {
+      const { loadLibrary, updateGame } = await getLibraryStore()
+      const saved = await updateGame(app, payload.gameId, (g) => { g.coverPath = res.path })
+      if (saved) broadcastLibraryEvent('library:updated', { reason: 'cover', games: (await loadLibrary(app)).games })
+    }
+    return res
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) }
   }
@@ -2617,7 +2662,8 @@ ipcMain.handle('youtube:download', async (event, payload) => {
     sleepIntervalSec,
     downloadEntirePlaylist,
     embedThumbnail = true,
-    embedMetadata = true
+    embedMetadata = true,
+    extra = {}
   } = payload
   if (!url || !outputDir) throw new Error('Missing URL or output directory')
   assertFileAccessGranted(outputDir, 'pasta de destino')
@@ -2633,6 +2679,12 @@ ipcMain.handle('youtube:download', async (event, payload) => {
     const ffmpegLocation = typeof ffmpegPath === 'string' && fsRaw.existsSync(ffmpegPath)
       ? path.dirname(ffmpegPath)
       : (fsRaw.existsSync(path.join(toolsDir, 'ffmpeg.exe')) ? toolsDir : null)
+
+    const { buildExtraArgs } = await import('./services/ytdlpOptions.js')
+    const extraOpts = { ...(extra && typeof extra === 'object' ? extra : {}) }
+    if (extraOpts.skipDownloaded) extraOpts.archivePath = path.join(app.getPath('userData'), 'ytdlp-archive.txt')
+    else delete extraOpts.archivePath
+    const { args: extraArgs, container } = buildExtraArgs(extraOpts, String(mode || '').startsWith('audio-'))
 
     const isPlaylistMode = downloadEntirePlaylist === true
     const template = isPlaylistMode
@@ -2705,6 +2757,8 @@ ipcMain.handle('youtube:download', async (event, payload) => {
       args.push('-f', 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bestvideo+bestaudio/best', '--merge-output-format', 'mp4')
     }
 
+    for (let i = 0; i < args.length; i++) if (args[i] === '--merge-output-format') args[i + 1] = container
+    args.push(...extraArgs)
     args.push('--', String(url))
 
     const { code, stderr } = await runYtDlp(ytdlpPath, args, {
@@ -2746,10 +2800,11 @@ ipcMain.handle('youtube:cancel', async () => {
 ipcMain.handle('ocr:extractText', async (_event, payload) => {
   const imagePath = typeof payload === 'string' ? payload : payload?.imagePath
   const base64Data = typeof payload === 'object' && payload?.base64 ? String(payload.base64) : null
-  const lang = typeof payload === 'object' && payload?.lang ? String(payload.lang) : 'eng+por'
+  const lang = typeof payload === 'object' && /^[a-z_]{3,8}(\+[a-z_]{3,8}){0,4}$/.test(String(payload?.lang ?? '')) ? String(payload.lang) : 'eng+por'
   const preprocess = typeof payload === 'object' ? Boolean(payload?.preprocess ?? true) : true
+  // page segmentation: 3 = automatic, 4 = single column, 6 = single block, 7 = single line, 11 = sparse text
+  const psm = [3, 4, 6, 7, 11].includes(Number(payload?.psm)) ? String(payload.psm) : '3'
 
-  let worker = null
   try {
     let inputBuffer = null
     if (base64Data) {
@@ -2765,25 +2820,31 @@ ipcMain.handle('ocr:extractText', async (_event, payload) => {
     if (preprocess) {
       try {
         const sharp = await getSharp()
-        inputBuffer = await sharp(inputBuffer)
-          .grayscale()
-          .linear(1.3, -20)
-          .sharpen()
-          .toBuffer()
+        const meta = await sharp(inputBuffer).metadata()
+        // Tesseract reads best with ~30 px tall glyphs: screenshots and small crops are upscaled first
+        const scale = meta.width && meta.width < 1600 ? Math.min(3, 2400 / meta.width) : 1
+        let img = sharp(inputBuffer).rotate().flatten({ background: '#ffffff' })
+        if (scale > 1.2) img = img.resize({ width: Math.round(meta.width * scale), kernel: 'lanczos3' })
+        img = img.grayscale().normalize().sharpen()
+        // light text on a dark background (dark themes, games) reads far better inverted
+        const { channels } = await img.clone().stats()
+        if (channels?.[0]?.mean < 110) img = img.negate({ alpha: false })
+        inputBuffer = await img.png().toBuffer()
       } catch {}
     }
 
-    worker = await createOcrWorker(lang)
-    const ret = await worker.recognize(inputBuffer)
+    const entry = await getOcrWorker(lang)
+    // one recognition at a time per worker
+    const job = entry.queue.then(async () => {
+      const worker = await entry.worker
+      await worker.setParameters({ tessedit_pageseg_mode: psm, preserve_interword_spaces: '1' })
+      return worker.recognize(inputBuffer)
+    })
+    entry.queue = job.catch(() => {})
+    const ret = await job
     return { ok: true, text: ret?.data?.text || '', confidence: ret?.data?.confidence || 0 }
   } catch (err) {
     throw new Error(`OCR failed: ${err.message}`)
-  } finally {
-    if (worker) {
-      try {
-        await worker.terminate()
-      } catch {}
-    }
   }
 })
 
@@ -2865,6 +2926,12 @@ async function loadVaultUsingWrapper(wrapper, password) {
 
   const vk = await unwrapVaultKeyWithPassword(wrapped, password)
   const data = decryptVaultData(vk, file?.data)
+  // Hardening: re-wrap with the current scrypt parameters when this wrapper is weaker (old file backed up first).
+  try {
+    await upgradeWrapperIfWeak({ vaultPath: vaultFilePath(), wrapperName: wrapper, secret: password, vaultKey: vk, readFile: readVaultFile, writeFile: writeVaultFile })
+  } catch (err) {
+    log.warn(`[vault] KDF upgrade skipped: ${err?.message || err}`)
+  }
   vaultUnlocked = true
   vaultKey = vk
   vaultData = data
@@ -3117,10 +3184,92 @@ ipcMain.handle('vault:import', async (_event, payload) => {
   } catch {
     return { ok: false, error: 'Invalid vault file' }
   }
+  // Never overwrite the current vault without a copy of it.
+  if (await vaultFileExists()) await backupVaultFile(vaultFilePath(), 'pre-import')
   await fs.copyFile(sourcePath, vaultFilePath())
   lockVault()
   return { ok: true }
 })
+
+// Vault transfer to another PC through Susuya (electron/services/vaultTransfer/vaultTransfer.js): the encrypted vault
+// is sealed again with a one-time key that only travels inside the code the user carries; the server copy lasts 1 h.
+let lastVaultTransfer = null
+ipcMain.handle('vault:transferSend', async () => {
+  try {
+    await ensureUnlocked()
+    const { sealVault, makeCode } = await import('./services/vaultTransfer/vaultTransfer.js')
+    const { SusuyaClient } = await import('./services/susuya/SusuyaClient.js')
+    const { key, blob } = sealVault(await fs.readFile(vaultFilePath()))
+    const tmp = path.join(os.tmpdir(), `darkhub-vault-${crypto.randomUUID()}.bin`)
+    await fs.writeFile(tmp, blob)
+    try {
+      const up = await new SusuyaClient().upload(tmp, { ttl: 3600, name: 'vault-transfer.bin' })
+      lastVaultTransfer = { id: up.id, deleteToken: up.deleteToken }
+      return { ok: true, code: makeCode(up.id, key), expiresAt: Date.now() + 3600 * 1000 }
+    } finally {
+      await fs.rm(tmp, { force: true }).catch(() => {})
+    }
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err) }
+  }
+})
+
+ipcMain.handle('vault:transferCancel', async () => {
+  if (!lastVaultTransfer) return { ok: true }
+  try {
+    const { SusuyaClient } = await import('./services/susuya/SusuyaClient.js')
+    await new SusuyaClient().remove(lastVaultTransfer.id, lastVaultTransfer.deleteToken)
+    lastVaultTransfer = null
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err) }
+  }
+})
+
+ipcMain.handle('vault:transferReceive', async (_event, payload) => {
+  try {
+    const { parseCode, openVault } = await import('./services/vaultTransfer/vaultTransfer.js')
+    const { SUSUYA_ORIGIN } = await import('./services/susuya/SusuyaClient.js')
+    const { fileId, key } = parseCode(payload?.code)
+    const res = await fetch(`${SUSUYA_ORIGIN}/d/${encodeURIComponent(fileId)}`)
+    if (res.status === 404 || res.status === 410) return { ok: false, error: 'expired' }
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` }
+    const blob = Buffer.from(await res.arrayBuffer())
+    if (blob.length > 64 * 1024 * 1024) return { ok: false, error: 'Invalid vault file' }
+    const bytes = openVault(blob, key)
+    const candidate = JSON.parse(bytes.toString('utf8'))
+    if (candidate?.version !== VAULT_VERSION || !candidate?.wrappers?.master || !candidate?.data) return { ok: false, error: 'Invalid vault file' }
+    // Never overwrite the current vault without a copy of it.
+    if (await vaultFileExists()) await backupVaultFile(vaultFilePath(), 'pre-transfer')
+    await fs.writeFile(vaultFilePath(), bytes)
+    lockVault()
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err) }
+  }
+})
+
+// Browser extension bridge (electron/ipc/vaultBridgeIpc.js). It reaches the vault only through these accessors.
+safeRegister('vaultBridge', () => registerVaultBridgeIPC({
+  app, ipcMain, dialog, shell, BrowserWindow, logger: Logger,
+  getMainWindow: () => mainWindow,
+  vault: {
+    isUnlocked: () => Boolean(vaultUnlocked && vaultKey && vaultData),
+    getEntries: () => (vaultUnlocked && vaultData ? (vaultData.entries ?? []) : []),
+    addEntry: async ({ site, username, password, notes }) => {
+      await ensureUnlocked()
+      const now = Date.now()
+      vaultData.entries = [...(vaultData.entries ?? []), { id: crypto.randomUUID(), site, username, password, notes: notes ?? '', createdAt: now, updatedAt: now }]
+      await persistVaultData()
+    },
+    updatePassword: async (id, newPassword) => {
+      await ensureUnlocked()
+      vaultData.entries = (vaultData.entries ?? []).map((e) => (e.id === id ? { ...e, password: newPassword, updatedAt: Date.now() } : e))
+      await persistVaultData()
+    },
+    lock: () => lockVault()
+  }
+}))
 
 ipcMain.handle('security:scanMalware', async () => {
   try {
@@ -4024,6 +4173,12 @@ ipcMain.handle('setup:detectHardware', async () => {
 
 app.whenReady().then(async () => {
   log.info('[startup] app ready')
+  // started without administrator (manifest bypassed): reopen through UAC before any window exists
+  {
+    const { ensureElevated } = await import('./services/ensureElevated.js')
+    const Elevation = (await import('./services/optimizer/ElevationHelper.js')).default
+    if (!(await ensureElevated({ app, dialog, isElevated: () => Elevation.isElevated(), log }))) return
+  }
   const runDeferredStartup = async () => {
     let liveServices = { latencyGuardian: true, overlay: true, autoClicker: true }
 
@@ -4121,13 +4276,16 @@ app.whenReady().then(async () => {
 
   }
 
+  // Library covers live in the app's own folder: always readable (the renderer never picks them through a dialog).
+  grantDirectoryPath(path.join(app.getPath('userData'), 'covers'))
   protocol.registerFileProtocol('local-resource', (request, callback) => {
-    let url = request.url.replace(/^local-resource:\/\//, '')
+    let url = request.url.replace(/^local-resource:\/\//, '').replace(/[?#].*$/, '')
 
-    if (url.match(/^[a-zA-Z]:/)) {
-      url = url.charAt(0) + ':' + url.slice(1)
-    } else if (url.match(/^\/[a-zA-Z]:/)) {
+    if (url.match(/^\/[a-zA-Z]:/)) {
       url = url.slice(1)
+    } else if (url.match(/^[a-zA-Z]\//)) {
+      // a standard scheme parses "C:\x" as host "c": put the drive colon back
+      url = url.charAt(0) + ':' + url.slice(1)
     }
     try {
       const resolved = decodeURIComponent(url)

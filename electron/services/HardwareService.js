@@ -110,7 +110,8 @@ class HardwareService {
 
       this._idleTimer = setTimeout(() => {
         this._idleTimer = null;
-        if (!this._paused) return;
+        // the game overlay keeps the sensors alive while DarkHub is hidden
+        if (!this._paused || this._holds?.size) return;
         Logger.info('HardwareService', 'Janela oculta há um tempo — encerrando daemons de sensores.');
         this._stopDaemons();
       }, IDLE_TEARDOWN_MS);
@@ -188,11 +189,31 @@ class HardwareService {
     this._clearIdleTimer();
     this._idleTimer = setTimeout(() => {
       this._idleTimer = null;
-      if (this.activeConsumers === 0) {
+      if (this.activeConsumers === 0 && !this._holds?.size) {
         Logger.info('HardwareService', 'Nenhum consumidor de telemetria ativo por 60s — encerrando daemons de sensores.');
         this._stopDaemons();
       }
     }, IDLE_TEARDOWN_MS);
+  }
+
+  /** Keeps the sensor daemons running for a main-process consumer (the game overlay), even with the window hidden. */
+  holdSensors(tag) {
+    (this._holds ||= new Set()).add(tag);
+    this._clearIdleTimer();
+    if (!this._daemonsUp) {
+      HAL.init();
+      this._daemonsUp = true;
+    }
+  }
+
+  releaseSensors(tag) {
+    this._holds?.delete(tag);
+    if (!this._holds?.size && this.activeConsumers === 0) this.stop();
+  }
+
+  /** Latest readings (same shape the renderer receives). */
+  snapshot() {
+    return HAL.getSnapshot();
   }
 
   teardown() {

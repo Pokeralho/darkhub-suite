@@ -1,5 +1,25 @@
 import { darkosMessages } from './darkosMessages';
 import { realtimeMessages } from './realtimeMessages';
+import { optimizerUiMessages } from './optimizerUiMessages';
+import { diskMapMessages } from './diskMapMessages';
+import { networkMessages } from './networkMessages';
+import { devToolsMessages } from './devToolsMessages';
+import { psToolsMessages } from './psToolsMessages';
+import { securityMessages } from './securityMessages';
+import { vaultMessages } from './vaultMessages';
+import { metadataMessages } from './metadataMessages';
+import { decryptMessages } from './decryptMessages';
+import { ocrMessages } from './ocrMessages';
+import { videoMessages } from './videoMessages';
+import { textEditorMessages } from './textEditorMessages';
+import { maintenanceMessages } from './maintenanceMessages';
+import { driverMessages } from './driverMessages';
+import { usbMessages } from './usbMessages';
+import { restoreMessages } from './restoreMessages';
+import { startupMessages } from './startupMessages';
+import { benchmarkMessages } from './benchmarkMessages';
+import { overlayMessages } from './overlayMessages';
+import { saveBackupMessages } from './saveBackupMessages';
 
 export type SupportedLang = 'pt-BR' | 'en-US' | 'es-ES' | 'de-DE' | 'fr-FR' | 'it-IT' | 'ru-RU' | 'zh-CN' | 'ja-JP';
 
@@ -1108,6 +1128,9 @@ export const messages: Record<string, Record<string, string>> = {
     'library.error.remove': 'Falha ao remover.',
     'library.error.optiscaler': 'Falha ao aplicar OptiScaler antes de iniciar.',
     'library.error.launch': 'Falha ao iniciar jogo.',
+    'library.apply.done': '{name}: {ok} otimizações aplicadas{failed}',
+    'library.apply.failedN': '{n} falharam',
+    'library.apply.failed': 'O jogo abriu, mas as otimizações falharam',
     'library.dialog.exe': 'Selecione o executável do jogo',
     'library.dialog.dir': 'Selecione a pasta de trabalho (opcional)',
     'library.title': 'Biblioteca',
@@ -2785,6 +2808,9 @@ export const messages: Record<string, Record<string, string>> = {
     'library.error.remove': 'Failed to remove.',
     'library.error.optiscaler': 'Failed to apply OptiScaler before launching.',
     'library.error.launch': 'Failed to launch game.',
+    'library.apply.done': '{name}: {ok} optimizations applied{failed}',
+    'library.apply.failedN': '{n} failed',
+    'library.apply.failed': 'The game started, but the optimizations failed',
     'library.dialog.exe': 'Select the game executable',
     'library.dialog.dir': 'Select the working folder (optional)',
     'library.title': 'Library',
@@ -3380,7 +3406,7 @@ export const messages: Record<string, Record<string, string>> = {
 
 };
 
-for (const extra of [darkosMessages, realtimeMessages]) {
+for (const extra of [darkosMessages, realtimeMessages, optimizerUiMessages, diskMapMessages, networkMessages, devToolsMessages, psToolsMessages, securityMessages, vaultMessages, metadataMessages, decryptMessages, ocrMessages, videoMessages, textEditorMessages, saveBackupMessages, overlayMessages, benchmarkMessages, startupMessages, usbMessages, maintenanceMessages, driverMessages, restoreMessages]) {
   for (const [code, dict] of Object.entries(extra)) {
     messages[code] = { ...(messages[code] || {}), ...dict };
   }

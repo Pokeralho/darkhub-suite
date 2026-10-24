@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DarkHub Vault</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="4" y="10" width="16" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </svg>
+    <strong>DarkHub Vault</strong>
+    <span id="host" class="host"></span>
+  </header>
+  <main id="root"><p class="muted" data-i18n="loading"></p></main>
+  <footer>
+    <label class="toggle"><input type="checkbox" id="offerSave" /> <span data-i18n="offerSave"></span></label>
+    <button id="unpair" class="link" hidden data-i18n="unpair"></button>
+  </footer>
+  <script src="popup.js"></script>
+</body>
+</html>

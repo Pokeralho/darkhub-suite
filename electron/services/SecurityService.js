@@ -1,10 +1,11 @@
 import os from 'node:os';
-import { ipcMain } from 'electron';
+import { app, ipcMain } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import Logger from './LoggerService.js';
 import { runPowerShell as runPowerShellShared } from './PowerShellRunner.js';
 import ElevationHelper from './optimizer/ElevationHelper.js';
+import { AdvancedProtectionService } from './security/AdvancedProtectionService.js';
 
 const HOSTNAME_RE = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 
@@ -14,9 +15,14 @@ class SecurityService {
     this.customPhishingDomains = [];
     this.customKeywords = [];
     this.customBrands = [];
-    this.customFileHashes = [];
+    // Hashes the user imported (JSON rules) and hashes from community feeds (Advanced Security) are kept apart so
+    // each can be restored on its own; `customFileHashes` (read by the real-time protection) is their union.
+    this.userFileHashes = [];
+    this.feedFileHashes = [];
+    this._mergedHashes = null;
     this.onFileHashesChanged = null;
     this.communityRulesPath = null;
+    this.advanced = new AdvancedProtectionService({ securityService: this });
     this.phishingDomains = [
 
       'steamcommunity-trade.com', 'steamcommunyty.com', 'steancomuninty.com', 'steam-gift-cards.com',
@@ -37,8 +43,58 @@ class SecurityService {
     ];
   }
 
+  /** Union of user-imported and feed hashes; this is what realtimeIpc.js feeds into the HashDb. */
+  get customFileHashes() {
+    if (!this._mergedHashes) this._mergedHashes = normalizeFileHashes([...this.userFileHashes, ...this.feedFileHashes]);
+    return this._mergedHashes;
+  }
+
+  set customFileHashes(list) {
+    this.userFileHashes = Array.isArray(list) ? list : [];
+    this._mergedHashes = null;
+  }
+
+  _getFeedHashesPath() {
+    return path.join(path.dirname(this._getRulesFilePath()), 'security_feed_hashes.json');
+  }
+
+  /** Replaces the community-feed hashes used by the real-time protection. Returns how many are active. */
+  setFeedFileHashes(list) {
+    this.feedFileHashes = normalizeFileHashes(list);
+    this._mergedHashes = null;
+    const p = this._getFeedHashesPath();
+    if (this.feedFileHashes.length) {
+      fs.writeFileSync(p, JSON.stringify({ fileHashes: this.feedFileHashes, updatedAt: new Date().toISOString() }), 'utf8');
+    } else if (fs.existsSync(p)) {
+      fs.unlinkSync(p);
+    }
+    this.onFileHashesChanged?.();
+    return this.feedFileHashes.length;
+  }
+
+  _registerAdvancedIpc() {
+    const adv = this.advanced;
+    const safe = (fn) => async (_e, payload) => {
+      try { return await fn(payload || {}); } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+    };
+    ipcMain.handle('security:advStatus', safe(() => adv.status()));
+    ipcMain.handle('security:advSetFeedEnabled', safe((p) => adv.setEnabled(String(p.id || ''), p.enabled === true)));
+    ipcMain.handle('security:advUpdateFeeds', safe((p) => adv.updateFeeds(Array.isArray(p.ids) ? p.ids.map(String) : null)));
+    ipcMain.handle('security:advApplyHosts', safe(() => adv.applyHosts()));
+    ipcMain.handle('security:advRestoreHosts', safe(() => adv.restoreHosts()));
+    ipcMain.handle('security:advApplyFirewall', safe(() => adv.applyFirewall()));
+    ipcMain.handle('security:advRestoreFirewall', safe(() => adv.restoreFirewall()));
+    ipcMain.handle('security:advApplyHashes', safe(() => adv.applyHashes()));
+    ipcMain.handle('security:advRestoreHashes', safe(() => adv.restoreHashes()));
+    ipcMain.handle('security:advHardeningStatus', safe(() => adv.hardeningStatus()));
+    ipcMain.handle('security:advHardeningApply', safe((p) => adv.hardeningApply(String(p.id || ''), { mode: p.mode })));
+    ipcMain.handle('security:advHardeningRestore', safe((p) => adv.hardeningRestore(String(p.id || ''))));
+  }
+
   init() {
     Logger.info('SecurityService', 'Initialized Advanced Security & Anti-Phishing Engine.');
+    try { this.advanced.setDataDir(app.getPath('userData')); } catch { /* falls back to %APPDATA%\DarkHub */ }
+    this._registerAdvancedIpc();
 
     ipcMain.handle('security:scanProcesses', async () => {
       return await this.scanRunningProcesses();
@@ -338,6 +394,13 @@ class SecurityService {
       { name: 'Metamask', target: 'metamask.io', typos: ['metamask-login', 'metamasc', 'metamask-restore'] }
     ];
 
+    // Brands imported through the community JSON rules ({ name, target, typos[] }) were stored but never used.
+    for (const cb of Array.isArray(this.customBrands) ? this.customBrands : []) {
+      const target = String(cb?.target || '').trim().toLowerCase();
+      const typos = (Array.isArray(cb?.typos) ? cb.typos : []).map((x) => String(x).trim().toLowerCase()).filter((x) => x.length >= 3);
+      if (target && typos.length) targetBrands.push({ name: String(cb.name || target).slice(0, 60), target, typos });
+    }
+
     for (const b of targetBrands) {
       if (hostname !== b.target && !hostname.endsWith('.' + b.target)) {
         for (const typo of b.typos) {
@@ -367,6 +430,13 @@ class SecurityService {
     if (this.getAllPhishingDomains().some(pd => hostname === pd || hostname.endsWith('.' + pd))) {
       score = 100;
       flags.push('Domínio presente na Base de Ameaças e Phishing do DarkHub Shield');
+    }
+
+    let feedHit = null;
+    try { feedHit = this.advanced.lookupDomain(hostname); } catch { feedHit = null; }
+    if (feedHit) {
+      score = 100;
+      flags.push(`Domínio presente na lista da comunidade ${feedHit.source} (${feedHit.domain})`);
     }
 
     const finalScore = Math.min(score, 100);
@@ -507,6 +577,13 @@ class SecurityService {
     try {
       const parsed = JSON.parse(raw);
       const list = Array.isArray(parsed) ? parsed : (parsed ? [parsed] : []);
+      // Tag remote addresses that appear on the downloaded IP blocklists (Spamhaus DROP, Feodo, IPsum).
+      for (const c of list) {
+        const ip = String(c?.Remote || '').replace(/:\d+$/, '');
+        let hit = null;
+        try { hit = ip && ip !== 'N/A' ? this.advanced.lookupIp(ip) : null; } catch { hit = null; }
+        if (hit) { c.Blocklisted = hit.source || true; c.IsSuspicious = true; }
+      }
       return { ok: true, connections: list };
     } catch (e) {
       return { ok: false, error: e.message, connections: [] };
@@ -579,6 +656,11 @@ class SecurityService {
         this.customFileHashes = normalizeFileHashes(parsed.fileHashes);
         Logger.info('SecurityService', `Loaded ${this.customPhishingDomains.length} community phishing rules.`);
       }
+      const fp = this._getFeedHashesPath();
+      if (fs.existsSync(fp)) {
+        this.feedFileHashes = normalizeFileHashes(JSON.parse(fs.readFileSync(fp, 'utf8'))?.fileHashes);
+        this._mergedHashes = null;
+      }
     } catch (e) {
       Logger.warn('SecurityService', `Failed to load community rules: ${e?.message ?? e}`);
     }
@@ -591,7 +673,8 @@ class SecurityService {
       customPhishingDomains: this.customPhishingDomains,
       customKeywords: this.customKeywords,
       customBrands: this.customBrands,
-      customFileHashes: this.customFileHashes.length,
+      customFileHashes: this.userFileHashes.length,
+      feedFileHashes: this.feedFileHashes.length,
       totalActivePhishingDomains: this.getAllPhishingDomains().length
     };
   }
@@ -618,23 +701,23 @@ class SecurityService {
       if (Array.isArray(brands)) {
         this.customBrands = [...this.customBrands, ...brands];
       }
-      const hashesBefore = this.customFileHashes.length;
-      this.customFileHashes = normalizeFileHashes([...this.customFileHashes, ...(Array.isArray(fileHashes) ? fileHashes : [])]);
+      const hashesBefore = this.userFileHashes.length;
+      this.customFileHashes = normalizeFileHashes([...this.userFileHashes, ...(Array.isArray(fileHashes) ? fileHashes : [])]);
 
       const p = this._getRulesFilePath();
       fs.writeFileSync(p, JSON.stringify({
         phishingDomains: this.customPhishingDomains,
         keywords: this.customKeywords,
         brands: this.customBrands,
-        fileHashes: this.customFileHashes,
+        fileHashes: this.userFileHashes,
         updatedAt: new Date().toISOString()
       }, null, 2), 'utf8');
 
-      if (this.customFileHashes.length !== hashesBefore) this.onFileHashesChanged?.();
+      if (this.userFileHashes.length !== hashesBefore) this.onFileHashesChanged?.();
       return {
         ok: true,
         msg: `Regras da comunidade importadas com sucesso! Total de regras ativas: ${this.getAllPhishingDomains().length}`,
-        fileHashes: this.customFileHashes.length,
+        fileHashes: this.userFileHashes.length,
         total: this.getAllPhishingDomains().length
       };
     } catch (e) {

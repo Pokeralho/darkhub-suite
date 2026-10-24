@@ -42,6 +42,32 @@ interface DownloadProgressState {
   totalItems?: number;
 }
 
+interface VideoExtraOptions {
+  container: 'mp4' | 'mkv' | 'webm';
+  codec: 'best' | 'h264' | 'av1';
+  subtitles: boolean;
+  autoSubs: boolean;
+  subLangs: string;
+  chapters: '' | 'embed' | 'split';
+  sponsorBlock: string[];
+  sponsorMode: 'remove' | 'mark';
+  trimStart: string;
+  trimEnd: string;
+  playlistItems: string;
+  rateLimit: string;
+  skipDownloaded: boolean;
+  writeDescription: boolean;
+  writeThumbnail: boolean;
+}
+
+const DEFAULT_EXTRA: VideoExtraOptions = {
+  container: 'mp4', codec: 'best', subtitles: false, autoSubs: false, subLangs: 'pt.*,en.*', chapters: 'embed',
+  sponsorBlock: [], sponsorMode: 'remove', trimStart: '', trimEnd: '', playlistItems: '', rateLimit: '',
+  skipDownloaded: false, writeDescription: false, writeThumbnail: false
+};
+
+const SPONSOR_CATEGORIES = ['sponsor', 'selfpromo', 'interaction', 'intro', 'outro', 'preview', 'music_offtopic', 'filler'];
+
 const YoutubeDownloader = () => {
   const { t } = useI18n();
   const [url, setUrl] = useState('');
@@ -55,6 +81,16 @@ const YoutubeDownloader = () => {
 
   const [downloadEntirePlaylist, setDownloadEntirePlaylist] = useState<boolean>(true);
   const [embedThumbnail, setEmbedThumbnail] = useState<boolean>(true);
+  // extra yt-dlp options (see electron/services/ytdlpOptions.js), remembered between sessions
+  const [extra, setExtra] = useState<VideoExtraOptions>(() => {
+    try { return { ...DEFAULT_EXTRA, ...JSON.parse(localStorage.getItem('dh.video.extra') || '{}') }; } catch { return DEFAULT_EXTRA; }
+  });
+  const patchExtra = (p: Partial<VideoExtraOptions>) => setExtra((prev) => {
+    const next = { ...prev, ...p };
+    try { localStorage.setItem('dh.video.extra', JSON.stringify({ ...next, trimStart: '', trimEnd: '', playlistItems: '' })); } catch { /* storage off */ }
+    return next;
+  });
+  const toggleSponsor = (c: string) => patchExtra({ sponsorBlock: extra.sponsorBlock.includes(c) ? extra.sponsorBlock.filter((x) => x !== c) : [...extra.sponsorBlock, c] });
   const [embedMetadata, setEmbedMetadata] = useState<boolean>(true);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -197,7 +233,8 @@ const YoutubeDownloader = () => {
           sleepIntervalSec,
           downloadEntirePlaylist: info?.isPlaylist ? downloadEntirePlaylist : undefined,
           embedThumbnail,
-          embedMetadata
+          embedMetadata,
+          extra
         });
 
         if (res.ok) {
@@ -535,6 +572,101 @@ const YoutubeDownloader = () => {
                   <span>{t('youtube.embedMetadata', 'Embutir Tags ID3 (Artista/Álbum)')}</span>
                 </label>
               </div>
+
+              <details className="rounded-lg border border-zinc-800/80 px-3 py-2">
+                <summary className="cursor-pointer select-none text-[12.5px] text-zinc-300">{t('ytx.more', 'Mais opções: formato, legendas, SponsorBlock, capítulos, trecho')}</summary>
+                <div className="mt-3 grid gap-4 md:grid-cols-2 text-[12.5px] text-zinc-300">
+                  <label className="flex items-center gap-2">
+                    <span className="w-28 shrink-0 text-zinc-400">{t('ytx.container', 'Contêiner')}</span>
+                    <select className="dh-input" value={extra.container} onChange={(e) => patchExtra({ container: e.target.value as VideoExtraOptions['container'] })}>
+                      <option value="mp4">MP4</option><option value="mkv">MKV</option><option value="webm">WebM</option>
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <span className="w-28 shrink-0 text-zinc-400">{t('ytx.codec', 'Codec de vídeo')}</span>
+                    <select className="dh-input min-w-0" value={extra.codec} onChange={(e) => patchExtra({ codec: e.target.value as VideoExtraOptions['codec'] })}>
+                      <option value="best">{t('ytx.codec.best', 'Melhor disponível')}</option>
+                      <option value="h264">{t('ytx.codec.h264', 'H.264 (toca em tudo: TV, editores, WhatsApp)')}</option>
+                      <option value="av1">{t('ytx.codec.av1', 'AV1 (menor e mais nítido, exige PC recente)')}</option>
+                    </select>
+                  </label>
+
+                  <div className="space-y-1.5">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input type="checkbox" checked={extra.subtitles} onChange={(e) => patchExtra({ subtitles: e.target.checked })} />
+                      <span>{t('ytx.subs', 'Baixar e embutir legendas')}</span>
+                    </label>
+                    {extra.subtitles && (
+                      <div className="flex flex-wrap items-center gap-3 pl-6">
+                        <input className="dh-input w-40 font-mono" value={extra.subLangs} onChange={(e) => patchExtra({ subLangs: e.target.value })} title={t('ytx.subLangsHelp', 'Idiomas separados por vírgula: pt.*, en.*, es')} />
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                          <input type="checkbox" checked={extra.autoSubs} onChange={(e) => patchExtra({ autoSubs: e.target.checked })} />
+                          <span>{t('ytx.autoSubs', 'Incluir legendas automáticas')}</span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                  <label className="flex items-center gap-2">
+                    <span className="w-28 shrink-0 text-zinc-400">{t('ytx.chapters', 'Capítulos')}</span>
+                    <select className="dh-input" value={extra.chapters} onChange={(e) => patchExtra({ chapters: e.target.value as VideoExtraOptions['chapters'] })}>
+                      <option value="">{t('ytx.chapters.none', 'Ignorar')}</option>
+                      <option value="embed">{t('ytx.chapters.embed', 'Embutir no arquivo')}</option>
+                      <option value="split">{t('ytx.chapters.split', 'Um arquivo por capítulo')}</option>
+                    </select>
+                  </label>
+
+                  <div className="md:col-span-2 space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-zinc-400">SponsorBlock</span>
+                      <select className="dh-input" value={extra.sponsorMode} onChange={(e) => patchExtra({ sponsorMode: e.target.value as VideoExtraOptions['sponsorMode'] })}>
+                        <option value="remove">{t('ytx.sb.remove', 'Cortar do vídeo')}</option>
+                        <option value="mark">{t('ytx.sb.mark', 'Só marcar como capítulo')}</option>
+                      </select>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {SPONSOR_CATEGORIES.map((c) => (
+                        <button key={c} type="button" onClick={() => toggleSponsor(c)}
+                          className={`px-2 py-0.5 rounded-md border text-[11.5px] ${extra.sponsorBlock.includes(c) ? 'border-blue-400/70 text-zinc-50 bg-zinc-800/60' : 'border-zinc-800 text-zinc-400 hover:border-zinc-700'}`}>
+                          {t(`ytx.sb.${c}`, c)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="w-28 shrink-0 text-zinc-400">{t('ytx.trim', 'Trecho')}</span>
+                    <input className="dh-input w-24 font-mono" placeholder="0:00" value={extra.trimStart} onChange={(e) => patchExtra({ trimStart: e.target.value })} aria-label={t('ytx.trimStart', 'Início')} />
+                    <span className="text-zinc-500">→</span>
+                    <input className="dh-input w-24 font-mono" placeholder={t('ytx.trimEndPh', 'fim')} value={extra.trimEnd} onChange={(e) => patchExtra({ trimEnd: e.target.value })} aria-label={t('ytx.trimEnd', 'Fim')} />
+                  </div>
+                  <label className="flex items-center gap-2">
+                    <span className="w-28 shrink-0 text-zinc-400">{t('ytx.rate', 'Limite de banda')}</span>
+                    <input className="dh-input w-24 font-mono" placeholder={t('ytx.ratePh', 'sem limite')} value={extra.rateLimit} onChange={(e) => patchExtra({ rateLimit: e.target.value })} title={t('ytx.rateHelp', 'Ex.: 5M = 5 MB/s, 800K = 800 KB/s')} />
+                  </label>
+                  {info?.isPlaylist && (
+                    <label className="flex items-center gap-2">
+                      <span className="w-28 shrink-0 text-zinc-400">{t('ytx.items', 'Itens da playlist')}</span>
+                      <input className="dh-input w-40 font-mono" placeholder="1-10,15,20-" value={extra.playlistItems} onChange={(e) => patchExtra({ playlistItems: e.target.value })} />
+                    </label>
+                  )}
+
+                  <div className="md:col-span-2 flex flex-wrap gap-5">
+                    <label className="flex items-center gap-2 cursor-pointer select-none" title={t('ytx.skipHelp', 'Guarda o que já foi baixado e pula na próxima vez (ótimo para playlists e canais)')}>
+                      <input type="checkbox" checked={extra.skipDownloaded} onChange={(e) => patchExtra({ skipDownloaded: e.target.checked })} />
+                      <span>{t('ytx.skip', 'Pular o que já baixei')}</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input type="checkbox" checked={extra.writeThumbnail} onChange={(e) => patchExtra({ writeThumbnail: e.target.checked })} />
+                      <span>{t('ytx.thumbFile', 'Salvar capa como .jpg')}</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input type="checkbox" checked={extra.writeDescription} onChange={(e) => patchExtra({ writeDescription: e.target.checked })} />
+                      <span>{t('ytx.desc', 'Salvar descrição em .txt')}</span>
+                    </label>
+                  </div>
+                </div>
+              </details>
+
 
               <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-zinc-800/80">
                 <div className="flex items-center gap-2 min-w-0">
