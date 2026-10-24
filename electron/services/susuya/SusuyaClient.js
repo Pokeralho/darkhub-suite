@@ -56,12 +56,12 @@ export class SusuyaClient {
    * Uploads a file from disk. onProgress(sentBytes, totalBytes); signal (AbortSignal) cancels and removes the
    * partial upload on the server.
    */
-  async upload(file, { ttl = 86400, name, onProgress = () => {}, signal } = {}) {
+  async upload(file, { ttl = 3600, name, onProgress = () => {}, signal } = {}) {
     const size = fs.statSync(file).size
     const cfg = await this.config()
     if (size <= 0) throw new Error('empty file')
     if (size > cfg.maxFileSize) throw new Error(`file larger than ${Math.round(cfg.maxFileSize / 1048576)} MB`)
-    const allowedTtl = cfg.ttlOptions?.includes(ttl) ? ttl : cfg.ttlOptions?.at(-1) ?? 86400
+    const allowedTtl = cfg.ttlOptions?.includes(ttl) ? ttl : cfg.ttlOptions?.[0] ?? 3600
     const session = await json(await this.fetch(`${this.origin}/api/uploads`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

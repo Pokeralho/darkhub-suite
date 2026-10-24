@@ -7,6 +7,7 @@ import { makeRegionPicker } from '../services/susuya/RegionPicker.js'
 
 const HISTORY_MAX = 100
 const TTLS = [3600, 21600, 86400]
+const DEFAULT_TTL = 3600
 const DEFAULT_HOTKEY = 'Ctrl+Shift+F12'
 const DEFAULT_REGION_HOTKEY = 'Ctrl+Shift+F11'
 
@@ -22,7 +23,9 @@ export function normalizeShareConfig(c = {}, picturesDir = '') {
     folder: typeof c.folder === 'string' && path.isAbsolute(c.folder) ? c.folder : path.join(picturesDir, 'DarkHub Screenshots'),
     autoUpload: c.autoUpload === true,
     copyImage: c.copyImage !== false,
-    ttl: TTLS.includes(Number(c.ttl)) ? Number(c.ttl) : 86400
+    // 1 h by default: longer links only when the user picked them (old configs saved 24 h without asking)
+    ttlChosen: c.ttlChosen === true,
+    ttl: c.ttlChosen === true && TTLS.includes(Number(c.ttl)) ? Number(c.ttl) : DEFAULT_TTL
   }
 }
 
@@ -126,7 +129,7 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globa
   handle('share:setConfig', (patch) => {
     if (patch.hotkey && patch.hotkey === (patch.regionHotkey ?? config.regionHotkey)) return { ...state(), error: 'atalho já usado pelo print de área' }
     if (patch.regionHotkey && patch.regionHotkey === (patch.hotkey ?? config.hotkey)) return { ...state(), error: 'atalho já usado pelo print da tela inteira' }
-    const next = normalizeShareConfig({ ...config, ...patch }, pictures)
+    const next = normalizeShareConfig({ ...config, ...patch, ...('ttl' in patch ? { ttlChosen: true } : {}) }, pictures)
     for (const key of ['hotkey', 'regionHotkey']) {
       if (next[key] === config[key] && registered[key]) continue
       const hk = bindHotkey(key, next[key])

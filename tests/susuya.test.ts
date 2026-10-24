@@ -118,7 +118,10 @@ describe('screenshots and share settings', () => {
   it('names files by date and validates settings', () => {
     expect(screenshotName(new Date(2026, 9, 23, 9, 5, 7))).toBe('DarkHub_2026-10-23_09-05-07.png');
     const c = normalizeShareConfig({ ttl: 999, folder: 'relative', hotkey: 'Ctrl+Shift+P' }, 'C:\\Users\\x\\Pictures');
-    expect(c).toEqual({ hotkey: 'Ctrl+Shift+P', regionHotkey: 'Ctrl+Shift+F11', folder: 'C:\\Users\\x\\Pictures\\DarkHub Screenshots', autoUpload: false, copyImage: true, ttl: 86400 });
+    expect(c).toEqual({ hotkey: 'Ctrl+Shift+P', regionHotkey: 'Ctrl+Shift+F11', folder: 'C:\\Users\\x\\Pictures\\DarkHub Screenshots', autoUpload: false, copyImage: true, ttlChosen: false, ttl: 3600 });
+    // 24 h saved by the old default is reset to 1 h; a validity the user picked is kept
+    expect(normalizeShareConfig({ ttl: 86400 }, 'C:/p').ttl).toBe(3600);
+    expect(normalizeShareConfig({ ttl: 86400, ttlChosen: true }, 'C:/p').ttl).toBe(86400);
     // the region shortcut can never be the same as the full-screen one
     expect(normalizeShareConfig({ hotkey: 'Alt+F9', regionHotkey: 'Alt+F9' }, 'C:/p').regionHotkey).toBe('Ctrl+Shift+F11');
     expect(normalizeShareConfig({ regionHotkey: 'Alt+F9' }, 'C:/p').regionHotkey).toBe('Alt+F9');
