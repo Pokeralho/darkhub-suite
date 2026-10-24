@@ -24,7 +24,7 @@ import { normalizeShareConfig } from '../electron/ipc/shareIpc.js';
 // @ts-ignore
 import { physicalSize, screenshotName, cropRect, captureRegion } from '../electron/services/susuya/Screenshot.js';
 // @ts-ignore
-import { parseRegionTitle } from '../electron/services/susuya/RegionPicker.js';
+import { parseRegionTitle, REGION_PAGE } from '../electron/services/susuya/RegionPicker.js';
 
 /** Minimal Susuya: same endpoints and shapes as susuya.darkhub.ink (checked against the live service). */
 function fakeSusuya({ chunkSize = 1024, failFirstPutOf = -1 } = {}) {
@@ -149,5 +149,29 @@ describe('screenshots and share settings', () => {
       expect(shot).toMatchObject({ width: 150, height: 60 });
       expect(fs.readdirSync(dir)).toHaveLength(1);
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
+describe('region selection overlay', () => {
+  it('a click or Enter selects the whole display', () => {
+    expect(parseRegionTitle('dh-region:full', { width: 2560, height: 1440 })).toEqual({ x: 0, y: 0, width: 2560, height: 1440 });
+    expect(parseRegionTitle('dh-region:cancel', { width: 2560, height: 1440 })).toBeNull();
+  });
+  it('loads its page from the app package itself (it is not unpacked)', () => {
+    expect(REGION_PAGE).not.toMatch(/app\.asar\.unpacked/);
+    expect(fs.existsSync(REGION_PAGE)).toBe(true);
+    const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+    expect(pkg.build.asarUnpack.some((g: string) => g.includes('assets'))).toBe(false);
+  });
+});
+
+describe('Susuya QR code', () => {
+  it('encodes a Susuya link as a scannable PNG data URL', async () => {
+    const QRCode = (await import('qrcode')).default;
+    const url = 'https://susuya.darkhub.ink/f/hXunnB9TMo';
+    const data = await QRCode.toDataURL(url, { errorCorrectionLevel: 'M', margin: 1, width: 280 });
+    expect(data.startsWith('data:image/png;base64,')).toBe(true);
+    const segments = QRCode.create(url, { errorCorrectionLevel: 'M' });
+    expect(segments.modules.size).toBeGreaterThanOrEqual(21);
   });
 });

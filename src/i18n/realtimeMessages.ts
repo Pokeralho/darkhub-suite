@@ -1,6 +1,11 @@
 // Strings for the Real-time screen (optimizer + protection) and the Susuya / screenshots screen. Merged into `messages` (see messages.ts).
 export const realtimeMessages: Record<'pt-BR' | 'en-US', Record<string, string>> = {
   'pt-BR': {
+    'share.qrHelp': 'Aponte a câmera do celular para abrir o arquivo direto, sem digitar nada.',
+    'share.qrMaking': 'gerando...',
+    'share.qrAlt': 'QR code do link',
+    'share.qr': 'QR code',
+    'share.open': 'Abrir',
     'nav.dlss5': 'DLSS Manager',
     'home.dlss5Title': 'DLSS Manager',
     'home.dlss5Desc': 'DLSS de cada jogo na versão mais nova da NVIDIA e DLSS 5 neural rendering pelo DLSS 5 Autopilot.',
@@ -71,8 +76,8 @@ export const realtimeMessages: Record<'pt-BR' | 'en-US', Record<string, string>>
     'share.none': 'Nenhum arquivo enviado ainda.',
     'share.copyDirect': 'Link direto',
     'share.pageCopied': 'Link da página copiado.',
-    'share.copyPage': 'Página',
-    'share.delete': 'Excluir do Susuya',
+    'share.copyPage': 'Link da página',
+    'share.delete': 'Apagar agora',
     'share.shots': 'Capturas de tela',
     'share.shotsDesc': 'Selecione uma área como no Recorte do Windows ou capture o monitor onde está o mouse, sempre na resolução física (4K a 150% sai em 3840x2160) e em PNG, sem perda.',
     'share.captureNow': 'Tela inteira',
@@ -147,6 +152,11 @@ export const realtimeMessages: Record<'pt-BR' | 'en-US', Record<string, string>>
     'rt.log.empty': 'Nada aconteceu ainda. As ações e detecções aparecem aqui.'
   },
   'en-US': {
+    'share.qrHelp': 'Point a phone\'s camera at it to open the file directly, without typing anything.',
+    'share.qrMaking': 'generating...',
+    'share.qrAlt': 'QR code of the link',
+    'share.qr': 'QR code',
+    'share.open': 'Open',
     'nav.dlss5': 'DLSS Manager',
     'home.dlss5Title': 'DLSS Manager',
     'home.dlss5Desc': 'Every game\'s DLSS on NVIDIA\'s newest build, and DLSS 5 neural rendering through DLSS 5 Autopilot.',
@@ -217,8 +227,8 @@ export const realtimeMessages: Record<'pt-BR' | 'en-US', Record<string, string>>
     'share.none': 'Nothing uploaded yet.',
     'share.copyDirect': 'Direct link',
     'share.pageCopied': 'Page link copied.',
-    'share.copyPage': 'Page',
-    'share.delete': 'Delete from Susuya',
+    'share.copyPage': 'Page link',
+    'share.delete': 'Delete now',
     'share.shots': 'Screenshots',
     'share.shotsDesc': 'Select an area like the Windows Snipping Tool or capture the monitor under the mouse, always at its physical resolution (4K at 150% gives 3840x2160) as a lossless PNG.',
     'share.captureNow': 'Full screen',

@@ -379,6 +379,7 @@ const darkhubApi = {
     cancel: (jobId) => ipcRenderer.invoke('share:cancel', { jobId }),
     remove: (id) => ipcRenderer.invoke('share:delete', { id }),
     copy: (text) => ipcRenderer.invoke('share:copy', { text }),
+    qr: (text) => ipcRenderer.invoke('share:qr', { text }),
     capture: () => ipcRenderer.invoke('share:capture'),
     captureRegion: () => ipcRenderer.invoke('share:captureRegion'),
     openFolder: () => ipcRenderer.invoke('share:openFolder'),

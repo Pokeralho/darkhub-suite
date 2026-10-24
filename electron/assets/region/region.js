@@ -7,7 +7,7 @@
   const hint = document.getElementById('hint')
   const src = new URLSearchParams(location.search).get('img') || ''
   if (src.startsWith('file:')) img.src = src
-  if (!/^pt/i.test(navigator.language || '')) hint.textContent = 'Drag to select an area · Esc cancels'
+  if (!/^pt/i.test(navigator.language || '')) hint.textContent = 'Drag to select an area · click or Enter for the whole screen · Esc cancels'
 
   const report = (v) => { document.title = 'dh-region:' + v }
   const cancel = () => report('cancel')
@@ -36,12 +36,12 @@
   window.addEventListener('mouseup', (e) => {
     if (e.button !== 0 || !start) return
     start = null
-    if (!box || box.w < 3 || box.h < 3) { // a click, not a drag: start over
-      sel.hidden = true; shade.classList.remove('off'); hint.classList.remove('hide'); box = null
-      return
-    }
+    if (!box || box.w < 3 || box.h < 3) { report('full'); return } // a click, not a drag: the whole screen
     report([box.x, box.y, box.w, box.h, window.innerWidth, window.innerHeight].map((n) => Math.round(n * 100) / 100).join(','))
   })
   window.addEventListener('contextmenu', (e) => { e.preventDefault(); cancel() })
-  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); cancel() } })
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); cancel() }
+    else if (e.key === 'Enter') { e.preventDefault(); report('full') }
+  })
 })()

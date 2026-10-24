@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import QRCode from 'qrcode'
 import path from 'node:path'
 import { SusuyaClient, SUSUYA_ORIGIN } from '../services/susuya/SusuyaClient.js'
 import { captureScreen, captureRegion } from '../services/susuya/Screenshot.js'
@@ -163,6 +164,12 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globa
     if (!s.startsWith(`${SUSUYA_ORIGIN}/`)) return { ok: false, error: 'only Susuya links' }
     clipboard.writeText(s)
     return { ok: true }
+  })
+  // QR code of a Susuya link, so a phone camera opens the file without typing (same as the site)
+  handle('share:qr', async ({ text }) => {
+    const s = String(text || '')
+    if (!s.startsWith(`${SUSUYA_ORIGIN}/`) || s.length > 200) return { ok: false, error: 'only Susuya links' }
+    return { ok: true, dataUrl: await QRCode.toDataURL(s, { errorCorrectionLevel: 'M', margin: 1, width: 280, color: { dark: '#0d1014', light: '#ffffff' } }) }
   })
   handle('share:capture', () => capture())
   handle('share:captureRegion', () => capture(true))

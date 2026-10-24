@@ -443,6 +443,7 @@ export interface DarkHubAPI {
     cancel: (jobId: string) => Promise<{ ok: boolean }>;
     remove: (id: string) => Promise<ShareState>;
     copy: (text: string) => Promise<{ ok: boolean; error?: string }>;
+    qr: (text: string) => Promise<{ ok: boolean; error?: string; dataUrl?: string }>;
     capture: () => Promise<ShareShotResult>;
     /** Snipping-Tool style: freezes the screen, the user drags a rectangle (Esc cancels → cancelled: true). */
     captureRegion: () => Promise<ShareShotResult>;

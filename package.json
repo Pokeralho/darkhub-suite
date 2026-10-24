@@ -1,6 +1,6 @@
 {
   "name": "darkhub-suite",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "High-performance modular Windows utility suite for gamers and power users.",
   "author": "DarkHub Team",
   "license": "MIT",
@@ -38,6 +38,7 @@
     "exiftool-vendored": "^30.3.0",
     "ffmpeg-static": "^5.2.0",
     "pdf-parse": "^2.4.5",
+    "qrcode": "1.5.4",
     "sharp": "^0.34.3",
     "systeminformation": "^5.27.7",
     "tesseract.js": "^7.0.0"

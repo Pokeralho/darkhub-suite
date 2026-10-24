@@ -6,8 +6,10 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-const here = path.dirname(fileURLToPath(import.meta.url)).replace(/app\.asar(?![.\w])/, 'app.asar.unpacked')
-const PAGE = path.join(here, '..', '..', 'assets', 'region', 'region.html')
+// loadFile reads inside app.asar, and electron/assets is not unpacked: the page must be addressed in the asar itself
+// (pointing at app.asar.unpacked made the overlay fail silently in the installed app).
+export const REGION_PAGE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets', 'region', 'region.html')
+const PAGE = REGION_PAGE
 const TIMEOUT_MS = 2 * 60 * 1000
 
 const NUM = /^-?\d+(?:\.\d+)?$/
@@ -20,6 +22,8 @@ const NUM = /^-?\d+(?:\.\d+)?$/
 export function parseRegionTitle(title, logical) {
   const t = String(title || '')
   if (!t.startsWith('dh-region:')) return null
+  // a click without dragging, or Enter: the whole display
+  if (t === 'dh-region:full') return logical?.width ? { x: 0, y: 0, width: logical.width, height: logical.height } : null
   const parts = t.slice('dh-region:'.length).split(',')
   if (parts.length !== 6 || !parts.every((p) => NUM.test(p))) return null
   const [x, y, w, h, vw, vh] = parts.map(Number)
@@ -73,7 +77,7 @@ export function makeRegionPicker(BrowserWindow) {
         win.show()
         win.focus()
       })
-      win.loadFile(PAGE, { query: { img: pathToFileURL(tmp).href } }).catch(() => finish(null))
+      win.loadFile(PAGE, { query: { img: pathToFileURL(tmp).href } }).catch((e) => { console.error('[RegionPicker] overlay page failed to load:', e?.message ?? e); finish(null) })
     })
   }
 }

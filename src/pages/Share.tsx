@@ -1,10 +1,52 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, Copy, ScreenRegion, ExternalLink, FolderOpen, Loader2, Trash2, UploadCloud, X } from '../components/icons';
+import { Camera, Copy, ScreenRegion, ExternalLink, FolderOpen, Loader2, Trash2, UploadCloud, X, FileImage, Film, Music, FileText, FileArchive, Package } from '../components/icons';
 import PageHeader from '../components/ui/PageHeader';
 import { useI18n } from '../i18n/I18nProvider';
 import type { ShareEntry, ShareEvent, ShareShotResult, ShareState } from '../global';
 
 const api = () => window.darkhub?.share;
+const SUSUYA = 'https://susuya.darkhub.ink';
+const KIND_ICON: Record<string, React.ComponentType<{ size?: number; className?: string }>> = { image: FileImage, video: Film, audio: Music, text: FileText, archive: FileArchive };
+
+/** One uploaded file, with the actions the Susuya site has: open, direct link, page link, QR code, delete. */
+function LinkRow({ h, t, copy, expiresIn, onRemove }: { h: ShareEntry; t: (k: string, d: string) => string; copy: (text: string, label: string) => void; expiresIn: (at: number) => string; onRemove: () => void }) {
+  const [qr, setQr] = useState<string | null>(null);
+  const [showQr, setShowQr] = useState(false);
+  const [thumbOk, setThumbOk] = useState(true);
+  const Icon = KIND_ICON[h.kind || ''] || Package;
+  const toggleQr = async () => {
+    if (!showQr && !qr) { const r = await window.darkhub?.share.qr(h.pageUrl); if (r?.ok && r.dataUrl) setQr(r.dataUrl); }
+    setShowQr((v) => !v);
+  };
+  return (
+    <li className="py-2.5 text-[12.5px]">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          {h.kind === 'image' && thumbOk ? (
+            <img src={`${SUSUYA}/r/${encodeURIComponent(h.id)}`} alt="" loading="lazy" onError={() => setThumbOk(false)} className="size-10 rounded object-cover bg-zinc-900 shrink-0" />
+          ) : <span className="size-10 rounded bg-zinc-900 grid place-items-center shrink-0"><Icon size={18} className="text-zinc-400" /></span>}
+          <div className="min-w-0">
+            <p className="text-zinc-100 truncate" title={h.name}>{h.name}</p>
+            <p className="text-zinc-500">{fmtBytes(h.size)} · {expiresIn(h.expiresAt)}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1.5 shrink-0">
+          <button type="button" className="dh-btn dh-btn-sm" onClick={() => copy(h.directUrl, t('share.linkCopied', 'Link de download direto copiado.'))}><Copy size={14} />{t('share.copyDirect', 'Link direto')}</button>
+          <button type="button" className="dh-btn dh-btn-ghost dh-btn-sm" onClick={() => copy(h.pageUrl, t('share.pageCopied', 'Link da página copiado.'))}>{t('share.copyPage', 'Link da página')}</button>
+          <button type="button" className="dh-btn dh-btn-ghost dh-btn-sm" onClick={() => window.darkhub?.shell.openExternal(h.pageUrl)}><ExternalLink size={14} />{t('share.open', 'Abrir')}</button>
+          <button type="button" className={`dh-btn dh-btn-ghost dh-btn-sm ${showQr ? 'text-blue-300' : ''}`} aria-expanded={showQr} onClick={toggleQr}>{t('share.qr', 'QR code')}</button>
+          <button type="button" className="dh-btn dh-btn-ghost dh-btn-sm" aria-label={t('share.delete', 'Apagar agora')} title={t('share.delete', 'Apagar agora')} onClick={onRemove}><Trash2 size={14} /></button>
+        </div>
+      </div>
+      {showQr ? (
+        <div className="mt-3 flex items-center gap-4">
+          {qr ? <img src={qr} alt={t('share.qrAlt', 'QR code do link')} className="size-[140px] rounded bg-white p-1" /> : <span className="text-zinc-500">{t('share.qrMaking', 'gerando...')}</span>}
+          <p className="dh-help max-w-[260px]">{t('share.qrHelp', 'Aponte a câmera do celular para abrir o arquivo direto, sem digitar nada.')}</p>
+        </div>
+      ) : null}
+    </li>
+  );
+}
 const TTL_HOURS = [1, 6, 24];
 
 const fmtBytes = (n: number) => (n < 1048576 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(n < 104857600 ? 1 : 0)} MB`);
@@ -153,17 +195,7 @@ export default function Share() {
             {st.history.length === 0 ? <p className="dh-help">{t('share.none', 'Nenhum arquivo enviado ainda.')}</p> : (
               <ul className="divide-y divide-zinc-800/80">
                 {st.history.map((h) => (
-                  <li key={h.id} className="py-2 flex flex-col sm:flex-row sm:items-center gap-2 text-[12.5px]">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-zinc-100 truncate" title={h.name}>{h.name}</p>
-                      <p className="text-zinc-500">{fmtBytes(h.size)} · {expiresIn(h.expiresAt)}</p>
-                    </div>
-                    <div className="flex gap-1.5 shrink-0">
-                      <button type="button" className="dh-btn dh-btn-sm" onClick={() => copy(h.directUrl, t('share.linkCopied', 'Link de download direto copiado.'))}><Copy size={14} />{t('share.copyDirect', 'Link direto')}</button>
-                      <button type="button" className="dh-btn dh-btn-ghost dh-btn-sm" onClick={() => copy(h.pageUrl, t('share.pageCopied', 'Link da página copiado.'))}>{t('share.copyPage', 'Página')}</button>
-                      <button type="button" className="dh-btn dh-btn-ghost dh-btn-sm" aria-label={t('share.delete', 'Excluir do Susuya')} title={t('share.delete', 'Excluir do Susuya')} onClick={async () => setSt(await api()!.remove(h.id))}><Trash2 size={14} /></button>
-                    </div>
-                  </li>
+                  <LinkRow key={h.id} h={h} t={t} copy={copy} expiresIn={expiresIn} onRemove={async () => setSt(await api()!.remove(h.id))} />
                 ))}
               </ul>
             )}

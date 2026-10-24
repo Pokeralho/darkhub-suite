@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-10-23T21:23:09. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-10-23T21:45:19. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -126,7 +126,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ipc/shareIpc.js`
 
-`readJson`:12, `writeJson`:13, `normalizeShareConfig`:17, `registerShareIPC`:29, `broadcast`:41, `notify`:42, `liveHistory`:43, `upload`:45, `publicEntry`:75, `capture`:79, `bindHotkey`:101, `handle`:116, `state`:123
+`readJson`:13, `writeJson`:14, `normalizeShareConfig`:18, `registerShareIPC`:30, `broadcast`:42, `notify`:43, `liveHistory`:44, `upload`:46, `publicEntry`:76, `capture`:80, `bindHotkey`:102, `handle`:117, `state`:124
 
 ## `electron/ipc/upscaleIpc.js`
 
@@ -166,7 +166,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:94, `listener`:156, `listener`:180, `handler`:241, `handler`:267, `handler`:273, `handler`:279, `handler`:285, `listener`:294, `listener`:305, `handler`:330, `listener`:343, `listener`:360, `handler`:387, `handler`:402, `listener`:425, `handler`:478
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:94, `listener`:156, `listener`:180, `handler`:241, `handler`:267, `handler`:273, `handler`:279, `handler`:285, `listener`:294, `listener`:305, `handler`:330, `listener`:343, `listener`:360, `handler`:388, `handler`:403, `listener`:426, `handler`:479
 
 ## `electron/services/CoverProviderService.js`
 
@@ -390,7 +390,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/susuya/RegionPicker.js`
 
-`parseRegionTitle`:20, `makeRegionPicker`:34, `finish`:51
+`parseRegionTitle`:22, `makeRegionPicker`:38, `finish`:55
 
 ## `electron/services/susuya/Screenshot.js`
 
@@ -682,7 +682,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/Share.tsx`
 
-`api`:7, `fmtBytes`:10, `acceleratorOf`:13, `HotkeyField`:25 _component_, `Share`:43 _component_, `setConfig`:74, `copy`:79, `report`:83, `onDrop`:88, `expiresIn`:92, `capture`:96
+`api`:7, `LinkRow`:12 _component_, `toggleQr`:17, `fmtBytes`:52, `acceleratorOf`:55, `HotkeyField`:67 _component_, `Share`:85 _component_, `setConfig`:116, `copy`:121, `report`:125, `onDrop`:130, `expiresIn`:134, `capture`:138
 
 ## `src/pages/SpaceSniffer/TreemapCanvas.tsx`
 
