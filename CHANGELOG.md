@@ -4,6 +4,98 @@ All notable changes to the DarkHub Suite project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.7.1] - 2026-10-24
+
+### Added
+- Restore Windows components (Post-Install Hub): brings back what custom ISOs remove, one click each and verified
+  afterwards: legacy Windows Media Player, Media Features, .NET 3.5 (Windows Update or offline from a mounted ISO),
+  DirectPlay, Print to PDF, WMIC, classic Notepad, Media Player/Photos/Camera and codecs, Calculator, Paint, Xbox apps,
+  the Microsoft Store and winget itself (official release, hash-pinned). Windows Update is unlocked only during the job.
+- Driver Center installs missing drivers: detects devices without a driver and GPUs on the Microsoft basic display
+  driver, then gets drivers from Windows Update (temporarily re-enabling it on DarkOS and restoring it after) or from
+  NVIDIA / AMD / Intel official sources (signature checked); restore point first, progress and log on screen.
+- Startup manager: Run keys, Startup folders, logon/boot tasks and auto services; enable/disable exactly like Task
+  Manager (StartupApproved), measured boot delay per app from the Diagnostics-Performance log, change history with undo.
+- Before/after benchmark: CPU single/multi, memory bandwidth/latency, 1 ms timer delay, disk sequential and flushed 4K
+  writes; records the system context and only reports a change when it exceeds the measured run-to-run variation.
+- Scheduled maintenance (off by default): temp cleanup, game save backups, security lists, ClamAV signatures and winget
+  updates on a daily/weekly/monthly schedule while DarkHub runs (tray included); missed slots run once later.
+- Game save backup: save locations for 22,000+ games from the Ludusavi manifest (PCGamingWiki data), versioned plain
+  folders, portable restore with a safety copy first, custom folders, automatic backup when a Library game closes.
+- In-game overlay: FPS, 1% low, frame time graph (Intel PresentMon, pinned and hash-checked) plus CPU/GPU load,
+  temperatures, VRAM and power on a click-through window; global shortcut Ctrl+Shift+F9; session log to CSV.
+- USB ports: devices per hub/port with their real product names, turn a device off without unplugging it (keyboards
+  and mice come back by themselves after 20 s unless confirmed), block USB storage, read-only flash drives, selective
+  suspend, safe eject and the history of storage devices.
+- Password vault transfer between PCs through Susuya: sealed again with a one-time key that only travels in the code.
+- Advanced Security: protective DNS (Quad9, Cloudflare Security/Family, AdGuard) with restore.
+- Text Editor runs code: JavaScript (bundled Node), PowerShell and Batch always; Python, C, C++, C# (.NET 10), Java,
+  Go and Rust when installed (winget command shown otherwise). Stdin box, time limit that kills the process tree, Stop,
+  capped output, and starter examples (output, input, function + loop) in every language. Line numbers, Tab indents.
+- Developer Tools rebuilt as a sidebar of 13 tools: two-way unit converter (temperature, data size decimal/binary, data
+  rate, length, mass, time, speed, area, volume, energy, pressure, angle, frequency, number bases, timestamps), Color
+  Picker (screen eyedropper, HEX/RGB/HSL/HSV/CMYK, WCAG contrast, history), regex tester, JWT decoder, cron explainer,
+  UUID/ULID, password generator with entropy, encoders.
+- Decryption: Base32/Base58/Base64URL, HTML entities, Morse, ROT13/ROT47, Caesar (with every shift listed), Atbash,
+  Vigenère, XOR; AES-256-GCM with PBKDF2-SHA256 (authenticated); hashes and HMAC (MD5 to SHA3-512, RIPEMD-160); format
+  identification and JWT decoding.
+- Advanced Security rebuilt with real, reversible protections: community hosts blocklists (StevenBlack, HaGeZi,
+  malware-filter URLhaus/phishing), firewall IP blocklists (Spamhaus DROP, Feodo, IPsum), malware hash lists fed into
+  real-time protection, and Windows hardening (Defender ASR rules, PUA, Controlled Folder Access, SmartScreen, SMBv1,
+  LLMNR/NetBIOS, script block logging, RDP). Every layer saves the previous state and restores it exactly.
+- Password vault browser extension (Chrome, Edge, Firefox; Manifest V3) over Native Messaging: one-time pairing with a
+  code confirmed in the app, logins offered only for the page's site, passwords only on an explicit fill, rate limits,
+  revocable paired browsers.
+- Metadata editor for any file: images (EXIF/IPTC/XMP, GPS removal, strip), audio (ID3, Vorbis, MP4 atoms, cover art),
+  video (ffmpeg stream copy), PDF, Office documents, read-only EXE/DLL version info; file dates, attributes, alternate
+  data streams and the "downloaded from the internet" mark; every write is read back before it replaces the file.
+- PowerShell Tools: 7 tabs and 20 configurable tools (system report, startup, tasks, services, event log, installed
+  programs, winget upgrades, disk health, large/duplicate files, old-file cleanup, open ports, Wi-Fi profiles, hosts
+  editor, update history, SFC/DISM, battery/energy reports) plus a custom script runner with live output and snippets.
+  Results filter, sort and export to CSV/JSON/TXT.
+- Network & Latency: live latency monitor with jitter/loss chart and game-server presets, per-hop traceroute, MTU
+  discovery, bufferbloat grade, DNS benchmark with apply/restore, and reversible adapter tweaks (interrupt moderation,
+  flow control, power saving, ECN, QoS DSCP per game).
+- Video downloader options: MP4/MKV/WebM, H.264 or AV1, subtitles (embed, languages, auto), SponsorBlock (cut or mark),
+  chapters (embed or split), section trim, playlist items, bandwidth limit, skip already downloaded.
+- OCR: capture a screen area, 11 languages, layout modes, confidence indicator; language data cached for offline use;
+  small images upscaled and light-on-dark text inverted before recognition.
+- Disk map: colors by category (system, junk, games, programs, development, media, installers), clickable legend with
+  per-category totals, back/forward history and keyboard navigation, "largest here" list.
+- Real-time optimizer smart mode (on by default): lowers updaters and background helpers, closes only Windows telemetry
+  runners, never closes user programs.
+
+### Changed
+- ClamAV installs itself with its signatures in the background when real-time protection is turned on.
+- DarkHub runs as administrator: when opened without it, it asks UAC to reopen elevated (retry, continue limited or
+  quit when declined). The installer is per-machine.
+- The installer also sets up the PawnIO driver (advanced sensors) and ClamAV 1.5.4, both downloaded from their official
+  sources and checked against pinned SHA-256 hashes (PawnIO also by its digital signature); a failure never blocks the
+  DarkHub install. Advanced sensors (CPU temperature) start with the app.
+- Download Manager picks the connection count from the file size (1 to 16) unless set by hand.
+- System Optimizer items grouped in collapsible categories with descriptions and applied counts.
+- Password vault: stronger scrypt parameters (migrated on unlock with a backup), full-length GCM tags enforced, KDF
+  parameters bounds-checked, backup before import, locks on Windows lock and sleep.
+
+### Fixed
+- Advanced Security hosts blocking is capped at 10,000 entries and only the URLhaus list is on by default: in the test
+  VM every hosts change stalled Windows DNS for 4 s at 5k entries and 12 min at ~100k (the previous default).
+- Hosts writes retry while Windows still holds the file; PresentMon download retries.
+- USB device list could drop devices when a property query failed for one of them.
+- Save backup: a restore within the same second as a backup could overwrite the version being restored.
+- Library: picking an executable now reaches the editor (games could not be saved); covers load again (local-resource
+  drive letter and covers folder access) with fallbacks and a refetch on error; cover saves no longer overwrite edits;
+  re-importing does not duplicate games; launch optimizations wait for the game process and report what was applied.
+- Optimizer Energy-Efficient Ethernet read/apply/restore matched `AdvancedEEE` too (wildcard keyword); now exact.
+- Network: Winsock/TCP reset runs elevated (it failed silently before); the guessed "optimized MTU" was replaced by real
+  MTU discovery.
+
+### Removed
+- Advanced Security's hand-written "anti-phishing shield" and the "anti-ransomware armor" (it only set the VSS service
+  to automatic and always reported success).
+
 ## [0.7.0] - 2026-10-23
 
 ### Added
