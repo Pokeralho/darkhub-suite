@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, Copy, ExternalLink, FolderOpen, Loader2, Trash2, UploadCloud, X } from '../components/icons';
+import { Camera, Copy, ScreenRegion, ExternalLink, FolderOpen, Loader2, Trash2, UploadCloud, X } from '../components/icons';
 import PageHeader from '../components/ui/PageHeader';
 import { useI18n } from '../i18n/I18nProvider';
-import type { ShareEntry, ShareEvent, ShareState } from '../global';
+import type { ShareEntry, ShareEvent, ShareShotResult, ShareState } from '../global';
 
 const api = () => window.darkhub?.share;
 const TTL_HOURS = [1, 6, 24];
@@ -21,6 +21,25 @@ function acceleratorOf(e: React.KeyboardEvent) {
   return [...parts, k].join('+');
 }
 
+/** Read-only field that records a global shortcut when focused. */
+function HotkeyField({ label, value, active, onChange }: { label: string; value: string; active: boolean; onChange: (acc: string) => void }) {
+  const { t } = useI18n();
+  const [recording, setRecording] = useState(false);
+  return (
+    <label className="block space-y-1 text-[12.5px]">
+      <span className="text-zinc-500">{label} {active ? '' : <span className="text-amber-200">· {t('share.hotkeyOff', 'inativo')}</span>}</span>
+      <input
+        readOnly
+        className={`dh-input w-full font-mono ${recording ? 'border-blue-400' : ''}`}
+        value={recording ? t('share.pressKeys', 'Pressione o atalho...') : value}
+        onFocus={() => setRecording(true)}
+        onBlur={() => setRecording(false)}
+        onKeyDown={(e) => { e.preventDefault(); const acc = acceleratorOf(e); if (acc) { setRecording(false); (e.target as HTMLInputElement).blur(); onChange(acc); } }}
+      />
+    </label>
+  );
+}
+
 export default function Share() {
   const { t } = useI18n();
   const [st, setSt] = useState<ShareState | null>(null);
@@ -28,7 +47,6 @@ export default function Share() {
   const [shots, setShots] = useState<{ file: string; name: string; bytes: number; at: number }[]>([]);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
   const [drag, setDrag] = useState(false);
-  const [recording, setRecording] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const now = useRef(Date.now());
 
@@ -75,11 +93,12 @@ export default function Share() {
     const h = Math.max(0, (at - now.current) / 3600000);
     return h >= 1 ? t('share.expiresH', 'expira em {n} h').replace('{n}', h.toFixed(0)) : t('share.expiresM', 'expira em {n} min').replace('{n}', String(Math.ceil(h * 60)));
   };
-  const capture = async () => {
-    setBusy('capture'); setNotice(null);
+  const capture = async (region = false) => {
+    setBusy(region ? 'region' : 'capture'); setNotice(null);
     try {
-      const r = await api()!.capture();
+      const r: ShareShotResult = region ? await api()!.captureRegion() : await api()!.capture();
       if (!r.ok) setNotice({ tone: 'err', text: r.error || '' });
+      else if (r.cancelled) setNotice(null);
       else setNotice({ tone: r.uploadError ? 'err' : 'ok', text: r.uploadError ? r.uploadError : r.entry ? t('share.shotUploaded', 'Print {w}x{h} enviado; link direto copiado.').replace('{w}', String(r.width)).replace('{h}', String(r.height)) : t('share.shotSaved', 'Print {w}x{h} salvo ({kb}) em {ms} ms.').replace('{w}', String(r.width)).replace('{h}', String(r.height)).replace('{kb}', fmtBytes(r.bytes || 0)).replace('{ms}', String(r.ms)) });
       void refreshShots();
     } finally { setBusy(null); }
@@ -154,22 +173,18 @@ export default function Share() {
         <aside className="dh-card p-4 space-y-4">
           <div>
             <h2 className="dh-section-title flex items-center gap-2"><Camera size={15} className="text-zinc-400" />{t('share.shots', 'Capturas de tela')}</h2>
-            <p className="dh-help mt-1">{t('share.shotsDesc', 'Captura o monitor onde está o mouse na resolução física (4K a 150% sai em 3840x2160) e salva em PNG, sem perda.')}</p>
+            <p className="dh-help mt-1">{t('share.shotsDesc', 'Selecione uma área como no Recorte do Windows ou capture o monitor onde está o mouse, em resolução física e PNG sem perda.')}</p>
           </div>
-          <button type="button" className="dh-btn dh-btn-primary w-full" disabled={busy !== null} onClick={capture}>
-            {busy === 'capture' ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}{t('share.captureNow', 'Capturar agora')}
-          </button>
-          <label className="block space-y-1 text-[12.5px]">
-            <span className="text-zinc-500">{t('share.hotkey', 'Atalho global')} {st.hotkeyActive ? '' : <span className="text-amber-200">· {t('share.hotkeyOff', 'inativo')}</span>}</span>
-            <input
-              readOnly
-              className={`dh-input w-full font-mono ${recording ? 'border-blue-400' : ''}`}
-              value={recording ? t('share.pressKeys', 'Pressione o atalho...') : c.hotkey}
-              onFocus={() => setRecording(true)}
-              onBlur={() => setRecording(false)}
-              onKeyDown={(e) => { e.preventDefault(); const acc = acceleratorOf(e); if (acc) { setRecording(false); (e.target as HTMLInputElement).blur(); void setConfig({ hotkey: acc }); } }}
-            />
-          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" className="dh-btn dh-btn-primary" disabled={busy !== null} onClick={() => capture(true)} title={t('share.captureRegionHelp', 'Congela a tela; arraste para escolher a área. Esc cancela.')}>
+              {busy === 'region' ? <Loader2 size={14} className="animate-spin" /> : <ScreenRegion size={14} />}{t('share.captureRegion', 'Selecionar área')}
+            </button>
+            <button type="button" className="dh-btn" disabled={busy !== null} onClick={() => capture(false)}>
+              {busy === 'capture' ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}{t('share.captureNow', 'Tela inteira')}
+            </button>
+          </div>
+          <HotkeyField label={t('share.regionHotkey', 'Atalho: área')} value={c.regionHotkey} active={st.regionHotkeyActive} onChange={(acc) => void setConfig({ regionHotkey: acc })} />
+          <HotkeyField label={t('share.hotkey', 'Atalho: tela inteira')} value={c.hotkey} active={st.hotkeyActive} onChange={(acc) => void setConfig({ hotkey: acc })} />
           <label className="flex items-center gap-2.5 text-[12.5px] text-zinc-300">
             <input type="checkbox" checked={c.autoUpload} onChange={(e) => setConfig({ autoUpload: e.target.checked })} />
             {t('share.autoUpload', 'Enviar ao Susuya e copiar o link')}

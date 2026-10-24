@@ -1,11 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { SusuyaClient, SUSUYA_ORIGIN } from '../services/susuya/SusuyaClient.js'
-import { captureScreen } from '../services/susuya/Screenshot.js'
+import { captureScreen, captureRegion } from '../services/susuya/Screenshot.js'
+import { makeRegionPicker } from '../services/susuya/RegionPicker.js'
 
 const HISTORY_MAX = 100
 const TTLS = [3600, 21600, 86400]
 const DEFAULT_HOTKEY = 'Ctrl+Shift+F12'
+const DEFAULT_REGION_HOTKEY = 'Ctrl+Shift+F11'
 
 function readJson(file, fallback) { try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return fallback } }
 function writeJson(file, value) {
@@ -15,6 +17,7 @@ function writeJson(file, value) {
 export function normalizeShareConfig(c = {}, picturesDir = '') {
   return {
     hotkey: typeof c.hotkey === 'string' && c.hotkey.length <= 40 ? c.hotkey : DEFAULT_HOTKEY,
+    regionHotkey: typeof c.regionHotkey === 'string' && c.regionHotkey.length <= 40 && c.regionHotkey !== c.hotkey ? c.regionHotkey : DEFAULT_REGION_HOTKEY,
     folder: typeof c.folder === 'string' && path.isAbsolute(c.folder) ? c.folder : path.join(picturesDir, 'DarkHub Screenshots'),
     autoUpload: c.autoUpload === true,
     copyImage: c.copyImage !== false,
@@ -71,8 +74,11 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globa
   // the delete token stays in the main process
   const publicEntry = ({ deleteToken, ...rest }) => rest
 
-  async function capture() {
-    const shot = await captureScreen(config.folder)
+  const pickRegion = makeRegionPicker(BrowserWindow)
+
+  async function capture(region = false) {
+    const shot = region ? await captureRegion(config.folder, pickRegion) : await captureScreen(config.folder)
+    if (!shot) return { ok: true, cancelled: true }
     if (config.copyImage) { try { clipboard.writeImage(shot.image) } catch { /* clipboard busy */ } }
     const info = { file: shot.file, width: shot.width, height: shot.height, bytes: shot.bytes, ms: shot.ms }
     broadcast({ type: 'screenshot', ...info })
@@ -90,15 +96,17 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globa
     return { ok: true, ...info }
   }
 
-  let registered = null
-  const bindHotkey = (accelerator) => {
-    if (registered) { try { globalShortcut.unregister(registered) } catch { /* gone */ } registered = null }
+  // two global shortcuts: full screen and region selection
+  const registered = { hotkey: null, regionHotkey: null }
+  const bindHotkey = (key, accelerator) => {
+    if (registered[key]) { try { globalShortcut.unregister(registered[key]) } catch { /* gone */ } registered[key] = null }
     if (!accelerator) return { ok: true }
+    const region = key === 'regionHotkey'
     try {
-      if (!globalShortcut.register(accelerator, () => { capture().catch((e) => logger?.warn?.('Share', `capture: ${e?.message ?? e}`)) })) {
+      if (!globalShortcut.register(accelerator, () => { capture(region).catch((e) => logger?.warn?.('Share', `capture: ${e?.message ?? e}`)) })) {
         return { ok: false, error: 'atalho em uso por outro programa' }
       }
-      registered = accelerator
+      registered[key] = accelerator
       return { ok: true }
     } catch (e) {
       return { ok: false, error: `atalho inválido: ${e?.message ?? e}` }
@@ -112,12 +120,17 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globa
     }
   })
 
-  const state = () => ({ ok: true, config, hotkeyActive: Boolean(registered), history: liveHistory().map(publicEntry), uploading: jobs.size })
+  const state = () => ({ ok: true, config, hotkeyActive: Boolean(registered.hotkey), regionHotkeyActive: Boolean(registered.regionHotkey), history: liveHistory().map(publicEntry), uploading: jobs.size })
   handle('share:state', state)
   handle('share:setConfig', (patch) => {
+    if (patch.hotkey && patch.hotkey === (patch.regionHotkey ?? config.regionHotkey)) return { ...state(), error: 'atalho já usado pelo print de área' }
+    if (patch.regionHotkey && patch.regionHotkey === (patch.hotkey ?? config.hotkey)) return { ...state(), error: 'atalho já usado pelo print da tela inteira' }
     const next = normalizeShareConfig({ ...config, ...patch }, pictures)
-    const hk = next.hotkey !== config.hotkey || !registered ? bindHotkey(next.hotkey) : { ok: true }
-    if (!hk.ok) { bindHotkey(config.hotkey); return { ...state(), error: hk.error } }
+    for (const key of ['hotkey', 'regionHotkey']) {
+      if (next[key] === config[key] && registered[key]) continue
+      const hk = bindHotkey(key, next[key])
+      if (!hk.ok) { bindHotkey(key, config[key]); return { ...state(), error: hk.error } }
+    }
     config = next
     writeJson(configFile, config)
     return state()
@@ -152,6 +165,7 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globa
     return { ok: true }
   })
   handle('share:capture', () => capture())
+  handle('share:captureRegion', () => capture(true))
   handle('share:openFolder', async () => { fs.mkdirSync(config.folder, { recursive: true }); await shell.openPath(config.folder); return { ok: true } })
   handle('share:uploadFile', async ({ file }) => {
     const f = String(file || '')
@@ -171,8 +185,8 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globa
     return { ok: true, files }
   })
 
-  app.whenReady().then(() => { bindHotkey(config.hotkey) })
-  app.on('will-quit', () => { if (registered) { try { globalShortcut.unregister(registered) } catch { /* gone */ } } })
+  app.whenReady().then(() => { bindHotkey('hotkey', config.hotkey); bindHotkey('regionHotkey', config.regionHotkey) })
+  app.on('will-quit', () => { for (const acc of Object.values(registered)) { if (acc) { try { globalShortcut.unregister(acc) } catch { /* gone */ } } } })
 }
 
 export default registerShareIPC

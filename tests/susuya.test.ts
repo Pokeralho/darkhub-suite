@@ -7,13 +7,24 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-vi.mock('electron', () => ({ desktopCapturer: {}, screen: {} }));
+const fakeShot = {
+  crops: [] as any[],
+  isEmpty: () => false,
+  getSize: () => ({ width: 3840, height: 2160 }),
+  crop(r: any) { fakeShot.crops.push(r); return { toPNG: () => Buffer.from('png'), getSize: () => ({ width: r.width, height: r.height }) }; }
+};
+vi.mock('electron', () => ({
+  desktopCapturer: { getSources: async () => [{ display_id: '1', thumbnail: fakeShot }] },
+  screen: { getCursorScreenPoint: () => ({ x: 0, y: 0 }), getDisplayNearestPoint: () => ({ id: 1, size: { width: 2560, height: 1440 }, scaleFactor: 1.5, bounds: { x: 0, y: 0, width: 2560, height: 1440 } }) }
+}));
 // @ts-ignore plain JS modules
 import { SusuyaClient, links, mimeOf } from '../electron/services/susuya/SusuyaClient.js';
 // @ts-ignore
 import { normalizeShareConfig } from '../electron/ipc/shareIpc.js';
 // @ts-ignore
-import { physicalSize, screenshotName } from '../electron/services/susuya/Screenshot.js';
+import { physicalSize, screenshotName, cropRect, captureRegion } from '../electron/services/susuya/Screenshot.js';
+// @ts-ignore
+import { parseRegionTitle } from '../electron/services/susuya/RegionPicker.js';
 
 /** Minimal Susuya: same endpoints and shapes as susuya.darkhub.ink (checked against the live service). */
 function fakeSusuya({ chunkSize = 1024, failFirstPutOf = -1 } = {}) {
@@ -107,6 +118,36 @@ describe('screenshots and share settings', () => {
   it('names files by date and validates settings', () => {
     expect(screenshotName(new Date(2026, 9, 23, 9, 5, 7))).toBe('DarkHub_2026-10-23_09-05-07.png');
     const c = normalizeShareConfig({ ttl: 999, folder: 'relative', hotkey: 'Ctrl+Shift+P' }, 'C:\\Users\\x\\Pictures');
-    expect(c).toEqual({ hotkey: 'Ctrl+Shift+P', folder: 'C:\\Users\\x\\Pictures\\DarkHub Screenshots', autoUpload: false, copyImage: true, ttl: 86400 });
+    expect(c).toEqual({ hotkey: 'Ctrl+Shift+P', regionHotkey: 'Ctrl+Shift+F11', folder: 'C:\\Users\\x\\Pictures\\DarkHub Screenshots', autoUpload: false, copyImage: true, ttl: 86400 });
+    // the region shortcut can never be the same as the full-screen one
+    expect(normalizeShareConfig({ hotkey: 'Alt+F9', regionHotkey: 'Alt+F9' }, 'C:/p').regionHotkey).toBe('Ctrl+Shift+F11');
+    expect(normalizeShareConfig({ regionHotkey: 'Alt+F9' }, 'C:/p').regionHotkey).toBe('Alt+F9');
+  });
+  it('maps a region drawn in logical pixels to physical pixels, clamped', () => {
+    const logical = { width: 2560, height: 1440 }, image = { width: 3840, height: 2160 };
+    expect(cropRect({ x: 100, y: 50, width: 200, height: 100 }, logical, image)).toEqual({ x: 150, y: 75, width: 300, height: 150 });
+    // dragged up-left, and past the edge
+    expect(cropRect({ x: 2600, y: 1500, width: -200, height: -100 }, logical, image)).toEqual({ x: 3600, y: 2100, width: 240, height: 60 });
+    expect(cropRect({ x: 10, y: 10, width: 1, height: 1 }, logical, image)).toBeNull();
+    expect(cropRect(null, logical, image)).toBeNull();
+  });
+  it('parses only well-formed overlay results', () => {
+    expect(parseRegionTitle('dh-region:10,20.5,300,200,2560,1440', { width: 2560, height: 1440 })).toEqual({ x: 10, y: 20.5, width: 300, height: 200 });
+    // window came out smaller than the display: scaled back to the display
+    expect(parseRegionTitle('dh-region:1272,0,1272,716,2544,1432', { width: 2560, height: 1440 })).toEqual({ x: 1280, y: 0, width: 1280, height: 720 });
+    expect(parseRegionTitle('dh-region:10,20,300,200')).toBeNull();
+    expect(parseRegionTitle('dh-region:cancel')).toBeNull();
+    expect(parseRegionTitle('DarkHub')).toBeNull();
+  });
+  it('saves only the selected area, and nothing when cancelled', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-region-'));
+    try {
+      expect(await captureRegion(dir, async () => null)).toBeNull();
+      expect(fs.readdirSync(dir)).toEqual([]);
+      const shot = await captureRegion(dir, async () => ({ x: 0, y: 0, width: 100, height: 40 }));
+      expect(fakeShot.crops.at(-1)).toEqual({ x: 0, y: 0, width: 150, height: 60 });
+      expect(shot).toMatchObject({ width: 150, height: 60 });
+      expect(fs.readdirSync(dir)).toHaveLength(1);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   });
 });

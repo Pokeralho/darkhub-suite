@@ -171,6 +171,8 @@ export const Crosshair = icon('Crosshair', [['c', 12, 12, 8], 'M12 2.5v5M12 16.5
 export const Target = icon('Target', [['c', 12, 12, 9], ['c', 12, 12, 5.2], ['dot', 'M12 12v.01']]);
 export const Headphones = icon('Headphones', ['M4 18v-5a8 8 0 0 1 16 0v5', cut(3, 13.5, 4, 6.5, 1), cut(17, 13.5, 4, 6.5, 1)]);
 export const Camera = icon('Camera', ['M3.5 8.5L5 7h3l1.5-2.5h5L16 7h3l1.5 1.5v10L19 20H5l-1.5-1.5Z', ['c', 12, 13, 3.5]]);
+/** Region screenshot: four chamfered corner brackets around a crosshair. */
+export const ScreenRegion = icon('ScreenRegion', ['M3.5 8V5l1.5-1.5h3', 'M16 3.5h3L20.5 5v3', 'M20.5 16v3L19 20.5h-3', 'M8 20.5H5L3.5 19v-3', 'M12 9v6', 'M9 12h6']);
 export const Video = icon('Video', [cut(2.5, 6, 13, 12, 2), 'M15.5 10.5l6-3.5v10l-6-3.5']);
 export const Film = icon('Film', [cut(3, 3, 18, 18, 2.5), 'M7.5 3v18M16.5 3v18M3 8h4.5M3 12h18M3 16h4.5M16.5 8H21M16.5 16H21']);
 export const Music = icon('Music', ['M9 18V5.5l11-2v12', ['c', 6.5, 18, 2.5], ['c', 17.5, 15.5, 2.5]]);

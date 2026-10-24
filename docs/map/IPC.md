@@ -1,6 +1,6 @@
-<!-- GERADO por electron_feature_map.py em 2026-10-23T15:42:17. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-10-23T21:23:09. NAO edite a mao: rode `npm run map`. -->
 
-# Canais IPC (319)
+# Canais IPC (320)
 
 | API (`window.darkhub.`) | canal | handler | chama | usado em |
 |---|---|---|---|---|
@@ -250,18 +250,19 @@
 | `setup.detectHardware` | `setup:detectHardware` | `electron/main.js:3996` | `si.cpu`<br>`si.graphics`<br>`si.baseboard` | `src/pages/SetupHub.tsx` |
 | `setup.installWinget` | `setup:installWinget` | `electron/main.js:3929` | `sender.isDestroyed`<br>`sender.send`<br>`appIds.map` | `src/pages/SetupHub.tsx` |
 | `setup.onInstallProgress` | `setup:installProgress` | _evento main->tela_ |  | `src/pages/SetupHub.tsx` |
-| `share.cancel` | `share:cancel` | `electron/ipc/shareIpc.js:139` | `jobs.get` | _nao usado_ |
-| `share.capture` | `share:capture` | `electron/ipc/shareIpc.js:154` |  | _nao usado_ |
-| `share.copy` | `share:copy` | `electron/ipc/shareIpc.js:148` | `s.startsWith`<br>`clipboard.writeText` | _nao usado_ |
+| `share.cancel` | `share:cancel` | `electron/ipc/shareIpc.js:152` | `jobs.get` | _nao usado_ |
+| `share.capture` | `share:capture` | `electron/ipc/shareIpc.js:167` |  | _nao usado_ |
+| `share.captureRegion` | `share:captureRegion` | `electron/ipc/shareIpc.js:168` |  | _nao usado_ |
+| `share.copy` | `share:copy` | `electron/ipc/shareIpc.js:161` | `s.startsWith`<br>`clipboard.writeText` | _nao usado_ |
 | `share.onEvent` | `share:event` | _evento main->tela_ |  | `src/pages/Share.tsx` |
-| `share.openFolder` | `share:openFolder` | `electron/ipc/shareIpc.js:155` |  | _nao usado_ |
-| `share.pickAndUpload` | `share:pickAndUpload` | `electron/ipc/shareIpc.js:125` | `results.push` | _nao usado_ |
-| `share.recentShots` | `share:recentShots` | `electron/ipc/shareIpc.js:162` | `i.test`<br>`globalShortcut.unregister` | `src/pages/Share.tsx` |
-| `share.remove` | `share:delete` | `electron/ipc/shareIpc.js:140` | `history.find`<br>`client.remove`<br>`i.test` | _nao usado_ |
-| `share.setConfig` | `share:setConfig` | `electron/ipc/shareIpc.js:117` |  | _nao usado_ |
-| `share.state` | `share:state` | `electron/ipc/shareIpc.js:116` |  | `src/pages/Share.tsx` |
-| `share.uploadFiles` | `share:uploadPaths` | `electron/ipc/shareIpc.js:133` | `results.push` | _nao usado_ |
-| `share.uploadScreenshot` | `share:uploadFile` | `electron/ipc/shareIpc.js:156` |  | _nao usado_ |
+| `share.openFolder` | `share:openFolder` | `electron/ipc/shareIpc.js:169` |  | _nao usado_ |
+| `share.pickAndUpload` | `share:pickAndUpload` | `electron/ipc/shareIpc.js:138` | `results.push` | _nao usado_ |
+| `share.recentShots` | `share:recentShots` | `electron/ipc/shareIpc.js:176` | `i.test`<br>`globalShortcut.unregister` | `src/pages/Share.tsx` |
+| `share.remove` | `share:delete` | `electron/ipc/shareIpc.js:153` | `history.find`<br>`client.remove`<br>`i.test` | _nao usado_ |
+| `share.setConfig` | `share:setConfig` | `electron/ipc/shareIpc.js:125` |  | _nao usado_ |
+| `share.state` | `share:state` | `electron/ipc/shareIpc.js:124` |  | `src/pages/Share.tsx` |
+| `share.uploadFiles` | `share:uploadPaths` | `electron/ipc/shareIpc.js:146` | `results.push` | _nao usado_ |
+| `share.uploadScreenshot` | `share:uploadFile` | `electron/ipc/shareIpc.js:170` |  | _nao usado_ |
 | `shell.openExternal` | `shell:openExternal` | `electron/main.js:1559` | `RENDERER_SYSTEM_URIS.has`<br>`raw.toLowerCase`<br>`parsed.toString` | `src/pages/Dashboard.tsx`<br>`src/pages/Dlss5Manager.tsx`<br>`src/pages/Share.tsx` |
 | `system.enableProcessTracking` | `system:enableProcessTracking` | `electron/main.js:1040` |  | `src/pages/SystemMonitor.tsx` |
 | `system.getAdvancedHardware` | `system:getAdvancedHardware` | `electron/main.js:1054` | `si.graphics`<br>`si.baseboard`<br>`si.bios` | _nao usado_ |

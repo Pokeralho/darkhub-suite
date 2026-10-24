@@ -1,17 +1,17 @@
 # Graph Report - DarkHub Suite  (2026-10-23)
 
 ## Corpus Check
-- 230 files · ~312,408 words
+- 232 files · ~314,474 words
 - Verdict: corpus is large enough that graph structure adds value.
-- Unclassified: 11 file(s) not represented in the graph (top: (none) 5, .example 1, .bat 1)
+- Unclassified: 12 file(s) not represented in the graph (top: (none) 5, .css 2, .example 1)
 
 ## Summary
-- 2663 nodes · 7072 edges · 126 communities (92 shown, 34 thin omitted)
+- 2679 nodes · 7119 edges · 128 communities (86 shown, 42 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 98 edges (avg confidence: 0.86)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `25539a4a`
+- Built from commit: `8092276d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -19,34 +19,34 @@
 - DarkOS.Recovery.psm1
 - main.js
 - DownloadManager
-- AdvancedSecurity.tsx
+- useI18n
 - optiscalerManager.js
 - Dashboard.tsx
-- DarkOSCenter.tsx
+- Loader2
 - App.tsx
-- runPowerShell
+- DriverCenterService.js
 - DarkOSRecoveryService
 - AppManagerEngine.js
 - lib.rs
-- YoutubeDownloader.tsx
+- PageHeader
 - SystemEngine
 - DeepTweaksEngine
 - OptimizerUtils.js
 - DarkHubLatencyEngine
 - SecurityService
 - realtime.test.ts
-- Realtime.tsx
-- DownloadManager.js
+- OptiScalerManager.tsx
+- HardwareHAL
 - WindowsToolsEngine.js
 - CONTRIBUTING.md
 - IDXGIFactory1
 - build
 - ClickEngine
-- UpdateService
-- package.json
 - Dlss5Service
+- package.json
+- DlssUpdater.js
 - DarkHubFrameLimiter
-- vaultCrypto.js
+- machineMarker.js
 - IntPtr
 - susuya.test.ts
 - devDependencies
@@ -54,7 +54,7 @@
 - libraryStore.js
 - react
 - DWORD
-- DarkOSCenter.tsx
+- Optimizer.tsx
 - compilerOptions
 - psQuote
 - DarkHub.LatencyEngine.cs
@@ -65,13 +65,13 @@
 - PowerShellToolsService.js
 - DeepHardwareService
 - SpaceSniffer/index.tsx
-- Home.tsx
+- MainLayout.tsx
 - configManager.js
 - ScanModel
 - LoggerService
 - icons/index.tsx
 - scripts
-- ref_node_os
+- gamingBooster
 - HardwareService
 - c_void
 - SystemOptimizerService
@@ -83,17 +83,17 @@
 - Changelog
 - .runElevatedPowerShell
 - ref_node_fs
-- persistVaultData
+- registerLatencyGuardian
 - perform_pacing
 - compute_stats
-- createMainWindow
-- machineMarker.js
+- runPowerShell
+- UpdateService
 - CoverProviderService
 - vite.config.js
-- realtimeConfig.js
-- psQuote
+- PowerEngine
+- SecureDownload.js
 - setup_shared_memory
-- darkosData.ts
+- nsis
 - bug_report.md
 - DXGI_SWAP_CHAIN_DESC
 - security_rule.md
@@ -107,11 +107,11 @@
 - enc
 - MD5
 - SHA256
-- hasFileAccessGrant
+- LoggerService.js
 - .Dump
-- FramePacerOverlay.js
+- TempsCollector
 - Features
-- RealtimeProtection
+- psSingleQuote
 - useRecentActivity.ts
 - dev.mjs
 - DarkHub "Frost" design system
@@ -123,22 +123,21 @@
 - ToolboxEngine.js
 - Security policy
 - runCommand
-- nsis
+- overlay.js
 - .Main
-- darkos.ts
-- shot.cjs
-- useDeepHardware.ts
-- useJunkScanner.ts
-- webview.d.ts
-- [0.5.0] - 2026-10-12
+- psQuote
+- NvidiaDaemon
+- Autopilot
+- GpuCollector
+- lhmSummary.js
+- LatencyCollector
 - README.md
-- DetailedHardwareInfo.tsx
-- preload.js
-- walk
+- react
+- walkFiles
 - [0.4.5] - 2026-09-01
 
 ## God Nodes (most connected - your core abstractions)
-1. `useI18n()` - 92 edges
+1. `useI18n()` - 93 edges
 2. `react` - 69 edges
 3. `PageHeader()` - 63 edges
 4. `runPowerShell()` - 58 edges
@@ -164,43 +163,43 @@
 ## Import Cycles
 - None detected.
 
-## Communities (126 total, 34 thin omitted)
+## Communities (128 total, 42 thin omitted)
 
 ### Community 0 - "DarkOS.Recovery.psm1"
 Cohesion: 0.07
 Nodes (92): Write-DhFail(), Write-DhLine(), Add-DkHistory(), Add-DkResults(), ConvertTo-DkHashtable(), ConvertTo-DkSignedDword(), ConvertTo-DkUInt32(), Enter-DkDefaultUser() (+84 more)
 
 ### Community 1 - "main.js"
-Cohesion: 0.05
-Nodes (39): registerWinToolsIPC(), appConfig, autoclickerConfigPath(), canSendDiscord(), computeJunkEstimate(), darkosService, DEFAULT_TRACKING_DOMAINS, __dirname (+31 more)
+Cohesion: 0.03
+Nodes (78): registerDiskScanIPC(), registerWinToolsIPC(), encodedPowerShellArgs(), appConfig, assertFileAccessGranted(), assertFileAccessGrantedMany(), assertOutputDirGranted(), autoclickerConfigPath() (+70 more)
 
 ### Community 2 - "DownloadManager"
-Cohesion: 0.10
-Nodes (10): downloadsService, AbortedError, DownloadManager, hashFile(), request(), sleep(), clampInt(), Throttle (+2 more)
+Cohesion: 0.08
+Nodes (22): downloadsService, AbortedError, DEFAULT_SETTINGS, DownloadManager, hashFile(), request(), sleep(), CATEGORY_BY_EXT (+14 more)
 
-### Community 3 - "AdvancedSecurity.tsx"
-Cohesion: 0.12
-Nodes (28): Code, Eye, EyeOff, KeyRound, Laptop, Layers, Lock, MousePointer (+20 more)
+### Community 3 - "useI18n"
+Cohesion: 0.09
+Nodes (30): EmbeddedSitePage(), EmbeddedSitePageProps, Check, Clipboard, RefreshCw, ScreenRegion, UploadCloud, DiscoveredGame (+22 more)
 
 ### Community 4 - "optiscalerManager.js"
-Cohesion: 0.10
-Nodes (53): installGithubReleaseMsi(), applyIniPatch(), applyOptiScaler(), backupPathIfExists(), buildAnalysis(), buildIniPatch(), chooseInputApi(), chooseLoader() (+45 more)
+Cohesion: 0.11
+Nodes (45): applyIniPatch(), applyOptiScaler(), backupPathIfExists(), buildAnalysis(), buildIniPatch(), chooseInputApi(), chooseLoader(), classifyAmdArchitecture() (+37 more)
 
 ### Community 5 - "Dashboard.tsx"
 Cohesion: 0.06
-Nodes (52): ArrowDownUp, Cpu, CpuIcon, Fan, Filter, LayoutTemplate, List, MemoryStick (+44 more)
+Nodes (56): Activity, AlertTriangle, Cpu, CpuIcon, Fan, Filter, LayoutTemplate, List (+48 more)
 
-### Community 6 - "DarkOSCenter.tsx"
-Cohesion: 0.08
-Nodes (57): react, DarkOSProgress(), DarkOSSystemPanel(), fmtUptime(), LiveStats, Metric(), Row(), UpdState (+49 more)
+### Community 6 - "Loader2"
+Cohesion: 0.05
+Nodes (73): DarkOSConfirmDialog(), DarkOSConfirmDialogProps, DarkOSProgress(), DarkOSSystemPanel(), fmtUptime(), LiveStats, Metric(), Row() (+65 more)
 
 ### Community 7 - "App.tsx"
 Cohesion: 0.08
 Nodes (40): AdvancedSecurity, App(), AutoClicker, DarkOSCenter, Dashboard, Decryption, DevTools, DllInjector (+32 more)
 
-### Community 8 - "runPowerShell"
-Cohesion: 0.06
-Nodes (67): registerDriverIPC(), clampInt(), isSafePingHost(), now(), psSingleQuote(), registerLatencyGuardian(), applyDnsCloudflareWithUndo(), findGameProcess() (+59 more)
+### Community 8 - "DriverCenterService.js"
+Cohesion: 0.13
+Nodes (17): registerDriverIPC(), boardPartnerFromPnpId(), cameraIssues(), classifyVendor(), DARKOS_CAMERA_ITEMS, DriverCenterService, isGenericDisplayDriver(), isOfficialDriverUrl() (+9 more)
 
 ### Community 9 - "DarkOSRecoveryService"
 Cohesion: 0.07
@@ -208,23 +207,23 @@ Nodes (23): CLI_FILE, COMMANDS, DARKOS_ROOT, DarkOSRecoveryService, defaultBundl
 
 ### Community 10 - "AppManagerEngine.js"
 Cohesion: 0.10
-Nodes (12): AppManagerEngine, BLOATWARE_LIST, toArray(), buildStartupApprovedBytes(), bytesToHex(), isProtectedService(), isSafeInstallLocationFor(), mergeGpuPreference() (+4 more)
+Nodes (13): AppManagerEngine, BLOATWARE_LIST, toArray(), buildStartupApprovedBytes(), bytesToHex(), isProtectedService(), isSafeInstallLocationFor(), isValidServiceName() (+5 more)
 
 ### Community 11 - "lib.rs"
 Cohesion: 0.06
 Nodes (31): BUSY, CONFIG_PTR, FRAME_COUNT, HIST, HIST_CAP, HIST_HEAD, HIST_LEN, HOOK_INSTALLED (+23 more)
 
-### Community 12 - "YoutubeDownloader.tsx"
-Cohesion: 0.08
-Nodes (51): HelpSection, HelpTip(), HelpTipProps, AlertCircle, Camera, Check, Clipboard, Cookie (+43 more)
+### Community 12 - "PageHeader"
+Cohesion: 0.11
+Nodes (37): HelpSection, HelpTip(), HelpTipProps, AlertCircle, Cookie, Copy, FileText, FolderOpen (+29 more)
 
 ### Community 13 - "SystemEngine"
-Cohesion: 0.13
-Nodes (6): bcdValueToArg(), isValidServiceName(), parseDhSnapLines(), scArgFromStartMode(), ServicesEngine, SystemEngine
+Cohesion: 0.14
+Nodes (5): bcdValueToArg(), parseDhSnapLines(), scArgFromStartMode(), ServicesEngine, SystemEngine
 
 ### Community 14 - "DeepTweaksEngine"
-Cohesion: 0.13
-Nodes (8): DeepTweaksEngine, kindToType(), parseRegistryReadOutput(), regEntryId(), regValueMatches(), snapshotEntryToOps(), adaptResult(), VisualsEngine
+Cohesion: 0.12
+Nodes (7): DeepTweaksEngine, kindToType(), parseRegistryReadOutput(), regEntryId(), regValueMatches(), snapshotEntryToOps(), VisualsEngine
 
 ### Community 15 - "OptimizerUtils.js"
 Cohesion: 0.08
@@ -235,20 +234,20 @@ Cohesion: 0.11
 Nodes (4): DarkHubLatencyEngine, ICMP_ECHO_REPLY, IP_OPTION_INFORMATION, PROCESS_POWER_THROTTLING_STATE
 
 ### Community 18 - "realtime.test.ts"
-Cohesion: 0.08
-Nodes (14): registerRealtimeIPC(), ClamAv, freshclamConf(), parseClamscan(), run(), EICAR_SHA256, HashDb, Quarantine (+6 more)
+Cohesion: 0.06
+Nodes (19): registerRealtimeIPC(), isCriticalProcessName(), ClamAv, run(), Quarantine, transcode(), xorStream(), clamp() (+11 more)
 
-### Community 19 - "Realtime.tsx"
-Cohesion: 0.21
-Nodes (10): currentPageRef, Entry, Activity, api(), gb(), Realtime(), Stat(), SUGGESTED (+2 more)
+### Community 19 - "OptiScalerManager.tsx"
+Cohesion: 0.10
+Nodes (36): Archive, Camera, CheckCircle2, ChevronDown, ChevronUp, Crosshair, DownloadCloud, FileCode (+28 more)
 
-### Community 20 - "DownloadManager.js"
-Cohesion: 0.24
-Nodes (12): DEFAULT_SETTINGS, CATEGORY_BY_EXT, categoryForFile(), fileNameFromUrl(), isInsideWindow(), parseContentDisposition(), parseHHMM(), planPieces() (+4 more)
+### Community 20 - "HardwareHAL"
+Cohesion: 0.12
+Nodes (5): CpuCollector, ProcessCollector, RamCollector, StorageCollector, HardwareHAL
 
 ### Community 21 - "WindowsToolsEngine.js"
-Cohesion: 0.09
-Nodes (15): ACTIONS, featureById(), featureReadScript(), launch(), NOT_WINDOWS, PANELS, parseFeatureLines(), summarizeFeatureState() (+7 more)
+Cohesion: 0.13
+Nodes (10): ACTIONS, featureById(), featureReadScript(), launch(), NOT_WINDOWS, PANELS, parseFeatureLines(), summarizeFeatureState() (+2 more)
 
 ### Community 22 - "CONTRIBUTING.md"
 Cohesion: 0.17
@@ -262,49 +261,53 @@ Nodes (21): build, appId, asarUnpack, compression, directories, electronFuses, e
 Cohesion: 0.14
 Nodes (4): Added, ClickEngine, INPUT, MOUSEINPUT
 
+### Community 26 - "Dlss5Service"
+Cohesion: 0.19
+Nodes (4): Dlss5Service, execAsync, inspectPeExecutable(), registerDlss5IPC()
+
 ### Community 27 - "package.json"
 Cohesion: 0.07
 Nodes (29): createOcrWorker(), getExiftool(), author, description, license, main, name, private (+21 more)
 
-### Community 28 - "Dlss5Service"
-Cohesion: 0.07
-Nodes (22): registerUpscaleIPC(), Dlss5Service, execAsync, inspectPeExecutable(), registerDlss5IPC(), Autopilot, findExe(), DLSS_FILES (+14 more)
+### Community 28 - "DlssUpdater.js"
+Cohesion: 0.16
+Nodes (16): registerUpscaleIPC(), DLSS_FILES, DlssUpdater, HOSTS, RAW(), safe(), scanGameFolder(), SKIP_DIRS (+8 more)
 
-### Community 30 - "vaultCrypto.js"
-Cohesion: 0.29
-Nodes (12): aesGcmDecrypt(), aesGcmEncrypt(), buildDefaultWordList(), buildKdf(), derivePasswordFromRecoveryWords(), encryptVaultData(), fromB64(), generateRecoveryWords() (+4 more)
+### Community 30 - "machineMarker.js"
+Cohesion: 0.14
+Nodes (28): _0x3c4d, ensureMachineMarker(), execFileAsync, _getH(), _mk(), _readMarker(), _regR(), _regW() (+20 more)
 
 ### Community 31 - "IntPtr"
 Cohesion: 0.15
 Nodes (4): CoreTempData, DarkHubSensorDaemon, GpuAdapter, PDH_FMT_COUNTERVALUE
 
 ### Community 32 - "susuya.test.ts"
-Cohesion: 0.15
-Nodes (18): normalizeShareConfig(), readJson(), registerShareIPC(), capture(), upload(), TTLS, writeJson(), captureScreen() (+10 more)
+Cohesion: 0.12
+Nodes (27): normalizeShareConfig(), readJson(), registerShareIPC(), capture(), upload(), TTLS, writeJson(), here (+19 more)
 
 ### Community 33 - "devDependencies"
 Cohesion: 0.09
 Nodes (22): devDependencies, concurrently, crypto-js, electron, electron-builder, @fontsource-variable/geist, @fontsource-variable/geist-mono, jsdom (+14 more)
 
 ### Community 34 - "BaseCollector"
-Cohesion: 0.06
-Nodes (21): BaseCollector, DEFAULT_STALE_MS, CpuCollector, DiskCollector, GpuCollector, LatencyCollector, buildTree(), find() (+13 more)
+Cohesion: 0.20
+Nodes (9): BaseCollector, DEFAULT_STALE_MS, DiskCollector, NetworkCollector, classifyTemperature(), createSensor(), createUnavailableSensor(), numOrNull() (+1 more)
 
 ### Community 35 - "libraryStore.js"
 Cohesion: 0.21
 Nodes (21): backupFilePath(), filePath(), loadLibrary(), newId(), newProfileId(), removeGame(), removeGameUnsafe(), sanitizeGame() (+13 more)
 
 ### Community 36 - "react"
-Cohesion: 0.14
-Nodes (29): EmbeddedSitePage(), EmbeddedSitePageProps, Clock, Plus, Settings, X, GameCard(), GameCardProps (+21 more)
+Cohesion: 0.23
+Nodes (17): Clock, DarkHubMark, Plus, Settings, GameCard(), GameCardProps, GameEditorModal(), GameEditorModalProps (+9 more)
 
 ### Community 37 - "DWORD"
 Cohesion: 0.17
 Nodes (16): CloseHandle(), CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, CreateFileMappingW(), CreateThread(), DllMain(), map_named(), MapViewOfFile(), OpenFileMappingW() (+8 more)
 
-### Community 38 - "DarkOSCenter.tsx"
-Cohesion: 0.06
-Nodes (57): DarkOSConfirmDialog(), DarkOSConfirmDialogProps, DarkOSOptimizerHint(), AlertTriangle, Archive, ChevronUp, DarkHubMark, FileArchive (+49 more)
+### Community 38 - "Optimizer.tsx"
+Cohesion: 0.12
+Nodes (27): DarkOSOptimizerHint(), Flame, Globe, Headphones, History, RotateCcw, Target, Undo2 (+19 more)
 
 ### Community 39 - "compilerOptions"
 Cohesion: 0.10
@@ -319,68 +322,64 @@ Cohesion: 0.24
 Nodes (3): DiskScan, Job, WIN32_FIND_DATA
 
 ### Community 44 - ".start"
-Cohesion: 0.10
-Nodes (5): FastSensorDaemon, HwSensorsDaemon, NvidiaDaemon, SensorBus, SlowSensorDaemon
+Cohesion: 0.13
+Nodes (4): FastSensorDaemon, HwSensorsDaemon, SensorBus, SlowSensorDaemon
 
 ### Community 45 - "ytdlp.js"
 Cohesion: 0.18
 Nodes (14): getFfmpegPath(), getYtDlpTools(), cancelActiveYtDlp(), __dirname, downloadTextWithRedirects(), downloadWithRedirects(), ensureFfmpeg(), ensureYtDlp() (+6 more)
 
 ### Community 46 - "PowerShellToolsService.js"
-Cohesion: 0.15
+Cohesion: 0.20
 Nodes (11): registerPowerShellIPC(), DARKOS_ROOT, effectivePolicy(), isPs1(), isUnderDarkOS(), normalizeScopes(), normalizeSignature(), POLICY_PRECEDENCE (+3 more)
 
 ### Community 48 - "SpaceSniffer/index.tsx"
 Cohesion: 0.13
 Nodes (27): CheckCheck, CheckSquare, Download, ExternalLink, HardDrive, HelpCircle, Home, LayoutGrid (+19 more)
 
-### Community 49 - "Home.tsx"
-Cohesion: 0.15
-Nodes (24): GuardianWidget(), ArrowRight, ChevronRight, Eraser, Gamepad2, MousePointerClick, Pause, PauseCircle (+16 more)
+### Community 49 - "MainLayout.tsx"
+Cohesion: 0.09
+Nodes (34): APP_VERSION, APP_VERSION_LABEL, GuardianWidget(), ChevronLeft, ChevronRight, Edit3, Film, Fingerprint (+26 more)
 
 ### Community 50 - "configManager.js"
 Cohesion: 0.39
 Nodes (8): CONFIG_PATH, getDefaultConfig(), loadConfig(), mergeDefaultConfig(), saveConfig(), shouldMigrateVerifyUrl(), loadRuntimeConfig(), normalizeWebhookUrl()
 
 ### Community 51 - "ScanModel"
-Cohesion: 0.06
-Nodes (30): registerDiskScanIPC(), csvCell(), DiskScanService, formatSize(), AGE_UNITS, ATTR_BITS, classOf(), EXT_CLASS (+22 more)
+Cohesion: 0.05
+Nodes (31): csvCell(), DiskScanService, formatSize(), AGE_UNITS, ATTR_BITS, classOf(), EXT_CLASS, FILE_CLASSES (+23 more)
 
 ### Community 53 - "icons/index.tsx"
 Cohesion: 0.06
-Nodes (45): crypto-js, diff, APP_VERSION, APP_VERSION_LABEL, AppWindow, ArrowRightLeft, Base(), Brackets (+37 more)
+Nodes (65): crypto-js, diff, AppWindow, ArrowRight, ArrowRightLeft, Base(), Brackets, Bug (+57 more)
 
 ### Community 54 - "scripts"
 Cohesion: 0.09
 Nodes (22): scripts, build, build:native, build:pacer, build:portable, build:renderer, build:setup-inno, build:setup-nsis (+14 more)
-
-### Community 55 - "ref_node_os"
-Cohesion: 0.11
-Nodes (7): gamingBooster, cpuLoadTracker, createGamingOverlay(), getRealLatency(), toggleGamingOverlay(), CpuLoadTracker, ManagedProcessRegistry
 
 ### Community 57 - "c_void"
 Cohesion: 0.26
 Nodes (10): com_release(), CreateWaitableTimerExW(), CreateWindowExA(), DestroyWindow(), GetProcAddress(), init_thread(), install_vtable_hooks(), LoadLibraryA() (+2 more)
 
 ### Community 58 - "SystemOptimizerService"
-Cohesion: 0.09
-Nodes (8): [0.4.8] - 2026-10-10, Added, Changed, Fixed, Notes, PowerEngine, SystemOptimizerService, op
+Cohesion: 0.12
+Nodes (7): [0.4.8] - 2026-10-10, Added, Changed, Fixed, Notes, SystemOptimizerService, op
 
 ### Community 59 - "[0.6.0] - 2026-10-21"
-Cohesion: 0.18
-Nodes (11): [0.6.0] - 2026-10-21, Added, Changed, Design, Developer, Fixed (monitoring), Fixed (Post-Install Hub), Fixed (shell) (+3 more)
+Cohesion: 0.20
+Nodes (10): [0.6.0] - 2026-10-21, Added, Changed, Design, Developer, Fixed (monitoring), Fixed (Post-Install Hub), Fixed (shell) (+2 more)
 
 ### Community 60 - "HwSensorsDaemon.js"
-Cohesion: 0.23
-Nodes (8): forgetPawnIoCheck(), here, HWSENSORS_EXE, isPawnIoInstalled(), pawnCache, QUERY_FIELDS, registerHwSensorsIPC(), installPawnIo()
+Cohesion: 0.18
+Nodes (10): runMutations(), sleep(), forgetPawnIoCheck(), here, HWSENSORS_EXE, isPawnIoInstalled(), pawnCache, registerHwSensorsIPC() (+2 more)
 
 ### Community 63 - "dependencies"
 Cohesion: 0.18
 Nodes (11): dependencies, diff, electron-log, electron-updater, exifr, exiftool-vendored, ffmpeg-static, pdf-parse (+3 more)
 
 ### Community 64 - "Changelog"
-Cohesion: 0.13
-Nodes (14): [0.1.0] - 2026-07-01, [0.4.0] - 2026-08-15, [0.4.6] - 2026-09-02, [0.4.7] - 2026-09-09, [0.7.0] - 2026-10-23, Added, Added, Added (+6 more)
+Cohesion: 0.11
+Nodes (18): [0.1.0] - 2026-07-01, [0.4.0] - 2026-08-15, [0.4.6] - 2026-09-02, [0.4.7] - 2026-09-09, [0.5.0] - 2026-10-12, [0.7.0] - 2026-10-23, Added, Added (+10 more)
 
 ### Community 65 - ".runElevatedPowerShell"
 Cohesion: 0.18
@@ -388,11 +387,11 @@ Nodes (5): DefenderControlEngine, ElevationHelper, execAsync, waitForElevated(),
 
 ### Community 66 - "ref_node_fs"
 Cohesion: 0.08
-Nodes (17): here, SENSOR_DAEMON_EXE, TAG_COLORS, execFileAsync, __dirname, __filename, PAWNIO, __dirname (+9 more)
+Nodes (16): TAG_COLORS, execFileAsync, __dirname, __filename, __dirname, __filename, MAX_ENCODED_ARG, freshclamConf() (+8 more)
 
-### Community 67 - "persistVaultData"
-Cohesion: 0.21
-Nodes (12): clearVaultAutoLock(), ensureUnlocked(), loadVaultUsingWrapper(), lockVault(), persistVaultData(), readVaultFile(), scheduleVaultAutoLock(), setVaultAutoLockMinutes() (+4 more)
+### Community 67 - "registerLatencyGuardian"
+Cohesion: 0.18
+Nodes (21): clampInt(), isSafePingHost(), now(), registerLatencyGuardian(), findGameProcess(), getProcessSnapshot(), loadConfig(), loop() (+13 more)
 
 ### Community 68 - "perform_pacing"
 Cohesion: 0.36
@@ -402,29 +401,25 @@ Nodes (7): get_qpc_ms(), hooked_present(), hooked_present1(), is_main_swapchain(
 Cohesion: 0.32
 Nodes (8): compute_stats(), CUR_STATS, low01_unavailable_with_few_samples(), push_sample(), reset(), Stats, stats_come_only_from_real_samples(), .ZERO
 
-### Community 70 - "createMainWindow"
-Cohesion: 0.24
-Nodes (12): createMainWindow(), ensureTray(), getAllowedExternalUrl(), getAppIconPath(), handleEmbeddedExternalNavigation(), hideWindowToBackground(), isAllowedExternalProtocol(), isDev() (+4 more)
-
-### Community 71 - "machineMarker.js"
-Cohesion: 0.42
-Nodes (10): _0x3c4d, ensureMachineMarker(), execFileAsync, _getH(), _mk(), _readMarker(), _regR(), _regW() (+2 more)
+### Community 70 - "runPowerShell"
+Cohesion: 0.22
+Nodes (19): applyDnsCloudflareWithUndo(), killBackgroundProcesses(), optimizeGlobalTcpStack(), setDisableFullscreenOptimizations(), setGamePriorityHigh(), setGpuHighPerformancePreference(), setMouseAccelerationDisabled(), setNagleDisabledOnActiveInterface() (+11 more)
 
 ### Community 73 - "vite.config.js"
 Cohesion: 0.29
 Nodes (5): @tailwindcss/vite, vite, @vitejs/plugin-react, pkg, strictProductionCsp
 
-### Community 74 - "realtimeConfig.js"
-Cohesion: 0.33
-Nodes (7): isCriticalProcessName(), clamp(), ConfigStore, defaults(), normalize(), normalizeFolder(), normalizeRule()
+### Community 75 - "SecureDownload.js"
+Cohesion: 0.38
+Nodes (10): installGithubReleaseMsi(), execFileAsync, installOfficialRelease(), resolveFsr4Rdna2Path(), assertAllowedUrl(), assetSha256(), downloadToFile(), fetchJson() (+2 more)
 
 ### Community 76 - "setup_shared_memory"
 Cohesion: 0.40
 Nodes (5): GetCurrentProcessId(), hist_recent(), publish(), QueryPerformanceFrequency(), setup_shared_memory()
 
-### Community 77 - "darkosData.ts"
-Cohesion: 0.20
-Nodes (14): DarkOSProfileId, asArray(), DARKOS_PROFILES, DarkOSFailure, isOn(), mergeChanges(), normalizeFailures(), normalizeReboot() (+6 more)
+### Community 77 - "nsis"
+Cohesion: 0.18
+Nodes (11): nsis, allowToChangeInstallationDirectory, createDesktopShortcut, createStartMenuShortcut, differentialPackage, include, installerIcon, oneClick (+3 more)
 
 ### Community 78 - "bug_report.md"
 Cohesion: 0.50
@@ -438,21 +433,17 @@ Nodes (4): DXGI_MODE_DESC, DXGI_RATIONAL, DXGI_SAMPLE_DESC, DXGI_SWAP_CHAIN_DESC
 Cohesion: 0.67
 Nodes (3): repository, type, url
 
-### Community 96 - "hasFileAccessGrant"
-Cohesion: 0.32
-Nodes (8): assertFileAccessGranted(), assertFileAccessGrantedMany(), assertOutputDirGranted(), grantDirectoryPath(), grantFilePath(), hasFileAccessGrant(), isPathInside(), normalizeAccessPath()
-
-### Community 98 - "FramePacerOverlay.js"
-Cohesion: 0.29
-Nodes (7): closeFramePacerOverlay(), createFramePacerOverlay(), getOverlayStatus(), overlayConfig, setOverlayClickThrough(), setOverlayConfig(), toggleFramePacerOverlay()
+### Community 96 - "LoggerService.js"
+Cohesion: 0.22
+Nodes (4): here, SENSOR_DAEMON_EXE, QUERY_FIELDS, SECRET_PATTERNS
 
 ### Community 99 - "Features"
 Cohesion: 0.29
 Nodes (7): Features, Gaming and latency, Hardware, Real-time (off by default), Security and tools, Sharing, Windows maintenance
 
-### Community 100 - "RealtimeProtection"
-Cohesion: 0.21
-Nodes (4): isScanCandidate(), RealtimeProtection, RISKY_EXT, sha256File()
+### Community 100 - "psSingleQuote"
+Cohesion: 0.31
+Nodes (10): psSingleQuote(), removeQosPolicy(), restoreDns(), restoreFullscreenOptimizations(), restoreGlobalTcpStack(), restoreGpuPreference(), restoreMouseAcceleration(), restoreNagle() (+2 more)
 
 ### Community 101 - "useRecentActivity.ts"
 Cohesion: 0.39
@@ -471,16 +462,16 @@ Cohesion: 0.40
 Nodes (4): Antes de procurar código: use o mapa (não varra o projeto), DarkHub Suite: instruções para o Claude, Regras do projeto, Verificação
 
 ### Community 105 - "electron"
-Cohesion: 0.13
-Nodes (16): devHistory, devStartPage, history, listeners, NOISY, preview(), mainWindow(), root (+8 more)
+Cohesion: 0.07
+Nodes (26): Fixed (startup), devHistory, devStartPage, history, listeners, NOISY, preview(), mainWindow() (+18 more)
 
 ### Community 106 - "optimizerAudit.test.ts"
-Cohesion: 0.09
-Nodes (22): registerDarkOSIPC(), encodedPowerShellArgs(), runPowerShellJson(), SECRET_PATTERNS, buildImageDefenderRestoreScript(), IMAGE_DEFENDER_DEFAULTS, POLICY_CHANGES, decodeShellOutput() (+14 more)
+Cohesion: 0.13
+Nodes (14): buildImageDefenderRestoreScript(), IMAGE_DEFENDER_DEFAULTS, POLICY_CHANGES, decodeShellOutput(), summarizeMemoryDelta(), WS_SKIP, buildAdvancedNetworkChanges(), LEGACY_GLOBAL_VALUES (+6 more)
 
 ### Community 107 - "global.d.ts"
 Cohesion: 0.07
-Nodes (26): CameraState, ClamAvStatus, crypto-js, DarkHubAPI, DevTraceEntry, DiskMapDrive, DiskMapInfo, DiskMapNode (+18 more)
+Nodes (27): CameraState, ClamAvStatus, crypto-js, DarkHubAPI, DevTraceEntry, DiskMapDrive, DiskMapInfo, DiskMapNode (+19 more)
 
 ### Community 108 - "feature_request.md"
 Cohesion: 0.50
@@ -491,44 +482,28 @@ Cohesion: 0.50
 Nodes (4): Reporting a vulnerability, Scope, Security policy, Supported versions
 
 ### Community 111 - "runCommand"
-Cohesion: 0.21
-Nodes (9): setPowerPlanHighPerformance(), findLibreOfficeSoffice(), isStartupTaskEnabled(), measureLatency(), setStartupTask(), assertSafeHost(), registerNetworkIPC(), runCmd() (+1 more)
+Cohesion: 0.19
+Nodes (10): restorePowerPlan(), setPowerPlanHighPerformance(), findLibreOfficeSoffice(), isStartupTaskEnabled(), measureLatency(), setStartupTask(), assertSafeHost(), registerNetworkIPC() (+2 more)
 
-### Community 112 - "nsis"
-Cohesion: 0.18
-Nodes (11): nsis, allowToChangeInstallationDirectory, createDesktopShortcut, createStartMenuShortcut, differentialPackage, include, installerIcon, oneClick (+3 more)
+### Community 112 - "overlay.js"
+Cohesion: 0.27
+Nodes (5): cpuLoadTracker, createGamingOverlay(), getRealLatency(), toggleGamingOverlay(), CpuLoadTracker
 
-### Community 115 - "darkos.ts"
-Cohesion: 0.17
-Nodes (11): DarkOSAPI, DarkOSCatalogEntry, DarkOSChangeResponse, DarkOSChangeResult, DarkOSInfo, DarkOSManifest, DarkOSManifestChange, DarkOSReadResponse (+3 more)
-
-### Community 116 - "shot.cjs"
-Cohesion: 0.29
-Nodes (6): { app, BrowserWindow }, fs, outDir, pages, path, [w, h]
-
-### Community 117 - "useDeepHardware.ts"
-Cohesion: 0.50
-Nodes (4): ALIASES, DeepCategoryApi, getDeepCategoryApi(), useDeepHardware()
-
-### Community 118 - "useJunkScanner.ts"
+### Community 119 - "lhmSummary.js"
 Cohesion: 0.60
-Nodes (4): CachedJunk, loadCached(), saveCache(), useJunkScanner()
-
-### Community 120 - "[0.5.0] - 2026-10-12"
-Cohesion: 0.50
-Nodes (4): [0.5.0] - 2026-10-12, Added, Changed, Removed
+Nodes (4): buildTree(), find(), RING0_CPU_TYPES, summarizeLhm()
 
 ### Community 121 - "README.md"
 Cohesion: 0.15
 Nodes (10): Third-party components (DarkHub.HwSensors), Architecture, Building from source, Contributing, How it stays safe, Install, License, JSON Rule Schema (+2 more)
 
-### Community 122 - "DetailedHardwareInfo.tsx"
-Cohesion: 0.39
-Nodes (7): DetailedHardwareInfo(), gb(), HardwareInfo, Metric(), MetricGrid(), tempEntries(), useSystemMetrics()
+### Community 122 - "react"
+Cohesion: 0.11
+Nodes (26): react, DetailedHardwareInfo(), gb(), HardwareInfo, Metric(), MetricGrid(), tempEntries(), ArrowDownUp (+18 more)
 
-### Community 124 - "walk"
+### Community 125 - "walkFiles"
 Cohesion: 0.67
-Nodes (3): scanDirectoryForBestExe(), walk(), scoreExecutable()
+Nodes (3): findUnrealExecutableCandidates(), walkFiles(), walk()
 
 ### Community 126 - "[0.4.5] - 2026-09-01"
 Cohesion: 0.50
@@ -536,23 +511,23 @@ Nodes (4): [0.4.5] - 2026-09-01, Added, Changed, Fixed
 
 ## Knowledge Gaps
 - **15 isolated node(s):** `darkhub_pacer_hook`, `@testing-library/jest-dom`, `@testing-library/react`, `@types/diff`, `@types/react` (+10 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 669 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **34 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 675 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **42 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Changelog` connect `Changelog` to `[0.5.0] - 2026-10-12`, `SystemOptimizerService`, `[0.6.0] - 2026-10-21`, `[0.4.5] - 2026-09-01`?**
-  _High betweenness centrality (0.148) - this node is a cross-community bridge._
-- **Are the 2 inferred relationships involving `runPowerShell()` (e.g. with `main.js` and `PowerShellRunner.js`) actually correct?**
-  _`runPowerShell()` has 2 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `Changelog` connect `Changelog` to `SystemOptimizerService`, `[0.6.0] - 2026-10-21`, `[0.4.5] - 2026-09-01`?**
+  _High betweenness centrality (0.159) - this node is a cross-community bridge._
 - **What connects `darkhub_pacer_hook`, `@testing-library/jest-dom`, `@testing-library/react` to the rest of the system?**
   _15 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `DarkOS.Recovery.psm1` be split into smaller, more focused modules?**
   _Cohesion score 0.06600877192982456 - nodes in this community are weakly interconnected._
-- **Why does `react` connect `DarkOSCenter.tsx` to `AdvancedSecurity.tsx`, `react`, `Dashboard.tsx`, `DarkOSCenter.tsx`, `App.tsx`, `useRecentActivity.ts`, `YoutubeDownloader.tsx`, `SpaceSniffer/index.tsx`, `Home.tsx`, `Realtime.tsx`, `ScanModel`, `icons/index.tsx`, `useDeepHardware.ts`, `useJunkScanner.ts`, `webview.d.ts`, `DetailedHardwareInfo.tsx`, `package.json`?**
-  _High betweenness centrality (0.117) - this node is a cross-community bridge._
-- **Should `main.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.04821802935010482 - nodes in this community are weakly interconnected._
 - **Why does `[0.4.6] - 2026-09-02` connect `Changelog` to `ClickEngine`?**
-  _High betweenness centrality (0.103) - this node is a cross-community bridge._
+  _High betweenness centrality (0.115) - this node is a cross-community bridge._
+- **Should `main.js` be split into smaller, more focused modules?**
+  _Cohesion score 0.03449048152295633 - nodes in this community are weakly interconnected._
+- **Why does `Added` connect `ClickEngine` to `Changelog`?**
+  _High betweenness centrality (0.115) - this node is a cross-community bridge._
+- **Should `DownloadManager` be split into smaller, more focused modules?**
+  _Cohesion score 0.08198757763975155 - nodes in this community are weakly interconnected._

@@ -39,13 +39,22 @@ describe('advanced sensors summary', () => {
 });
 
 describe('advanced sensors daemon', () => {
-  it('is off by default and never spawns the helper on its own', async () => {
+  it('is on by default, respects "off" and never spawns the helper when off', async () => {
     // @ts-ignore plain JS module
     const { default: daemon } = await import('../electron/hal/collectors/HwSensorsDaemon.js');
-    daemon._settingsFile = require('node:path').join(require('node:os').tmpdir(), `dh-hw-${Date.now()}.json`);
+    const p = require('node:path'), os = require('node:os'), fs = require('node:fs');
+    const file = p.join(os.tmpdir(), `dh-hw-${Date.now()}.json`);
+    daemon._settingsFile = file;
+    expect(daemon.enabled).toBe(true); // no saved choice yet
+    daemon.enabled = false;
     expect(daemon.enabled).toBe(false);
     daemon.start();
     expect(daemon.process).toBeNull();
+    fs.writeFileSync(file, '{broken');
+    expect(daemon.enabled).toBe(false); // corrupted file: stay off
+    fs.rmSync(file, { force: true });
+    daemon._settingsFile = null;
+    expect(daemon.enabled).toBe(false); // outside Electron
   });
 });
 

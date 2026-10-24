@@ -1,0 +1,18 @@
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; cursor: crosshair; user-select: none; }
+#shot { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; pointer-events: none; }
+/* darkened screen outside the selection: the selection box casts a huge shadow instead of four panels */
+#shade { position: fixed; inset: 0; background: rgba(5, 7, 10, .45); pointer-events: none; }
+#shade.off { background: transparent; }
+#sel { position: fixed; box-sizing: border-box; border: 1px solid #8fd3f4; box-shadow: 0 0 0 100vmax rgba(5, 7, 10, .45); pointer-events: none; }
+#sel[hidden] { display: none; }
+#dim {
+  position: absolute; left: 0; top: -24px; padding: 2px 7px; white-space: nowrap;
+  font: 500 11.5px/18px "Geist Mono", ui-monospace, Consolas, monospace; color: #0d1014; background: #8fd3f4;
+}
+#dim.inside { top: 4px; left: 4px; }
+#hint {
+  position: fixed; left: 50%; top: 22px; transform: translateX(-50%); padding: 8px 14px; pointer-events: none;
+  font: 500 13px/1.3 Geist, "Segoe UI", system-ui, sans-serif; color: #eef2f6; background: rgba(13, 16, 20, .92);
+  border: 1px solid #2a313b; clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px), 0 8px);
+}
+#hint.hide { display: none; }

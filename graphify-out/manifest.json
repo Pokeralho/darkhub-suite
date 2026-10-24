@@ -90,9 +90,9 @@
     "semantic_hash": ""
   },
   "electron/hal/collectors/SensorBus.js": {
-    "mtime": 1792604555.7437422,
-    "seen": 1792605178.4434426,
-    "ast_hash": "16512a048b7c25ccc43e7608dee703ad",
+    "mtime": 1792800859.3118267,
+    "seen": 1792801247.6015701,
+    "ast_hash": "9faebff74113af3c6f25adbe00045574",
     "semantic_hash": ""
   },
   "electron/hal/collectors/SlowSensorDaemon.js": {
@@ -180,9 +180,9 @@
     "semantic_hash": ""
   },
   "electron/preload.js": {
-    "mtime": 1792775283.1386554,
-    "seen": 1792775917.6381967,
-    "ast_hash": "95566d6c08612cbaa5e605b4e8316ec3",
+    "mtime": 1792801090.4242675,
+    "seen": 1792801247.6015701,
+    "ast_hash": "b00a09849eef5ed65af798dc381651ec",
     "semantic_hash": ""
   },
   "electron/services/CoverProviderService.js": {
@@ -606,9 +606,9 @@
     "semantic_hash": ""
   },
   "src/global.d.ts": {
-    "mtime": 1792775283.1386554,
-    "seen": 1792775917.6387024,
-    "ast_hash": "7450fd0a5039e6154ab81f9f0c15c152",
+    "mtime": 1792801090.4247673,
+    "seen": 1792801247.6020718,
+    "ast_hash": "52b18fcf9f3f6ee3d635e0b46e52581e",
     "semantic_hash": ""
   },
   "src/hooks/useDeepHardware.ts": {
@@ -660,9 +660,9 @@
     "semantic_hash": ""
   },
   "src/i18n/darkosMessages.ts": {
-    "mtime": 1792758876.5630684,
-    "seen": 1792758959.9621274,
-    "ast_hash": "4dc769470e4b0138206dfb0fcce93c7e",
+    "mtime": 1792800955.504913,
+    "seen": 1792801247.6020718,
+    "ast_hash": "8eb809f8884fd8a246bbfa5dddcdfa47",
     "semantic_hash": ""
   },
   "src/i18n/messages.ts": {
@@ -954,9 +954,9 @@
     "semantic_hash": ""
   },
   "tests/system.test.ts": {
-    "mtime": 1788666049.176937,
-    "seen": 1792528297.5132642,
-    "ast_hash": "be5d71ee92393a79e0ba28c77a7645ee",
+    "mtime": 1792781149.251068,
+    "seen": 1792801247.6020718,
+    "ast_hash": "7ac68dbf369a538b74fae8a3be1fe061",
     "semantic_hash": ""
   },
   "tsconfig.json": {
@@ -1092,9 +1092,9 @@
     "semantic_hash": ""
   },
   "src/components/icons/index.tsx": {
-    "mtime": 1792599424.0518882,
-    "seen": 1792603431.72837,
-    "ast_hash": "10930ca8f25c940c3bdceac87fef2c5d",
+    "mtime": 1792801118.8362794,
+    "seen": 1792801247.6020718,
+    "ast_hash": "111e40e76b3a4db47923a56eef6aec8a",
     "semantic_hash": ""
   },
   "src/components/ui/PageHeader.tsx": {
@@ -1218,9 +1218,9 @@
     "semantic_hash": ""
   },
   "electron/hal/collectors/HwSensorsDaemon.js": {
-    "mtime": 1792604566.244976,
-    "seen": 1792605178.4434426,
-    "ast_hash": "c87e040bb3ba0c65b5e98051ad216e2f",
+    "mtime": 1792800859.2106123,
+    "seen": 1792801247.6015701,
+    "ast_hash": "178c5d70cf4527134aaf7fd8a6f84504",
     "semantic_hash": ""
   },
   "electron/hal/collectors/lhmSummary.js": {
@@ -1242,15 +1242,15 @@
     "semantic_hash": ""
   },
   "src/components/monitor/AdvancedSensorsPanel.tsx": {
-    "mtime": 1792625625.8170905,
-    "seen": 1792626022.9862592,
-    "ast_hash": "1979a89d656f9f31e2081acaaef237fe",
+    "mtime": 1792800951.781747,
+    "seen": 1792801247.6020718,
+    "ast_hash": "adc75fd0713b8c6ca976286568d1b1da",
     "semantic_hash": ""
   },
   "tests/hwSensors.test.ts": {
-    "mtime": 1792625686.7495866,
-    "seen": 1792626022.9862592,
-    "ast_hash": "75c6dcc94f0774f2e3635f66088fd264",
+    "mtime": 1792801187.5016892,
+    "seen": 1792801247.6020718,
+    "ast_hash": "d65d284a89e23d0d9b4eff3e4b10f247",
     "semantic_hash": ""
   },
   "electron/services/hwsensors/HidSharp.LICENSE.txt": {
@@ -1356,9 +1356,9 @@
     "semantic_hash": ""
   },
   "src/i18n/realtimeMessages.ts": {
-    "mtime": 1792780900.4455938,
-    "seen": 1792780953.0641565,
-    "ast_hash": "67108b7b84ac36a6a652fd4a6601ff50",
+    "mtime": 1792801130.150533,
+    "seen": 1792801247.6020718,
+    "ast_hash": "c388367f46efe710b1f1fd95c1bbdc4b",
     "semantic_hash": ""
   },
   "src/pages/Realtime.tsx": {
@@ -1374,9 +1374,9 @@
     "semantic_hash": ""
   },
   "electron/ipc/shareIpc.js": {
-    "mtime": 1792774405.9815764,
-    "seen": 1792775917.6381967,
-    "ast_hash": "15c05326e061f68ad59fce851393a20f",
+    "mtime": 1792801080.7204168,
+    "seen": 1792801247.6015701,
+    "ast_hash": "74920c25be92a885779cbe197ed0be8b",
     "semantic_hash": ""
   },
   "electron/ipc/upscaleIpc.js": {
@@ -1386,9 +1386,9 @@
     "semantic_hash": ""
   },
   "electron/services/susuya/Screenshot.js": {
-    "mtime": 1792774364.597618,
-    "seen": 1792775917.6387024,
-    "ast_hash": "62ad1e63154ceef30a5d92d5941bfc34",
+    "mtime": 1792801022.5017884,
+    "seen": 1792801247.6020718,
+    "ast_hash": "c777c2b73c47f65925d93987abe5b138",
     "semantic_hash": ""
   },
   "electron/services/susuya/SusuyaClient.js": {
@@ -1416,15 +1416,33 @@
     "semantic_hash": ""
   },
   "src/pages/Share.tsx": {
-    "mtime": 1792774516.6795096,
-    "seen": 1792775917.6387024,
-    "ast_hash": "c63262403231755572df8483d1f17da3",
+    "mtime": 1792801224.0454142,
+    "seen": 1792801247.6020718,
+    "ast_hash": "352a9250ab7077d33d8505bb842d177a",
     "semantic_hash": ""
   },
   "tests/susuya.test.ts": {
-    "mtime": 1792774577.9836762,
-    "seen": 1792775917.6387024,
-    "ast_hash": "845888b9624b3711fe5052ed43c9903d",
+    "mtime": 1792801281.770254,
+    "seen": 1792801338.7195141,
+    "ast_hash": "ac497b851a21f7899243944f5836302d",
+    "semantic_hash": ""
+  },
+  "electron/assets/region/region.js": {
+    "mtime": 1792801281.7697492,
+    "seen": 1792801338.7190099,
+    "ast_hash": "f878c24a299dea9e6ece24d68246ffdc",
+    "semantic_hash": ""
+  },
+  "electron/services/susuya/RegionPicker.js": {
+    "mtime": 1792801363.3115997,
+    "seen": 1792801404.508384,
+    "ast_hash": "9d91c73715f4f7e2b857eb8bceb2b5da",
+    "semantic_hash": ""
+  },
+  "electron/assets/region/region.html": {
+    "mtime": 1792801057.828928,
+    "seen": 1792801247.6020718,
+    "ast_hash": "85f9100632a8917870db4860c81ad5c4",
     "semantic_hash": ""
   }
 }

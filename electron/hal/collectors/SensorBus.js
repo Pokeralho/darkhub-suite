@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import FastSensorDaemon from './FastSensorDaemon.js';
 import SlowSensorDaemon from './SlowSensorDaemon.js';
-import HwSensorsDaemon from './HwSensorsDaemon.js';
+import HwSensorsDaemon, { isPawnIoInstalled } from './HwSensorsDaemon.js';
 
 class SensorBus extends EventEmitter {
   constructor() {
@@ -26,9 +26,29 @@ class SensorBus extends EventEmitter {
     if (this._running) return;
     this._running = true;
     FastSensorDaemon.start();
-    SlowSensorDaemon.withTemps = !HwSensorsDaemon.enabled;
+    // Começa com as temperaturas WMI/ACPI ligadas (lado seguro) e só as troca pelos sensores avançados
+    // quando eles realmente leem a CPU (driver PawnIO + app como administrador).
+    SlowSensorDaemon.withTemps = true;
     SlowSensorDaemon.start();
-    HwSensorsDaemon.start(); // no-op unless the user turned advanced sensors on
+    HwSensorsDaemon.start(); // on by default; no-op if the user turned advanced sensors off
+    this._applyTempSource().catch(() => { /* mantém WMI/ACPI */ });
+  }
+
+  /**
+   * Os sensores avançados substituem as temperaturas WMI/ACPI do daemon lento só quando conseguem ler a CPU:
+   * sem o driver PawnIO, ou sem o DarkHub como administrador, eles leem apenas GPU e discos, e desligar o WMI
+   * faria a temperatura da CPU sumir.
+   */
+  async _applyTempSource() {
+    let replace = false;
+    if (HwSensorsDaemon.enabled && isPawnIoInstalled()) {
+      try { replace = await (await import('../../services/optimizer/ElevationHelper.js')).default.isElevated(); } catch { replace = false; }
+    }
+    const withTemps = !replace;
+    if (SlowSensorDaemon.withTemps !== withTemps) {
+      SlowSensorDaemon.withTemps = withTemps;
+      if (this._running) { SlowSensorDaemon.stop(); SlowSensorDaemon.start(); }
+    }
   }
 
   stop() {
@@ -43,11 +63,7 @@ class SensorBus extends EventEmitter {
   setAdvanced(on) {
     HwSensorsDaemon.enabled = on;
     if (on) HwSensorsDaemon.restart(); else HwSensorsDaemon.stop();
-    const withTemps = !on;
-    if (SlowSensorDaemon.withTemps !== withTemps) {
-      SlowSensorDaemon.withTemps = withTemps;
-      if (this._running) { SlowSensorDaemon.stop(); SlowSensorDaemon.start(); }
-    }
+    this._applyTempSource().catch(() => { /* mantém WMI/ACPI */ });
   }
 
   get running() {

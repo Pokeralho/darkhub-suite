@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-10-23T15:42:17. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-10-23T21:23:09. NAO edite a mao: rode `npm run map`. -->
 
 # Mapa de funcionalidades (tela -> IPC -> backend)
 Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/preload.js` -> canal IPC -> handler -> servico.
@@ -413,8 +413,8 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | API | canal | handler | chama |
 |---|---|---|---|
 | `share.onEvent` | `share:event` | `nao encontrado` |  |
-| `share.recentShots` | `share:recentShots` | `electron/ipc/shareIpc.js:162` | `i.test`<br>`globalShortcut.unregister` |
-| `share.state` | `share:state` | `electron/ipc/shareIpc.js:116` |  |
+| `share.recentShots` | `share:recentShots` | `electron/ipc/shareIpc.js:176` | `i.test`<br>`globalShortcut.unregister` |
+| `share.state` | `share:state` | `electron/ipc/shareIpc.js:124` |  |
 | `shell.openExternal` | `shell:openExternal` | `electron/main.js:1559` | `RENDERER_SYSTEM_URIS.has`<br>`raw.toLowerCase`<br>`parsed.toString`<br>`cp.spawn` |
 
 ### Disk map  (rota `spacesniffer`)

@@ -48,7 +48,7 @@ export default function AdvancedSensorsPanel({ values, gpuProbe }: Props) {
           <h2 className="dh-section-title">{t('monitor.adv.title', 'Advanced sensors')}</h2>
           <p className="mt-1 dh-help">{st.enabled
             ? (st.pawnio ? t('monitor.adv.onFull', 'On, with the PawnIO driver: CPU per core, fans and voltages from the motherboard.') : t('monitor.adv.onPartial', 'On without a driver: GPU (core, hot spot, power) and disks. CPU temperature, fans and voltages need the PawnIO driver.'))
-            : t('monitor.adv.off2', 'Reads each CPU core real sensor, fans, voltages, GPU and disks (LibreHardwareMonitor + PawnIO). Off by default.')}</p>
+            : t('monitor.adv.off2', 'Reads each CPU core real sensor, fans, voltages, GPU and disks (LibreHardwareMonitor + PawnIO). On by default.')}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button onClick={toggle} disabled={busy} className={`dh-btn dh-btn-sm ${st.enabled ? '' : 'dh-btn-accent'}`} title={st.enabled ? undefined : t('monitor.adv.pawnioHelp2', 'Also installs the PawnIO driver (signed by its author, compatible with Memory Integrity) when it is missing.')}>

@@ -443,7 +443,9 @@ export interface DarkHubAPI {
     cancel: (jobId: string) => Promise<{ ok: boolean }>;
     remove: (id: string) => Promise<ShareState>;
     copy: (text: string) => Promise<{ ok: boolean; error?: string }>;
-    capture: () => Promise<{ ok: boolean; error?: string; file?: string; width?: number; height?: number; bytes?: number; ms?: number; entry?: ShareEntry; uploadError?: string }>;
+    capture: () => Promise<ShareShotResult>;
+    /** Snipping-Tool style: freezes the screen, the user drags a rectangle (Esc cancels → cancelled: true). */
+    captureRegion: () => Promise<ShareShotResult>;
     openFolder: () => Promise<{ ok: boolean; error?: string }>;
     recentShots: () => Promise<{ ok: boolean; error?: string; files?: { file: string; name: string; bytes: number; at: number }[] }>;
     onEvent: (callback: (e: ShareEvent) => void) => () => void;
@@ -552,10 +554,11 @@ declare global {
 
 export interface DlssFile { file: string; name: string; kind: 'sr' | 'rr' | 'fg'; version: string | null; hasOriginal: boolean; x64: boolean; behind: boolean }
 export interface DlssGameInfo { latest?: string; tag?: string; anticheat?: string | null; files?: DlssFile[] }
-export interface ShareConfig { hotkey: string; folder: string; autoUpload: boolean; copyImage: boolean; ttl: number }
+export type ShareShotResult = { ok: boolean; error?: string; file?: string; width?: number; height?: number; bytes?: number; ms?: number; entry?: ShareEntry; uploadError?: string; cancelled?: boolean };
+export interface ShareConfig { hotkey: string; regionHotkey: string; folder: string; autoUpload: boolean; copyImage: boolean; ttl: number }
 export interface ShareEntry { id: string; name: string; size: number; kind?: string; createdAt: number; expiresAt: number; pageUrl: string; directUrl: string; origin?: string }
 export interface ShareUploadResult { ok: boolean; error?: string; entry?: ShareEntry }
-export interface ShareState { ok: boolean; error?: string; config: ShareConfig; hotkeyActive: boolean; history: ShareEntry[]; uploading: number }
+export interface ShareState { ok: boolean; error?: string; config: ShareConfig; hotkeyActive: boolean; regionHotkeyActive: boolean; history: ShareEntry[]; uploading: number }
 export type ShareEvent =
   | { type: 'start'; jobId: string; name: string; origin: string }
   | { type: 'progress'; jobId: string; sent: number; total: number }

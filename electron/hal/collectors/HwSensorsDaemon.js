@@ -28,8 +28,9 @@ export function isPawnIoInstalled(execFileSync = cp.execFileSync, maxAgeMs = 100
 export function forgetPawnIoCheck() { pawnCache = { at: 0, value: false }; }
 
 /**
- * Advanced sensors (LibreHardwareMonitorLib) in a child process. Off by default; the choice is stored in
- * userData/hwsensors.json. Emits the parsed {"type":"lhm"} samples on 'data'.
+ * Advanced sensors (LibreHardwareMonitorLib) in a child process. On by default (start with the app); turning
+ * them off is stored in userData/hwsensors.json and respected. The PawnIO driver is never installed by default:
+ * only when the user presses "Turn on" in the panel. Emits the parsed {"type":"lhm"} samples on 'data'.
  */
 class HwSensorsDaemon extends EventEmitter {
   constructor() {
@@ -49,7 +50,13 @@ class HwSensorsDaemon extends EventEmitter {
   }
 
   get enabled() {
-    try { return Boolean(this._settingsFile && JSON.parse(fs.readFileSync(this._settingsFile, 'utf8')).enabled); } catch { return false; }
+    if (!this._settingsFile) return false; // fora do Electron (testes): nunca sobe o helper
+    try {
+      return Boolean(JSON.parse(fs.readFileSync(this._settingsFile, 'utf8')).enabled);
+    } catch (e) {
+      // Sem escolha salva = ligado (padrão). Arquivo corrompido = desligado (lado seguro).
+      return e?.code === 'ENOENT';
+    }
   }
 
   set enabled(v) {

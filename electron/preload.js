@@ -380,6 +380,7 @@ const darkhubApi = {
     remove: (id) => ipcRenderer.invoke('share:delete', { id }),
     copy: (text) => ipcRenderer.invoke('share:copy', { text }),
     capture: () => ipcRenderer.invoke('share:capture'),
+    captureRegion: () => ipcRenderer.invoke('share:captureRegion'),
     openFolder: () => ipcRenderer.invoke('share:openFolder'),
     recentShots: () => ipcRenderer.invoke('share:recentShots'),
     onEvent: (callback) => {

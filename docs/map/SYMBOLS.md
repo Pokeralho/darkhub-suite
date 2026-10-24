@@ -1,8 +1,12 @@
-<!-- GERADO por electron_feature_map.py em 2026-10-23T15:42:17. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-10-23T21:23:09. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
 Busque aqui com Ctrl+F / grep pelo nome da funcao.
+
+## `electron/assets/region/region.js`
+
+`report`:12, `cancel`:13, `draw`:18
 
 ## `electron/configManager.js`
 
@@ -50,7 +54,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/hal/collectors/HwSensorsDaemon.js`
 
-`isPawnIoInstalled`:17, `forgetPawnIoCheck`:28, `HwSensorsDaemon`:34 _class_, `enabled`:51, `enabled`:55, `status`:60, `start`:73, `stop`:110, `restart`:121
+`isPawnIoInstalled`:17, `forgetPawnIoCheck`:28, `HwSensorsDaemon`:35 _class_, `enabled`:52, `enabled`:62, `status`:67, `start`:80, `stop`:117, `restart`:128
 
 ## `electron/hal/collectors/LatencyCollector.js`
 
@@ -74,7 +78,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/hal/collectors/SensorBus.js`
 
-`SensorBus`:6 _class_, `_wire`:15, `forward`:18, `start`:24, `stop`:34, `setAdvanced`:43, `running`:53
+`SensorBus`:6 _class_, `_wire`:15, `forward`:18, `start`:24, `_applyTempSource`:42, `stop`:54, `setAdvanced`:63, `running`:69
 
 ## `electron/hal/collectors/SlowSensorDaemon.js`
 
@@ -122,7 +126,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ipc/shareIpc.js`
 
-`readJson`:10, `writeJson`:11, `normalizeShareConfig`:15, `registerShareIPC`:26, `broadcast`:38, `notify`:39, `liveHistory`:40, `upload`:42, `publicEntry`:72, `capture`:74, `bindHotkey`:94, `handle`:108, `state`:115
+`readJson`:12, `writeJson`:13, `normalizeShareConfig`:17, `registerShareIPC`:29, `broadcast`:41, `notify`:42, `liveHistory`:43, `upload`:45, `publicEntry`:75, `capture`:79, `bindHotkey`:101, `handle`:116, `state`:123
 
 ## `electron/ipc/upscaleIpc.js`
 
@@ -162,7 +166,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:94, `listener`:156, `listener`:180, `handler`:241, `handler`:267, `handler`:273, `handler`:279, `handler`:285, `listener`:294, `listener`:305, `handler`:330, `listener`:343, `listener`:360, `handler`:386, `handler`:401, `listener`:424, `handler`:477
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:94, `listener`:156, `listener`:180, `handler`:241, `handler`:267, `handler`:273, `handler`:279, `handler`:285, `listener`:294, `listener`:305, `handler`:330, `listener`:343, `listener`:360, `handler`:387, `handler`:402, `listener`:425, `handler`:478
 
 ## `electron/services/CoverProviderService.js`
 
@@ -384,9 +388,13 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `clamp`:7, `normalizeRule`:11, `normalizeFolder`:17, `defaults`:22, `normalize`:45, `ConfigStore`:75 _class_, `read`:82, `update`:86
 
+## `electron/services/susuya/RegionPicker.js`
+
+`parseRegionTitle`:20, `makeRegionPicker`:34, `finish`:51
+
 ## `electron/services/susuya/Screenshot.js`
 
-`pad`:7, `screenshotName`:8, `physicalSize`:13, `captureScreen`:18
+`pad`:9, `screenshotName`:10, `physicalSize`:15, `cropRect`:24, `clampX`:28, `clampY`:29, `grabDisplay`:39, `saveShot`:48, `captureScreen`:59, `captureRegion`:69
 
 ## `electron/services/susuya/SusuyaClient.js`
 
@@ -674,7 +682,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/Share.tsx`
 
-`api`:7, `fmtBytes`:10, `acceleratorOf`:13, `Share`:24 _component_, `setConfig`:56, `copy`:61, `report`:65, `onDrop`:70, `expiresIn`:74, `capture`:78
+`api`:7, `fmtBytes`:10, `acceleratorOf`:13, `HotkeyField`:25 _component_, `Share`:43 _component_, `setConfig`:74, `copy`:79, `report`:83, `onDrop`:88, `expiresIn`:92, `capture`:96
 
 ## `src/pages/SpaceSniffer/TreemapCanvas.tsx`
 
@@ -766,7 +774,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `tests/susuya.test.ts`
 
-`fakeSusuya`:19, `send`:26, `tmpFile`:62
+`crop`:14, `fakeSusuya`:30, `send`:37, `tmpFile`:73
 
 ## `tests/templateBackslash.test.ts`
 
