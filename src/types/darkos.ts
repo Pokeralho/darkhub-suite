@@ -87,6 +87,8 @@ export interface DarkOSAPI {
   isDarkOS: () => Promise<DarkOSInfo>;
   getCatalog: (payload?: { profile?: DarkOSProfileId }) => Promise<DarkOSReadResponse<DarkOSCatalogEntry[]>>;
   getManifest: () => Promise<DarkOSReadResponse<DarkOSManifest>>;
+  /** Latest DarkOS ISO on darkos.darkhub.ink (SHA-256 from the site's .sha256 file). */
+  latestRelease: () => Promise<{ ok: boolean; error?: string; release?: DarkOSRelease }>;
   getStatus: (payload?: { ids?: string[] }) => Promise<DarkOSReadResponse<any>>;
   applyChange: (payload: { ids: string[]; confirmSecurity?: boolean }) => Promise<DarkOSChangeResponse>;
   revertChange: (payload: { ids: string[]; confirmSecurity?: boolean }) => Promise<DarkOSChangeResponse>;
@@ -102,4 +104,15 @@ export interface DarkOSAPI {
   getRebootPending: () => Promise<DarkOSReadResponse<any>>;
   exportDiagnostics: () => Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>;
   onRunEvent: (callback: (evt: DarkOSRunEvent) => void) => () => void;
+}
+
+export interface DarkOSRelease {
+  version: string | null;
+  build: string | null;
+  date: string | null;
+  isoName: string;
+  url: string;
+  sha256: string;
+  size: number | null;
+  releasesUrl: string;
 }

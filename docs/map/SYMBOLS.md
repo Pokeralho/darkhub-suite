@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-10-24T16:10:11. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-10-26T10:12:14. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -140,6 +140,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `bootAdvancedSensors`:14, `registerHwSensorsIPC`:33, `handle`:38, `elevated`:44
 
+## `electron/ipc/kakuganIpc.js`
+
+`makeTokenStore`:15, `can`:17, `registerKakuganIPC`:37, `readState`:41, `save`:49, `settings`:50, `poll`:53, `resume`:74, `handle`:92, `withQr`:98, `str`:99
+
 ## `electron/ipc/maintenanceIpc.js`
 
 `registerMaintenanceIPC`:5, `broadcast`:6, `notify`:7, `handle`:32
@@ -150,7 +154,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ipc/overlayIpc.js`
 
-`registerOverlayIPC`:8, `broadcast`:10, `get`:17, `handle`:22
+`registerOverlayIPC`:9, `broadcast`:11, `get`:18, `handle`:23
 
 ## `electron/ipc/powershellIpc.js`
 
@@ -170,7 +174,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ipc/shareIpc.js`
 
-`readJson`:14, `writeJson`:15, `normalizeShareConfig`:19, `registerShareIPC`:33, `broadcast`:45, `notify`:46, `liveHistory`:47, `upload`:49, `publicEntry`:79, `capture`:83, `bindHotkey`:105, `handle`:120, `state`:127
+`readJson`:14, `writeJson`:15, `normalizeShareConfig`:19, `registerShareIPC`:37, `broadcast`:49, `notify`:50, `liveHistory`:51, `upload`:53, `publicEntry`:83, `capture`:87, `bindHotkey`:114, `handle`:129, `state`:136
 
 ## `electron/ipc/startupIpc.js`
 
@@ -206,7 +210,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/main.js`
 
-`getSystemInformation`:117, `get`:123, `getSharp`:132, `getOcrWorker`:141, `getExiftool`:161, `getFfmpegPath`:169, `getLibraryStore`:201, `safeRegister`:208, `getYtDlpTools`:236, `isDev`:241, `normalizeAccessPath`:275, `isPathInside`:285, `grantFilePath`:291, `grantDirectoryPath`:296, `hasFileAccessGrant`:301, `assertOutputDirGranted`:313, `assertFileAccessGranted`:319, `assertFileAccessGrantedMany`:328, `psSingleQuote`:334, `normalizeWebhookUrl`:338, `loadRuntimeConfig`:357, `canSendDiscord`:383, `truncateDiscord`:397, `redactSensitive`:403, `normalizeTelemetryError`:414, `postDiscord`:423, `reportBugTelemetry`:451, `isAllowedExternalProtocol`:480, `getAllowedExternalUrl`:484, `openAllowedExternalUrlDetached`:494, `isEmbeddedExternalProtocol`:505, `handleEmbeddedExternalNavigation`:509, `isTrustedAppNavigation`:521, `getAppIconPath`:531, `showMainWindow`:546, `ensureTray`:559, `hideWindowToBackground`:586, `estimateDirectoryBytes`:591, `computeJunkEstimate`:635, `work`:649, `createMainWindow`:716, `kickWindowsPaint`:781, `showWhenReady`:848, `eventSender`:939, `measureLatency`:966, `getActiveAdapterName`:996, `getMainCpuLoad`:1232, `broadcastLibraryEvent`:1376, `scoreExecutable`:1452, `key`:1457, `scanDirectoryForBestExe`:1478, `walk`:1481, `findPgeBat`:1622, `launchPgeBat`:1642, `isStartupTaskEnabled`:1718, `setStartupTask`:1728, `refreshLiveCounts`:1872, `sendEvent`:2147, `findLibreOfficeSoffice`:2379, `toXml`:2471, `buildArgs`:2564, `vaultFilePath`:2852, `setVaultAutoLockMinutes`:2860, `clearVaultAutoLock`:2867, `scheduleVaultAutoLock`:2874, `touchVault`:2883, `vaultFileExists`:2887, `readVaultFile`:2896, `writeVaultFile`:2901, `lockVault`:2909, `ensureUnlocked`:2916, `loadVaultUsingWrapper`:2921, `persistVaultData`:2942, `getSecurityScoreV2`:3314, `add`:3319, `isValidHostname`:3496, `autoclickerConfigPath`:3635, `loadAutoClickerConfig`:3639, `saveAutoClickerConfig`:3659, `unregisterAutoClickerHotkey`:3670, `registerAutoClickerHotkey`:3676, `getClickEnginePath`:3693, `startAutoClicker`:3713, `stopAutoClicker`:3870, `isValidWingetId`:4040, `installGithubReleaseMsi`:4052, `progress`:4081, `tryInstall`:4109, `runDeferredStartup`:4182
+`getSystemInformation`:118, `get`:124, `getSharp`:133, `getOcrWorker`:142, `getExiftool`:162, `getFfmpegPath`:170, `getLibraryStore`:202, `safeRegister`:209, `getYtDlpTools`:241, `isDev`:246, `normalizeAccessPath`:280, `isPathInside`:290, `grantFilePath`:296, `grantDirectoryPath`:301, `hasFileAccessGrant`:306, `assertOutputDirGranted`:318, `assertFileAccessGranted`:324, `assertFileAccessGrantedMany`:333, `psSingleQuote`:339, `normalizeWebhookUrl`:343, `loadRuntimeConfig`:362, `canSendDiscord`:388, `truncateDiscord`:402, `redactSensitive`:408, `normalizeTelemetryError`:419, `postDiscord`:428, `reportBugTelemetry`:456, `isAllowedExternalProtocol`:485, `getAllowedExternalUrl`:489, `openAllowedExternalUrlDetached`:499, `isEmbeddedExternalProtocol`:510, `handleEmbeddedExternalNavigation`:514, `isTrustedAppNavigation`:526, `getAppIconPath`:536, `showMainWindow`:551, `ensureTray`:564, `hideWindowToBackground`:591, `estimateDirectoryBytes`:596, `computeJunkEstimate`:640, `work`:654, `createMainWindow`:721, `kickWindowsPaint`:786, `showWhenReady`:853, `eventSender`:944, `measureLatency`:971, `getActiveAdapterName`:1001, `getMainCpuLoad`:1237, `broadcastLibraryEvent`:1381, `scoreExecutable`:1457, `key`:1462, `scanDirectoryForBestExe`:1483, `walk`:1486, `findPgeBat`:1627, `launchPgeBat`:1647, `isStartupTaskEnabled`:1723, `setStartupTask`:1733, `refreshLiveCounts`:1877, `sendEvent`:2152, `findLibreOfficeSoffice`:2384, `toXml`:2476, `buildArgs`:2569, `vaultFilePath`:2857, `setVaultAutoLockMinutes`:2865, `clearVaultAutoLock`:2872, `scheduleVaultAutoLock`:2879, `touchVault`:2888, `vaultFileExists`:2892, `readVaultFile`:2901, `writeVaultFile`:2906, `lockVault`:2914, `ensureUnlocked`:2921, `loadVaultUsingWrapper`:2926, `persistVaultData`:2947, `getSecurityScoreV2`:3319, `add`:3324, `isValidHostname`:3501, `autoclickerConfigPath`:3640, `loadAutoClickerConfig`:3644, `saveAutoClickerConfig`:3664, `unregisterAutoClickerHotkey`:3675, `registerAutoClickerHotkey`:3681, `getClickEnginePath`:3698, `startAutoClicker`:3718, `stopAutoClicker`:3875, `isValidWingetId`:4045, `installGithubReleaseMsi`:4057, `progress`:4086, `tryInstall`:4114, `runDeferredStartup`:4187
 
 ## `electron/networkIPC.js`
 
@@ -222,7 +226,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:94, `listener`:156, `listener`:180, `handler`:209, `handler`:228, `handler`:238, `handler`:250, `listener`:293, `handler`:345, `handler`:371, `handler`:377, `handler`:383, `handler`:389, `listener`:398, `listener`:409, `handler`:434, `listener`:447, `listener`:464, `handler`:499, `handler`:514, `listener`:537, `listener`:557, `listener`:584, `handler`:629
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:94, `listener`:157, `listener`:181, `handler`:228, `handler`:247, `handler`:257, `handler`:269, `listener`:312, `handler`:364, `handler`:390, `handler`:396, `handler`:402, `handler`:408, `listener`:417, `listener`:428, `handler`:453, `listener`:466, `listener`:483, `handler`:518, `handler`:533, `listener`:556, `listener`:576, `listener`:603, `handler`:648
 
 ## `electron/services/CodeRunner.js`
 
@@ -344,6 +348,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `isValidChangeId`:48, `isValidProfile`:52, `isValidPackageName`:57, `sanitizeLabel`:65, `isValidDiagnosticsDestination`:73, `uniqueIds`:80, `parseCliOutput`:93, `parseProgressLine`:133, `stripLeakedProgress`:146, `clean`:148, `extractChangeResults`:171, `summarizeChangeResults`:187, `psq`:241, `defaultBundledDir`:245, `defaultRunner`:258, `onStdout`:263, `defaultIsElevated`:290, `DarkOSRecoveryService`:301 _class_, `manifestPath`:326, `isDarkOS`:330, `available`:344, `catalogPath`:348, `resolveCli`:352, `info`:372, `_emit`:386, `_enqueue`:395, `buildScript`:402, `run`:420, `onLine`:445, `_runChange`:485, `_read`:502, `getCatalog`:509, `getManifest`:518, `getStatus`:522, `_change`:530, `applyChange`:540, `revertChange`:544, `setProfile`:548, `restoreProfile`:555, `getRemovedApps`:559, `restoreAppx`:563, `listSnapshots`:571, `createSnapshot`:575, `restoreSnapshot`:587, `getFailures`:592, `getRebootPending`:596, `exportDiagnostics`:600
 
+## `electron/services/darkos/darkosRelease.js`
+
+`parseReleasePage`:6, `parseSha256File`:18, `isNewerBuild`:23, `p`:24, `fetchLatestRelease`:32, `get`:33
+
 ## `electron/services/diskscan/DiskScanService.js`
 
 `defaultExe`:13, `csvCell`:18, `formatSize`:20, `DiskScanService`:27 _class_, `_filter`:38, `drives`:46, `status`:59, `emit`:92, `cancel`:123, `view`:134, `info`:155, `setTag`:160, `_pathOf`:165, `open`:171, `reveal`:178, `trash`:186, `pathOf`:196, `exportTo`:199, `write`:204
@@ -391,6 +399,14 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `electron/services/hwsensors/pawnio.js`
 
 `installPawnIo`:16
+
+## `electron/services/kakugan/KakuganClient.js`
+
+`KakuganError`:6 _class_, `sessionFromSetCookie`:17, `KakuganClient`:28 _class_, `loggedIn`:36, `request`:38, `status`:59, `plans`:60, `me`:61, `login`:62, `logout`:63, `dashboard`:66, `orders`:67, `steamLoginStart`:68, `steamLoginPoll`:69, `steamLoginCode`:70, `steamLoginCancel`:71, `updateAccount`:72, `accountInput`:73, `removeAccount`:74, `searchGames`:75, `gameNames`:76
+
+## `electron/services/kakugan/kakuganAlerts.js`
+
+`kakuganAlerts`:12, `push`:14, `accountsToPause`:46
 
 ## `electron/services/maintenance/MaintenanceService.js`
 
@@ -482,7 +498,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/overlay/OverlayService.js`
 
-`OverlayService`:14 _class_, `_save`:41, `_emit`:42, `status`:44, `setSettings`:52, `_bindHotkey`:63, `_place`:73, `_ensureWindow`:79, `show`:95, `hide`:112, `toggle`:124, `_closeSession`:126, `p`:129, `_attach`:135, `_follow`:149, `_restartLoop`:160, `_stopLoop`:166, `_render`:168, `_log`:178, `f`:187, `dispose`:192
+`OverlayService`:16 _class_, `_save`:49, `_emit`:50, `status`:52, `setSettings`:60, `_bindHotkey`:71, `_place`:81, `_ensureWindow`:87, `show`:103, `hide`:120, `toggle`:132, `_closeSession`:134, `p`:137, `_attach`:143, `_follow`:159, `_restartLoop`:170, `_stopLoop`:176, `_render`:178, `add`:189, `_log`:198, `f`:207, `dispose`:212
 
 ## `electron/services/overlay/PresentMonService.js`
 
@@ -490,11 +506,15 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/overlay/frameStats.js`
 
-`splitCsv`:4, `createCsvParser`:19, `num`:29, `pct`:43, `FrameWindow`:46 _class_, `push`:55, `stats`:65, `avg`:72, `reset`:89
+`splitCsv`:4, `createCsvParser`:19, `num`:29, `pct`:43, `FrameWindow`:46 _class_, `push`:55, `stats`:65, `avg`:72, `reset`:89, `SessionStats`:100 _class_, `reset`:103, `push`:117, `percentile`:138, `stats`:149
+
+## `electron/services/overlay/lhmModel.js`
+
+`pos`:5, `index`:7, `get`:10, `all`:11, `avg`:15, `readLhm`:17
 
 ## `electron/services/overlay/overlayModel.js`
 
-`normalizeSettings`:16, `clamp`:17, `v`:30, `n`:31, `readSensors`:34, `tone`:48, `buildRows`:54
+`normalizeSettings`:18, `clamp`:19, `v`:33, `n`:34, `readSensors`:37, `tone`:52, `buildRows`:58, `f`:82, `cell`:83, `buildPanel`:91, `L`:93, `mm`:151
 
 ## `electron/services/psTools/PsToolkitService.js`
 
@@ -662,7 +682,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/App.tsx`
 
-`pageFromHash`:49, `PageLoading`:54 _component_, `App`:69 _component_, `onHash`:80, `report`:86, `onError`:102, `onRejection`:108, `reportRenderError`:123, `renderPage`:138
+`pageFromHash`:50, `PageLoading`:55 _component_, `App`:70 _component_, `onHash`:84, `report`:90, `onError`:106, `onRejection`:112, `reportRenderError`:127, `renderPage`:142
 
 ## `src/components/DetailedHardwareInfo.tsx`
 
@@ -711,6 +731,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `src/components/darkos/DarkOSProgress.tsx`
 
 `DarkOSProgress`:7 _component_
+
+## `src/components/darkos/DarkOSReleaseCard.tsx`
+
+`gb`:6, `newer`:7, `p`:8, `DarkOSReleaseCard`:18 _component_, `download`:28
 
 ## `src/components/darkos/DarkOSSystemPanel.tsx`
 
@@ -886,11 +910,11 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/i18n/messages.ts`
 
-`SupportedLang`:24 _type_, `LanguageOption`:26 _type_, `getTranslationTemplate`:3415
+`SupportedLang`:25 _type_, `LanguageOption`:27 _type_, `getTranslationTemplate`:3416
 
 ## `src/layouts/MainLayout.tsx`
 
-`MainLayoutProps`:15 _type_, `NavSection`:21 _type_, `MainLayout`:31 _component_, `handleMenuClick`:133, `handleNavKeyDown`:156, `navButton`:171, `rail`:177
+`MainLayoutProps`:15 _type_, `NavSection`:21 _type_, `MainLayout`:31 _component_, `handleMenuClick`:139, `handleNavKeyDown`:162, `navButton`:177, `rail`:183
 
 ## `src/lib/cipherTools.ts`
 
@@ -899,6 +923,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `src/lib/codeExamples.ts`
 
 `CodeLanguage`:4 _type_, `ExampleId`:5 _type_, `languageForFile`:13
+
+## `src/lib/shutterSound.ts`
+
+`playShutter`:5
 
 ## `src/pages/AdvancedSecurity.tsx`
 
@@ -914,7 +942,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/DarkOSCenter.tsx`
 
-`TabId`:17 _type_, `Banner`:19 _type_, `ConfirmState`:21 _type_, `api`:40, `Section`:43 _component_, `Figure`:57 _component_, `Empty`:64 _component_, `DarkOSCenter`:68 _component_, `current`:97, `profileName`:166, `describe`:167, `toggleChange`:169, `toggleGroup`:190, `askProfile`:197, `askRestoreAll`:224, `askRestoreSnapshot`:232, `renderOverview`:319, `renderChanges`:355, `renderProfiles`:437, `renderRecovery`:491, `renderSnapshots`:528, `renderFailures`:572, `renderDiagnostics`:596, `notice`:619
+`TabId`:18 _type_, `Banner`:20 _type_, `ConfirmState`:22 _type_, `api`:41, `Section`:44 _component_, `Figure`:58 _component_, `Empty`:65 _component_, `DarkOSCenter`:69 _component_, `current`:98, `profileName`:167, `describe`:168, `toggleChange`:170, `toggleGroup`:191, `askProfile`:198, `askRestoreAll`:225, `askRestoreSnapshot`:233, `renderOverview`:321, `renderChanges`:358, `renderProfiles`:440, `renderRecovery`:494, `renderSnapshots`:531, `renderFailures`:575, `renderDiagnostics`:599, `notice`:622
 
 ## `src/pages/Dashboard.tsx`
 
@@ -954,7 +982,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/GameOverlay.tsx`
 
-`n`:8, `GameOverlay`:10 _component_, `api`:18, `metricLabel`:20, `set`:37, `toggle`:44, `toggleMetric`:53
+`n`:8, `GameOverlay`:10 _component_, `api`:18, `metricLabel`:20, `set`:43, `toggle`:50, `toggleMetric`:59
 
 ## `src/pages/Home.tsx`
 
@@ -967,6 +995,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `src/pages/Juuzou.tsx`
 
 `Juuzou`:5 _component_
+
+## `src/pages/Kakugan.tsx`
+
+`api`:7, `brl`:8, `Kakugan`:11 _component_, `setPref`:23, `act`:60, `open`:67, `LoginBox`:139 _component_, `submit`:145, `Plans`:169 _component_, `Patch`:192 _type_, `PlanCard`:194 _component_, `AccountRow`:229 _component_, `run`:238, `GamesEditor`:295 _component_, `add`:310, `SteamLoginModal`:340 _component_, `poll`:349
 
 ## `src/pages/Library.tsx`
 
@@ -1082,7 +1114,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/types/darkos.ts`
 
-`DarkOSProfileId`:4 _type_, `DarkOSCatalogEntry`:6 _type_, `DarkOSManifestChange`:20 _type_, `DarkOSManifest`:26 _type_, `DarkOSSnapshot`:35 _type_, `DarkOSChangeResult`:37 _type_, `DarkOSChangeResponse`:47 _type_, `DarkOSReadResponse`:61 _type_, `DarkOSInfo`:63 _type_, `DarkOSRunEvent`:76 _type_, `DarkOSAPI`:86 _type_
+`DarkOSProfileId`:4 _type_, `DarkOSCatalogEntry`:6 _type_, `DarkOSManifestChange`:20 _type_, `DarkOSManifest`:26 _type_, `DarkOSSnapshot`:35 _type_, `DarkOSChangeResult`:37 _type_, `DarkOSChangeResponse`:47 _type_, `DarkOSReadResponse`:61 _type_, `DarkOSInfo`:63 _type_, `DarkOSRunEvent`:76 _type_, `DarkOSAPI`:86 _type_, `DarkOSRelease`:109 _type_
 
 ## `src/utils/darkosData.ts`
 
@@ -1115,6 +1147,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/hwSensors.test.ts`
 
 `sample`:8
+
+## `tests/kakugan.test.ts`
+
+`res`:13, `acc`:80, `dash`:81
 
 ## `tests/maintenanceSchedule.test.ts`
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { visibleInterval } from '../utils/visibleInterval';
 import {
   Zap, Activity, Gamepad2, Cpu, ArrowRight, Monitor, Flame, Play,
-  Network, Wrench, ChevronRight, Sparkles, Loader2, DarkHubMark, AlertTriangle
+  Network, Wrench, ChevronRight, Sparkles, Loader2, DarkHubMark, AlertTriangle, Layers
 } from '../components/icons';
 import { useI18n } from '../i18n/I18nProvider';
 
@@ -108,7 +108,8 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
   const shortcuts = [
     { id: 'ultra-latency', icon: Flame, title: 'Ultra Low Latency', desc: t('home.ultraLatencyDesc', 'Timer Resolution & Kernel') },
     { id: 'monitor', icon: Monitor, title: t('home.hardwareMonitor', 'Hardware Monitor'), desc: t('home.hardwareMonitorDesc', 'Real-time Sensors & Usage') },
-    { id: 'networktools', icon: Network, title: t('home.networkDiagnostics', 'Network Diagnostics'), desc: t('home.networkDiagnosticsDesc', 'Ping, DNS & Cloudflare Test') }
+    { id: 'networktools', icon: Network, title: t('home.networkDiagnostics', 'Network Diagnostics'), desc: t('home.networkDiagnosticsDesc', 'Ping, DNS & Cloudflare Test') },
+    { id: 'overlay', icon: Layers, title: t('nav.overlay', 'In-game overlay'), desc: t('home.overlayDesc', 'FPS, 1% low, sensors · Ctrl+Shift+F9') }
   ];
 
   return (
@@ -216,7 +217,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
       {/* Shortcuts: one strip, not five cards */}
       <section aria-labelledby="home-shortcuts">
         <h2 id="home-shortcuts" className="text-[13px] font-medium text-zinc-400 mb-2.5">{t('home.quickUtilities', 'Quick Utilities')}</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 rounded-xl border border-zinc-800/80 bg-zinc-900/30 divide-y sm:divide-y-0 lg:divide-x divide-zinc-800/80 overflow-hidden">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 rounded-xl border border-zinc-800/80 bg-zinc-900/30 divide-y sm:divide-y-0 lg:divide-x divide-zinc-800/80 overflow-hidden">
           {shortcuts.map(({ id, icon: Icon, title, desc }) => (
             <button
               key={id}

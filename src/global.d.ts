@@ -4,6 +4,21 @@ export interface UsbPort {
   instanceId: string; name: string; kind: 'input' | 'keyboard' | 'mouse' | 'gamepad' | 'storage' | 'camera' | 'audio' | 'serial' | 'hid' | 'other';
   port: number; hub: number; status: string; enabled: boolean; problemCode: number; children: { instanceId: string; name: string; class: string }[];
 }
+export type KgResult<T> = { ok: boolean; status?: number; error?: string } & T;
+export interface KgStatus { asfOnline: boolean; capacity: number | null; used: number; soldOut: boolean }
+export interface KgPlan { id: string; kind: 'HOURS' | 'CARDS' | 'UNLIMITED'; name: string; priceCents: number; slots: number; days: number; hours?: number; summary: string; features: string[]; highlight?: boolean }
+export interface KgMe { id: string; name: string; email: string; isAdmin: boolean; hasCpf: boolean }
+export interface KgGame { id: number; name: string; image: string }
+export interface KgAccount {
+  id: string; steamLogin: string; nickname: string | null; avatar: string | null; profileUrl: string | null;
+  state: 'offline' | 'paused' | 'expired' | 'missing' | 'needs_password' | 'needs_email_code' | 'needs_app_code' | 'online' | 'connecting' | 'stopped';
+  playingElsewhere: boolean; games: number[]; farmCards: boolean; invisible: boolean; customGame: string | null; lastOnlineAt: string | null;
+  cards: { farming: { appId: number; name: string; cardsRemaining: number; hoursPlayed: number }[]; gamesLeft: number; cardsLeft: number; timeRemaining: string; paused: boolean } | null;
+}
+export interface KgEntitlement { id: string; planId: string; name: string; kind: KgPlan['kind']; slots: number; active: boolean; expiresAt: string; minutesTotal: number; minutesUsed: number; accounts: KgAccount[] }
+export interface KgDashboard { asfOnline: boolean; plans: KgEntitlement[] }
+export interface KgLoginAttempt { id: string; method: 'qr' | 'credentials'; state: 'waiting' | 'scanned' | 'done' | 'failed'; actions: string[]; qrUrl: string | null; qrDataUrl: string | null; error: string | null }
+
 export interface RestoreComponent {
   id: string;
   group: 'media' | 'apps' | 'gaming' | 'system';
@@ -21,7 +36,7 @@ export interface UsbState {
   policies?: { storageBlocked: boolean; writeProtect: boolean; selectiveSuspend: boolean | null };
 }
 
-export interface OverlaySettings { position: 'tl' | 'tr' | 'bl' | 'br'; scale: number; opacity: number; background: number; intervalMs: number; hotkey: string; metrics: string[]; logFolder: string }
+export interface OverlaySettings { layout: 'compact' | 'advanced' | 'oc'; position: 'tl' | 'tr' | 'bl' | 'br'; scale: number; opacity: number; background: number; intervalMs: number; hotkey: string; metrics: string[]; logFolder: string }
 export interface OverlayFrameStats { fps: number | null; frameTimeMs: number | null; low1: number | null; low01: number | null; maxFrameTimeMs: number; gpuBusyMs: number | null; latencyMs: number | null; presentMode: string; graph: number[] }
 export interface OverlayStatus {
   ok: boolean; error?: string | null; visible?: boolean; settings?: OverlaySettings; target?: { pid: number; name: string } | null; mode?: 'foreground' | 'fixed';
@@ -402,6 +417,25 @@ export interface DarkHubAPI {
     setWriteProtect: (payload: { on: boolean }) => Promise<{ ok: boolean; error?: string }>;
     setSelectiveSuspend: (payload: { on: boolean }) => Promise<{ ok: boolean; error?: string }>;
     eject: (payload: { letter: string }) => Promise<{ ok: boolean; error?: string }>;
+  };
+  /** Kakugan (kakugan.darkhub.ink): Steam hours/cards farm panel. Session kept in the main process. */
+  kakugan: {
+    state: () => Promise<KgResult<{ status?: KgStatus; plans?: KgPlan[]; me?: KgMe | null }>>;
+    login: (payload: { email: string; password: string }) => Promise<KgResult<{ me?: KgMe }>>;
+    logout: () => Promise<KgResult<{}>>;
+    dashboard: () => Promise<KgResult<{ dashboard?: KgDashboard }>>;
+    steamLoginStart: (payload: { planId?: string; accountId?: string }) => Promise<KgResult<{ attempt?: KgLoginAttempt }>>;
+    steamLoginPoll: (payload: { id: string }) => Promise<KgResult<{ attempt?: KgLoginAttempt }>>;
+    steamLoginCode: (payload: { id: string; code: string }) => Promise<KgResult<{ attempt?: KgLoginAttempt }>>;
+    steamLoginCancel: (payload: { id: string }) => Promise<KgResult<{}>>;
+    updateAccount: (payload: { id: string; patch: { games?: number[]; farmCards?: boolean; invisible?: boolean; paused?: boolean; customGame?: string | null } }) => Promise<KgResult<{}>>;
+    accountInput: (payload: { id: string; kind: 'password' | 'email_code' | 'app_code'; value: string }) => Promise<KgResult<{}>>;
+    removeAccount: (payload: { id: string }) => Promise<KgResult<{}>>;
+    searchGames: (payload: { q: string }) => Promise<KgResult<{ games?: KgGame[] }>>;
+    gameNames: (payload: { ids: number[] }) => Promise<KgResult<{ games?: KgGame[] }>>;
+    openSite: (payload: { page: string }) => Promise<KgResult<{}>>;
+    getSettings: () => Promise<KgResult<{ notify?: boolean; autoPause?: boolean }>>;
+    setSettings: (payload: { notify?: boolean; autoPause?: boolean }) => Promise<KgResult<{ notify?: boolean; autoPause?: boolean }>>;
   };
   /** Restores Windows components removed by a custom ISO (Media Player, .NET 3.5, Store apps, Store, winget). */
   restore: {
@@ -908,7 +942,7 @@ declare global {
 export interface DlssFile { file: string; name: string; kind: 'sr' | 'rr' | 'fg'; version: string | null; hasOriginal: boolean; x64: boolean; behind: boolean }
 export interface DlssGameInfo { latest?: string; tag?: string; anticheat?: string | null; files?: DlssFile[] }
 export type ShareShotResult = { ok: boolean; error?: string; file?: string; width?: number; height?: number; bytes?: number; ms?: number; entry?: ShareEntry; uploadError?: string; cancelled?: boolean };
-export interface ShareConfig { hotkey: string; regionHotkey: string; folder: string; autoUpload: boolean; copyImage: boolean; ttl: number }
+export interface ShareConfig { hotkey: string; regionHotkey: string; folder: string; autoUpload: boolean; copyImage: boolean; clip: 'image' | 'link' | 'both' | 'none'; sound: boolean; ttl: number }
 export interface ShareEntry { id: string; name: string; size: number; kind?: string; createdAt: number; expiresAt: number; pageUrl: string; directUrl: string; origin?: string }
 export interface ShareUploadResult { ok: boolean; error?: string; entry?: ShareEntry }
 export interface ShareState { ok: boolean; error?: string; config: ShareConfig; hotkeyActive: boolean; regionHotkeyActive: boolean; history: ShareEntry[]; uploading: number }

@@ -5,13 +5,27 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
 <style>
   html, body { margin: 0; background: transparent; overflow: hidden; font: 600 13px/1.25 "Segoe UI", system-ui, sans-serif; color: #f4f4f5; user-select: none; }
-  #box { position: absolute; padding: 6px 9px; border-radius: 6px; background: rgba(9, 9, 11, var(--bg, 0.55)); transform-origin: top left; min-width: 120px; }
+  #box { position: absolute; padding: 6px 9px; border-radius: 6px; background: rgba(9, 9, 11, var(--bg, 0.72)); transform-origin: top left; min-width: 120px; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.7); }
   .row { display: flex; justify-content: space-between; gap: 14px; white-space: nowrap; }
   .k { color: #a1a1aa; font-weight: 500; }
   .v { font-variant-numeric: tabular-nums; }
   .fps { font-size: 22px; line-height: 1; }
-  .warn { color: #fbbf24; } .bad { color: #f87171; } .good { color: #4ade80; }
+  .warn { color: #fbbf24 !important; } .bad { color: #f87171 !important; } .good { color: #4ade80 !important; }
   canvas { display: block; margin-top: 4px; }
+  /* advanced / overclocker */
+  .adv { font: 600 13px/1.35 "Cascadia Mono", Consolas, "Segoe UI", monospace; }
+  .ln { display: grid; grid-template-columns: 44px auto; align-items: baseline; white-space: nowrap; }
+  .tag { font-weight: 700; letter-spacing: 0.02em; }
+  .cells { display: flex; gap: 12px; }
+  .c { font-variant-numeric: tabular-nums; color: #fafafa; }
+  .u { color: #a1a1aa; font-weight: 500; font-size: 11px; margin-left: 2px; }
+  .big .c { font-size: 18px; }
+  .u.p { margin: 0 3px 0 0; }
+  .gr { margin-top: 6px; }
+  .gh { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; color: #a1a1aa; font-weight: 500; }
+  .st { margin-top: 6px; display: grid; grid-template-columns: auto auto; column-gap: 12px; row-gap: 1px; font-size: 12px; }
+  .st .sk { color: #a1a1aa; font-weight: 500; } .st .sv { text-align: right; font-variant-numeric: tabular-nums; }
+  .sep { height: 1px; background: rgba(161, 161, 170, 0.25); margin: 5px 0 2px; }
 </style>
 </head>
 <body>
@@ -19,27 +33,73 @@
 <script>
   // The main process calls window.__overlay(data) with already-formatted values; nothing here talks to Node.
   const box = document.getElementById('box')
-  const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+  const color = (c) => (/^#[0-9a-f]{6}$/i.test(c || '') ? c : '#e4e4e7')
+
+  function line(canvas, values, col, floor, ceil, w, h) {
+    if (!values || values.length < 2) return
+    const c = canvas.getContext('2d')
+    const span = Math.max(1e-6, ceil - floor)
+    c.strokeStyle = col; c.lineWidth = 1.5; c.beginPath()
+    values.forEach((v, i) => {
+      const x = (i / (values.length - 1)) * w
+      const y = h - 1 - (Math.min(ceil, Math.max(floor, v)) - floor) / span * (h - 2)
+      i ? c.lineTo(x, y) : c.moveTo(x, y)
+    })
+    c.stroke()
+  }
+
+  function renderPanel(p) {
+    let html = '<div class="adv">'
+    for (const l of p.lines) {
+      html += `<div class="ln${l.big ? ' big' : ''}"><span class="tag" style="color:${color(l.color)}">${esc(l.tag)}</span><span class="cells">`
+      html += l.cells.map((c) => `<span class="c ${c.t || ''}">${c.p ? `<span class="u p">${esc(c.p)}</span>` : ''}${esc(c.v)}<span class="u">${esc(c.u)}</span></span>`).join('')
+      html += '</span></div>'
+    }
+    p.graphs.forEach((g, i) => {
+      html += `<div class="gr"><div class="gh"><span>${esc(g.title)}</span><span>${esc(g.info || '')}</span></div><canvas id="g${i}" height="40"></canvas></div>`
+    })
+    if (p.threads) html += `<div class="gr"><div class="gh"><span>${esc(p.threadsLabel || 'Threads')}</span><span>${p.threads.length}</span></div><canvas id="th" height="26"></canvas></div>`
+    if (p.stats.length) html += '<div class="sep"></div><div class="st">' + p.stats.map(([k, v]) => `<span class="sk">${esc(k)}</span><span class="sv">${esc(v)}</span>`).join('') + '</div>'
+    box.innerHTML = html + '</div>'
+    // graphs span the width of the text lines
+    const W = Math.max(180, Math.round(box.querySelector('.adv').getBoundingClientRect().width / (Number(box.dataset.scale) || 1)))
+    p.graphs.forEach((g, i) => {
+      const cv = document.getElementById('g' + i)
+      cv.width = W
+      const ctx = cv.getContext('2d')
+      ctx.strokeStyle = 'rgba(161,161,170,0.18)'; ctx.lineWidth = 1
+      for (const y of [0.25, 0.5, 0.75]) { ctx.beginPath(); ctx.moveTo(0, 40 * y); ctx.lineTo(W, 40 * y); ctx.stroke() }
+      for (const s of g.series || [{ color: g.color, values: g.values }]) line(cv, s.values, color(s.color), g.floor, g.ceil, W, 40)
+    })
+    const th = document.getElementById('th')
+    if (th) {
+      th.width = W
+      const ctx = th.getContext('2d'), n = p.threads.length, bw = W / n
+      p.threads.forEach((x, i) => {
+        const v = Math.max(0, Math.min(100, x)), hgt = Math.max(1, (v / 100) * 26)
+        ctx.fillStyle = v >= 95 ? '#f87171' : v >= 80 ? '#fbbf24' : '#60a5fa'
+        ctx.fillRect(i * bw + 1, 26 - hgt, Math.max(1, bw - 2), hgt)
+      })
+    }
+  }
+
   window.__overlay = (d) => {
     const s = d.settings
     box.style.setProperty('--bg', String(s.background))
     box.style.opacity = String(s.opacity)
     box.style.transform = `scale(${s.scale})`
+    box.dataset.scale = String(s.scale)
     const right = s.position.endsWith('r'), bottom = s.position.startsWith('b')
     box.style.left = right ? '' : '0'; box.style.right = right ? '0' : ''
     box.style.top = bottom ? '' : '0'; box.style.bottom = bottom ? '0' : ''
     box.style.transformOrigin = `${bottom ? 'bottom' : 'top'} ${right ? 'right' : 'left'}`
+    if (d.panel) { renderPanel(d.panel); return }
     const rows = d.rows.map((r) => r.big
       ? `<div class="row"><span class="v fps ${r.tone || ''}">${esc(r.value)}</span><span class="k">${esc(r.label)}</span></div>`
       : `<div class="row"><span class="k">${esc(r.label)}</span><span class="v ${r.tone || ''}">${esc(r.value)}</span></div>`).join('')
     box.innerHTML = rows + (d.graph ? '<canvas id="g" width="150" height="34"></canvas>' : '')
-    if (d.graph) {
-      const c = document.getElementById('g').getContext('2d')
-      const g = d.graph, max = Math.max(33.4, ...g)
-      c.strokeStyle = '#60a5fa'; c.lineWidth = 1.5; c.beginPath()
-      g.forEach((v, i) => { const x = (i / Math.max(1, g.length - 1)) * 150, y = 34 - (v / max) * 32; i ? c.lineTo(x, y) : c.moveTo(x, y) })
-      c.stroke()
-    }
+    if (d.graph) line(document.getElementById('g'), d.graph, '#60a5fa', 0, Math.max(33.4, ...d.graph), 150, 34)
   }
 </script>
 </body>

@@ -221,9 +221,19 @@ export default function Share() {
             <input type="checkbox" checked={c.autoUpload} onChange={(e) => setConfig({ autoUpload: e.target.checked })} />
             {t('share.autoUpload', 'Enviar ao Susuya e copiar o link')}
           </label>
+          <label className="flex items-center justify-between gap-2.5 text-[12.5px] text-zinc-300">
+            {t('share.clip', 'Área de transferência')}
+            <select className="dh-input" value={c.clip} onChange={(e) => setConfig({ clip: e.target.value as typeof c.clip })}>
+              <option value="image">{t('share.clip.image', 'Copiar a imagem')}</option>
+              <option value="link" disabled={!c.autoUpload}>{t('share.clip.link', 'Copiar o link do Susuya')}</option>
+              <option value="both" disabled={!c.autoUpload}>{t('share.clip.both', 'Imagem e link')}</option>
+              <option value="none">{t('share.clip.none', 'Não copiar')}</option>
+            </select>
+          </label>
+          {c.clip === 'both' ? <p className="dh-help">{t('share.clip.bothHelp', 'Colar dá a imagem em apps de imagem (Discord, Paint) e o link em campos de texto.')}</p> : null}
           <label className="flex items-center gap-2.5 text-[12.5px] text-zinc-300">
-            <input type="checkbox" checked={c.copyImage} onChange={(e) => setConfig({ copyImage: e.target.checked })} />
-            {t('share.copyImage', 'Copiar a imagem para a área de transferência')}
+            <input type="checkbox" checked={c.sound} onChange={(e) => setConfig({ sound: e.target.checked })} />
+            {t('share.sound', 'Som de câmera ao tirar print')}
           </label>
           <button type="button" className="dh-btn dh-btn-sm" onClick={() => api()!.openFolder()}><FolderOpen size={14} />{t('share.openFolder', 'Abrir pasta')}</button>
           <ul className="space-y-1.5 border-t border-zinc-800/80 pt-3">

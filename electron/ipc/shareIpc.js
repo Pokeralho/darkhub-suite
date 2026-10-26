@@ -23,6 +23,10 @@ export function normalizeShareConfig(c = {}, picturesDir = '') {
     folder: typeof c.folder === 'string' && path.isAbsolute(c.folder) ? c.folder : path.join(picturesDir, 'DarkHub Screenshots'),
     autoUpload: c.autoUpload === true,
     copyImage: c.copyImage !== false,
+    // what ends up in the clipboard: the picture, the Susuya link (only with auto-upload) or both (paste gives the
+    // picture in image apps and the link in text fields)
+    clip: ['image', 'link', 'both', 'none'].includes(c.clip) ? c.clip : (c.copyImage === false ? 'none' : (c.autoUpload === true ? 'link' : 'image')),
+    sound: c.sound !== false,
     // 1 h by default: longer links only when the user picked them (old configs saved 24 h without asking)
     ttlChosen: c.ttlChosen === true,
     ttl: c.ttlChosen === true && TTLS.includes(Number(c.ttl)) ? Number(c.ttl) : DEFAULT_TTL
@@ -83,14 +87,19 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globa
   async function capture(region = false) {
     const shot = region ? await captureRegion(config.folder, pickRegion) : await captureScreen(config.folder)
     if (!shot) return { ok: true, cancelled: true }
-    if (config.copyImage) { try { clipboard.writeImage(shot.image) } catch { /* clipboard busy */ } }
+    if (config.clip === 'image' || config.clip === 'both' || (config.clip === 'link' && !config.autoUpload)) { try { clipboard.writeImage(shot.image) } catch { /* clipboard busy */ } }
     const info = { file: shot.file, width: shot.width, height: shot.height, bytes: shot.bytes, ms: shot.ms }
-    broadcast({ type: 'screenshot', ...info })
+    // the main window plays the shutter sound (also when DarkHub is in the tray)
+    broadcast({ type: 'screenshot', ...info, sound: config.sound })
     if (config.autoUpload) {
       const r = await upload(shot.file, 'screenshot')
       if (r.ok) {
-        clipboard.writeText(r.entry.directUrl)
-        notify('DarkHub: print enviado ao Susuya', `${shot.width}x${shot.height} · link direto copiado`)
+        try {
+          if (config.clip === 'link') clipboard.writeText(r.entry.directUrl)
+          else if (config.clip === 'both') clipboard.write({ image: shot.image, text: r.entry.directUrl })
+        } catch { /* clipboard busy */ }
+        const copied = config.clip === 'link' ? 'link direto copiado' : config.clip === 'both' ? 'imagem e link copiados' : config.clip === 'image' ? 'imagem copiada' : 'link no histórico'
+        notify('DarkHub: print enviado ao Susuya', `${shot.width}x${shot.height} · ${copied}`)
         return { ok: true, ...info, entry: r.entry }
       }
       notify('DarkHub: print salvo', `Falha ao enviar: ${r.error}`)

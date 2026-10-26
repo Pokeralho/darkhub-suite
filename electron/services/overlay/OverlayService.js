@@ -4,16 +4,23 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { FrameWindow } from './frameStats.js'
-import { normalizeSettings, readSensors, buildRows } from './overlayModel.js'
+import { FrameWindow, SessionStats } from './frameStats.js'
+import { normalizeSettings, readSensors, buildRows, buildPanel } from './overlayModel.js'
+import { readLhm } from './lhmModel.js'
 
 const PAGE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets', 'overlay', 'overlay.html')
 const FOLLOW_MS = 2000
+const HISTORY = 120 // samples kept for the overclocker graphs (one per refresh)
 const DEFAULT_LABELS = { fps: 'FPS', low1: '1% low', frametime: 'Frame', latency: 'Latência', cpuTemp: 'CPU °C', cpuPower: 'CPU W', gpuTemp: 'GPU °C', gpuClock: 'GPU clk' }
 
 export class OverlayService {
-  constructor({ app, BrowserWindow, screen, globalShortcut, presentMon, hardware, native, onEvent }) {
+  constructor({ app, BrowserWindow, screen, globalShortcut, presentMon, hardware, native, onEvent, lhmSource }) {
     Object.assign(this, { app, BrowserWindow, screen, globalShortcut, presentMon, hardware, native, onEvent })
+    this.lhm = null
+    this.sessionStats = new SessionStats()
+    this.history = { fps: [], cpu: [], gpu: [], cpuTemp: [], gpuTemp: [] }
+    // full LibreHardwareMonitor tree (clocks, power, voltages, fans) for the advanced layouts
+    lhmSource?.on?.('data', (p) => { if (p?.type === 'lhm') this.lhm = readLhm(p) })
     this.file = path.join(app.getPath('userData'), 'overlay.json')
     this.win = null
     this.visible = false
@@ -32,6 +39,7 @@ export class OverlayService {
     presentMon.on('frame', (f) => {
       if (this.target && f.pid !== this.target.pid) return
       this.window.push(f)
+      this.sessionStats.push(f.msBetweenPresents)
       if (f.msBetweenPresents > 0 && this.session.length < 500000) this.session.push(f.msBetweenPresents)
     })
     presentMon.on('exit', ({ error }) => { if (error) this.error = error; this._emit() })
@@ -45,7 +53,7 @@ export class OverlayService {
     return {
       ok: true, visible: this.visible, settings: this.settings, target: this.target, mode: this.mode,
       capturing: this.presentMon.running, presentMonInstalled: this.presentMon.installed(), error: this.error,
-      stats: this.window.stats(), lastSession: this.lastSession
+      stats: this.window.stats(), session: this.sessionStats.stats(), lastSession: this.lastSession
     }
   }
 
@@ -136,6 +144,8 @@ export class OverlayService {
     if (this.target?.pid === pid && this.presentMon.running) return
     this._closeSession()
     this.window.reset()
+    this.sessionStats.reset()
+    for (const k of Object.keys(this.history)) this.history[k] = []
     this.target = { pid, name }
     try {
       await this.presentMon.start({ pid })
@@ -169,8 +179,18 @@ export class OverlayService {
     if (!this.win || this.win.isDestroyed() || !this.visible) return
     const frames = this.window.stats()
     const sensors = readSensors(this.hardware.snapshot())
-    const rows = buildRows(this.settings, frames, sensors, this.labels)
-    const data = { settings: this.settings, rows, graph: this.settings.metrics.includes('graph') && frames ? frames.graph : null }
+    let data
+    if (this.settings.layout === 'compact') {
+      const rows = buildRows(this.settings, frames, sensors, this.labels)
+      data = { settings: this.settings, rows, graph: this.settings.metrics.includes('graph') && frames ? frames.graph : null }
+    } else {
+      const hw = this.lhm && Date.now() - (this.lhm.at || 0) < 10000 ? this.lhm : null
+      const h = this.history
+      const add = (k, x) => { if (x != null && Number.isFinite(Number(x))) { h[k].push(Number(x)); if (h[k].length > HISTORY) h[k].shift() } }
+      add('fps', frames?.fps); add('cpu', sensors.cpu ?? hw?.cpu?.load); add('gpu', hw?.gpu?.load ?? sensors.gpu)
+      add('cpuTemp', hw?.cpu?.temp ?? sensors.cpuTemp); add('gpuTemp', hw?.gpu?.temp ?? sensors.gpuTemp)
+      data = { settings: this.settings, panel: buildPanel(this.settings.layout, frames, this.sessionStats.stats(), hw, sensors, h, this.labels) }
+    }
     this.win.webContents.executeJavaScript(`window.__overlay && window.__overlay(${JSON.stringify(data)})`).catch(() => {})
     this._log(frames, sensors)
   }

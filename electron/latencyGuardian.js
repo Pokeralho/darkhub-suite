@@ -1269,6 +1269,7 @@ public static class Psapi {
 
       launchedGame = { proc, exePath, startedAt: now(), prevConfig, prevUltra, gameId: payload?.gameId, gameName: payload?.gameName ?? '' }
 
+      appEvents.emit('gameStarted', { gameId: payload?.gameId, gameName: payload?.gameName ?? '', exePath })
       broadcastEvent('library:gameStarted', {
         gameId: payload?.gameId,
         gameName: payload?.gameName ?? '',

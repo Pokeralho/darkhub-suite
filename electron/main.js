@@ -1,6 +1,6 @@
 // Must stay the first import: dev profile + IPC trace (no-op when packaged).
 import { devStartPage } from './devBootstrap.js'
-import { app, BrowserWindow, dialog, ipcMain, shell, protocol, clipboard, globalShortcut, Menu, Tray, screen, session, Notification } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell, protocol, clipboard, globalShortcut, Menu, Tray, screen, session, Notification, safeStorage } from 'electron'
 import log from 'electron-log'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -67,6 +67,7 @@ import { registerOverlayIPC } from './ipc/overlayIpc.js'
 import { registerUsbIPC } from './ipc/usbIpc.js'
 import { registerRestoreIPC } from './ipc/restoreIpc.js'
 import { registerShareIPC } from './ipc/shareIpc.js'
+import { registerKakuganIPC } from './ipc/kakuganIpc.js'
 import { registerUpscaleIPC } from './ipc/upscaleIpc.js'
 import { registerMetadataIPC } from './ipc/metadataIpc.js'
 import { SYSTEM_TAR } from './services/SecureDownload.js'
@@ -231,6 +232,10 @@ safeRegister('usb', () => registerUsbIPC({ ipcMain, logger: Logger }))
 safeRegister('restore', () => registerRestoreIPC({ ipcMain, logger: Logger }))
 safeRegister('upscale', () => registerUpscaleIPC({ app, ipcMain, BrowserWindow, logger: Logger }))
 safeRegister('share', () => registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globalShortcut, BrowserWindow, Notification, logger: Logger }))
+safeRegister('kakugan', () => registerKakuganIPC({
+  app, ipcMain, shell, safeStorage, Notification, logger: Logger,
+  openPage: (page) => { showMainWindow(); mainWindow?.webContents.executeJavaScript(`location.hash = ${JSON.stringify('#' + page)}`).catch(() => {}) }
+}))
 safeRegister('metadata', () => registerMetadataIPC({ ipcMain, assertFileAccessGranted, hasFileAccessGrant, getFfmpegPath, logger: Logger }))
 
 async function getYtDlpTools() {

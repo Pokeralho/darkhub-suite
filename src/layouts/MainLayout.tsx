@@ -3,7 +3,7 @@ import { APP_VERSION_LABEL } from '../appVersion';
 import {
   Home as HomeIcon, LayoutGrid, Zap, Monitor, FileText, Settings,
   PlaySquare, ScanText, ShieldAlert, Lock, Image as ImageIcon,
-  Edit3, MousePointerClick, LibraryBig, Gamepad2, Film,
+  Edit3, MousePointerClick, LibraryBig, Gamepad2, Film, Eye,
   Download, Fingerprint, Network, Code, ChevronLeft, ChevronRight,
   Cpu, Crosshair, Activity, Flame, Sparkles, Minus, Square, X, LifeBuoy, Gauge, UploadCloud,
   MonitorCog, Terminal, DarkHubMark, Archive, Layers, Rocket, Usb, History
@@ -115,7 +115,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
         { id: 'decryption', label: t('nav.decryption', 'Decryption'), icon: Fingerprint },
         { id: 'converter', label: t('nav.converter', 'File Converter'), icon: FileText },
         { id: 'downloads', label: t('nav.downloads', 'Download Manager'), icon: Download },
-        { id: 'share', label: t('nav.share', 'Susuya'), icon: UploadCloud },
         { id: 'youtube', label: t('nav.youtube', 'Video Downloader'), icon: PlaySquare },
         { id: 'ocr', label: t('nav.ocr', 'Image OCR'), icon: ScanText },
         { id: 'metadata', label: t('nav.metadata', 'EXIF Editor'), icon: ImageIcon },
@@ -123,7 +122,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
         { id: 'summarizer', label: t('nav.summarizer', 'Summarizer'), icon: Sparkles },
         { id: 'autoclicker', label: t('nav.autoclicker', 'AutoClicker'), icon: MousePointerClick },
         { id: 'devtools', label: t('nav.devtools', 'Developer Tools'), icon: Code },
-        { id: 'powershell', label: t('nav.powershell', 'PowerShell Tools'), icon: Terminal },
+        { id: 'powershell', label: t('nav.powershell', 'PowerShell Tools'), icon: Terminal }
+      ]
+    },
+    {
+      category: t('nav.cat.services', 'DarkHub services'),
+      items: [
+        { id: 'kakugan', label: t('nav.kakugan', 'Kakugan'), icon: Eye },
+        { id: 'share', label: t('nav.share', 'Susuya'), icon: UploadCloud },
         { id: 'luluflix', label: t('nav.luluflix', 'LuluFlix'), icon: Film },
         { id: 'juuzou', label: t('nav.juuzou', 'Juuzou'), icon: Download }
       ]

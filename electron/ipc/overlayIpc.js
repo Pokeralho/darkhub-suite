@@ -3,6 +3,7 @@ import { PresentMonService } from '../services/overlay/PresentMonService.js'
 import { OverlayService } from '../services/overlay/OverlayService.js'
 import HardwareService from '../services/HardwareService.js'
 import nativeLatencyClient from '../services/NativeLatencyClient.js'
+import HwSensorsDaemon from '../hal/collectors/HwSensorsDaemon.js'
 
 /** `overlay:*`: in-game FPS/sensor overlay. Status goes out on `overlay:event`. */
 export function registerOverlayIPC({ app, ipcMain, BrowserWindow, screen, globalShortcut, dialog, logger } = {}) {
@@ -15,7 +16,7 @@ export function registerOverlayIPC({ app, ipcMain, BrowserWindow, screen, global
   }
   // created after "ready": BrowserWindow, screen and globalShortcut need it
   const get = () => (svc ||= new OverlayService({
-    app, BrowserWindow, screen, globalShortcut, hardware: HardwareService, native: nativeLatencyClient, onEvent: broadcast,
+    app, BrowserWindow, screen, globalShortcut, hardware: HardwareService, native: nativeLatencyClient, onEvent: broadcast, lhmSource: HwSensorsDaemon,
     presentMon: new PresentMonService({ toolsDir: path.join(app.getPath('userData'), 'tools') })
   }))
 

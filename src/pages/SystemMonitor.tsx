@@ -4,7 +4,7 @@ import {
   Cpu, Server, HardDrive, Network, Monitor, Zap,
   RefreshCw, AlertTriangle, PlaySquare, ShieldCheck,
   CheckCircle2, LayoutTemplate, Wifi, FileDigit, CpuIcon, Activity, List, Thermometer, Copy, Clock,
-  Loader2, Filter, Gauge as GaugeIcon
+  Loader2, Filter, Gauge as GaugeIcon, Layers
 } from '../components/icons';
 import { useSystemMetrics } from '../hooks/useSystemMetrics';
 import { useDeepHardware } from '../hooks/useDeepHardware';
@@ -1145,6 +1145,11 @@ const SystemMonitor = () => {
           </span>
         }
         subtitle={t('monitor.subtitle', 'Varredura profunda do sistema ao Ring-0.')}
+        actions={(
+          <button type="button" className="dh-btn dh-btn-sm" onClick={() => void window.darkhub?.overlay?.show({})} title={t('monitor.overlayHelp', 'Mostra estes sensores por cima do jogo (Ctrl+Shift+F9)')}>
+            <Layers size={14} />{t('monitor.overlay', 'Mostrar no jogo')}
+          </button>
+        )}
       />
 
       <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0">

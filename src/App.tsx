@@ -37,6 +37,7 @@ const Home = lazy(() => import('./pages/Home'));
 const SpaceSniffer = lazy(() => import('./pages/SpaceSniffer'));
 const Maintenance = lazy(() => import('./pages/Maintenance'));
 const UsbControl = lazy(() => import('./pages/UsbControl'));
+const Kakugan = lazy(() => import('./pages/Kakugan'));
 const StartupManager = lazy(() => import('./pages/StartupManager'));
 const Benchmark = lazy(() => import('./pages/Benchmark'));
 const GameOverlay = lazy(() => import('./pages/GameOverlay'));
@@ -75,6 +76,9 @@ const App = () => {
   useEffect(() => {
     if (window.location.hash.replace(/^#/, '') !== currentPage) window.history.replaceState(null, '', `#${currentPage}`);
   }, [currentPage]);
+
+  // screenshot shutter sound, wherever the user is (the window may be in the tray)
+  useEffect(() => window.darkhub?.share?.onEvent?.((m: any) => { if (m?.type === 'screenshot' && m.sound) void import('./lib/shutterSound').then((x) => x.playShutter()); }), []);
 
   useEffect(() => {
     const onHash = () => { const p = pageFromHash(); setCurrentPage((cur) => (cur === p ? cur : p)); };
@@ -215,6 +219,8 @@ ${componentStack}` : ''}`
         return <StartupManager />;
       case 'usb':
         return <UsbControl />;
+      case 'kakugan':
+        return <Kakugan />;
       case 'maintenance':
         return <Maintenance />;
       case 'settings':

@@ -118,9 +118,15 @@ describe('screenshots and share settings', () => {
   it('names files by date and validates settings', () => {
     expect(screenshotName(new Date(2026, 9, 23, 9, 5, 7))).toBe('DarkHub_2026-10-23_09-05-07.png');
     const c = normalizeShareConfig({ ttl: 999, folder: 'relative', hotkey: 'Ctrl+Shift+P' }, 'C:\\Users\\x\\Pictures');
-    expect(c).toEqual({ hotkey: 'Ctrl+Shift+P', regionHotkey: 'Ctrl+Shift+F11', folder: 'C:\\Users\\x\\Pictures\\DarkHub Screenshots', autoUpload: false, copyImage: true, ttlChosen: false, ttl: 3600 });
+    expect(c).toEqual({ hotkey: 'Ctrl+Shift+P', regionHotkey: 'Ctrl+Shift+F11', folder: 'C:\\Users\\x\\Pictures\\DarkHub Screenshots', autoUpload: false, copyImage: true, clip: 'image', sound: true, ttlChosen: false, ttl: 3600 });
     // 24 h saved by the old default is reset to 1 h; a validity the user picked is kept
     expect(normalizeShareConfig({ ttl: 86400 }, 'C:/p').ttl).toBe(3600);
+    // clipboard choice: old configs keep their behaviour (auto-upload copied the link, otherwise the image)
+    expect(normalizeShareConfig({ autoUpload: true }, 'C:/p').clip).toBe('link');
+    expect(normalizeShareConfig({}, 'C:/p').clip).toBe('image');
+    expect(normalizeShareConfig({ copyImage: false }, 'C:/p').clip).toBe('none');
+    expect(normalizeShareConfig({ clip: 'both' }, 'C:/p').clip).toBe('both');
+    expect(normalizeShareConfig({}, 'C:/p').sound).toBe(true);
     expect(normalizeShareConfig({ ttl: 86400, ttlChosen: true }, 'C:/p').ttl).toBe(86400);
     // the region shortcut can never be the same as the full-screen one
     expect(normalizeShareConfig({ hotkey: 'Alt+F9', regionHotkey: 'Alt+F9' }, 'C:/p').regionHotkey).toBe('Ctrl+Shift+F11');

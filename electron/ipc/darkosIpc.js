@@ -57,6 +57,8 @@ export function registerDarkOSIPC({ ipcMain, dialog, BrowserWindow, app, logger,
   })
 
   handle('darkos:isDarkOS', async () => pick().info())
+  // Latest DarkOS ISO published on darkos.darkhub.ink (version, build, SHA-256 from the site's .sha256 file).
+  handle('darkos:latestRelease', async () => ({ ok: true, release: await (await import('../services/darkos/darkosRelease.js')).fetchLatestRelease() }))
   handle('darkos:getCatalog', (p, o) => pick().getCatalog(p, o))
   handle('darkos:getManifest', (_p, o) => pick().getManifest(o))
   handle('darkos:getStatus', (p, o) => pick().getStatus(p, o))

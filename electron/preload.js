@@ -138,6 +138,7 @@ const darkhubApi = {
     isDarkOS: () => ipcRenderer.invoke('darkos:isDarkOS'),
     getCatalog: (payload) => ipcRenderer.invoke('darkos:getCatalog', payload),
     getManifest: () => ipcRenderer.invoke('darkos:getManifest'),
+    latestRelease: () => ipcRenderer.invoke('darkos:latestRelease'),
     getStatus: (payload) => ipcRenderer.invoke('darkos:getStatus', payload),
     applyChange: (payload) => ipcRenderer.invoke('darkos:applyChange', payload),
     revertChange: (payload) => ipcRenderer.invoke('darkos:revertChange', payload),
@@ -193,6 +194,24 @@ const darkhubApi = {
     setWriteProtect: (payload) => ipcRenderer.invoke('usb:setWriteProtect', payload),
     setSelectiveSuspend: (payload) => ipcRenderer.invoke('usb:setSelectiveSuspend', payload),
     eject: (payload) => ipcRenderer.invoke('usb:eject', payload)
+  },
+  kakugan: {
+    state: () => ipcRenderer.invoke('kakugan:state'),
+    login: (payload) => ipcRenderer.invoke('kakugan:login', payload),
+    logout: () => ipcRenderer.invoke('kakugan:logout'),
+    dashboard: () => ipcRenderer.invoke('kakugan:dashboard'),
+    steamLoginStart: (payload) => ipcRenderer.invoke('kakugan:steamLoginStart', payload),
+    steamLoginPoll: (payload) => ipcRenderer.invoke('kakugan:steamLoginPoll', payload),
+    steamLoginCode: (payload) => ipcRenderer.invoke('kakugan:steamLoginCode', payload),
+    steamLoginCancel: (payload) => ipcRenderer.invoke('kakugan:steamLoginCancel', payload),
+    updateAccount: (payload) => ipcRenderer.invoke('kakugan:updateAccount', payload),
+    accountInput: (payload) => ipcRenderer.invoke('kakugan:accountInput', payload),
+    removeAccount: (payload) => ipcRenderer.invoke('kakugan:removeAccount', payload),
+    searchGames: (payload) => ipcRenderer.invoke('kakugan:searchGames', payload),
+    gameNames: (payload) => ipcRenderer.invoke('kakugan:gameNames', payload),
+    openSite: (payload) => ipcRenderer.invoke('kakugan:openSite', payload),
+    getSettings: () => ipcRenderer.invoke('kakugan:getSettings'),
+    setSettings: (payload) => ipcRenderer.invoke('kakugan:setSettings', payload)
   },
   restore: {
     status: () => ipcRenderer.invoke('restore:status'),
