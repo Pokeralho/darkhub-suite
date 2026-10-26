@@ -6,6 +6,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-10-26
+
+### Added
+- Kakugan inside DarkHub (Serviços DarkHub > Kakugan): sign in, plans and balance, Steam accounts with live state,
+  cards being farmed, pause/resume, invisible mode, games to idle (Steam search, up to 32), Steam sign-in by QR code
+  with the phone app, Steam Guard code/password prompts, remove account. Payment and account creation stay on the
+  website. The session is the site's own cookie, kept encrypted with Windows DPAPI (safeStorage) in the main process.
+- DarkOS releases on the DarkOS screen: latest version and build from darkos.darkhub.ink, compared with the installed
+  build; the ISO downloads through the Download Manager checked against the SHA-256 the site publishes.
+- In-game overlay layouts: "Avançado" (RivaTuner style, one line per component: GPU load/temp/clock/power, VRAM and
+  memory clock, CPU load/temp/clock/power, RAM, FPS with frame time and 1%/0.1% lows, frame-time graph) and
+  "Overclocker" (adds GPU voltage, % of TDP, hotspot/memory junction, fan RPM, CPU Vcore and max core clock, busiest
+  thread, FPS/load/temperature graphs, per-thread load bars and a session panel: average/min/max FPS, 1%/0.1% lows,
+  worst frame, frame-time standard deviation, stutters, GPU- or CPU-bound and present mode). Data from the full
+  LibreHardwareMonitor tree; CPU load from Windows' own counters (LHM reports 100% on recent Windows 11 builds).
+- Kakugan alerts in the tray while DarkHub runs (every 5 min, signed in): Steam asking for a code/password or a new
+  QR sign-in, plan ending in 3 days, hours running out, farm server down/back. Clicking opens the Kakugan screen.
+- Kakugan pauses the farm while a game launched from the Library runs and resumes the same accounts when it closes
+  (also on the next start if DarkHub was closed mid-game). Both are switches on the Kakugan screen.
+- Screenshots: camera shutter sound (synthesized, can be turned off) and a clipboard choice: image, Susuya link, both
+  (image apps paste the picture, text fields the link) or nothing. Old settings keep their behaviour.
+- In-game overlay shortcut on the home screen (Quick Utilities) and a "Show in game" button on the System Monitor.
+
+### Changed
+- Menu: new "Serviços DarkHub" group (Kakugan, Susuya, LuluFlix, Juuzou); "Gaming & Performance" is now translated
+  ("Jogos e Desempenho").
+
 ## [0.7.1] - 2026-10-24
 
 ### Added
