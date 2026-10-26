@@ -157,6 +157,19 @@ Bug reports, translations, security rules and pull requests are welcome. Read [C
 [TRANSLATIONS.md](./TRANSLATIONS.md) and [SECURITY_RULES.md](./SECURITY_RULES.md). To report a vulnerability, see
 [SECURITY.md](./SECURITY.md).
 
+## More from DarkHub
+
+DarkHub Suite is part of [DarkHub](https://darkhub.ink/), a set of services in Portuguese:
+
+| Service | What it does |
+|---|---|
+| [Website and guides](https://darkhub.ink/otimizador-de-pc/) | DarkHub Suite overview, FAQ and Windows gaming guides (pt-BR) |
+| [Juuzou](https://darkhub.ink/juuzou/) | Search for game, software and repack torrents |
+| [Susuya](https://darkhub.ink/susuya/) | Share files up to 600MB, deleted automatically after 1 hour |
+| [LuLuFlix](https://darkhub.ink/luluflix/) | Jellyfin streaming server for movies, series and anime |
+| [Kakugan](https://kakugan.darkhub.ink/) | Steam hours and trading card farming 24/7 on ArchiSteamFarm (paid) |
+
+
 ## License
 
 [MIT](./LICENSE). Third-party components keep their own licenses
