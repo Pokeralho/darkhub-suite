@@ -67,7 +67,7 @@ main { padding: 12px 14px 14px; min-height: 120px; }
 .card { margin-top: 12px; padding: 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
 .card .title { color: var(--text-strong); font-weight: 500; }
 .card .sub { margin-top: 2px; }
-.card .status:empty { display: none; }
+.status:empty { min-height: 0; margin: 0; }
 
 .skeleton { display: grid; gap: 8px; padding-top: 6px; }
 .skeleton i { display: block; height: 30px; border-radius: 8px; background: var(--surface); animation: pulse 1.4s var(--ease) infinite; }
