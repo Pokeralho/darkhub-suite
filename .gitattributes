@@ -37,3 +37,17 @@
 *.zip binary
 *.7z binary
 *.tar.gz binary
+
+# ------------------------------------------------------------------------------
+# GitHub language statistics (Linguist)
+# Generated files are excluded so the repository shows up as TypeScript/JavaScript
+# instead of HTML (graphify-out/graph.html alone is ~4.7 MB).
+# ------------------------------------------------------------------------------
+graphify-out/** linguist-generated=true
+docs/map/** linguist-generated=true
+docs/hub/BUILTIN.md linguist-generated=true
+package-lock.json linguist-generated=true
+
+# Third-party binaries and libraries shipped as-is
+electron/services/hwsensors/*.dll linguist-vendored=true
+electron/services/fsr4_rdna2/** linguist-vendored=true

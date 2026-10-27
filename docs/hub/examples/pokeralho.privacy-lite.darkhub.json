@@ -1,0 +1,22 @@
+{
+  "$schema": "https://darkhub.ink/schema/v1.json",
+  "schemaVersion": 1,
+  "type": "module",
+  "id": "pokeralho.privacy-lite",
+  "version": "1.0.0",
+  "name": { "pt-BR": "Privacidade leve", "en-US": "Light privacy" },
+  "description": {
+    "pt-BR": "Desliga o ID de publicidade, as tarefas do programa de experiência do usuário e o serviço de telemetria conectada. Não mexe em Windows Update nem em segurança.",
+    "en-US": "Turns off the advertising ID, the customer experience program tasks and the connected telemetry service. Does not touch Windows Update or security."
+  },
+  "author": { "github": "Pokeralho" },
+  "tags": ["privacy", "telemetry"],
+  "minApp": "0.7.3",
+  "items": [
+    { "registry": { "path": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo", "name": "Enabled", "type": "dword", "value": 0 } },
+    { "registry": { "path": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Privacy", "name": "TailoredExperiencesWithDiagnosticDataEnabled", "type": "dword", "value": 0 } },
+    { "task": { "path": "\\Microsoft\\Windows\\Customer Experience Improvement Program\\", "name": "Consolidator", "state": "disabled" } },
+    { "task": { "path": "\\Microsoft\\Windows\\Application Experience\\", "name": "ProgramDataUpdater", "state": "disabled" }, "note": "Not present on every Windows build; DarkHub skips missing tasks." },
+    { "service": { "name": "DiagTrack", "startType": "disabled", "stop": true }, "note": "Connected User Experiences and Telemetry." }
+  ]
+}

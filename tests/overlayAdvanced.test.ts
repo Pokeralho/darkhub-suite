@@ -66,7 +66,7 @@ describe('overlay: advanced layouts', () => {
     const s = new SessionStats()
     for (let i = 0; i < 300; i++) s.push(6.9)
     const hist = { fps: [140, 144], cpu: [40, 42], gpu: [95, 97], cpuTemp: [70, 71], gpuTemp: [65, 66] }
-    const p = buildPanel('oc', frames, s.stats(), readLhm(sample), {}, hist, {})
+    const p = buildPanel('oc', frames, s.stats(), readLhm(sample), { cpu: 20, cores: [23.5, 64.7] }, hist, {})
     expect(p.lines.length).toBeGreaterThan(5)
     expect(p.graphs.map((g: any) => g.title)).toEqual(['Frametime', 'FPS', 'Load %', 'Temp °C'])
     expect(p.threads).toEqual([24, 65])

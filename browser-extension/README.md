@@ -1,5 +1,9 @@
 # DarkHub Vault browser extension
 
+> Developed in its own repository: [Pokeralho/darkhub-vault-extension](https://github.com/Pokeralho/darkhub-vault-extension)
+> (issues, pull requests and release zips). This folder is the copy DarkHub Suite ships and opens from
+> **Password vault → Browser extension → Open extension folder**; keep both in sync.
+
 Manifest V3 extension for Chrome, Edge and Firefox (115+) that fills logins from the DarkHub Suite password vault.
 It never talks to the network: it reaches the running DarkHub app through **native messaging**.
 

@@ -1,7 +1,7 @@
 import React from 'react';
 
 // Standard page header for every screen: title, one line of context, optional actions on the right.
-// No icon chip, no version pill, no uppercase eyebrow (see DESIGN.md).
+// No icon chip, no version pill, no uppercase eyebrow (see docs/DESIGN.md).
 export default function PageHeader({ title, subtitle, actions, children }: {
   title: React.ReactNode;
   subtitle?: React.ReactNode;

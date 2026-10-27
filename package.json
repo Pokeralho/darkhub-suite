@@ -1,6 +1,6 @@
 {
   "name": "darkhub-suite",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "High-performance modular Windows utility suite for gamers and power users.",
   "author": "DarkHub Team",
   "license": "MIT",
@@ -13,7 +13,7 @@
     "dev:legacy": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\"",
     "dev:renderer": "vite",
     "dev:electron": "wait-on http://localhost:5173 && electron .",
-    "build:native": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.LatencyEngine.exe electron\\services\\DarkHub.LatencyEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.FrameLimiter.exe electron\\services\\DarkHub.FrameLimiter.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.ClickEngine.exe electron\\services\\DarkHub.ClickEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.SensorDaemon.exe electron\\services\\DarkHub.SensorDaemon.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.DiskScan.exe electron\\services\\DarkHub.DiskScan.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\hwsensors\\DarkHub.HwSensors.exe /r:electron\\services\\hwsensors\\LibreHardwareMonitorLib.dll /r:System.Management.dll electron\\services\\hwsensors\\DarkHub.HwSensors.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:anycpu /optimize+ /out:electron\\services\\DarkHub.VaultBridgeHost.exe electron\\services\\DarkHub.VaultBridgeHost.cs\"",
+    "build:native": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.LatencyEngine.exe electron\\services\\DarkHub.LatencyEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.FrameLimiter.exe electron\\services\\DarkHub.FrameLimiter.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.ClickEngine.exe electron\\services\\DarkHub.ClickEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.SensorDaemon.exe electron\\services\\DarkHub.SensorDaemon.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.DiskScan.exe electron\\services\\DarkHub.DiskScan.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\hwsensors\\DarkHub.HwSensors.exe /r:electron\\services\\hwsensors\\LibreHardwareMonitorLib.dll /r:System.Management.dll electron\\services\\hwsensors\\DarkHub.HwSensors.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:anycpu /optimize+ /out:electron\\services\\DarkHub.VaultBridgeHost.exe electron\\services\\DarkHub.VaultBridgeHost.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:anycpu /optimize+ /r:System.Web.Extensions.dll /out:electron\\services\\DarkHub.Mcp.exe electron\\services\\DarkHub.Mcp.cs\"",
     "build:renderer": "vite build",
     "build:pacer": "cargo build --release --manifest-path native_pacer/Cargo.toml && powershell -NoProfile -Command \"Copy-Item native_pacer/target/release/DarkHub_PacerHook.dll electron/services/DarkHub.PacerHook.dll -Force\"",
     "test:pacer": "cargo test --manifest-path native_pacer/Cargo.toml -- --test-threads=1",
@@ -28,9 +28,15 @@
     "test:watch": "vitest",
     "test:feature": "vitest --dir tests",
     "shot": "electron scripts/shot.cjs",
-    "selftest": "node -e \"process.env.DARKHUB_SELFTEST='1';process.exit(require('child_process').spawnSync(require('electron'),['.'],{stdio:'inherit',env:process.env}).status)\""
+    "selftest": "node -e \"process.env.DARKHUB_SELFTEST='1';process.exit(require('child_process').spawnSync(require('electron'),['.'],{stdio:'inherit',env:process.env}).status)\"",
+    "hub:docs": "node scripts/hub-docs.mjs",
+    "hub:validate": "node scripts/hub-validate.mjs",
+    "hub:core": "node scripts/hub-core.mjs",
+    "ext:new": "node scripts/ext.mjs new",
+    "ext:pack": "node scripts/ext.mjs pack"
   },
   "dependencies": {
+    "ajv": "^8.17.1",
     "diff": "^9.0.0",
     "electron-log": "^5.4.3",
     "electron-updater": "^6.8.3",
@@ -98,6 +104,7 @@
       "electron/services/darkos/*.ps1",
       "electron/services/darkos/*.psm1",
       "electron/services/darkos/policy/**",
+      "electron/services/hub/schema/**",
       "electron/services/hwsensors/**",
       "electron/services/fsr4_rdna2/**",
       "node_modules/sharp/**",
@@ -155,6 +162,14 @@
         "provider": "github",
         "owner": "Pokeralho",
         "repo": "darkhub-suite"
+      }
+    ],
+    "protocols": [
+      {
+        "name": "DarkHub",
+        "schemes": [
+          "darkhub"
+        ]
       }
     ]
   },

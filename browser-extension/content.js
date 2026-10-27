@@ -73,6 +73,10 @@
   // ------------------------------------------------------------------------------------------------------------
   // Inline icon (closed shadow root so the page cannot reach into it through the DOM).
 
+  const MARK = '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12L12 2.5M12 5.8l1.81-2.01M12 5.8l-1.81-2.01M12 12L3.77 7.25M6.63 8.9l-.83-2.57M6.63 8.9l-2.64.56M12 12l-8.23 4.75M6.63 15.1l-2.64-.56M6.63 15.1l-.83 2.57M12 12v9.5M12 18.2l-1.81 2.01M12 18.2l1.81 2.01M12 12l8.23 4.75M17.37 15.1l.83 2.57M17.37 15.1l2.64-.56M12 12l8.23-4.75M17.37 8.9l2.64.56M17.37 8.9l.83-2.57" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
+  const PT = (navigator.language || '').toLowerCase().startsWith('pt')
+  const tr = (pt, en) => (PT ? pt : en)
+
   let host = null
   let shadow = null
   let anchorEl = null
@@ -84,20 +88,31 @@
     shadow = host.attachShadow({ mode: 'closed' })
     shadow.innerHTML = `
       <style>
-        .btn{position:absolute;width:22px;height:22px;border-radius:6px;border:1px solid #3f3f46;background:#18181b;
-          display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 1px 3px rgba(0,0,0,.4)}
-        .btn:hover{border-color:#60a5fa}
-        .menu{position:absolute;min-width:220px;max-width:320px;background:#18181b;color:#e4e4e7;border:1px solid #3f3f46;
-          border-radius:8px;padding:4px;font:13px/1.3 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.5)}
-        .item{display:block;width:100%;text-align:left;background:none;border:0;color:inherit;padding:7px 8px;border-radius:6px;cursor:pointer;font:inherit}
-        .item:hover{background:#27272a}
-        .sub{color:#a1a1aa;font-size:11px}
-        .msg{padding:7px 8px;color:#a1a1aa}
+        :host{all:initial}
+        .btn{position:absolute;width:22px;height:22px;border-radius:6px;border:1px solid oklch(0.34 0.013 255);background:oklch(0.193 0.011 255);
+          display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;color:#2ee6f2;
+          box-shadow:0 1px 3px oklch(0.1 0.01 255 / .5);transition:border-color 150ms cubic-bezier(.23,1,.32,1),transform 140ms cubic-bezier(.23,1,.32,1)}
+        .btn:hover{border-color:oklch(0.81 0.085 228)}
+        .btn:active{transform:scale(.94)}
+        .btn:focus-visible{outline:1.5px solid oklch(0.81 0.085 228);outline-offset:2px}
+        .menu{position:absolute;min-width:232px;max-width:320px;background:oklch(0.193 0.011 255);color:oklch(0.945 0.006 255);
+          border:1px solid oklch(0.262 0.012 255);border-radius:10px;padding:4px;font:13px/1.35 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+          box-shadow:0 12px 32px oklch(0.1 0.01 255 / .55);transform-origin:top left;
+          transition:opacity 150ms cubic-bezier(.23,1,.32,1),transform 150ms cubic-bezier(.23,1,.32,1)}
+        @starting-style{.menu{opacity:0;transform:scale(.97) translateY(-2px)}}
+        .head{display:flex;align-items:center;gap:6px;padding:6px 8px 5px;color:oklch(0.67 0.014 255);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+        .head svg{color:#2ee6f2}
+        .item{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:0;color:inherit;padding:6px 8px;border-radius:7px;cursor:pointer;font:inherit}
+        .item:hover,.item:focus-visible{background:oklch(0.225 0.012 255);outline:none}
+        .av{flex:none;width:24px;height:24px;border-radius:6px;display:grid;place-items:center;background:oklch(0.158 0.010 255);
+          border:1px solid oklch(0.262 0.012 255);color:oklch(0.81 0.085 228);font-weight:600;font-size:12px}
+        .who{min-width:0}
+        .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .sub{color:oklch(0.55 0.015 255);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .msg{padding:8px;color:oklch(0.67 0.014 255)}
+        @media (prefers-reduced-motion: reduce){.btn,.menu{transition:none}}
       </style>
-      <button class="btn" part="btn" title="DarkHub Vault" aria-label="DarkHub Vault">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-      </button>
+      <button class="btn" part="btn" title="DarkHub Vault" aria-label="DarkHub Vault">${MARK}</button>
       <div class="menu" hidden></div>`
     shadow.querySelector('.btn').addEventListener('mousedown', (e) => e.preventDefault())
     shadow.querySelector('.btn').addEventListener('click', onIconClick)
@@ -122,9 +137,18 @@
     menu.style.top = `${window.scrollY + r.bottom + 4}px`
   }
 
+  function menuHead() {
+    const h = document.createElement('div')
+    h.className = 'head'
+    h.innerHTML = MARK
+    h.append('DarkHub Vault')
+    return h
+  }
+
   function menuMessage(text) {
     const menu = shadow.querySelector('.menu')
     menu.textContent = ''
+    menu.appendChild(menuHead())
     const d = document.createElement('div')
     d.className = 'msg'
     d.textContent = text
@@ -133,41 +157,51 @@
   }
 
   const ERRORS = {
-    locked: 'Desbloqueie o cofre no DarkHub / Unlock the vault in DarkHub',
-    not_paired: 'Abra a extensão para parear / Open the extension to pair',
-    host_unavailable: 'DarkHub não está aberto / DarkHub is not running',
-    app_not_running: 'DarkHub não está aberto / DarkHub is not running',
-    cross_site_frame: 'Formulário de outro site / Form from another site'
+    locked: tr('Desbloqueie o cofre no DarkHub.', 'Unlock the vault in DarkHub.'),
+    not_paired: tr('Abra a extensão para parear com o DarkHub.', 'Open the extension to pair with DarkHub.'),
+    host_unavailable: tr('O DarkHub não está aberto.', 'DarkHub is not running.'),
+    app_not_running: tr('O DarkHub não está aberto.', 'DarkHub is not running.'),
+    cross_site_frame: tr('Este formulário é de outro site.', 'This form belongs to another site.')
   }
+  const GENERIC = tr('Não foi possível falar com o cofre.', 'Could not reach the vault.')
 
   async function onIconClick(e) {
     if (!e.isTrusted || !anchorEl) return
     e.preventDefault()
     e.stopPropagation()
     const res = await api.runtime.sendMessage({ type: 'cs.query' }).catch(() => null)
-    if (!res?.ok) return menuMessage(ERRORS[res?.error] || 'DarkHub Vault: erro / error')
+    if (!res?.ok) return menuMessage(ERRORS[res?.error] || GENERIC)
     const logins = res.logins || []
-    if (!logins.length) return menuMessage('Nenhum login salvo para este site / No saved logins for this site')
+    if (!logins.length) return menuMessage(tr('Nenhum login salvo para este site.', 'No saved logins for this site.'))
     const menu = shadow.querySelector('.menu')
     menu.textContent = ''
+    menu.appendChild(menuHead())
     for (const l of logins) {
       const b = document.createElement('button')
       b.className = 'item'
+      const label = l.username || tr('(sem usuário)', '(no username)')
+      const av = document.createElement('span')
+      av.className = 'av'
+      av.textContent = (l.username || '?').trim().charAt(0).toUpperCase() || '?'
+      const who = document.createElement('span')
+      who.className = 'who'
       const name = document.createElement('div')
-      name.textContent = l.username || '(sem usuário / no username)'
-      b.appendChild(name)
+      name.className = 'name'
+      name.textContent = label
+      who.appendChild(name)
       if (l.match !== 'exact') {
         const sub = document.createElement('div')
         sub.className = 'sub'
         sub.textContent = l.host
-        b.appendChild(sub)
+        who.appendChild(sub)
       }
+      b.append(av, who)
       b.addEventListener('mousedown', (ev) => ev.preventDefault())
       b.addEventListener('click', async (ev) => {
         if (!ev.isTrusted) return
         const target = anchorEl
         const cred = await api.runtime.sendMessage({ type: 'cs.fill', entryId: l.entryId }).catch(() => null)
-        if (!cred?.ok) return menuMessage(ERRORS[cred?.error] || 'DarkHub Vault: erro / error')
+        if (!cred?.ok) return menuMessage(ERRORS[cred?.error] || GENERIC)
         if (cred.origin !== location.origin) return
         fillCredentials(cred.username, cred.password, target)
         hideUi()

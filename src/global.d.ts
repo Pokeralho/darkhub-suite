@@ -4,6 +4,26 @@ export interface UsbPort {
   instanceId: string; name: string; kind: 'input' | 'keyboard' | 'mouse' | 'gamepad' | 'storage' | 'camera' | 'audio' | 'serial' | 'hid' | 'other';
   port: number; hub: number; status: string; enabled: boolean; problemCode: number; children: { instanceId: string; name: string; class: string }[];
 }
+export interface HubError { path: string; message: string }
+export interface HubHardware { osBuild: number | null; cpuVendor: string | null; gpuVendors: string[]; gpuNames: string[]; gpuDedicated: boolean; chassis: 'laptop' | 'desktop'; ramGb: number | null; netWired: boolean; darkos: boolean }
+export interface HubRow { index: number; kind: 'tweak' | 'op' | 'registry' | 'service' | 'task' | 'permission' | 'page' | 'widget'; group: string; title: string; target: string; note: string; current: string | null; done: boolean; missing?: boolean }
+export interface HubInspect {
+  ok: boolean; error?: string; errors?: HubError[];
+  pkg?: { id: string; version: string; type: 'module' | 'preset' | 'extension'; name: string; description: string; author: { github: string; name?: string }; tags: string[]; evidence: string[]; expects: { metric: string; direction: string }[] };
+  risk?: 'low' | 'medium' | 'high'; applicable?: boolean; notFor?: string | null; rows?: HubRow[];
+  skipped?: { index: number; reason: string; group: string; title: string; target: string }[];
+  installed?: { version: string; installedAt: string } | null; hardware?: HubHardware | null; official?: boolean; findings?: ExtFinding[];
+}
+export interface ExtContribution { id: string; title: string | Record<string, string>; description?: string | Record<string, string>; icon?: string; entry: string; height?: number }
+export interface HubInstalled { id: string; version: string; name: string | Record<string, string>; author: { github: string }; type: string; installedAt: string; risk: string; steps: number; source?: { hub?: string; tier?: string; version?: string; sha256?: string; dev?: string } | null; extension?: { pages: ExtContribution[]; widgets: ExtContribution[]; permissions: string[]; network: string[] } | null }
+export interface ExtFinding { file: string; line: number; rule: string; severity: 'low' | 'medium' | 'high'; message: { pt: string; en: string } }
+export type HubText = string | Record<string, string>;
+export interface HubServer { url: string; official: boolean; trusted: boolean }
+export interface HubCatalogItem { id: string; type: 'module' | 'preset' | 'extension'; name: HubText; description: HubText; author: { github: string; name?: string }; tags: string[]; version: string; tier: 'official' | 'verified' | 'community'; installs: number; risk: 'low' | 'medium' | 'high'; when: Record<string, unknown> | null; minApp: string | null; items: number; updatedAt: string; fits?: boolean; installedVersion?: string | null; rating?: { avg: number; count: number }; hype: number }
+export interface HubCatalogDetail extends HubCatalogItem { owner: string; evidence: string[]; expects: { metric: string; direction: string }[]; versions: { version: string; sha256: string; risk: string; createdAt: string }[]; rows: Record<string, { index: number; kind: string; group: string; title: string; target: string; note: string; via: string | null; if: Record<string, unknown> | null }[]> }
+export interface HubMcpStatus { ok: boolean; enabled: boolean; running: boolean; url: string; token: string; configFile: string; bridge: string; error: string }
+export type HubEvent = { type: 'extReload'; id: string } | { type: 'extDevError'; folder: string; error: string } | { type: 'open'; id: string } | { type: 'approval'; id: string; client: string; title: string; preview: HubInspect & { remote?: { hub: string; tier: string; version: string; sha256: string }; uninstall?: { id: string; version: string; steps: number } } } | { type: 'approvalClosed'; id: string };
+type HubInstallResult = { ok: boolean; error?: string; errors?: HubError[]; id?: string; applied?: number; skipped?: number; missingTasks?: string[]; notes?: string[]; requiresReboot?: boolean };
 export type KgResult<T> = { ok: boolean; status?: number; error?: string } & T;
 export interface KgStatus { asfOnline: boolean; capacity: number | null; used: number; soldOut: boolean }
 export interface KgPlan { id: string; kind: 'HOURS' | 'CARDS' | 'UNLIMITED'; name: string; priceCents: number; slots: number; days: number; hours?: number; summary: string; features: string[]; highlight?: boolean }
@@ -36,7 +56,23 @@ export interface UsbState {
   policies?: { storageBlocked: boolean; writeProtect: boolean; selectiveSuspend: boolean | null };
 }
 
-export interface OverlaySettings { layout: 'compact' | 'advanced' | 'oc'; position: 'tl' | 'tr' | 'bl' | 'br'; scale: number; opacity: number; background: number; intervalMs: number; hotkey: string; metrics: string[]; logFolder: string }
+export type OvlStyle = Partial<Record<'color' | 'background' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'padding' | 'margin' | 'borderRadius' | 'border' | 'textAlign' | 'opacity' | 'letterSpacing' | 'textShadow' | 'gap' | 'justifyContent', string>>;
+export interface OvlItem { metric: string; decimals?: number; unit?: string; prefix?: string; color?: string; size?: number; warn?: number; bad?: number }
+export type OvlWidget =
+  | ({ id: string; type: 'metrics'; style: OvlStyle; hidden?: boolean; label: string; labelColor: string; items: OvlItem[] })
+  | ({ id: string; type: 'value'; style: OvlStyle; hidden?: boolean; label: string; size: number } & OvlItem)
+  | ({ id: string; type: 'graph'; style: OvlStyle; hidden?: boolean; title: string; series: { source: string; color: string }[]; height: number; width: number; fill: boolean; info: boolean; lineWidth: number; grid: boolean })
+  | ({ id: string; type: 'bars'; style: OvlStyle; hidden?: boolean; title: string; height: number; color: string; warnColor: string; badColor: string })
+  | ({ id: string; type: 'stats'; style: OvlStyle; hidden?: boolean; keys: string[]; columns: number })
+  | ({ id: string; type: 'text'; style: OvlStyle; hidden?: boolean; text: string })
+  | ({ id: string; type: 'separator'; style: OvlStyle; hidden?: boolean })
+  | ({ id: string; type: 'spacer'; style: OvlStyle; hidden?: boolean; height: number });
+export interface OvlTheme { fontFamily: string; fontSize: number; fontWeight: number; color: string; labelColor: string; unitColor: string; good: string; warn: string; bad: string; background: string; backgroundOpacity: number; border: string; radius: number; padding: number; gap: number; direction: 'column' | 'row'; textShadow: boolean }
+export interface OvlLayout { version: 1; id: string; name: string; anchor: 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br'; offsetX: number; offsetY: number; scale: number; opacity: number; theme: OvlTheme; widgets: OvlWidget[]; css: string }
+export interface OvlLayoutsState { ok: boolean; error?: string; active: string; layouts: OvlLayout[]; presets: Record<string, string>; metrics: { key: string; group: string; label: string; unit: string; decimals: number }[]; series: { key: string; label: string }[]; saved?: OvlLayout }
+export interface OvlCanvas { id: string; kind: 'graph' | 'bars'; series?: { color: string; values: number[] }[]; values?: number[]; floor?: number; ceil?: number; height: number; width?: number; fill?: boolean; lineWidth?: number; grid?: boolean; colors?: string[] }
+export interface OvlPreview { ok: boolean; error?: string; live: boolean; html: string; css: string; canvases: OvlCanvas[]; box: { anchor: string; offsetX: number; offsetY: number; scale: number; opacity: number } }
+export interface OverlaySettings { layout: 'compact' | 'advanced' | 'oc' | 'custom'; position: 'tl' | 'tr' | 'bl' | 'br'; scale: number; opacity: number; background: number; intervalMs: number; hotkey: string; metrics: string[]; logFolder: string }
 export interface OverlayFrameStats { fps: number | null; frameTimeMs: number | null; low1: number | null; low01: number | null; maxFrameTimeMs: number; gpuBusyMs: number | null; latencyMs: number | null; presentMode: string; graph: number[] }
 export interface OverlayStatus {
   ok: boolean; error?: string | null; visible?: boolean; settings?: OverlaySettings; target?: { pid: number; name: string } | null; mode?: 'foreground' | 'fixed';
@@ -418,6 +454,45 @@ export interface DarkHubAPI {
     setSelectiveSuspend: (payload: { on: boolean }) => Promise<{ ok: boolean; error?: string }>;
     eject: (payload: { letter: string }) => Promise<{ ok: boolean; error?: string }>;
   };
+  /** DarkHub packages (modules/presets): inspect (dry run), install, uninstall, export this PC. */
+  ext: {
+    doc: (payload: { id: string; contribution: string; kind?: 'pages' | 'widgets'; lang?: string }) => Promise<{ ok: boolean; error?: string; html?: string; title?: string; version?: string }>;
+    call: (payload: { id: string; method: string; params?: unknown }) => Promise<{ ok: boolean; value?: unknown; error?: string }>;
+    log: (payload: { id: string; level: string; args: string[] }) => Promise<{ ok: boolean }>;
+    logs: (payload: { id: string }) => Promise<{ ok: boolean; items: { at: string; level: string; text: string }[] }>;
+    devList: () => Promise<{ ok: boolean; folders: string[] }>;
+    devAdd: () => Promise<{ ok: boolean; error?: string; canceled?: boolean; id?: string; folder?: string; errors?: HubError[] }>;
+    devRemove: (payload: { folder: string }) => Promise<{ ok: boolean }>;
+  };
+  hub: {
+    list: () => Promise<{ ok: boolean; error?: string; packages?: HubInstalled[] }>;
+    hardware: (payload?: { force?: boolean }) => Promise<{ ok: boolean; error?: string; hardware?: HubHardware }>;
+    builtins: () => Promise<{ ok: boolean; builtins?: { id: string; title: string; risk: string; securityRelated: boolean }[] }>;
+    inspect: (payload: { text: string; lang?: string }) => Promise<HubInspect>;
+    install: (payload: { text: string }) => Promise<HubInstallResult>;
+    uninstall: (payload: { id: string }) => Promise<{ ok: boolean; error?: string }>;
+    exportMine: (payload: { name: string; github: string }) => Promise<{ ok: boolean; error?: string; text?: string; count?: number }>;
+    openFile: () => Promise<{ ok: boolean; error?: string; canceled?: boolean; text?: string; file?: string }>;
+    saveFile: (payload: { text: string; name: string }) => Promise<{ ok: boolean; error?: string; canceled?: boolean; file?: string }>;
+    pendingLink: (payload?: { peek?: boolean }) => Promise<{ ok: boolean; link: { id: string } | null }>;
+    onEvent: (cb: (m: HubEvent) => void) => () => void;
+    catalog: {
+      server: () => Promise<{ ok: boolean; server: HubServer }>;
+      setServer: (payload: { url: string }) => Promise<{ ok: boolean; error?: string; server?: HubServer }>;
+      search: (payload: { q?: string; type?: string; tier?: string; tag?: string; sort?: string; offset?: number; limit?: number }) => Promise<{ ok: boolean; error?: string; server?: HubServer; total?: number; items?: HubCatalogItem[] }>;
+      detail: (payload: { id: string }) => Promise<{ ok: boolean; error?: string; server?: HubServer; pkg?: HubCatalogDetail }>;
+      inspect: (payload: { id: string; version?: string; lang?: string }) => Promise<HubInspect & { remote?: { hub: string; tier: string; version: string; sha256: string } }>;
+      install: (payload: { id: string; version?: string }) => Promise<HubInstallResult>;
+      updates: () => Promise<{ ok: boolean; error?: string; items?: { id: string; installed: string; latest: string; name: HubText }[] }>;
+      update: (payload: { id: string }) => Promise<HubInstallResult & { updatedFrom?: string }>;
+    };
+    mcp: {
+      status: () => Promise<HubMcpStatus>;
+      setEnabled: (payload: { on: boolean }) => Promise<HubMcpStatus>;
+      regenerate: () => Promise<HubMcpStatus>;
+      answer: (payload: { id: string; ok: boolean }) => Promise<{ ok: boolean }>;
+    };
+  };
   /** Kakugan (kakugan.darkhub.ink): Steam hours/cards farm panel. Session kept in the main process. */
   kakugan: {
     state: () => Promise<KgResult<{ status?: KgStatus; plans?: KgPlan[]; me?: KgMe | null }>>;
@@ -445,6 +520,12 @@ export interface DarkHubAPI {
   /** In-game overlay (PresentMon frame timing + the app's sensors). */
   overlay: {
     status: () => Promise<OverlayStatus>;
+    layouts: () => Promise<OvlLayoutsState>;
+    saveLayout: (payload: { layout: OvlLayout }) => Promise<OvlLayoutsState>;
+    newLayout: (payload: { preset: string }) => Promise<OvlLayoutsState>;
+    deleteLayout: (payload: { id: string }) => Promise<OvlLayoutsState>;
+    activateLayout: (payload: { id: string }) => Promise<OvlLayoutsState>;
+    preview: (payload: { layout: OvlLayout }) => Promise<OvlPreview>;
     show: (payload?: { pid?: number }) => Promise<OverlayStatus>;
     hide: () => Promise<OverlayStatus>;
     setSettings: (payload: Partial<OverlaySettings> & { labels?: Record<string, string> }) => Promise<OverlayStatus & { hotkeyError?: string | null }>;

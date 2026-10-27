@@ -3,11 +3,13 @@ import { APP_VERSION_LABEL } from '../appVersion';
 import {
   Home as HomeIcon, LayoutGrid, Zap, Monitor, FileText, Settings,
   PlaySquare, ScanText, ShieldAlert, Lock, Image as ImageIcon,
-  Edit3, MousePointerClick, LibraryBig, Gamepad2, Film, Eye,
+  Edit3, MousePointerClick, LibraryBig, Gamepad2, Film, Eye, Package,
   Download, Fingerprint, Network, Code, ChevronLeft, ChevronRight,
   Cpu, Crosshair, Activity, Flame, Sparkles, Minus, Square, X, LifeBuoy, Gauge, UploadCloud,
-  MonitorCog, Terminal, DarkHubMark, Archive, Layers, Rocket, Usb, History
+  MonitorCog, Terminal, DarkHubMark, Archive, Layers, Rocket, Usb, History,
+  Wrench, Shield, Globe, Music, List, Clock, FolderOpen
 } from '../components/icons';
+import { extPageId, textIn, useExtensions } from '../lib/extensions';
 import { useI18n } from '../i18n/I18nProvider';
 
 const GuardianWidget = React.lazy(() => import('../components/GuardianWidget'));
@@ -29,7 +31,7 @@ interface NavSection {
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurrentPage }) => {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [collapsed, setCollapsed] = React.useState<boolean>(() => {
     try {
       return globalThis.localStorage?.getItem('darkhub.sidebarCollapsed') === '1'
@@ -66,12 +68,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
     return () => window.clearTimeout(id);
   }, []);
 
+  const extensions = useExtensions();
+  const EXT_ICONS: Record<string, NavSection['items'][number]['icon']> = { puzzle: Package, chart: Activity, gauge: Gauge, cpu: Cpu, gamepad: Gamepad2, wrench: Wrench, shield: Shield, bolt: Zap, globe: Globe, music: Music, image: ImageIcon, code: Code, list: List, star: Zap, clock: Clock, folder: FolderOpen };
+  const extItems = extensions.flatMap((e) => (e.extension?.pages || []).map((p) => ({ id: extPageId(e.id, p.id), label: textIn(p.title, lang), icon: EXT_ICONS[p.icon || 'puzzle'] || Package })));
+
   const navSections: NavSection[] = [
     {
       category: t('nav.cat.overview', 'Overview'),
       items: [
         { id: 'home', label: t('nav.home', 'Home'), icon: HomeIcon },
         { id: 'dashboard', label: t('nav.dashboard', 'Dashboard'), icon: LayoutGrid },
+        { id: 'presets', label: t('nav.presets', 'Presets e módulos'), icon: Package },
         { id: 'realtime', label: t('nav.realtime', 'Real-time'), icon: Gauge },
         // Always listed: on DarkOS it is the management/recovery center; elsewhere it shows an
         // explanatory empty state (nothing can run, the main process refuses without manifest.json).
@@ -133,7 +140,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
         { id: 'luluflix', label: t('nav.luluflix', 'LuluFlix'), icon: Film },
         { id: 'juuzou', label: t('nav.juuzou', 'Juuzou'), icon: Download }
       ]
-    }
+    },
+    ...(extItems.length ? [{ category: t('nav.cat.extensions', 'Extensões'), items: extItems }] : [])
   ];
 
   const handleMenuClick = async (id: string) => {

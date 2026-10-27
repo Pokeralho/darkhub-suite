@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head>
+  <style>
+    .row { display: flex; gap: 24px; align-items: baseline; }
+    .row p { margin: 0; }
+  </style>
+</head>
+<body>
+  <div class="row">
+    <div><p class="dh-help">CPU</p><p class="dh-stat" id="cpu">--</p></div>
+    <div><p class="dh-help">GPU</p><p class="dh-stat" id="gpu">--</p></div>
+    <button class="dh-btn" id="open" type="button" style="margin-left:auto">Abrir</button>
+  </div>
+  <script>
+    const fmt = (v) => (v == null ? '--' : Math.round(v) + '°C')
+    darkhub.sensors.subscribe((s) => {
+      document.getElementById('cpu').textContent = fmt(s.cpu.temp)
+      document.getElementById('gpu').textContent = fmt(s.gpu.temp)
+    }, 2000)
+    document.getElementById('open').textContent = darkhub.t('Abrir', 'Open')
+    document.getElementById('open').addEventListener('click', () => darkhub.app.navigate('ext__pokeralho_painel-termico__main'))
+  </script>
+</body>
+</html>

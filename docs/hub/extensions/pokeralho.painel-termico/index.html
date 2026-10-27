@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <section class="dh-grid stats" aria-label="Agora">
+      <div class="dh-card"><p class="dh-help" id="l-cpu">CPU</p><p class="dh-stat" id="cpu-temp">--</p><p class="dh-help" id="cpu-load">--</p></div>
+      <div class="dh-card"><p class="dh-help" id="l-gpu">GPU</p><p class="dh-stat" id="gpu-temp">--</p><p class="dh-help" id="gpu-load">--</p></div>
+      <div class="dh-card"><p class="dh-help" id="l-peak">Picos</p><p class="dh-stat" id="peaks">--</p><p class="dh-help" id="peaks-sub">CPU / GPU</p></div>
+    </section>
+
+    <section class="dh-card chart-card">
+      <div class="dh-row head">
+        <h2 id="l-chart">Últimos 2 minutos</h2>
+        <span class="legend"><i class="sw cpu"></i>CPU <i class="sw gpu"></i>GPU</span>
+      </div>
+      <canvas id="chart" height="220" aria-label="Gráfico de temperatura"></canvas>
+    </section>
+
+    <section class="dh-card dh-row">
+      <label for="limit" id="l-limit">Avisar quando a GPU passar de</label>
+      <input id="limit" class="dh-input" type="number" min="50" max="105" step="1" style="width:80px">
+      <span>°C</span>
+      <button id="reset" class="dh-btn" type="button">Zerar picos</button>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

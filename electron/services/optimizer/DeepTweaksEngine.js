@@ -918,7 +918,9 @@ class DeepTweaksEngine {
     if (checks.length === 0) return { active: false, partial: false };
     let hits = 0;
     for (const c of checks) {
-      if (regValueMatches(c, readMap.get(regEntryId(c.key, c.name)))) hits += 1;
+      const cur = readMap.get(regEntryId(c.key, c.name));
+      // a change that deletes a value (DarkHub packages) is in place when the value is gone
+      if (c.deleteValue ? !cur?.exists : regValueMatches(c, cur)) hits += 1;
     }
     return { active: hits === checks.length, partial: hits > 0 && hits < checks.length };
   }
@@ -1116,7 +1118,9 @@ class DeepTweaksEngine {
   /** Apply an ad-hoc change set (used by other engines) with snapshot + read-back verification. */
   async applyChangeSet({ id, title, changes, statusOnly, commands, explorerRestart, liveAction, requiresReboot }, eventSender = () => {}) {
     if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
-    const clean = (changes || []).map((c) => (c.deleteKey ? { key: c.key, deleteKey: true } : { key: c.key, name: c.name || '', type: c.type || 'REG_SZ', data: String(c.data ?? '') }));
+    const clean = (changes || []).map((c) => (c.deleteKey ? { key: c.key, deleteKey: true }
+      : c.deleteValue ? { key: c.key, name: c.name || '', deleteValue: true }
+        : { key: c.key, name: c.name || '', type: c.type || 'REG_SZ', data: String(c.data ?? '') }));
     if (!id || clean.some((c) => !validateChange(c))) return { ok: false, error: 'Conjunto de alterações inválido' };
     const def = { id, title: title || id, changes: clean, statusOnly: statusOnly || [], commands, explorerRestart, liveAction, requiresReboot, requiresAdmin: true };
     const run = await this._applyDefs([def], eventSender, 'darkHubChangeSet');

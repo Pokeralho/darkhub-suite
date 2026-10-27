@@ -6,16 +6,23 @@ const STRINGS = {
     loading: 'Carregando…',
     offerSave: 'Oferecer para salvar logins',
     unpair: 'Desparear',
+    hostMissingTitle: 'DarkHub não encontrado',
+    pairTitle: 'Parear este navegador',
+    lockedTitle: 'Cofre bloqueado',
+    unsupportedTitle: 'Nada para preencher aqui',
+    noneTitle: 'Nenhum login para este site',
+    count: '{n} login(s) para este site',
     hostMissing: 'Não foi possível falar com o DarkHub. Abra o DarkHub Suite e, na tela Cofre de senhas, registre este navegador em "Extensão do navegador".',
     pairIntro: 'Este navegador ainda não está pareado com o cofre do DarkHub.',
     pairBtn: 'Parear com o DarkHub',
     pairWaiting: 'Confirme no DarkHub se o código abaixo é o mesmo mostrado lá:',
     pairRejected: 'Pareamento recusado no DarkHub.',
     pairDone: 'Pareado.',
+    waitingConfirm: 'Aguardando confirmação no DarkHub…',
     cancel: 'Cancelar',
-    locked: 'O cofre está bloqueado. Desbloqueie no DarkHub e abra esta janela de novo.',
-    unsupported: 'Esta página não é um site http(s).',
-    none: 'Nenhum login salvo para este site.',
+    locked: 'Desbloqueie o cofre no DarkHub e abra esta janela de novo.',
+    unsupported: 'O cofre só preenche logins em sites http(s).',
+    none: 'Ao entrar num site, o DarkHub pode oferecer para salvar o login.',
     fill: 'Preencher',
     filled: 'Preenchido.',
     noForm: 'Nenhum formulário de login encontrado nesta página.',
@@ -33,16 +40,23 @@ const STRINGS = {
     loading: 'Loading…',
     offerSave: 'Offer to save logins',
     unpair: 'Unpair',
+    hostMissingTitle: 'DarkHub not found',
+    pairTitle: 'Pair this browser',
+    lockedTitle: 'Vault locked',
+    unsupportedTitle: 'Nothing to fill here',
+    noneTitle: 'No logins for this site',
+    count: '{n} login(s) for this site',
     hostMissing: 'Could not reach DarkHub. Open DarkHub Suite and, on the Password vault screen, register this browser under "Browser extension".',
     pairIntro: 'This browser is not paired with the DarkHub vault yet.',
     pairBtn: 'Pair with DarkHub',
     pairWaiting: 'Confirm in DarkHub that the code below is the same one shown there:',
     pairRejected: 'Pairing was rejected in DarkHub.',
     pairDone: 'Paired.',
+    waitingConfirm: 'Waiting for confirmation in DarkHub…',
     cancel: 'Cancel',
-    locked: 'The vault is locked. Unlock it in DarkHub and open this window again.',
-    unsupported: 'This page is not an http(s) site.',
-    none: 'No saved logins for this site.',
+    locked: 'Unlock the vault in DarkHub and open this window again.',
+    unsupported: 'The vault only fills logins on http(s) sites.',
+    none: 'When you sign in to a site, DarkHub can offer to save the login.',
     fill: 'Fill',
     filled: 'Filled.',
     noForm: 'No login form found on this page.',
@@ -79,6 +93,10 @@ function send(type, extra = {}) {
   return api.runtime.sendMessage({ type, tabId, ...extra })
 }
 
+function state(kind, title, body) {
+  return el('div', { className: 'state ' + kind }, el('h1', {}, title), el('p', {}, body))
+}
+
 function render(...nodes) {
   root.textContent = ''
   root.append(...nodes)
@@ -90,69 +108,75 @@ async function refresh() {
   document.getElementById('offerSave').checked = s.settings?.offerSave !== false
   document.getElementById('unpair').hidden = !s.paired
 
-  if (!s.connected) return render(el('p', { className: 'err' }, t('hostMissing')))
+  if (!s.connected) return render(state('error', t('hostMissingTitle'), t('hostMissing')))
 
   if (!s.paired) {
     const p = s.pairing
     if (p?.status === 'waiting') {
       startPolling()
       return render(
-        el('p', { className: 'muted' }, t('pairWaiting')),
-        el('div', { className: 'code' }, p.code),
-        el('div', { className: 'row' }, el('button', { className: 'btn', onclick: async () => { await send('popup.pairCancel'); refresh() } }, t('cancel')))
+        state('', t('pairTitle'), t('pairWaiting')),
+        el('div', { className: 'code', 'aria-label': String(p.code).split('').join(' ') }, ...String(p.code).split('').map((d) => el('span', { 'aria-hidden': 'true' }, d))),
+        el('div', { className: 'waiting' }, el('i'), t('waitingConfirm')),
+        el('div', { className: 'actions' }, el('button', { className: 'btn', onclick: async () => { await send('popup.pairCancel'); refresh() } }, t('cancel')))
       )
     }
     stopPolling()
-    const note = p?.status === 'rejected' ? el('p', { className: 'err' }, t('pairRejected'))
-      : p?.status === 'error' ? el('p', { className: 'err' }, t('error', { e: p.error })) : null
+    const note = p?.status === 'rejected' ? el('p', { className: 'status err' }, t('pairRejected'))
+      : p?.status === 'error' ? el('p', { className: 'status err' }, t('error', { e: p.error })) : null
     return render(
-      el('p', { className: 'muted' }, t('pairIntro')),
-      note,
-      el('div', { className: 'row' }, el('button', { className: 'btn primary', onclick: async () => { await send('popup.pair'); refresh() } }, t('pairBtn')))
+      state('', t('pairTitle'), t('pairIntro')),
+      el('div', { className: 'actions' }, el('button', { className: 'btn primary wide', onclick: async () => { await send('popup.pair'); refresh() } }, t('pairBtn'))),
+      note
     )
   }
   stopPolling()
 
-  if (!s.unlocked) return render(el('p', { className: 'muted' }, t('locked')))
-  if (!/^https?:/i.test(s.url || '')) return render(el('p', { className: 'muted' }, t('unsupported')))
+  if (!s.unlocked) return render(state('warn', t('lockedTitle'), t('locked')))
+  if (!/^https?:/i.test(s.url || '')) return render(state('', t('unsupportedTitle'), t('unsupported')))
 
   const nodes = []
-  if (s.error) nodes.push(el('p', { className: 'err' }, t('error', { e: s.error })))
+  if (s.error) nodes.push(el('p', { className: 'status err' }, t('error', { e: s.error })))
   if (s.logins?.length) {
     const ul = el('ul', { className: 'list' })
-    const status = el('p', { className: 'muted' })
+    const status = el('p', { className: 'status', role: 'status' })
     for (const l of s.logins) {
-      const who = el('div', { className: 'who' }, el('div', { className: 'user' }, l.username || '—'))
+      const name = l.username || '—'
+      const who = el('div', { className: 'who' }, el('div', { className: 'user', title: name }, name))
       if (l.match !== 'exact') who.append(el('div', { className: 'sub' }, t('otherHost', { host: l.host })))
       const btn = el('button', {
         className: 'btn primary',
+        'aria-label': `${t('fill')}: ${name}`,
         onclick: async () => {
           btn.disabled = true
           const r = await send('popup.fill', { entryId: l.entryId }).catch(() => null)
           btn.disabled = false
+          status.className = 'status ' + (r?.ok ? 'ok' : 'err')
           status.textContent = r?.ok ? t('filled') : r?.error === 'no_form' ? t('noForm') : t('error', { e: r?.error || '?' })
           if (r?.ok) setTimeout(() => window.close(), 400)
         }
       }, t('fill'))
-      ul.append(el('li', {}, who, btn))
+      ul.append(el('li', {}, el('span', { className: 'avatar', 'aria-hidden': 'true' }, name.trim().charAt(0).toUpperCase() || '?'), who, btn))
     }
-    nodes.push(ul, status)
+    nodes.push(el('p', { className: 'count' }, t('count', { n: s.logins.length })), ul, status)
   } else {
-    nodes.push(el('p', { className: 'muted' }, t('none')))
+    nodes.push(state('', t('noneTitle'), t('none')))
   }
 
   if (s.pendingSave) {
-    const msg = el('p', { className: 'muted' })
+    const msg = el('p', { className: 'status', role: 'status' })
     const card = el('div', { className: 'card' },
-      el('div', {}, t(s.pendingSave.exists ? 'updatePrompt' : 'savePrompt', { host: s.pendingSave.host })),
+      el('div', { className: 'title' }, t(s.pendingSave.exists ? 'updatePrompt' : 'savePrompt', { host: s.pendingSave.host })),
       el('div', { className: 'sub' }, s.pendingSave.username || ''),
-      el('div', { className: 'row' },
+      el('div', { className: 'actions' },
         el('button', {
           className: 'btn primary',
           onclick: async (e) => {
-            e.target.disabled = true
+            e.currentTarget.disabled = true
+            msg.className = 'status'
             msg.textContent = t('saveSent')
             const r = await send('popup.save').catch(() => null)
+            msg.className = 'status ' + (r?.ok && r.saved ? 'ok' : 'err')
             msg.textContent = r?.ok ? (r.saved ? t('saved') : t('notSaved')) : t('error', { e: r?.error || '?' })
           }
         }, t('save')),

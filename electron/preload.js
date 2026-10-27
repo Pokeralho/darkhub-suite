@@ -195,6 +195,49 @@ const darkhubApi = {
     setSelectiveSuspend: (payload) => ipcRenderer.invoke('usb:setSelectiveSuspend', payload),
     eject: (payload) => ipcRenderer.invoke('usb:eject', payload)
   },
+  /** DarkHub extensions: sandboxed pages, their bridge and development folders. */
+  ext: {
+    doc: (payload) => ipcRenderer.invoke('ext:doc', payload),
+    call: (payload) => ipcRenderer.invoke('ext:call', payload),
+    log: (payload) => ipcRenderer.invoke('ext:log', payload),
+    logs: (payload) => ipcRenderer.invoke('ext:logs', payload),
+    devList: () => ipcRenderer.invoke('ext:devList'),
+    devAdd: () => ipcRenderer.invoke('ext:devAdd'),
+    devRemove: (payload) => ipcRenderer.invoke('ext:devRemove', payload)
+  },
+  hub: {
+    list: () => ipcRenderer.invoke('hub:list'),
+    hardware: (payload) => ipcRenderer.invoke('hub:hardware', payload),
+    builtins: () => ipcRenderer.invoke('hub:builtins'),
+    inspect: (payload) => ipcRenderer.invoke('hub:inspect', payload),
+    install: (payload) => ipcRenderer.invoke('hub:install', payload),
+    uninstall: (payload) => ipcRenderer.invoke('hub:uninstall', payload),
+    exportMine: (payload) => ipcRenderer.invoke('hub:exportMine', payload),
+    openFile: () => ipcRenderer.invoke('hub:openFile'),
+    saveFile: (payload) => ipcRenderer.invoke('hub:saveFile', payload),
+    pendingLink: (payload) => ipcRenderer.invoke('hub:pendingLink', payload),
+    onEvent: (cb) => {
+      const handler = (_e, m) => cb(m)
+      ipcRenderer.on('hub:event', handler)
+      return () => ipcRenderer.removeListener('hub:event', handler)
+    },
+    catalog: {
+      server: () => ipcRenderer.invoke('hub:catalog:server'),
+      setServer: (payload) => ipcRenderer.invoke('hub:catalog:setServer', payload),
+      search: (payload) => ipcRenderer.invoke('hub:catalog:search', payload),
+      detail: (payload) => ipcRenderer.invoke('hub:catalog:detail', payload),
+      inspect: (payload) => ipcRenderer.invoke('hub:catalog:inspect', payload),
+      install: (payload) => ipcRenderer.invoke('hub:catalog:install', payload),
+      updates: () => ipcRenderer.invoke('hub:catalog:updates'),
+      update: (payload) => ipcRenderer.invoke('hub:catalog:update', payload)
+    },
+    mcp: {
+      status: () => ipcRenderer.invoke('hub:mcp:status'),
+      setEnabled: (payload) => ipcRenderer.invoke('hub:mcp:setEnabled', payload),
+      regenerate: () => ipcRenderer.invoke('hub:mcp:regenerate'),
+      answer: (payload) => ipcRenderer.invoke('hub:mcp:answer', payload)
+    }
+  },
   kakugan: {
     state: () => ipcRenderer.invoke('kakugan:state'),
     login: (payload) => ipcRenderer.invoke('kakugan:login', payload),
@@ -219,6 +262,12 @@ const darkhubApi = {
   },
   overlay: {
     status: () => ipcRenderer.invoke('overlay:status'),
+    layouts: () => ipcRenderer.invoke('overlay:layouts'),
+    saveLayout: (payload) => ipcRenderer.invoke('overlay:saveLayout', payload),
+    newLayout: (payload) => ipcRenderer.invoke('overlay:newLayout', payload),
+    deleteLayout: (payload) => ipcRenderer.invoke('overlay:deleteLayout', payload),
+    activateLayout: (payload) => ipcRenderer.invoke('overlay:activateLayout', payload),
+    preview: (payload) => ipcRenderer.invoke('overlay:preview', payload),
     show: (payload) => ipcRenderer.invoke('overlay:show', payload),
     hide: () => ipcRenderer.invoke('overlay:hide'),
     setSettings: (payload) => ipcRenderer.invoke('overlay:setSettings', payload),

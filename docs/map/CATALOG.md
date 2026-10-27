@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-10-26T10:12:14. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-10-27T10:44:32. NAO edite a mao: rode `npm run map`. -->
 
 # Catalogo de operacoes registradas (106)
 

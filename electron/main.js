@@ -68,12 +68,15 @@ import { registerUsbIPC } from './ipc/usbIpc.js'
 import { registerRestoreIPC } from './ipc/restoreIpc.js'
 import { registerShareIPC } from './ipc/shareIpc.js'
 import { registerKakuganIPC } from './ipc/kakuganIpc.js'
+import { registerHubIPC } from './ipc/hubIpc.js'
 import { registerUpscaleIPC } from './ipc/upscaleIpc.js'
 import { registerMetadataIPC } from './ipc/metadataIpc.js'
 import { SYSTEM_TAR } from './services/SecureDownload.js'
 import { createFramePacerOverlay, closeFramePacerOverlay, toggleFramePacerOverlay, setOverlayClickThrough, setOverlayConfig, getOverlayStatus } from './services/FramePacerOverlay.js'
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'local-resource', privileges: { bypassCSP: true, secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }
+  { scheme: 'local-resource', privileges: { bypassCSP: true, secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } },
+  // extension pages: their own origin and their own CSP (an srcdoc frame would inherit the app's); no fetch, no CORS
+  { scheme: 'darkhub-ext', privileges: { standard: true, secure: true } }
 ])
 registerNetworkIPC()
 log.transports.file.level = 'info'
@@ -88,6 +91,7 @@ log.info(`[startup] process started isPackaged=${app.isPackaged} argv=${process.
 
 // Declared before the second-instance handler below, which can run before the rest of this module has executed.
 let mainWindow = null
+let hubIpc = null
 const gotTheLock = app.requestSingleInstanceLock()
 if (!gotTheLock) {
   log.info('[startup] Second instance detected, quitting...')
@@ -96,6 +100,8 @@ if (!gotTheLock) {
 } else {
   app.on('second-instance', (event, commandLine, workingDirectory) => {
     log.info('[startup] Second instance attempted to open. Restoring main window.')
+    const link = commandLine.find((a) => /^darkhub:\/\//i.test(a))
+    if (link && hubIpc?.openLink(link)) return
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.show()
@@ -232,6 +238,7 @@ safeRegister('usb', () => registerUsbIPC({ ipcMain, logger: Logger }))
 safeRegister('restore', () => registerRestoreIPC({ ipcMain, logger: Logger }))
 safeRegister('upscale', () => registerUpscaleIPC({ app, ipcMain, BrowserWindow, logger: Logger }))
 safeRegister('share', () => registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globalShortcut, BrowserWindow, Notification, logger: Logger }))
+hubIpc = safeRegister('hub', () => registerHubIPC({ app, ipcMain, dialog, BrowserWindow, logger: Logger, getMainWindow: () => mainWindow, showMainWindow: () => showMainWindow() }))
 safeRegister('kakugan', () => registerKakuganIPC({
   app, ipcMain, shell, safeStorage, Notification, logger: Logger,
   openPage: (page) => { showMainWindow(); mainWindow?.webContents.executeJavaScript(`location.hash = ${JSON.stringify('#' + page)}`).catch(() => {}) }
@@ -805,6 +812,11 @@ function createMainWindow() {
     if (isTrustedAppNavigation(url)) return
     event.preventDefault()
     openAllowedExternalUrlDetached(url, 'main-window-navigation')
+  })
+
+  // extension frames (iframe name="dh-ext") never leave their sandboxed page: a navigation could carry data out
+  win.webContents.on('will-frame-navigate', (event) => {
+    if (!event.isMainFrame && event.frame?.name === 'dh-ext' && !String(event.url).startsWith('darkhub-ext://ext/')) event.preventDefault()
   })
 
   win.webContents.on('will-attach-webview', (event, webPreferences, params) => {
@@ -4283,6 +4295,7 @@ app.whenReady().then(async () => {
 
   // Library covers live in the app's own folder: always readable (the renderer never picks them through a dialog).
   grantDirectoryPath(path.join(app.getPath('userData'), 'covers'))
+  protocol.handle('darkhub-ext', (request) => hubIpc?.extResponse(request) ?? new Response('indisponível', { status: 503 }))
   protocol.registerFileProtocol('local-resource', (request, callback) => {
     let url = request.url.replace(/^local-resource:\/\//, '').replace(/[?#].*$/, '')
 
@@ -4339,6 +4352,11 @@ app.whenReady().then(async () => {
   log.info('[startup] main window created')
   setTimeout(runDeferredStartup, 900)
 
+  // darkhub://hub/install?id=... (the "Install in DarkHub" button on hub.darkhub.ink) and the MCP server, if enabled
+  if (app.isPackaged) { try { app.setAsDefaultProtocolClient('darkhub') } catch (e) { log.warn(`[startup] protocol: ${e?.message}`) } }
+  { const link = process.argv.find((a) => /^darkhub:\/\//i.test(a)); if (link) hubIpc?.openLink(link) }
+  void hubIpc?.init()
+
   app.on('activate', () => {
     showMainWindow()
   })
@@ -4355,6 +4373,7 @@ let latencyGuardianStopHandled = false
 app.on('before-quit', (event) => {
   appIsQuitting = true
   try { void downloadsService?.shutdown() } catch {}
+  try { void hubIpc?.stop() } catch {}
   try {
     UpdateService.destroy()
   } catch {}

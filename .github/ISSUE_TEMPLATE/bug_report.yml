@@ -1,0 +1,74 @@
+name: Bug report
+description: Something in DarkHub Suite does not work as expected
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Security vulnerabilities go through the [security policy](https://github.com/Pokeralho/darkhub-suite/security/policy), not here.
+        Please try the [latest release](https://github.com/Pokeralho/darkhub-suite/releases/latest) first: the app updates itself.
+  - type: input
+    id: version
+    attributes:
+      label: DarkHub Suite version
+      description: Settings > About (for example 0.7.2)
+      placeholder: "0.7.2"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version and build
+      description: Run `winver` (for example Windows 11 24H2, build 26100.2314). Say if it is DarkOS or another custom ISO.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - System Optimizer / tweaks
+        - Presets and modules (packages)
+        - Latency / DarkPacer / overlay
+        - DLSS / OptiScaler
+        - Hardware monitor / sensors
+        - Security / real-time protection
+        - Downloads / video / converters / other tools
+        - Installer / updates
+        - Interface / translation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what happened instead. Include the exact error message if there is one.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open '...'
+        2. Click '...'
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log (optional)
+      description: The relevant lines of the DarkHub log (darkhub_elite.log in the app data folder; secrets are masked, but check before pasting). Screenshots are welcome too.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I am on the latest release.
+          required: false
+        - label: I searched the existing issues.
+          required: true

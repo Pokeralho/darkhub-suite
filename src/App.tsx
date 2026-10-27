@@ -2,10 +2,12 @@ import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import Layout from './layouts/MainLayout';
 import { I18nProvider } from './i18n/I18nProvider';
 import UpdaterOverlay from './components/UpdaterOverlay';
+import HubApproval from './components/hub/HubApproval';
 import ErrorBoundary from './components/ErrorBoundary';
 
 // Every page is a separate chunk: only the shell (layout, i18n, updater) is in the startup bundle.
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const ExtensionPage = lazy(() => import('./pages/ExtensionPage'));
 const Optimizer = lazy(() => import('./pages/Optimizer'));
 const SystemMonitor = lazy(() => import('./pages/SystemMonitor'));
 const FileConverter = lazy(() => import('./pages/FileConverter'));
@@ -38,6 +40,8 @@ const SpaceSniffer = lazy(() => import('./pages/SpaceSniffer'));
 const Maintenance = lazy(() => import('./pages/Maintenance'));
 const UsbControl = lazy(() => import('./pages/UsbControl'));
 const Kakugan = lazy(() => import('./pages/Kakugan'));
+const OverlayEditor = lazy(() => import('./pages/OverlayEditor'));
+const Presets = lazy(() => import('./pages/Presets'));
 const StartupManager = lazy(() => import('./pages/StartupManager'));
 const Benchmark = lazy(() => import('./pages/Benchmark'));
 const GameOverlay = lazy(() => import('./pages/GameOverlay'));
@@ -79,6 +83,10 @@ const App = () => {
 
   // screenshot shutter sound, wherever the user is (the window may be in the tray)
   useEffect(() => window.darkhub?.share?.onEvent?.((m: any) => { if (m?.type === 'screenshot' && m.sound) void import('./lib/shutterSound').then((x) => x.playShutter()); }), []);
+
+  // darkhub:// links from hub.darkhub.ink open the package on the Presets page (which reads the link itself)
+  useEffect(() => window.darkhub?.hub?.onEvent?.((m) => { if (m.type === 'open') setCurrentPage('presets'); }), []);
+  useEffect(() => { window.darkhub?.hub?.pendingLink?.({ peek: true }).then((r) => { if (r?.link) setCurrentPage('presets'); }); }, []);
 
   useEffect(() => {
     const onHash = () => { const p = pageFromHash(); setCurrentPage((cur) => (cur === p ? cur : p)); };
@@ -212,7 +220,7 @@ ${componentStack}` : ''}`
       case 'savebackup':
         return <SaveBackup />;
       case 'overlay':
-        return <GameOverlay />;
+        return <GameOverlay onNavigate={(p: string) => setCurrentPage(p)} />;
       case 'benchmark':
         return <Benchmark />;
       case 'startup':
@@ -221,11 +229,16 @@ ${componentStack}` : ''}`
         return <UsbControl />;
       case 'kakugan':
         return <Kakugan />;
+      case 'presets':
+        return <Presets />;
+      case 'overlay-editor':
+        return <OverlayEditor onNavigate={(p: string) => setCurrentPage(p)} />;
       case 'maintenance':
         return <Maintenance />;
       case 'settings':
         return <SettingsPage />;
       default:
+        if (currentPage.startsWith('ext__')) return <ExtensionPage page={currentPage} onNavigate={(p: string) => setCurrentPage(p)} />;
         return <Home onNavigate={(p: string) => setCurrentPage(p)} />;
     }
   };
@@ -242,6 +255,7 @@ ${componentStack}` : ''}`
         </ErrorBoundary>
         <ErrorBoundary silent onError={reportRenderError}>
           <UpdaterOverlay />
+          <HubApproval />
         </ErrorBoundary>
         {DevTracePanel && (
           <ErrorBoundary silent>

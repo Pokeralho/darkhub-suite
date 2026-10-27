@@ -1,0 +1,34 @@
+name: Feature request
+description: Suggest a new tool, tweak or improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For open-ended ideas and questions, [Discussions](https://github.com/Pokeralho/darkhub-suite/discussions) is a better place. If your idea is a set of Windows changes, it may fit in a [package](https://github.com/Pokeralho/darkhub-suite/blob/main/docs/hub/README.md) that anyone can write, with no change to the app.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does it solve?
+      description: What you are trying to do and why the current app does not cover it.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How you imagine it working (screen, option, tweak...). For a Windows tweak, include the registry key, service or command and a source that documents it.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Other tools or approaches you considered.
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contribution
+      options:
+        - label: I would like to implement this myself (see CONTRIBUTING.md).

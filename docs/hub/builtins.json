@@ -1,0 +1,765 @@
+{
+ "op:advancedNetwork": {
+  "kind": "op",
+  "title": "Rede: TCP NoDelay/AckFrequency por adaptador, EEE off, QoS",
+  "risk": "medium",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": null
+ },
+ "op:blockAdsAndSuggestions": {
+  "kind": "op",
+  "title": "Bloquear Anúncios e Sugestões do Windows",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": [
+   "tweak:blockAdsAndSuggestions"
+  ]
+ },
+ "op:classicContextMenu": {
+  "kind": "op",
+  "title": "Menu de Contexto Clássico (Windows 11)",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": [
+   "tweak:classicContextMenu"
+  ]
+ },
+ "op:cleanTemp": {
+  "kind": "op",
+  "title": "Limpar Arquivos Temporários",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": false,
+  "packageUse": "yes",
+  "tweakIds": null
+ },
+ "op:cpuUnpark": {
+  "kind": "op",
+  "title": "CPU: manter todos os núcleos ativos (plano atual, na tomada)",
+  "risk": "medium",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": null
+ },
+ "op:darkModeAndColors": {
+  "kind": "op",
+  "title": "Modo Escuro no Sistema e Aplicativos",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": [
+   "tweak:darkModeAndColors"
+  ]
+ },
+ "op:deepCleanOneDrive": {
+  "kind": "op",
+  "title": "Desinstalar OneDrive",
+  "risk": "medium",
+  "securityRelated": false,
+  "reversible": false,
+  "packageUse": "official",
+  "tweakIds": null
+ },
+ "op:disableActivityHistory": {
+  "kind": "op",
+  "title": "Desativar Histórico de Atividades",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": [
+   "tweak:disableActivityHistory"
+  ]
+ },
+ "op:disableAiAndAds": {
+  "kind": "op",
+  "title": "Desativar Recall (IA), Copilot e Sugestões Web",
+  "risk": "medium",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": [
+   "tweak:disableAiAndAds"
+  ]
+ },
+ "op:disableCoreIsolation": {
+  "kind": "op",
+  "title": "Modo Hardcore: Desativar VBS / Integridade de Memória  [RISCO DE SEGURANÇA]",
+  "risk": "high",
+  "securityRelated": true,
+  "reversible": true,
+  "packageUse": "official",
+  "tweakIds": [
+   "tweak:disableVBS",
+   "tweak:disableHibernation"
+  ]
+ },
+ "op:disableCortana": {
+  "kind": "op",
+  "title": "Desativar Cortana (política legada)",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": [
+   "tweak:disableCortana"
+  ]
+ },
+ "op:disableGameBar": {
+  "kind": "op",
+  "title": "Desativar Gravação em Segundo Plano (Game DVR)",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": [
+   "tweak:disableGameDvr"
+  ]
+ },
+ "op:disableHibernation": {
+  "kind": "op",
+  "title": "Desativar Hibernação (liberar espaço do hiberfil.sys)",
+  "risk": "medium",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": [
+   "tweak:disableHibernation"
+  ]
+ },
+ "op:disableLocation": {
+  "kind": "op",
+  "title": "Desativar Localização (política)",
+  "risk": "medium",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": [
+   "tweak:disableLocation"
+  ]
+ },
+ "op:disableMouseAcceleration": {
+  "kind": "op",
+  "title": "Desativar Aceleração do Mouse (precisão do ponteiro)",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": [
+   "tweak:disableMouseAcceleration"
+  ]
+ },
+ "op:disableServices": {
+  "kind": "op",
+  "title": "Desativar Serviços Redundantes (WSearch, DiagTrack, CDPSvc, lfsvc)",
+  "risk": "high",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": null
+ },
+ "op:disableTelemetry": {
+  "kind": "op",
+  "title": "Reduzir Telemetria ao Mínimo",
+  "risk": "medium",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": [
+   "tweak:disableTelemetry"
+  ]
+ },
+ "op:disableVisualEffects": {
+  "kind": "op",
+  "title": "Efeitos Visuais: Melhor Desempenho",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": null
+ },
+ "op:edgeOptimizations": {
+  "kind": "op",
+  "title": "Microsoft Edge: Sem Execução em Segundo Plano",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": [
+   "tweak:edgeOptimizations"
+  ]
+ },
+ "op:explorerTweaks": {
+  "kind": "op",
+  "title": "Explorador: Este Computador, Extensões e Itens Ocultos",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": [
+   "tweak:explorerOpenThisPC",
+   "tweak:showFileExtensions",
+   "tweak:showHiddenFiles",
+   "tweak:explorerCompactMode"
+  ]
+ },
+ "op:flushDns": {
+  "kind": "op",
+  "title": "Limpar Cache de DNS",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": false,
+  "packageUse": "yes",
+  "tweakIds": null
+ },
+ "op:kernelExtreme": {
+  "kind": "op",
+  "title": "Kernel e Latência: prioridade de primeiro plano, MMCSS, NTFS e timer",
+  "risk": "medium",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": null
+ },
+ "op:msiMode": {
+  "kind": "op",
+  "title": "Modo MSI para a(s) GPU(s)  [AVANÇADO]",
+  "risk": "high",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": null
+ },
+ "op:networkExtreme": {
+  "kind": "op",
+  "title": "Pilha TCP: RSC desligado, RSS ligado, timestamps off",
+  "risk": "medium",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": null
+ },
+ "op:optimizeAudioLatency": {
+  "kind": "op",
+  "title": "Garantir Prioridade Alta do Áudio (temporário)",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": false,
+  "packageUse": "yes",
+  "tweakIds": null
+ },
+ "op:optimizeGameRoute": {
+  "kind": "op",
+  "title": "Prioridade Multimídia para Jogos (MMCSS)",
+  "risk": "medium",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": [
+   "tweak:mmcssGames"
+  ]
+ },
+ "op:optimizeRAM": {
+  "kind": "op",
+  "title": "Liberar Memória RAM (temporário)",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": false,
+  "packageUse": "yes",
+  "tweakIds": null
+ },
+ "op:powerPlanBalanced": {
+  "kind": "op",
+  "title": "Plano de Energia: Equilibrado",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": false,
+  "packageUse": "no",
+  "tweakIds": null
+ },
+ "op:powerPlanHighPerformance": {
+  "kind": "op",
+  "title": "Plano de Energia: Alto Desempenho",
+  "risk": "medium",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": null
+ },
+ "op:powerPlanRestore": {
+  "kind": "op",
+  "title": "Plano de Energia: Restaurar anterior",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": false,
+  "packageUse": "no",
+  "tweakIds": null
+ },
+ "op:powerPlanUltimate": {
+  "kind": "op",
+  "title": "Plano de Energia: Desempenho Máximo",
+  "risk": "medium",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": null
+ },
+ "op:preventAutoBitLocker": {
+  "kind": "op",
+  "title": "Impedir Criptografia Automática do Dispositivo (BitLocker)",
+  "risk": "medium",
+  "securityRelated": true,
+  "reversible": true,
+  "packageUse": "official",
+  "tweakIds": [
+   "tweak:preventAutoBitLocker"
+  ]
+ },
+ "op:removeCapabilities": {
+  "kind": "op",
+  "title": "Remover Recursos Opcionais Legados & Recall",
+  "risk": "medium",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": null
+ },
+ "op:taskbarEndTask": {
+  "kind": "op",
+  "title": "Habilitar \"Finalizar Tarefa\" na Barra de Tarefas",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": [
+   "tweak:taskbarEndTask"
+  ]
+ },
+ "op:taskbarTweaks": {
+  "kind": "op",
+  "title": "Barra de Tarefas: Esquerda, sem Pesquisa e sem Visão de Tarefas",
+  "risk": "low",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": [
+   "tweak:taskbarAlignLeft",
+   "tweak:hideSearchBox",
+   "tweak:hideTaskViewButton",
+   "tweak:taskbarEndTask"
+  ]
+ },
+ "op:timerTuning": {
+  "kind": "op",
+  "title": "Timer: desativar dynamic tick (BCD)",
+  "risk": "medium",
+  "securityRelated": false,
+  "reversible": true,
+  "packageUse": "yes",
+  "tweakIds": null
+ },
+ "tweak:addCopyMoveToContextMenu": {
+  "kind": "tweak",
+  "title": "Adicionar \"Copiar Para\" e \"Mover Para\" no Menu de Contexto",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:batteryPercentage": {
+  "kind": "tweak",
+  "title": "Porcentagem da bateria na barra de tarefas",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:blockAdsAndSuggestions": {
+  "kind": "tweak",
+  "title": "Bloqueio de Anúncios e Sugestões do Windows",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:blockDeviceMetadata": {
+  "kind": "tweak",
+  "title": "Bloquear apps de fabricante baixados ao conectar dispositivos",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:blockPeripheralBloat": {
+  "kind": "tweak",
+  "title": "Bloquear instalação automática do Razer Synapse e do Logi Download Assistant",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:braveDebloat": {
+  "kind": "tweak",
+  "title": "Brave sem Rewards, carteira cripto, VPN, IA e telemetria",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:classicContextMenu": {
+  "kind": "tweak",
+  "title": "Menu de Contexto Clássico (estilo Windows 10)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:classicStartMenu": {
+  "kind": "tweak",
+  "title": "Menu Iniciar anterior (antes do novo layout do 25H2)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:darkModeAndColors": {
+  "kind": "tweak",
+  "title": "Modo Escuro Completo no Sistema e Aplicativos",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:desktopIcons": {
+  "kind": "tweak",
+  "title": "Exibir Ícones Essenciais na Área de Trabalho",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:detailedBsod": {
+  "kind": "tweak",
+  "title": "Tela azul (BSOD) com detalhes técnicos",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableActivityHistory": {
+  "kind": "tweak",
+  "title": "Desativar Histórico de Atividades (Timeline)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableAeroShake": {
+  "kind": "tweak",
+  "title": "Desativar Aero Shake (Chacoalhar Janelas)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableAiAndAds": {
+  "kind": "tweak",
+  "title": "Desativar Recall (IA), Copilot e Sugestões Web na Pesquisa",
+  "risk": "medium",
+  "securityRelated": false
+ },
+ "tweak:disableBackgroundApps": {
+  "kind": "tweak",
+  "title": "Bloquear Aplicativos UWP em Segundo Plano",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableCortana": {
+  "kind": "tweak",
+  "title": "Desativar Assistente Cortana (política legada)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableDeliveryOptimization": {
+  "kind": "tweak",
+  "title": "Desativar Otimização de Entrega P2P",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableErrorReporting": {
+  "kind": "tweak",
+  "title": "Desativar Relatório de Erros do Windows",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableFastStartup": {
+  "kind": "tweak",
+  "title": "Desativar Inicialização Rápida (Fast Startup)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableFolderDiscovery": {
+  "kind": "tweak",
+  "title": "Explorador mais rápido em pastas grandes (sem detecção de tipo de pasta)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableGameDvr": {
+  "kind": "tweak",
+  "title": "Desativar Xbox Game DVR / Gravação em Segundo Plano",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableHibernation": {
+  "kind": "tweak",
+  "title": "Desativar Hibernação (apaga hiberfil.sys)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableIPv6": {
+  "kind": "tweak",
+  "title": "Desativar IPv6",
+  "risk": "medium",
+  "securityRelated": false
+ },
+ "tweak:disableLocation": {
+  "kind": "tweak",
+  "title": "Desativar Rastreamento de Localização (política)",
+  "risk": "medium",
+  "securityRelated": false
+ },
+ "tweak:disableLockScreen": {
+  "kind": "tweak",
+  "title": "Pular a tela de bloqueio (ir direto para a senha)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableLockscreenBlur": {
+  "kind": "tweak",
+  "title": "Desativar Desfoque na Tela de Login",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableMouseAcceleration": {
+  "kind": "tweak",
+  "title": "Desativar Aceleração do Mouse (\"Aprimorar precisão do ponteiro\")",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableMpo": {
+  "kind": "tweak",
+  "title": "Desativar Multiplane Overlay (MPO)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableNotifications": {
+  "kind": "tweak",
+  "title": "Desativar Central de Notificações e notificações pop-up",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableReservedStorage": {
+  "kind": "tweak",
+  "title": "Liberar o Armazenamento Reservado (~7 GB)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableStickyKeys": {
+  "kind": "tweak",
+  "title": "Desativar Atalho das Teclas de Aderência (Shift 5x)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableStorageSense": {
+  "kind": "tweak",
+  "title": "Desativar o Sensor de Armazenamento",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableStoreSearchResults": {
+  "kind": "tweak",
+  "title": "Sem sugestões da Microsoft Store na pesquisa do Iniciar",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableTelemetry": {
+  "kind": "tweak",
+  "title": "Reduzir Telemetria da Microsoft ao Mínimo",
+  "risk": "medium",
+  "securityRelated": false
+ },
+ "tweak:disableTeredo": {
+  "kind": "tweak",
+  "title": "Desativar túnel Teredo",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableVBS": {
+  "kind": "tweak",
+  "title": "Desativar VBS / Isolamento de Núcleo (HVCI)  [RISCO DE SEGURANÇA]",
+  "risk": "high",
+  "securityRelated": true
+ },
+ "tweak:disableWindowSnapping": {
+  "kind": "tweak",
+  "title": "Desativar o encaixe automático de janelas (Snap)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableWpbt": {
+  "kind": "tweak",
+  "title": "Impedir que o firmware instale programas no Windows (WPBT)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:edgeOptimizations": {
+  "kind": "tweak",
+  "title": "Otimização do Microsoft Edge (políticas)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:explorerCompactMode": {
+  "kind": "tweak",
+  "title": "Modo de Exibição Compacto no Explorador",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:explorerOpenThisPC": {
+  "kind": "tweak",
+  "title": "Abrir Explorador no \"Este Computador\"",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:hideCopilotButton": {
+  "kind": "tweak",
+  "title": "Ocultar Botão do Copilot na Barra de Tarefas",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:hideHomeGallery": {
+  "kind": "tweak",
+  "title": "Remover \"Início\" e \"Galeria\" do Explorador",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:hideSearchBox": {
+  "kind": "tweak",
+  "title": "Ocultar Caixa de Pesquisa da Barra de Tarefas",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:hideSettingsHome": {
+  "kind": "tweak",
+  "title": "Ocultar a página \"Início\" do app Configurações",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:hideTaskViewButton": {
+  "kind": "tweak",
+  "title": "Ocultar Botão Visão de Tarefas (Task View)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:keepClassicOutlook": {
+  "kind": "tweak",
+  "title": "Manter o Outlook clássico (sem migração para o \"novo Outlook\")",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:legacyBootMenu": {
+  "kind": "tweak",
+  "title": "Menu de boot clássico (F8 / Modo de Segurança)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:longPaths": {
+  "kind": "tweak",
+  "title": "Permitir caminhos de arquivo com mais de 260 caracteres",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:mmcssGames": {
+  "kind": "tweak",
+  "title": "Prioridade Multimídia (MMCSS) para Jogos",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:ntpPool": {
+  "kind": "tweak",
+  "title": "Sincronizar o relógio com pool.ntp.org",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:numLockOnStartup": {
+  "kind": "tweak",
+  "title": "Num Lock ligado ao iniciar",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:preferIPv4": {
+  "kind": "tweak",
+  "title": "Preferir IPv4 em vez de IPv6",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:preventAutoBitLocker": {
+  "kind": "tweak",
+  "title": "Impedir Criptografia Automática de Dispositivo (BitLocker)  [SEGURANÇA]",
+  "risk": "medium",
+  "securityRelated": true
+ },
+ "tweak:rdpUnsignedNoWarning": {
+  "kind": "tweak",
+  "title": "Sem aviso ao abrir arquivos .rdp não assinados  [SEGURANÇA]",
+  "risk": "medium",
+  "securityRelated": true
+ },
+ "tweak:registryBackup": {
+  "kind": "tweak",
+  "title": "Backup automático do registro (RegBack)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:s3Sleep": {
+  "kind": "tweak",
+  "title": "Usar suspensão S3 clássica em vez do Modern Standby",
+  "risk": "medium",
+  "securityRelated": false
+ },
+ "tweak:scrollbarsAlwaysVisible": {
+  "kind": "tweak",
+  "title": "Barras de rolagem sempre visíveis",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:setUtcTime": {
+  "kind": "tweak",
+  "title": "Relógio do Hardware em UTC (somente dual boot com Linux)",
+  "risk": "medium",
+  "securityRelated": false
+ },
+ "tweak:showFileExtensions": {
+  "kind": "tweak",
+  "title": "Exibir Extensões de Arquivos Conhecidos",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:showHiddenFiles": {
+  "kind": "tweak",
+  "title": "Exibir Arquivos Ocultos e Protegidos do Sistema",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:showSecondsInClock": {
+  "kind": "tweak",
+  "title": "Exibir Segundos no Relógio da Barra de Tarefas",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:standbyNetworkOff": {
+  "kind": "tweak",
+  "title": "Sem rede durante a suspensão moderna (notebooks)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:taskbarAlignLeft": {
+  "kind": "tweak",
+  "title": "Alinhar Barra de Tarefas à Esquerda",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:taskbarEndTask": {
+  "kind": "tweak",
+  "title": "Habilitar \"Finalizar Tarefa\" na Barra de Tarefas",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:verboseLogon": {
+  "kind": "tweak",
+  "title": "Mensagens detalhadas ao iniciar e desligar",
+  "risk": "low",
+  "securityRelated": false
+ }
+}

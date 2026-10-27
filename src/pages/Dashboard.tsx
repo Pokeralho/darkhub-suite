@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import ExtensionFrame from '../components/ExtensionFrame';
+import { textIn, useExtensions } from '../lib/extensions';
 import {
   Shield, Cpu, Activity, HardDrive, ArrowDownUp, Gamepad2, Wrench,
   CheckCircle, AlertTriangle, Trash2, Loader2, Sparkles, RefreshCw, Layers,
@@ -694,8 +696,26 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </ul>
         )}
       </section>
+      <ExtensionWidgets onNavigate={onNavigate} />
     </div>
   );
 };
+
+/** Cards contributed by installed extensions. */
+function ExtensionWidgets({ onNavigate }: { onNavigate?: (page: string) => void }) {
+  const { lang } = useI18n();
+  const widgets = useExtensions().flatMap((e) => (e.extension?.widgets || []).map((w) => ({ ext: e, w })));
+  if (!widgets.length) return null;
+  return (
+    <section className="grid gap-3 md:grid-cols-2">
+      {widgets.map(({ ext, w }) => (
+        <div key={`${ext.id}/${w.id}`} className="dh-card p-3">
+          <p className="text-[12px] font-medium text-zinc-400 mb-2">{textIn(w.title, lang)} <span className="text-zinc-600">· {textIn(ext.name, lang)}</span></p>
+          <ExtensionFrame extId={ext.id} contribution={w.id} kind="widgets" fixedHeight={undefined} onNavigate={onNavigate} />
+        </div>
+      ))}
+    </section>
+  );
+}
 
 export default Dashboard;

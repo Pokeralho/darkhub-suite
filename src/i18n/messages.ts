@@ -17,6 +17,8 @@ import { driverMessages } from './driverMessages';
 import { usbMessages } from './usbMessages';
 import { restoreMessages } from './restoreMessages';
 import { kakuganMessages } from './kakuganMessages';
+import { overlayEditorMessages } from './overlayEditorMessages';
+import { hubMessages } from './hubMessages';
 import { startupMessages } from './startupMessages';
 import { benchmarkMessages } from './benchmarkMessages';
 import { overlayMessages } from './overlayMessages';
@@ -3407,7 +3409,7 @@ export const messages: Record<string, Record<string, string>> = {
 
 };
 
-for (const extra of [darkosMessages, realtimeMessages, optimizerUiMessages, diskMapMessages, networkMessages, devToolsMessages, psToolsMessages, securityMessages, vaultMessages, metadataMessages, decryptMessages, ocrMessages, videoMessages, textEditorMessages, saveBackupMessages, overlayMessages, benchmarkMessages, startupMessages, usbMessages, maintenanceMessages, driverMessages, restoreMessages, kakuganMessages]) {
+for (const extra of [darkosMessages, realtimeMessages, optimizerUiMessages, diskMapMessages, networkMessages, devToolsMessages, psToolsMessages, securityMessages, vaultMessages, metadataMessages, decryptMessages, ocrMessages, videoMessages, textEditorMessages, saveBackupMessages, overlayMessages, benchmarkMessages, startupMessages, usbMessages, maintenanceMessages, driverMessages, restoreMessages, kakuganMessages, overlayEditorMessages, hubMessages]) {
   for (const [code, dict] of Object.entries(extra)) {
     messages[code] = { ...(messages[code] || {}), ...dict };
   }

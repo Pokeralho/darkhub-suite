@@ -1,0 +1,829 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://darkhub.ink/schema/v1.json",
+  "title": "DarkHub package (module or preset), schema v1",
+  "description": "A DarkHub package is a JSON file that describes Windows changes as data. DarkHub captures the current value of everything a package touches before applying it, verifies after applying, and restores exactly that value when the package is uninstalled. Packages never run scripts. File name convention: <id>.darkhub.json. Full guide: docs/hub/README.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "type",
+    "id",
+    "version",
+    "name",
+    "author"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional. Point it to https://darkhub.ink/schema/v1.json so editors and AI tools validate while writing."
+    },
+    "schemaVersion": {
+      "const": 1,
+      "description": "Always 1 for this schema."
+    },
+    "type": {
+      "enum": [
+        "module",
+        "preset",
+        "extension"
+      ],
+      "description": "module: a small set of related changes with one goal (e.g. 'Ethernet tuned for games'). preset: a recipe that combines built-in tweaks, modules' worth of changes and hardware conditions for a scenario (e.g. 'Valorant low latency on an NVIDIA desktop'). extension: new functionality for the app itself (screens, tools, dashboard widgets) written in HTML, CSS and JavaScript. It runs isolated and talks to DarkHub only through the permissions it declares; it cannot change Windows except by asking DarkHub to install a package, which the user approves."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,38}\\.[a-z0-9][a-z0-9-]{1,62}$",
+      "description": "Unique id: <author>.<name>, lowercase letters, digits and dashes. The author part is the GitHub user name in lowercase.",
+      "examples": [
+        "pokeralho.valorant-low-latency",
+        "ana.ethernet-gaming"
+      ]
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$",
+      "description": "Semantic version MAJOR.MINOR.PATCH. Raise MAJOR when the package changes something new, MINOR for new conditional items, PATCH for text fixes.",
+      "examples": [
+        "1.0.0"
+      ]
+    },
+    "name": {
+      "$ref": "#/$defs/text",
+      "description": "Short title shown in DarkHub (up to 60 characters). Give pt-BR and en-US when you can."
+    },
+    "description": {
+      "$ref": "#/$defs/longText",
+      "description": "What the package does and for whom, in plain words (up to 600 characters). Say what it changes, not promises like '+50 FPS'."
+    },
+    "author": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "github"
+      ],
+      "properties": {
+        "github": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$",
+          "description": "GitHub user name of the author."
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 60,
+          "description": "Display name (optional)."
+        }
+      }
+    },
+    "license": {
+      "type": "string",
+      "maxLength": 40,
+      "default": "MIT",
+      "description": "SPDX license id of the package. Defaults to MIT."
+    },
+    "tags": {
+      "type": "array",
+      "maxItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]{0,30}$"
+      },
+      "description": "Lowercase search tags: game names, 'latency', 'privacy', 'laptop', 'nvidia'..."
+    },
+    "minApp": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Oldest DarkHub Suite version that understands this package. Use the version you tested with."
+    },
+    "when": {
+      "$ref": "#/$defs/condition",
+      "description": "Hardware/system condition for the whole package. When it does not match, DarkHub shows the package as 'not for this PC' and does not install it."
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 200,
+      "description": "The changes, applied in order. Each item is exactly one of: use (a built-in DarkHub tweak), op (a built-in DarkHub operation), registry, service or task. Each item may have its own 'if' condition and a 'note'.",
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    },
+    "expects": {
+      "type": "array",
+      "maxItems": 10,
+      "description": "Effects the author expects, which DarkHub's before/after benchmark can measure. Only list what can be measured.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric",
+          "direction"
+        ],
+        "properties": {
+          "metric": {
+            "enum": [
+              "cpu.single",
+              "cpu.multi",
+              "memory.bandwidth",
+              "memory.latency",
+              "timer.latency",
+              "disk.read",
+              "disk.write",
+              "boot.time",
+              "background.processes"
+            ],
+            "description": "Benchmark metric."
+          },
+          "direction": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "description": "Whether the value should go up or down."
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "maxLength": 300,
+        "pattern": "^https://[^ ]+$"
+      },
+      "description": "Links that back the changes: Microsoft documentation, measurements, GitHub discussions."
+    },
+    "permissions": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 12,
+      "description": "Extensions only. What the extension may ask DarkHub for; the user sees and approves the list when installing. storage: its own key-value storage. hardware: PC facts (CPU, GPU, RAM, chassis). sensors: live temperatures, loads and clocks. network: HTTPS requests to the origins listed in \"network\". notifications: Windows notifications. clipboard: write text to the clipboard. packages: ask DarkHub to preview and install DarkHub packages (the user approves each one). tweaks.read: read which built-in tweaks are on.",
+      "items": {
+        "enum": [
+          "storage",
+          "hardware",
+          "sensors",
+          "network",
+          "notifications",
+          "clipboard",
+          "packages",
+          "tweaks.read"
+        ]
+      }
+    },
+    "network": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 20,
+      "description": "Extensions with the network permission: the only origins it may call, e.g. https://api.github.com.",
+      "items": {
+        "type": "string",
+        "pattern": "^https://[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:[0-9]{2,5})?$"
+      }
+    },
+    "contributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "description": "Extensions only. Where the extension shows up in DarkHub.",
+      "properties": {
+        "pages": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "description": "New screens in the sidebar (section Extensões).",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "entry"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+              },
+              "title": {
+                "$ref": "#/$defs/text"
+              },
+              "description": {
+                "$ref": "#/$defs/longText"
+              },
+              "icon": {
+                "enum": [
+                  "puzzle",
+                  "chart",
+                  "gauge",
+                  "cpu",
+                  "gamepad",
+                  "wrench",
+                  "shield",
+                  "bolt",
+                  "globe",
+                  "music",
+                  "image",
+                  "code",
+                  "list",
+                  "star",
+                  "clock",
+                  "folder"
+                ],
+                "default": "puzzle"
+              },
+              "entry": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*\\.html$"
+              }
+            }
+          }
+        },
+        "widgets": {
+          "type": "array",
+          "maxItems": 4,
+          "description": "Cards on the DarkHub dashboard.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "entry"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+              },
+              "title": {
+                "$ref": "#/$defs/text"
+              },
+              "entry": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*\\.html$"
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 80,
+                "maximum": 480,
+                "default": 180
+              }
+            }
+          }
+        }
+      }
+    },
+    "files": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 64,
+      "description": "Extensions only. The source files, as text: path -> content. Allowed: .html .js .css .json .svg .md .txt. Scripts and styles are inlined into each page; there is no network loading of code.",
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*\\.(html|js|css|json|svg|md|txt)$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 1048576
+      }
+    }
+  },
+  "$defs": {
+    "text": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 60
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "pt-BR": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 60
+            },
+            "en-US": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 60
+            }
+          }
+        }
+      ]
+    },
+    "longText": {
+      "oneOf": [
+        {
+          "type": "string",
+          "maxLength": 600
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "pt-BR": {
+              "type": "string",
+              "maxLength": 600
+            },
+            "en-US": {
+              "type": "string",
+              "maxLength": 600
+            }
+          }
+        }
+      ]
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "description": "All listed keys must match (AND). A value can be a single value, a list (any of) or a numeric range {gte, lte, gt, lt}.",
+      "properties": {
+        "os.build": {
+          "$ref": "#/$defs/numberMatch",
+          "description": "Windows build number, e.g. 22631 (23H2), 26100 (24H2), 26200 (25H2)."
+        },
+        "cpu.vendor": {
+          "$ref": "#/$defs/enumMatch",
+          "description": "'intel' or 'amd'."
+        },
+        "gpu.vendor": {
+          "$ref": "#/$defs/enumMatch",
+          "description": "Vendor of any GPU in the PC: 'nvidia', 'amd' or 'intel'."
+        },
+        "gpu.dedicated": {
+          "type": "boolean",
+          "description": "true when the PC has a dedicated NVIDIA or AMD Radeon card."
+        },
+        "chassis": {
+          "$ref": "#/$defs/enumMatch",
+          "description": "'laptop' or 'desktop'."
+        },
+        "ram.gb": {
+          "$ref": "#/$defs/numberMatch",
+          "description": "Installed RAM in GB, e.g. {\"gte\": 16}."
+        },
+        "net.wired": {
+          "type": "boolean",
+          "description": "true when an Ethernet adapter is connected."
+        },
+        "darkos": {
+          "type": "boolean",
+          "description": "true on DarkOS."
+        }
+      }
+    },
+    "numberMatch": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "type": "number"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "gte": {
+              "type": "number"
+            },
+            "lte": {
+              "type": "number"
+            },
+            "gt": {
+              "type": "number"
+            },
+            "lt": {
+              "type": "number"
+            }
+          }
+        }
+      ]
+    },
+    "enumMatch": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "intel",
+            "amd",
+            "nvidia",
+            "laptop",
+            "desktop"
+          ]
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": {
+            "type": "string",
+            "enum": [
+              "intel",
+              "amd",
+              "nvidia",
+              "laptop",
+              "desktop"
+            ]
+          }
+        }
+      ]
+    },
+    "common": {
+      "type": "object",
+      "properties": {
+        "if": {
+          "$ref": "#/$defs/condition",
+          "description": "Apply this item only when the condition matches. Example: {\"chassis\": \"desktop\"}."
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Why this item is here, shown next to it in DarkHub."
+        }
+      }
+    },
+    "item": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "use"
+          ],
+          "description": "Use a built-in DarkHub tweak by id. DarkHub's own definition, snapshot and revert are used. The list of ids is in docs/hub/BUILTIN.md.",
+          "properties": {
+            "use": {
+              "type": "string",
+              "pattern": "^darkhub:tweak:[A-Za-z0-9]+$",
+              "examples": [
+                "darkhub:tweak:disableGameDvr",
+                "darkhub:tweak:showFileExtensions"
+              ]
+            },
+            "if": {
+              "$ref": "#/$defs/condition"
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op"
+          ],
+          "description": "Run a built-in DarkHub operation by id (power plan, network, services, timer, cleanup...). Reversible operations are undone on uninstall with their own revert; one-time actions (cleanup, DNS flush) just run. The list, and which operations packages may use, is in docs/hub/BUILTIN.md.",
+          "properties": {
+            "op": {
+              "type": "string",
+              "pattern": "^darkhub:op:[A-Za-z0-9]+$",
+              "examples": [
+                "darkhub:op:powerPlanUltimate",
+                "darkhub:op:networkExtreme",
+                "darkhub:op:cleanTemp"
+              ]
+            },
+            "if": {
+              "$ref": "#/$defs/condition"
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "registry"
+          ],
+          "description": "Set or delete one registry value (or delete a key). DarkHub records the previous value and restores it on uninstall.",
+          "properties": {
+            "registry": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "maxLength": 300,
+                  "pattern": "^(HKCU|HKLM)\\\\[^\\\\/:*?\"<>|][^:*?\"<>|]*[^\\\\]$",
+                  "description": "Key path starting with HKCU\\ or HKLM\\, backslash separated, no trailing backslash. In JSON every backslash is written twice.",
+                  "examples": [
+                    "HKCU\\System\\GameConfigStore",
+                    "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\GameDVR"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "description": "Value name. Use \"\" for the key's (Default) value. Omit only with deleteKey."
+                },
+                "type": {
+                  "enum": [
+                    "dword",
+                    "qword",
+                    "string",
+                    "expandString",
+                    "multiString",
+                    "binary"
+                  ],
+                  "description": "Registry type. dword/qword take numbers, multiString takes a list of strings, binary takes hex like \"00ff10\"."
+                },
+                "value": {
+                  "description": "The value to write. Numbers for dword/qword; text for string/expandString; list of texts for multiString; hex text for binary.",
+                  "oneOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    {
+                      "type": "array",
+                      "maxItems": 50,
+                      "items": {
+                        "type": "string",
+                        "maxLength": 500
+                      }
+                    }
+                  ]
+                },
+                "delete": {
+                  "const": true,
+                  "description": "Delete this value instead of writing it."
+                },
+                "deleteKey": {
+                  "const": true,
+                  "description": "Delete the whole key. Use rarely: DarkHub can only restore the values it captured."
+                }
+              },
+              "oneOf": [
+                {
+                  "required": [
+                    "name",
+                    "type",
+                    "value"
+                  ],
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "delete"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "deleteKey"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "required": [
+                    "name",
+                    "delete"
+                  ],
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "type"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "value"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "deleteKey"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "required": [
+                    "deleteKey"
+                  ],
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "name"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "type"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "value"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "delete"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "if": {
+              "$ref": "#/$defs/condition"
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "service"
+          ],
+          "description": "Change how a Windows service starts. The previous start type is restored on uninstall. Security services cannot be changed by packages.",
+          "properties": {
+            "service": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "startType"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_.-]{2,80}$",
+                  "description": "Service name (not the display name), e.g. DiagTrack, SysMain, XblGameSave."
+                },
+                "startType": {
+                  "enum": [
+                    "automatic",
+                    "automaticDelayed",
+                    "manual",
+                    "disabled"
+                  ],
+                  "description": "New start type."
+                },
+                "stop": {
+                  "type": "boolean",
+                  "description": "Also stop the service now (otherwise the change takes effect after a restart)."
+                }
+              }
+            },
+            "if": {
+              "$ref": "#/$defs/condition"
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "task"
+          ],
+          "description": "Enable or disable a scheduled task. The previous state is restored on uninstall.",
+          "properties": {
+            "task": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path",
+                "name",
+                "state"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "pattern": "^\\\\([^\\\\:*?\"<>|]+\\\\)*$",
+                  "maxLength": 200,
+                  "description": "Task folder, starting and ending with a backslash, e.g. \\Microsoft\\Windows\\Application Experience\\."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "pattern": "^[^\\\\:*?\"<>|]+$",
+                  "description": "Task name inside the folder."
+                },
+                "state": {
+                  "enum": [
+                    "enabled",
+                    "disabled"
+                  ]
+                }
+              }
+            },
+            "if": {
+              "$ref": "#/$defs/condition"
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "module",
+              "preset"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "items"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "files"
+              ]
+            },
+            {
+              "required": [
+                "contributes"
+              ]
+            },
+            {
+              "required": [
+                "permissions"
+              ]
+            },
+            {
+              "required": [
+                "network"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "extension"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "contributes",
+          "files"
+        ],
+        "not": {
+          "required": [
+            "items"
+          ]
+        }
+      }
+    }
+  ]
+}

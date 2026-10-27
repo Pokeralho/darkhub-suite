@@ -1,0 +1,22 @@
+{
+  "$schema": "https://darkhub.ink/schema/v1.json",
+  "schemaVersion": 1,
+  "type": "preset",
+  "id": "pokeralho.laptop-quiet",
+  "version": "1.0.0",
+  "name": { "pt-BR": "Notebook silencioso", "en-US": "Quiet laptop" },
+  "description": {
+    "pt-BR": "Para notebooks: menos tarefas em segundo plano, porcentagem da bateria na barra de tarefas e sem apps rodando escondidos. Não aparece em desktops.",
+    "en-US": "For laptops: fewer background tasks, battery percentage on the taskbar and no apps running hidden. Does not show up on desktops."
+  },
+  "author": { "github": "Pokeralho" },
+  "tags": ["laptop", "battery"],
+  "minApp": "0.7.3",
+  "when": { "chassis": "laptop" },
+  "items": [
+    { "use": "darkhub:tweak:batteryPercentage" },
+    { "use": "darkhub:tweak:disableBackgroundApps" },
+    { "use": "darkhub:tweak:disableDeliveryOptimization", "note": "Stops uploading Windows updates to other PCs." },
+    { "registry": { "path": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Search", "name": "BackgroundAppGlobalToggle", "type": "dword", "value": 0 } }
+  ]
+}

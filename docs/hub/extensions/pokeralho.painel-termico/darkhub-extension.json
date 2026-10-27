@@ -1,0 +1,21 @@
+{
+  "$schema": "https://darkhub.ink/schema/v1.json",
+  "schemaVersion": 1,
+  "type": "extension",
+  "id": "pokeralho.painel-termico",
+  "version": "1.0.0",
+  "name": { "pt-BR": "Painel térmico", "en-US": "Thermal panel" },
+  "description": {
+    "pt-BR": "Gráfico ao vivo de temperatura e uso de CPU e GPU, com os picos da sessão e um alerta quando a GPU passa do limite que você escolher.",
+    "en-US": "Live chart of CPU and GPU temperature and load, with the session peaks and an alert when the GPU goes over the limit you pick."
+  },
+  "author": { "github": "Pokeralho", "name": "Pokeralho" },
+  "license": "MIT",
+  "tags": ["temperature", "monitor", "gpu", "cpu"],
+  "minApp": "0.7.3",
+  "permissions": ["sensors", "storage", "notifications"],
+  "contributes": {
+    "pages": [{ "id": "main", "title": { "pt-BR": "Painel térmico", "en-US": "Thermal panel" }, "icon": "gauge", "entry": "index.html" }],
+    "widgets": [{ "id": "now", "title": { "pt-BR": "Temperaturas agora", "en-US": "Temperatures now" }, "entry": "widget.html" }]
+  }
+}

@@ -30,6 +30,13 @@ export function registerOverlayIPC({ app, ipcMain, BrowserWindow, screen, global
   handle('overlay:show', ({ pid }) => get().show({ pid: pid ? Number(pid) : null }))
   handle('overlay:hide', () => get().hide())
   handle('overlay:setSettings', (patch) => get().setSettings(patch))
+  // layout editor
+  handle('overlay:layouts', () => get().layoutsState())
+  handle('overlay:saveLayout', ({ layout }) => get().saveLayout(layout))
+  handle('overlay:newLayout', ({ preset }) => get().newLayout(String(preset || 'rivatuner')))
+  handle('overlay:deleteLayout', ({ id }) => get().deleteLayout(String(id)))
+  handle('overlay:activateLayout', ({ id }) => get().activateLayout(String(id)))
+  handle('overlay:preview', ({ layout }) => get().preview(layout))
   handle('overlay:processes', async () => {
     const list = await nativeLatencyClient.listProcesses().catch(() => null)
     return { ok: Boolean(list), processes: (list?.processes || []).filter((p) => p.pid > 4 && p.wsMb >= 150).sort((a, b) => b.wsMb - a.wsMb).slice(0, 40) }

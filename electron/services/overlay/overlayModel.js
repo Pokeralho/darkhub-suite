@@ -1,7 +1,7 @@
 // Overlay settings and the rows it shows. Pure.
 
 export const METRICS = ['fps', 'low1', 'frametime', 'graph', 'cpu', 'cpuTemp', 'gpu', 'gpuTemp', 'vram', 'gpuClock', 'ram', 'cpuPower', 'latency']
-export const LAYOUTS = ['compact', 'advanced', 'oc']
+export const LAYOUTS = ['compact', 'advanced', 'oc', 'custom']
 export const DEFAULTS = {
   layout: 'compact',
   position: 'tl',
@@ -97,9 +97,9 @@ export function buildPanel(layout, frames, session, hw, sensors, history, labels
   const gpuLoad = gpu.load ?? sensors?.gpu
   const gpuTemp = gpu.temp ?? sensors?.gpuTemp
   // CPU load from Windows' own counters first: LHM reports 100% on every thread on recent Windows 11 builds
-  const cpuLoad = sensors?.cpu ?? cpu.load
-  const threads = sensors?.cores?.length ? sensors.cores : cpu.threads
-  const loadMax = threads?.length ? Math.max(...threads) : cpu.loadMax
+  const cpuLoad = sensors?.cpu ?? null
+  const threads = sensors?.cores?.length ? sensors.cores : null
+  const loadMax = threads?.length ? Math.max(...threads) : null
   const cpuTemp = cpu.temp ?? sensors?.cpuTemp
   const vramMb = gpu.vramUsedMb ?? sensors?.vramMb
   const lines = []
@@ -136,14 +136,14 @@ export function buildPanel(layout, frames, session, hw, sensors, history, labels
   const graphs = []
   if (frames?.graph?.length) {
     const g = frames.graph
-    graphs.push({ title: L('frametime', 'Frametime'), color: COLORS.frame, values: g, unit: 'ms', floor: 0, ceil: Math.max(16.7, ...g),
+    graphs.push({ title: L('frametime', 'Frametime'), sources: [{ key: 'frametime', color: COLORS.frame }], mode: 'ft', color: COLORS.frame, values: g, unit: 'ms', floor: 0, ceil: Math.max(16.7, ...g),
       info: `${L('avg', 'avg')} ${f(g.reduce((a, b) => a + b, 0) / g.length, 1)} · ${L('max', 'max')} ${f(Math.max(...g), 1)} ms` })
   }
   if (oc) {
     const h = history || {}
-    if (h.fps?.length) graphs.push({ title: 'FPS', color: COLORS.fps, values: h.fps, unit: '', floor: 0, ceil: Math.max(60, ...h.fps), info: `${f(Math.min(...h.fps))} – ${f(Math.max(...h.fps))}` })
-    if (h.gpu?.length || h.cpu?.length) graphs.push({ title: L('load', 'Load %'), series: [{ color: COLORS.gpu, values: h.gpu || [] }, { color: COLORS.cpu, values: h.cpu || [] }], floor: 0, ceil: 100, info: 'GPU · CPU' })
-    if (h.gpuTemp?.length || h.cpuTemp?.length) graphs.push({ title: L('temps', 'Temp °C'), series: [{ color: COLORS.gpu, values: h.gpuTemp || [] }, { color: COLORS.cpu, values: h.cpuTemp || [] }], floor: 30, ceil: 100, info: 'GPU · CPU' })
+    if (h.fps?.length) graphs.push({ title: 'FPS', sources: [{ key: 'fps', color: COLORS.fps }], mode: 'fps', color: COLORS.fps, values: h.fps, unit: '', floor: 0, ceil: Math.max(60, ...h.fps), info: `${f(Math.min(...h.fps))} – ${f(Math.max(...h.fps))}` })
+    if (h.gpu?.length || h.cpu?.length) graphs.push({ title: L('load', 'Load %'), sources: [{ key: 'gpu.load', color: COLORS.gpu }, { key: 'cpu.load', color: COLORS.cpu }], mode: 'pct', series: [{ color: COLORS.gpu, values: h.gpu || [] }, { color: COLORS.cpu, values: h.cpu || [] }], floor: 0, ceil: 100, info: 'GPU · CPU' })
+    if (h.gpuTemp?.length || h.cpuTemp?.length) graphs.push({ title: L('temps', 'Temp °C'), sources: [{ key: 'gpu.temp', color: COLORS.gpu }, { key: 'cpu.temp', color: COLORS.cpu }], mode: 'temp', series: [{ color: COLORS.gpu, values: h.gpuTemp || [] }, { color: COLORS.cpu, values: h.cpuTemp || [] }], floor: 30, ceil: 100, info: 'GPU · CPU' })
   }
 
   const stats = []

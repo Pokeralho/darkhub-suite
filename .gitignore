@@ -119,4 +119,7 @@ desktop.ini
 
 
 # graphify (keep report/graph, skip cache)
-graphify-out/cache/
+
+
+# graphify code map: generated locally by `npm run map`, not versioned
+graphify-out/

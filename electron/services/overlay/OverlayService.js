@@ -7,16 +7,19 @@ import { fileURLToPath } from 'node:url'
 import { FrameWindow, SessionStats } from './frameStats.js'
 import { normalizeSettings, readSensors, buildRows, buildPanel } from './overlayModel.js'
 import { readLhm } from './lhmModel.js'
+import { normalizeLayout, renderLayout, fromPreset, sampleContext, PRESETS, METRICS, SERIES } from './customModel.js'
 
 const PAGE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets', 'overlay', 'overlay.html')
 const FOLLOW_MS = 2000
 const HISTORY = 120 // samples kept for the overclocker graphs (one per refresh)
+const STREAM_MS = 33 // frame times go to the overlay ~30 times a second; the page draws graphs at the display's rate
 const DEFAULT_LABELS = { fps: 'FPS', low1: '1% low', frametime: 'Frame', latency: 'Latência', cpuTemp: 'CPU °C', cpuPower: 'CPU W', gpuTemp: 'GPU °C', gpuClock: 'GPU clk' }
 
 export class OverlayService {
   constructor({ app, BrowserWindow, screen, globalShortcut, presentMon, hardware, native, onEvent, lhmSource }) {
     Object.assign(this, { app, BrowserWindow, screen, globalShortcut, presentMon, hardware, native, onEvent })
     this.lhm = null
+    this.pendingFt = []
     this.sessionStats = new SessionStats()
     this.history = { fps: [], cpu: [], gpu: [], cpuTemp: [], gpuTemp: [] }
     // full LibreHardwareMonitor tree (clocks, power, voltages, fans) for the advanced layouts
@@ -35,15 +38,71 @@ export class OverlayService {
     let saved = {}
     try { saved = JSON.parse(fs.readFileSync(this.file, 'utf8')) } catch { /* defaults */ }
     this.settings = normalizeSettings(saved)
+    // layouts made in the editor
+    this.layoutsFile = path.join(app.getPath('userData'), 'overlay-layouts.json')
+    let store = {}
+    try { store = JSON.parse(fs.readFileSync(this.layoutsFile, 'utf8')) } catch { /* first use */ }
+    this.layouts = (Array.isArray(store.layouts) ? store.layouts : []).slice(0, 50).map(normalizeLayout)
+    if (!this.layouts.length) this.layouts = [fromPreset('rivatuner')]
+    this.activeLayout = this.layouts.some((l) => l.id === store.active) ? store.active : this.layouts[0].id
     this.labels = { ...DEFAULT_LABELS, ...(saved.labels || {}) }
     presentMon.on('frame', (f) => {
       if (this.target && f.pid !== this.target.pid) return
       this.window.push(f)
       this.sessionStats.push(f.msBetweenPresents)
+      if (this.visible && f.msBetweenPresents > 0 && this.pendingFt.length < 4000) this.pendingFt.push(Math.round(f.msBetweenPresents * 100) / 100)
       if (f.msBetweenPresents > 0 && this.session.length < 500000) this.session.push(f.msBetweenPresents)
     })
     presentMon.on('exit', ({ error }) => { if (error) this.error = error; this._emit() })
     this._bindHotkey()
+  }
+
+  _saveLayouts() { fs.writeFileSync(this.layoutsFile, JSON.stringify({ active: this.activeLayout, layouts: this.layouts }, null, 1)) }
+
+  layoutsState() {
+    return {
+      ok: true, active: this.activeLayout, layouts: this.layouts,
+      presets: Object.fromEntries(Object.entries(PRESETS).map(([k, p]) => [k, p.name])),
+      metrics: Object.entries(METRICS).map(([key, m]) => ({ key, group: m.group, label: m.label, unit: m.unit, decimals: m.d })),
+      series: Object.entries(SERIES).map(([key, x]) => ({ key, label: x.label }))
+    }
+  }
+
+  saveLayout(model) {
+    const l = normalizeLayout(model)
+    const i = this.layouts.findIndex((x) => x.id === l.id)
+    if (i >= 0) this.layouts[i] = l
+    else { if (this.layouts.length >= 50) throw new Error('Limite de 50 layouts'); this.layouts.push(l) }
+    this._saveLayouts()
+    return { ...this.layoutsState(), saved: l }
+  }
+
+  newLayout(preset) {
+    const l = fromPreset(preset)
+    if (this.layouts.some((x) => x.name === l.name)) l.name = `${l.name} ${this.layouts.length + 1}`
+    return this.saveLayout(l)
+  }
+
+  deleteLayout(id) {
+    if (this.layouts.length <= 1) throw new Error('Mantenha ao menos um layout')
+    this.layouts = this.layouts.filter((x) => x.id !== id)
+    if (this.activeLayout === id) this.activeLayout = this.layouts[0].id
+    this._saveLayouts()
+    return this.layoutsState()
+  }
+
+  activateLayout(id) {
+    if (!this.layouts.some((x) => x.id === id)) throw new Error('Layout não encontrado')
+    this.activeLayout = id
+    this._saveLayouts()
+    this.setSettings({ layout: 'custom' })
+    return this.layoutsState()
+  }
+
+  /** Editor preview: the layout drawn with live data when the overlay runs, otherwise with sample numbers. */
+  preview(model) {
+    const live = this.visible && this._ctx ? this._ctx : null
+    return { ok: true, live: Boolean(live), ...renderLayout(model, { ...(live || sampleContext()), labels: this.labels }) }
   }
 
   _save() { fs.writeFileSync(this.file, JSON.stringify({ ...this.settings, labels: this.labels }, null, 1)) }
@@ -119,6 +178,7 @@ export class OverlayService {
 
   hide() {
     this._stopLoop()
+    this.pendingFt = []
     this.presentMon.stop()
     this._closeSession()
     this.hardware.releaseSensors('overlay')
@@ -170,26 +230,49 @@ export class OverlayService {
   _restartLoop() {
     this._stopLoop()
     this.timers.push(setInterval(() => this._render(), this.settings.intervalMs))
+    this.timers.push(setInterval(() => this._stream(), STREAM_MS))
     if (this.mode === 'foreground') this.timers.push(setInterval(() => { void this._follow() }, FOLLOW_MS))
   }
 
   _stopLoop() { for (const t of this.timers) clearInterval(t); this.timers = [] }
 
+  _stream() {
+    if (!this.win || this.win.isDestroyed() || !this.visible || !this.pendingFt.length) return
+    const ft = this.pendingFt
+    this.pendingFt = []
+    this.win.webContents.executeJavaScript(`window.__stream && window.__stream({ft:[${ft.join(',')}]})`).catch(() => {})
+  }
+
   _render() {
     if (!this.win || this.win.isDestroyed() || !this.visible) return
     const frames = this.window.stats()
     const sensors = readSensors(this.hardware.snapshot())
+    const hw = this.lhm && Date.now() - (this.lhm.at || 0) < 10000 ? this.lhm : null
+    // current values for the page's own time-based graphs (fps, loads, temperatures)
+    const live = {
+      fps: frames?.fps ?? null, 'gpu.load': hw?.gpu?.load ?? sensors.gpu ?? null, 'cpu.load': sensors.cpu ?? null,
+      'gpu.temp': hw?.gpu?.temp ?? sensors.gpuTemp ?? null, 'cpu.temp': hw?.cpu?.temp ?? sensors.cpuTemp ?? null
+    }
     let data
     if (this.settings.layout === 'compact') {
       const rows = buildRows(this.settings, frames, sensors, this.labels)
-      data = { settings: this.settings, rows, graph: this.settings.metrics.includes('graph') && frames ? frames.graph : null }
+      data = { settings: this.settings, live, rows, graph: this.settings.metrics.includes('graph') && frames ? 1 : 0 }
     } else {
-      const hw = this.lhm && Date.now() - (this.lhm.at || 0) < 10000 ? this.lhm : null
       const h = this.history
       const add = (k, x) => { if (x != null && Number.isFinite(Number(x))) { h[k].push(Number(x)); if (h[k].length > HISTORY) h[k].shift() } }
-      add('fps', frames?.fps); add('cpu', sensors.cpu ?? hw?.cpu?.load); add('gpu', hw?.gpu?.load ?? sensors.gpu)
+      add('fps', frames?.fps); add('cpu', sensors.cpu); add('gpu', hw?.gpu?.load ?? sensors.gpu)
       add('cpuTemp', hw?.cpu?.temp ?? sensors.cpuTemp); add('gpuTemp', hw?.gpu?.temp ?? sensors.gpuTemp)
-      data = { settings: this.settings, panel: buildPanel(this.settings.layout, frames, this.sessionStats.stats(), hw, sensors, h, this.labels) }
+      const session = this.sessionStats.stats()
+      this._ctx = { frames, session, hw, sensors, history: h }
+      if (this.settings.layout === 'custom') {
+        const layout = this.layouts.find((l) => l.id === this.activeLayout) || this.layouts[0]
+        data = { settings: this.settings, live, custom: renderLayout(layout, { ...this._ctx, labels: this.labels }, { values: false }) }
+      } else {
+        const panel = buildPanel(this.settings.layout, frames, session, hw, sensors, h, this.labels)
+        // the page plots the streams itself: the points are not sent
+        panel.graphs = panel.graphs.map(({ values, series, ...g }) => g)
+        data = { settings: this.settings, live, panel }
+      }
     }
     this.win.webContents.executeJavaScript(`window.__overlay && window.__overlay(${JSON.stringify(data)})`).catch(() => {})
     this._log(frames, sensors)

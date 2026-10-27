@@ -222,7 +222,7 @@ select option { background: var(--color-zinc-900); color: var(--color-zinc-100);
 
 input[type="range"] { accent-color: var(--color-blue-400); cursor: pointer; }
 
-/* ---------------------------------------------------------------- component vocabulary (see DESIGN.md) */
+/* ---------------------------------------------------------------- component vocabulary (see docs/DESIGN.md) */
 @layer components {
   .dh-card {
     border: 1px solid oklch(0.262 0.012 255 / 0.8);

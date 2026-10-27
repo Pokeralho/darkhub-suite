@@ -6,6 +6,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-10-27
+
+### Added
+- DarkHub packages (modules and presets), phase 0 of the open Hub: JSON files that describe Windows changes as data
+  (built-in tweaks by id, registry values, service start types, scheduled tasks) with hardware conditions (Windows
+  build, CPU/GPU vendor, dedicated GPU, laptop/desktop, RAM, Ethernet, DarkOS). New screen "Presets e módulos": open a
+  file or paste JSON, see every change with this PC's current value next to the new one, install, remove and restore,
+  and "Create a preset from my PC". Installing saves every original value, verifies after applying and rolls back on
+  failure; removing restores exactly (values that did not exist are deleted again). Packages are checked against a
+  JSON Schema (electron/services/hub/schema/v1.json) and security rules: no Defender, UAC, firewall, Windows Update,
+  startup persistence, code loading or essential/security services, and no scripts. Risk is computed, not declared.
+- DarkHub Hub (hub.darkhub.ink): "Presets e módulos" now has a Catalog tab that searches the Hub, filters "only the ones
+  for this PC" by hardware, opens any package in the same preview and installs it. Every download is checked against its
+  SHA-256 and the Hub's Ed25519 signature (`id@version:sha256:tier`, public key embedded in the app) before anything is
+  shown or installed; tiers official/verified/community. Installed Hub packages get update checks and a one-click update
+  (the old version is restored if the new one fails). `darkhub://hub/install?id=...` links from the site open the
+  preview in DarkHub (never install by themselves). A development server can be set in the tab; it counts as community
+  unless it signs with the official key. Twenty official presets (gaming, privacy, interface, laptop, cleanup...).
+- Packages can run the Optimizer's operations (`{ "op": "darkhub:op:<id>" }`): reversible ones are undone on removal
+  (and left alone when they were already active), one-time actions just run, operations that only wrap built-in tweaks
+  are installed as those tweaks, security/irreversible ones are official-only and the ones with no way back are refused.
+  If any step fails, everything the package did is undone. "Create a preset from my PC" includes active operations.
+- Extensions: packages of type "extension" add new screens (sidebar section Extensões) and Dashboard cards written in
+  HTML/CSS/JS, with no build step. They run in a sandboxed frame on their own `darkhub-ext://` origin with a strict CSP
+  (no Node, files, direct network, remote code or navigation) and reach DarkHub only through `window.darkhub`, which the
+  main process answers per declared permission: storage, hardware, sensors (no process names), tweaks.read, network
+  (declared https origins only), notifications, clipboard, packages (installs go through the package engine and the
+  user approves each one). Development: load a folder that reloads on save, a console per extension, `npm run ext:new`
+  and `npm run ext:pack`, and MCP tools to load, reload and read logs. Example: pokeralho.painel-termico.
+- MCP server for AI assistants (Presets e módulos > IA (MCP), off by default): Claude Code (HTTP) and Claude Desktop
+  (stdio bridge `DarkHub.Mcp.exe`) can read the PC's hardware, list built-in tweaks/operations, validate and preview
+  packages, search the Hub and install, update or remove packages. Loopback only, token required, browser origins
+  refused, and every change waits for the user to approve it in a DarkHub window. See docs/hub/MCP.md.
+- Documentation for creating packages with AI: docs/AGENTS.md, docs/hub/README.md (full spec), docs/hub/BUILTIN.md
+  (generated list of the 66 built-in tweaks and what they write), docs/hub/PROMPTS.md (ready prompts in Portuguese and
+  English), three example packages, and `npm run hub:validate` (same checks as the app, explains each change).
+- Overlay editor (In-game overlay > Open the overlay editor): build your own overlay from blocks (metrics line, big
+  value, graph with up to 4 lines, per-thread bars, statistics table, text, separator, spacer) bound to ~45 metrics
+  (FPS/frames, GPU, CPU, RAM, session, clock); per-value prefix, unit, decimals, color, size and warning/critical
+  thresholds; per-block style (colors, background, size, weight, alignment, padding, margin, corners, border, text
+  effect, letter spacing, opacity); theme (font, colors, background and opacity, border, corners, spacing, vertical
+  list or horizontal bar, text shadow); position by screen corner/center with offset, scale and opacity, or by
+  dragging in the preview; and free CSS with an id per block. Live preview (real numbers while the overlay is on) over
+  dark/bright/colorful backgrounds, at real size or on a 1920x1080 screen. Six templates (RivaTuner classic,
+  Overclocker, Top bar, FPS only, Neon, Compact), named layouts, duplicate, export/import as a code. Used in game as
+  the "Personalizado" layout. Imported layouts are sanitized and the overlay page loads nothing and runs no scripts.
+
+### Changed
+- Overlay graphs scroll smoothly: frame times stream to the overlay ~30 times a second and the page draws every graph
+  at the display's refresh rate on the game's own clock (frame time) or wall time (FPS, loads, temperatures), with an
+  easing vertical scale and animated thread bars. Canvases are kept between refreshes (only the text is replaced) and
+  drawn at the real pixel density (Windows scaling x overlay scale), so they stay sharp. Measured: ~0.05-0.08 ms per
+  frame for all graphs.
+- The editor's live preview refreshes every 300 ms.
+- Password vault browser extension: new look matching the app (DarkHub mark, cold neutrals, one accent), a title and
+  one line of help for every state (not running, pairing, locked, unsupported page, no logins), the pairing code shown
+  one digit per box, login rows with initials and a clear fill result, and an inline picker in the same style whose
+  messages follow the browser's language; extension icons. Same messages, permissions and security checks as before.
+  The extension now also has its own repository: https://github.com/Pokeralho/darkhub-vault-extension
+- Repository: contributor docs moved out of the root (`.github/CONTRIBUTING.md`, `.github/SECURITY.md`, `docs/`),
+  release scripts moved to `scripts/` and no longer tied to one folder, generated code maps no longer versioned,
+  Portuguese README, issue forms, "Why DarkHub needs administrator rights" section and contributor guide without the
+  native toolchain.
+
+### Fixed
+- Optimizer change sets kept "delete this value" as "write an empty text", and their read-back check treated a deleted
+  value as a failure; both now handle deletions.
+- Overlay CPU load and per-thread bars no longer fall back to LibreHardwareMonitor's load, which reads 100% on every
+  thread on recent Windows 11 builds; they show "—" for the first seconds until Windows' counters have a reading.
+
 ## [0.7.2] - 2026-10-26
 
 ### Added

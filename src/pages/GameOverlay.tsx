@@ -7,7 +7,7 @@ import type { OverlayStatus, OverlaySettings } from '../global';
 const METRICS = ['fps', 'low1', 'frametime', 'graph', 'latency', 'cpu', 'cpuTemp', 'cpuPower', 'gpu', 'gpuTemp', 'vram', 'gpuClock', 'ram'];
 const n = (v: number | null | undefined, d = 0) => (v == null || !Number.isFinite(v) ? '—' : v.toFixed(d));
 
-export default function GameOverlay() {
+export default function GameOverlay({ onNavigate }: { onNavigate?: (page: string) => void } = {}) {
   const { t } = useI18n();
   const [st, setSt] = useState<OverlayStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -34,6 +34,7 @@ export default function GameOverlay() {
       frames: t('ovl.l.frames', 'Quadros'), bound: t('ovl.l.bound', 'Limitado por'), presentMode: t('ovl.l.present', 'Apresentação')
     } })
       .then((s) => { if (s?.ok) { setSt(s); setHotkey(s.settings?.hotkey ?? ''); } });
+    void api()?.layouts().then((l) => { if (l?.ok) void api()?.setSettings({ labels: Object.fromEntries(l.metrics.map((m) => [`m.${m.key}`, t(`ovle.m.${m.key}`, m.label)])) }); });
     void api()?.processes().then((r) => setProcs(r?.processes ?? []));
     const off = api()?.onEvent((s) => setSt(s));
     const timer = setInterval(() => { void api()?.status().then((s) => s?.ok && setSt(s)); }, 1000);
@@ -131,11 +132,12 @@ export default function GameOverlay() {
           </div>
           <div>
             <p className="dh-label mb-2">{t('ovl.layout', 'Layout')}</p>
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {([
                 ['compact', t('ovl.layout.compact', 'Compacto'), t('ovl.layout.compactHelp', 'FPS e as métricas que você escolher, uma por linha.')],
                 ['advanced', t('ovl.layout.advanced', 'Avançado'), t('ovl.layout.advancedHelp', 'Estilo RivaTuner: uma linha por componente com uso, temperatura, clock e consumo, mais o gráfico de frame time.')],
-                ['oc', t('ovl.layout.oc', 'Overclocker'), t('ovl.layout.ocHelp', 'Tudo do Avançado mais voltagens, hotspot, ventoinha, % do TDP, gráficos de FPS, uso e temperatura, carga por thread e estatísticas da sessão (1%/0,1%, σ, engasgos, gargalo).')]
+                ['oc', t('ovl.layout.oc', 'Overclocker'), t('ovl.layout.ocHelp', 'Tudo do Avançado mais voltagens, hotspot, ventoinha, % do TDP, gráficos de FPS, uso e temperatura, carga por thread e estatísticas da sessão (1%/0,1%, σ, engasgos, gargalo).')],
+                ['custom', t('ovl.layout.custom', 'Personalizado'), t('ovl.layout.customHelp', 'O seu layout, montado no editor: blocos, cores, fontes, gráficos e CSS livre.')]
               ] as const).map(([id, name, help]) => (
                 <button key={id} type="button" onClick={() => void set({ layout: id })} aria-pressed={s.layout === id}
                   className={`text-left rounded-lg border p-3 ${s.layout === id ? 'border-blue-400/70 bg-zinc-800/60' : 'border-zinc-800 hover:border-zinc-700'}`}>
@@ -144,6 +146,7 @@ export default function GameOverlay() {
                 </button>
               ))}
             </div>
+            <button type="button" className="dh-btn dh-btn-sm mt-2" onClick={() => onNavigate?.('overlay-editor')}>{t('ovl.openEditor', 'Abrir o editor de overlay')}</button>
             {s.layout !== 'compact' ? <p className="dh-help mt-2">{t('ovl.layout.sensors', 'Clock, temperatura e consumo da CPU vêm dos sensores avançados (driver PawnIO, instalado com o DarkHub). Sem eles, esses campos aparecem como —.')}</p> : null}
           </div>
           {s.layout === 'compact' ? <div>

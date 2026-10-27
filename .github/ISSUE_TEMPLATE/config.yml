@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Questions, ideas and help (Discussions)
+    url: https://github.com/Pokeralho/darkhub-suite/discussions
+    about: The community forum. Ask questions, share packages and results, propose ideas.
   - name: Security vulnerability
     url: https://github.com/Pokeralho/darkhub-suite/security/advisories/new
-    about: Report vulnerabilities privately, not as a public issue.
+    about: Report vulnerabilities privately, not as a public issue. See the security policy (.github/SECURITY.md).

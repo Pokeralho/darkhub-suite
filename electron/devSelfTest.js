@@ -132,7 +132,7 @@ export async function run(listeners) {
 
   // ---------------------------------------------------------------- 2. every screen with the real backend
   // Without docs/map (e.g. a copied app folder) fall back to the known routes.
-  let routes = process.env.SELFTEST_SCENARIOS_ONLY ? [] : ['home', 'dashboard', 'darkos', 'optimizer', 'ultra-latency', 'darkpacer', 'optiscaler', 'dlss5', 'dll-injector', 'monitor', 'driver', 'networktools', 'setuphub', 'library', 'security', 'passwords', 'decryption', 'converter', 'downloads', 'youtube', 'ocr', 'metadata', 'texteditor', 'summarizer', 'autoclicker', 'devtools', 'powershell', 'luluflix', 'juuzou', 'savebackup', 'overlay', 'benchmark', 'startup', 'usb', 'maintenance', 'kakugan', 'settings']
+  let routes = process.env.SELFTEST_SCENARIOS_ONLY ? [] : ['home', 'dashboard', 'darkos', 'optimizer', 'ultra-latency', 'darkpacer', 'optiscaler', 'dlss5', 'dll-injector', 'monitor', 'driver', 'networktools', 'setuphub', 'library', 'security', 'passwords', 'decryption', 'converter', 'downloads', 'youtube', 'ocr', 'metadata', 'texteditor', 'summarizer', 'autoclicker', 'devtools', 'powershell', 'luluflix', 'juuzou', 'savebackup', 'overlay', 'benchmark', 'startup', 'usb', 'maintenance', 'kakugan', 'overlay-editor', 'presets', 'settings']
   try {
     const map = JSON.parse(fs.readFileSync(path.join(root, 'docs', 'map', 'map.json'), 'utf8'))
     if (!process.env.SELFTEST_SCENARIOS_ONLY) routes = [...new Set(['home', ...map.features.map((f) => f.id), 'settings'])]

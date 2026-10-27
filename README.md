@@ -18,9 +18,14 @@
 </p>
 
 <p align="center">
+  <b>English</b> · <a href="./README.pt-BR.md">Português</a>
+</p>
+
+<p align="center">
   <a href="#install">Install</a> ·
   <a href="#features">Features</a> ·
   <a href="#how-it-stays-safe">Safety</a> ·
+  <a href="#why-darkhub-needs-administrator-rights-and-what-the-sensitive-parts-do">Admin rights</a> ·
   <a href="#architecture">Architecture</a> ·
   <a href="#building-from-source">Build</a> ·
   <a href="#contributing">Contributing</a>
@@ -101,6 +106,73 @@ Full list of changes: [CHANGELOG.md](./CHANGELOG.md).
 
 ---
 
+## Why DarkHub needs administrator rights, and what the sensitive parts do
+
+A tool that changes Windows settings has to be trusted. This section explains, in plain terms, the parts that usually
+worry people. Everything here can be checked in the source code linked below.
+
+**Administrator rights.** The installed app asks for them when it starts (`requireAdministrator` in the Windows
+manifest). Most of what DarkHub does writes to places only an administrator can change: system registry keys
+(`HKLM`), Windows services, power plans, drivers, the firewall and the `hosts` file. If you start it without admin, it
+offers to reopen through the normal Windows UAC prompt, or to continue without admin with those features off
+([electron/services/ensureElevated.js](./electron/services/ensureElevated.js)).
+
+**DLL injector.** A developer and modding tool: it loads a `.dll` file you choose into a running process you name
+(the classic `CreateRemoteThread` + `LoadLibrary` technique, in
+[electron/DarkHub.Injector.ps1](./electron/DarkHub.Injector.ps1)). It does nothing on its own, never runs in the
+background and only acts when you click **Inject DLL** with both fields filled in. **Do not use it with online games
+protected by anti-cheat** (Easy Anti-Cheat, BattlEye, Vanguard, VAC and others): injecting into those games can get your
+account banned. Only inject DLLs you trust.
+
+**Microsoft Defender and security settings.** The Security screen can turn Defender's real-time protection off and back
+on. It only uses the supported mechanisms (Group Policy values and `Set-MpPreference`), saves the previous values
+first, and then asks Defender itself whether it changed. If Tamper Protection is on, DarkHub refuses and tells you how
+to change it yourself; if Defender stays on anyway, DarkHub undoes its changes
+([DefenderControlEngine.js](./electron/services/optimizer/DefenderControlEngine.js)). Your PC has no active antivirus
+while it is off, so turn it back on when you are done. Community packages
+([DarkHub packages](./docs/hub/README.md#5-what-packages-cannot-do)) are **not allowed** to touch Defender, UAC, the
+firewall, Windows Update, VBS or anything that runs at startup: the app and the validator refuse such a package as a
+whole.
+
+**PawnIO driver.** The *All sensors* panel (CPU temperatures, voltages, fans, SMBus) uses LibreHardwareMonitor, which
+needs a kernel driver to read those values. DarkHub uses [PawnIO](https://github.com/namazso/PawnIO.Setup), an
+open-source, signed driver made for this. The setup installs it from the official release; if that step is skipped,
+the app installs it when you turn the panel on. In both cases the file is checked against a pinned SHA-256 and a valid
+Authenticode signature before it runs ([build/deps/install-deps.ps1](./build/deps/install-deps.ps1),
+[pawnio.js](./electron/services/hwsensors/pawnio.js)).
+
+**ClamAV.** The setup also installs [ClamAV](https://www.clamav.net/), the open-source antivirus by Cisco Talos, from its
+official release (pinned SHA-256). It is used only by *Real-time protection*, which is **off** until you turn it on.
+
+**The one-line installer.** `irm https://raw.githubusercontent.com/Pokeralho/darkhub-suite/main/install.ps1 | iex`
+downloads [install.ps1](./install.ps1) from this repository and runs it. The script asks the GitHub API for the latest
+release, downloads the setup to your TEMP folder, compares its SHA-512 with the one published in that release's
+`latest.yml` (the same file the in-app updater uses) and aborts if they differ. Then it closes running DarkHub
+processes, runs the setup silently, opens the app and deletes the downloaded file. If a release has no `latest.yml`,
+the script says so and continues without that check. You can read the script before running it, or skip it entirely
+and install by hand.
+
+**Manual install and checking the file.** Download `DarkHub-Setup-x.y.z.exe` from the
+[releases page](https://github.com/Pokeralho/darkhub-suite/releases/latest) and run it. The installer is **not
+code-signed yet**, so Windows SmartScreen may show "Windows protected your PC"; click *More info* → *Run anyway* only
+after checking the file. To check it, compare its SHA-256 with the `sha256:` digest GitHub shows next to the asset on
+the release page:
+
+```powershell
+Get-FileHash .\DarkHub*Setup*.exe -Algorithm SHA256   # run it in the folder where you saved the file
+```
+
+**Signing and reproducible builds, honestly.** Releases are built on the maintainer's PC with
+[build-release.ps1](./scripts/build-release.ps1); they are not built in CI and not byte-for-byte reproducible yet (installer
+timestamps differ between builds). The small native helpers (`electron/services/*.exe`) are committed prebuilt so
+contributors do not need the .NET toolchain; each one is built from the `.cs` file next to it by `npm run build:native`,
+so you can rebuild them and read the source they come from. The plan, in order: build releases in GitHub Actions with
+[artifact attestations](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations) (so
+`gh attestation verify` proves an installer came from a given commit), then free open-source code signing
+([SignPath Foundation](https://signpath.org/)) so SmartScreen stops warning. Help with either is welcome.
+
+---
+
 ## How it stays safe
 
 - **Reversible by design**: tweaks store the original value before changing it, read it back to verify, and can be
@@ -125,7 +197,7 @@ Native     DarkHub.SensorDaemon (PDH, DXGI)      DarkHub.HwSensors (LibreHardwar
            native_pacer (Rust)                   yt-dlp, FFmpeg, ExifTool
 ```
 
-Code map for contributors: [docs/PROJECT_MAP.md](./docs/PROJECT_MAP.md). Design rules: [DESIGN.md](./DESIGN.md).
+Code map for contributors: [docs/PROJECT_MAP.md](./docs/PROJECT_MAP.md). Design rules: [DESIGN.md](./docs/DESIGN.md).
 
 ---
 
@@ -149,13 +221,29 @@ npm run build          # native helpers + renderer + installer
 
 Installers are written to `dist_release/` (`DarkHub Setup x.y.z.exe` and `DarkHub x.y.z-portable.exe`).
 
+**Where things are.** Contributor docs live in [.github/](./.github) (CONTRIBUTING, SECURITY) and [docs/](./docs)
+(design rules, translations, project map). Instructions for AI coding assistants are in [docs/AGENTS.md](./docs/AGENTS.md)
+and `.claude/`. Code maps are generated locally with `npm run map` (`docs/map/` and an unversioned `graphify-out/`).
+
 ---
 
 ## Contributing
 
-Bug reports, translations, security rules and pull requests are welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md),
-[TRANSLATIONS.md](./TRANSLATIONS.md) and [SECURITY_RULES.md](./SECURITY_RULES.md). To report a vulnerability, see
-[SECURITY.md](./SECURITY.md).
+Bug reports, translations, packages, security rules and pull requests are welcome. The native helpers are prebuilt
+and committed, so screens, translations, texts, tests and packages only need Node.js and npm. Read
+[CONTRIBUTING.md](.github/CONTRIBUTING.md) (it has a list of good first contributions), [TRANSLATIONS.md](./docs/TRANSLATIONS.md)
+and [docs/SECURITY_RULES.md](./docs/SECURITY_RULES.md). To report a vulnerability, see [SECURITY.md](.github/SECURITY.md).
+
+## Contributors
+
+Thanks to everyone who has helped with code, translations, packages and bug reports.
+
+<a href="https://github.com/Pokeralho/darkhub-suite/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Pokeralho/darkhub-suite" alt="DarkHub Suite contributors" />
+</a>
+
+Questions, ideas and help: [GitHub Discussions](https://github.com/Pokeralho/darkhub-suite/discussions) is the community
+forum. Use [issues](https://github.com/Pokeralho/darkhub-suite/issues) for bugs and concrete proposals.
 
 ## More from DarkHub
 

@@ -31,75 +31,253 @@
 <body>
 <div id="box"></div>
 <script>
-  // The main process calls window.__overlay(data) with already-formatted values; nothing here talks to Node.
+  // The main process calls window.__overlay(data) on every refresh (formatted text, layout) and window.__stream({ ft })
+  // about 30 times a second with the new frame times. Graphs are drawn here at the display's refresh rate, so they
+  // scroll smoothly instead of jumping once per refresh. Nothing here talks to Node.
   const box = document.getElementById('box')
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
-  const color = (c) => (/^#[0-9a-f]{6}$/i.test(c || '') ? c : '#e4e4e7')
+  const color = (c) => (/^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\))$/i.test(c || '') ? c : '#e4e4e7')
 
-  function line(canvas, values, col, floor, ceil, w, h) {
-    if (!values || values.length < 2) return
-    const c = canvas.getContext('2d')
-    const span = Math.max(1e-6, ceil - floor)
-    c.strokeStyle = col; c.lineWidth = 1.5; c.beginPath()
-    values.forEach((v, i) => {
-      const x = (i / (values.length - 1)) * w
-      const y = h - 1 - (Math.min(ceil, Math.max(floor, v)) - floor) / span * (h - 2)
-      i ? c.lineTo(x, y) : c.moveTo(x, y)
-    })
-    c.stroke()
+  // ------------------------------------------------------------------ data
+  // frame times on the game's own clock (sum of frame times), so the graph moves at game time
+  const FT = { t: [], v: [], clock: 0, edge: 0 }
+  const FT_KEEP = 12000
+  window.__stream = (d) => {
+    for (const ft of d.ft || []) {
+      if (!(ft > 0)) continue
+      FT.clock += ft
+      FT.t.push(FT.clock); FT.v.push(ft)
+    }
+    let cut = 0
+    while (cut < FT.t.length && FT.t[cut] < FT.clock - FT_KEEP) cut++
+    if (cut) { FT.t.splice(0, cut); FT.v.splice(0, cut) }
+  }
+  // sampled values (fps, loads, temperatures) on wall-clock time
+  const H = {}
+  const H_KEEP = 130000
+  function pushLive(live) {
+    const now = performance.now()
+    for (const [k, v] of Object.entries(live || {})) {
+      if (v == null || !Number.isFinite(Number(v))) continue
+      const a = (H[k] = H[k] || { t: [], v: [] })
+      a.t.push(now); a.v.push(Number(v))
+      while (a.t.length && a.t[0] < now - H_KEEP) { a.t.shift(); a.v.shift() }
+    }
   }
 
-  function renderPanel(p) {
-    let html = '<div class="adv">'
+  // ------------------------------------------------------------------ graph engine
+  // spec: { id, sources: [{ key, color }], mode: 'ft' | 'fps' | 'pct' | 'temp', height, width (0 = auto), fill, lineWidth, grid }
+  const graphs = new Map()
+  const bars = new Map()
+  let autoW = 200
+  let pixelScale = 1
+
+  function registerCanvases(list) {
+    graphs.clear(); bars.clear()
+    for (const c of list || []) {
+      if (c.kind === 'bars') bars.set(c.id, Object.assign({}, c, { cur: [], target: c.values || [] }))
+      else graphs.set(c.id, Object.assign({}, c, { ceil: null }))
+    }
+  }
+  function setBarTargets(values) { for (const b of bars.values()) b.target = values || [] }
+
+  function size(cv, W, Hh) {
+    const k = (window.devicePixelRatio || 1) * pixelScale
+    const bw = Math.round(W * k), bh = Math.round(Hh * k)
+    if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; cv.style.width = W + 'px'; cv.style.height = Hh + 'px' }
+    const ctx = cv.getContext('2d')
+    ctx.setTransform(k, 0, 0, k, 0, 0)
+    ctx.clearRect(0, 0, W, Hh)
+    return ctx
+  }
+
+  const FT_WINDOW = 4000      // ms of game time on screen
+  const HIST_WINDOW = 60000   // ms of wall time on screen
+  const HIST_LAG = 600        // history is drawn slightly behind so the newest segment slides in instead of popping
+
+  function visible(t, v, left, right) {
+    let i = 0
+    while (i < t.length && t[i] < left) i++
+    if (i > 0) i--
+    let j = t.length
+    while (j > 0 && t[j - 1] > right) j--
+    if (j < t.length) j++
+    return { t: t.slice(i, j), v: v.slice(i, j) }
+  }
+
+  function drawGraph(g, now) {
+    const cv = document.getElementById(g.id)
+    if (!cv) return
+    const W = g.width || autoW, Hh = g.height
+    const ctx = size(cv, W, Hh)
+    if (g.grid !== false) {
+      ctx.strokeStyle = 'rgba(161,161,170,0.16)'; ctx.lineWidth = 1
+      for (const y of [0.25, 0.5, 0.75]) { const py = Math.round(Hh * y) + 0.5; ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(W, py); ctx.stroke() }
+    }
+    const sets = g.sources.map((s) => {
+      if (s.key === 'frametime') {
+        const right = FT.edge, left = right - FT_WINDOW
+        return Object.assign({ s, left, span: FT_WINDOW }, visible(FT.t, FT.v, left, right))
+      }
+      const a = H[s.key] || { t: [], v: [] }
+      const right = now - HIST_LAG, left = right - HIST_WINDOW
+      return Object.assign({ s, left, span: HIST_WINDOW }, visible(a.t, a.v, left, right))
+    })
+    // the vertical scale eases toward its target instead of jumping
+    let floor = 0, target = 100
+    let vmax = 0
+    for (const x of sets) for (const v of x.v) if (v > vmax) vmax = v
+    if (g.mode === 'ft') target = Math.max(16.7, vmax * 1.15)
+    else if (g.mode === 'fps') target = Math.max(60, vmax * 1.12)
+    else if (g.mode === 'temp') { floor = 30; target = 100 }
+    g.ceil = g.ceil == null ? target : g.ceil + (target - g.ceil) * 0.08
+    const span = Math.max(1e-6, g.ceil - floor)
+    for (const x of sets) {
+      if (x.v.length < 2) continue
+      ctx.beginPath()
+      for (let i = 0; i < x.v.length; i++) {
+        const px = ((x.t[i] - x.left) / x.span) * W
+        const py = Hh - 1 - ((Math.min(g.ceil, Math.max(floor, x.v[i])) - floor) / span) * (Hh - 2)
+        if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py)
+      }
+      ctx.strokeStyle = color(x.s.color); ctx.lineWidth = g.lineWidth || 1.5; ctx.lineJoin = 'round'; ctx.stroke()
+      if (g.fill) {
+        const last = ((x.t[x.t.length - 1] - x.left) / x.span) * W, first = ((x.t[0] - x.left) / x.span) * W
+        ctx.lineTo(last, Hh); ctx.lineTo(first, Hh); ctx.closePath()
+        ctx.globalAlpha = 0.18; ctx.fillStyle = color(x.s.color); ctx.fill(); ctx.globalAlpha = 1
+      }
+    }
+  }
+
+  function drawBars(b, dt) {
+    const cv = document.getElementById(b.id)
+    if (!cv) return
+    const n = b.target.length
+    if (b.cur.length !== n) b.cur = b.target.slice()
+    const W = b.width || autoW, Hh = b.height
+    const ctx = size(cv, W, Hh)
+    const bw = W / Math.max(1, n), k = Math.min(1, dt / 140)
+    for (let i = 0; i < n; i++) {
+      b.cur[i] += (b.target[i] - b.cur[i]) * k
+      const v = Math.max(0, Math.min(100, b.cur[i])), h = Math.max(1, (v / 100) * Hh)
+      const cols = b.colors || []
+      ctx.fillStyle = color(v >= 95 ? cols[2] : v >= 80 ? cols[1] : cols[0])
+      ctx.fillRect(i * bw + 1, Hh - h, Math.max(1, bw - 2), h)
+    }
+  }
+
+  let lastFrame = performance.now()
+  function frame(now) {
+    const dt = Math.min(100, now - lastFrame)
+    lastFrame = now
+    // the frame-time view follows the game clock at real speed: bursts of frames from PresentMon are absorbed, and if
+    // it falls too far behind it jumps forward
+    FT.edge = Math.min(FT.clock, FT.edge + dt)
+    if (FT.clock - FT.edge > 600) FT.edge = FT.clock - 150
+    if (graphs.size || bars.size) {
+      for (const g of graphs.values()) drawGraph(g, now)
+      for (const b of bars.values()) drawBars(b, dt)
+    }
+    requestAnimationFrame(frame)
+  }
+  requestAnimationFrame(frame)
+
+  function measureAuto(scale) {
+    pixelScale = scale || 1
+    if (getComputedStyle(box).flexDirection === 'row' && box.classList.contains('custom')) { autoW = 160; return }
+    const texts = [...box.querySelectorAll('.w, .ln, .row, .st')].filter((e) => !e.classList.contains('w-graph') && !e.classList.contains('w-bars'))
+    let max = 0
+    for (const e of texts) max = Math.max(max, e.getBoundingClientRect().width)
+    autoW = Math.max(150, Math.round(max / pixelScale))
+  }
+
+  // ------------------------------------------------------------------ layouts
+  // The structure (and its canvases) is rebuilt only when it changes; every refresh replaces just the text.
+  let lastSig = ''
+
+  function renderPanel(p, scale) {
+    const sig = 'panel|' + p.graphs.map((g) => g.title + g.sources.map((s) => s.key + s.color).join()).join('|') + '|' + (p.threads ? 1 : 0) + '|' + (p.stats.length ? 1 : 0)
+    if (sig !== lastSig) {
+      lastSig = sig
+      let html = '<div class="adv"><div id="lines"></div>'
+      p.graphs.forEach((g, i) => { html += `<div class="gr"><div class="gh"><span>${esc(g.title)}</span><span id="gi${i}"></span></div><canvas id="g${i}"></canvas></div>` })
+      if (p.threads) html += `<div class="gr"><div class="gh"><span>${esc(p.threadsLabel || 'Threads')}</span><span id="thn"></span></div><canvas id="th"></canvas></div>`
+      if (p.stats.length) html += '<div class="sep"></div><div class="st" id="stats"></div>'
+      box.innerHTML = html + '</div>'
+      registerCanvases(p.graphs.map((g, i) => ({ id: 'g' + i, kind: 'graph', sources: g.sources, mode: g.mode, height: 40, grid: true }))
+        .concat(p.threads ? [{ id: 'th', kind: 'bars', height: 26, colors: ['#60a5fa', '#fbbf24', '#f87171'], values: p.threads }] : []))
+    }
+    let lines = ''
     for (const l of p.lines) {
-      html += `<div class="ln${l.big ? ' big' : ''}"><span class="tag" style="color:${color(l.color)}">${esc(l.tag)}</span><span class="cells">`
-      html += l.cells.map((c) => `<span class="c ${c.t || ''}">${c.p ? `<span class="u p">${esc(c.p)}</span>` : ''}${esc(c.v)}<span class="u">${esc(c.u)}</span></span>`).join('')
-      html += '</span></div>'
+      lines += `<div class="ln${l.big ? ' big' : ''}"><span class="tag" style="color:${color(l.color)}">${esc(l.tag)}</span><span class="cells">`
+      lines += l.cells.map((c) => `<span class="c ${c.t || ''}">${c.p ? `<span class="u p">${esc(c.p)}</span>` : ''}${esc(c.v)}<span class="u">${esc(c.u)}</span></span>`).join('')
+      lines += '</span></div>'
     }
-    p.graphs.forEach((g, i) => {
-      html += `<div class="gr"><div class="gh"><span>${esc(g.title)}</span><span>${esc(g.info || '')}</span></div><canvas id="g${i}" height="40"></canvas></div>`
-    })
-    if (p.threads) html += `<div class="gr"><div class="gh"><span>${esc(p.threadsLabel || 'Threads')}</span><span>${p.threads.length}</span></div><canvas id="th" height="26"></canvas></div>`
-    if (p.stats.length) html += '<div class="sep"></div><div class="st">' + p.stats.map(([k, v]) => `<span class="sk">${esc(k)}</span><span class="sv">${esc(v)}</span>`).join('') + '</div>'
-    box.innerHTML = html + '</div>'
-    // graphs span the width of the text lines
-    const W = Math.max(180, Math.round(box.querySelector('.adv').getBoundingClientRect().width / (Number(box.dataset.scale) || 1)))
-    p.graphs.forEach((g, i) => {
-      const cv = document.getElementById('g' + i)
-      cv.width = W
-      const ctx = cv.getContext('2d')
-      ctx.strokeStyle = 'rgba(161,161,170,0.18)'; ctx.lineWidth = 1
-      for (const y of [0.25, 0.5, 0.75]) { ctx.beginPath(); ctx.moveTo(0, 40 * y); ctx.lineTo(W, 40 * y); ctx.stroke() }
-      for (const s of g.series || [{ color: g.color, values: g.values }]) line(cv, s.values, color(s.color), g.floor, g.ceil, W, 40)
-    })
-    const th = document.getElementById('th')
-    if (th) {
-      th.width = W
-      const ctx = th.getContext('2d'), n = p.threads.length, bw = W / n
-      p.threads.forEach((x, i) => {
-        const v = Math.max(0, Math.min(100, x)), hgt = Math.max(1, (v / 100) * 26)
-        ctx.fillStyle = v >= 95 ? '#f87171' : v >= 80 ? '#fbbf24' : '#60a5fa'
-        ctx.fillRect(i * bw + 1, 26 - hgt, Math.max(1, bw - 2), hgt)
-      })
+    document.getElementById('lines').innerHTML = lines
+    p.graphs.forEach((g, i) => { const el = document.getElementById('gi' + i); if (el) el.textContent = g.info || '' })
+    if (p.threads) { setBarTargets(p.threads); document.getElementById('thn').textContent = String(p.threads.length) }
+    if (p.stats.length) document.getElementById('stats').innerHTML = p.stats.map(([k, v]) => `<span class="sk">${esc(k)}</span><span class="sv">${esc(v)}</span>`).join('')
+    measureAuto(scale)
+  }
+
+  // ---- custom layouts (editor): HTML/CSS come from the main process (escaped/filtered there)
+  const userStyle = document.createElement('style')
+  document.head.appendChild(userStyle)
+  function placeCustom(b) {
+    const a = b.anchor || 'tl', v = a[0], h = a[1]
+    box.style.left = box.style.right = box.style.top = box.style.bottom = ''
+    let tx = '', ty = ''
+    if (h === 'l') box.style.left = b.offsetX + 'px'; else if (h === 'r') box.style.right = (-b.offsetX) + 'px'; else { box.style.left = `calc(50% + ${b.offsetX}px)`; tx = '-50%' }
+    if (v === 't') box.style.top = b.offsetY + 'px'; else if (v === 'b') box.style.bottom = (-b.offsetY) + 'px'; else { box.style.top = `calc(50% + ${b.offsetY}px)`; ty = '-50%' }
+    box.style.transform = `translate(${tx || 0}, ${ty || 0}) scale(${b.scale})`
+    box.style.transformOrigin = `${v === 'b' ? 'bottom' : v === 't' ? 'top' : 'center'} ${h === 'r' ? 'right' : h === 'l' ? 'left' : 'center'}`
+    box.style.opacity = String(b.opacity)
+  }
+  function renderCustom(c) {
+    if (userStyle.textContent !== c.css) userStyle.textContent = c.css
+    box.className = 'custom'
+    if (c.sig !== lastSig) {
+      // the layout was edited: rebuild; otherwise only the text of each block is replaced
+      lastSig = c.sig
+      box.innerHTML = c.html
+      registerCanvases(c.canvases)
+    } else {
+      for (const b of c.blocks) {
+        const el = document.getElementById('w-' + b.id)
+        if (!el) continue
+        if (b.canvas) { const head = el.querySelector('.ghead'); if (head && b.head != null && head.innerHTML !== b.head) head.innerHTML = b.head }
+        else if (el.innerHTML !== b.inner) el.innerHTML = b.inner
+      }
     }
+    setBarTargets(c.threads)
+    placeCustom(c.box)
+    measureAuto(c.box.scale)
   }
 
   window.__overlay = (d) => {
+    pushLive(d.live)
+    if (d.custom) { renderCustom(d.custom); return }
+    box.className = ''
+    if (userStyle.textContent) userStyle.textContent = ''
     const s = d.settings
     box.style.setProperty('--bg', String(s.background))
     box.style.opacity = String(s.opacity)
     box.style.transform = `scale(${s.scale})`
-    box.dataset.scale = String(s.scale)
     const right = s.position.endsWith('r'), bottom = s.position.startsWith('b')
     box.style.left = right ? '' : '0'; box.style.right = right ? '0' : ''
     box.style.top = bottom ? '' : '0'; box.style.bottom = bottom ? '0' : ''
     box.style.transformOrigin = `${bottom ? 'bottom' : 'top'} ${right ? 'right' : 'left'}`
-    if (d.panel) { renderPanel(d.panel); return }
-    const rows = d.rows.map((r) => r.big
+    if (d.panel) { renderPanel(d.panel, s.scale); return }
+    const sig = 'compact|' + (d.graph ? 1 : 0)
+    if (sig !== lastSig) {
+      lastSig = sig
+      box.innerHTML = '<div id="rows"></div>' + (d.graph ? '<canvas id="g"></canvas>' : '')
+      registerCanvases(d.graph ? [{ id: 'g', kind: 'graph', sources: [{ key: 'frametime', color: '#60a5fa' }], mode: 'ft', height: 34, width: 150, grid: false }] : [])
+    }
+    document.getElementById('rows').innerHTML = d.rows.map((r) => r.big
       ? `<div class="row"><span class="v fps ${r.tone || ''}">${esc(r.value)}</span><span class="k">${esc(r.label)}</span></div>`
       : `<div class="row"><span class="k">${esc(r.label)}</span><span class="v ${r.tone || ''}">${esc(r.value)}</span></div>`).join('')
-    box.innerHTML = rows + (d.graph ? '<canvas id="g" width="150" height="34"></canvas>' : '')
-    if (d.graph) line(document.getElementById('g'), d.graph, '#60a5fa', 0, Math.max(33.4, ...d.graph), 150, 34)
+    pixelScale = s.scale || 1
   }
 </script>
 </body>

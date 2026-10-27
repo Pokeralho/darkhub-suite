@@ -1,0 +1,61 @@
+name: Package help or review
+description: Ask for help or a review of a DarkHub package (module or preset)
+title: "[Package]: "
+labels: ["packages"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Packages are published on **hub.darkhub.ink**. This form is for **help and review** before you publish: a validator error you do not understand, a change you are not sure about, or a request for feedback.
+        Specification: [docs/hub/README.md](https://github.com/Pokeralho/darkhub-suite/blob/main/docs/hub/README.md). To add an example to this repository, open a pull request to `docs/hub/examples/` instead.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Package type
+      options:
+        - module
+        - preset
+    validations:
+      required: true
+  - type: input
+    id: id
+    attributes:
+      label: Package id
+      placeholder: "yourname.ethernet-gaming"
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: What the package is for
+      description: Who it is for and what it should change.
+    validations:
+      required: true
+  - type: textarea
+    id: json
+    attributes:
+      label: Package JSON
+      description: Paste the whole .darkhub.json file.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: validator
+    attributes:
+      label: Validator output
+      description: Output of `npm run hub:validate -- your.darkhub.json`.
+      render: text
+  - type: textarea
+    id: question
+    attributes:
+      label: What you need
+      description: Your question, or what you would like reviewed.
+    validations:
+      required: true
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: Rules
+      options:
+        - label: The package does not try to change security settings (Defender, UAC, firewall, Windows Update, VBS) or anything that runs at startup (docs/hub/README.md section 5).
+          required: true

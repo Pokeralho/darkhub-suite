@@ -1,0 +1,33 @@
+{
+  "$schema": "https://darkhub.ink/schema/v1.json",
+  "schemaVersion": 1,
+  "type": "preset",
+  "id": "pokeralho.gaming-essentials",
+  "version": "1.0.0",
+  "name": { "pt-BR": "Essenciais para jogos", "en-US": "Gaming essentials" },
+  "description": {
+    "pt-BR": "Desliga a gravação em segundo plano do Xbox, dá prioridade multimídia aos jogos, tira a aceleração do mouse e o atalho das teclas de aderência. Em desktops com 16 GB ou mais, desliga o SysMain (pré-carregamento), que só ajuda em discos lentos.",
+    "en-US": "Turns off Xbox background recording, gives games multimedia priority, removes mouse acceleration and the sticky keys shortcut. On desktops with 16 GB or more, turns off SysMain (prefetching), which only helps slow disks."
+  },
+  "author": { "github": "Pokeralho" },
+  "license": "MIT",
+  "tags": ["gaming", "latency", "mouse"],
+  "minApp": "0.7.3",
+  "when": { "os.build": { "gte": 19045 } },
+  "items": [
+    { "use": "darkhub:tweak:disableGameDvr", "note": "Background recording costs GPU time and VRAM in every game." },
+    { "use": "darkhub:tweak:mmcssGames" },
+    { "use": "darkhub:tweak:disableMouseAcceleration", "note": "Same hand movement, same distance on screen." },
+    { "use": "darkhub:tweak:disableStickyKeys" },
+    {
+      "registry": { "path": "HKCU\\System\\GameConfigStore", "name": "GameDVR_FSEBehaviorMode", "type": "dword", "value": 2 },
+      "note": "Lets fullscreen optimizations decide per game instead of forcing the old fullscreen behaviour."
+    },
+    {
+      "service": { "name": "SysMain", "startType": "disabled", "stop": true },
+      "if": { "chassis": "desktop", "ram.gb": { "gte": 16 } },
+      "note": "Prefetching helps hard drives; on SSD desktops with plenty of RAM it mostly adds background disk work."
+    }
+  ],
+  "evidence": ["https://learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service"]
+}
