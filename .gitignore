@@ -31,6 +31,7 @@ build/*
 !build/icon.ico
 !build/installer.nsh
 !build/icon.png
+!build/deps/
 
 # ── Heavy Binaries & Bundled Portables ──
 resources/
