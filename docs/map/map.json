@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-27T10:44:32",
+ "generated_at": "2026-10-27T14:31:13",
  "bridge": "darkhub",
  "preload": "electron/preload.js",
  "features": [
@@ -27863,7 +27863,7 @@
    {
     "name": "useI18n",
     "kind": "function",
-    "line": 102
+    "line": 105
    }
   ],
   "src/i18n/messages.ts": [
@@ -31610,6 +31610,13 @@
     "name": "sample",
     "kind": "function",
     "line": 8
+   }
+  ],
+  "tests/i18nFallback.test.tsx": [
+   {
+    "name": "tFor",
+    "kind": "function",
+    "line": 7
    }
   ],
   "tests/kakugan.test.ts": [

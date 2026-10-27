@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-10-27T10:44:32. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-10-27T14:31:13. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -978,7 +978,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/i18n/I18nProvider.tsx`
 
-`I18nContextValue`:4 _type_, `readInitialLang`:15, `I18nProvider`:23 _component_, `useI18n`:102
+`I18nContextValue`:4 _type_, `readInitialLang`:15, `I18nProvider`:23 _component_, `useI18n`:105
 
 ## `src/i18n/messages.ts`
 
@@ -1251,6 +1251,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/hwSensors.test.ts`
 
 `sample`:8
+
+## `tests/i18nFallback.test.tsx`
+
+`tFor`:7
 
 ## `tests/kakugan.test.ts`
 

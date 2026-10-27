@@ -74,6 +74,9 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
         return builtIn[key]
       }
 
+      // Inline defaults are written in pt-BR, so a pt-BR user gets them before the en-US dictionary.
+      if (lang === 'pt-BR' && defaultValue) return defaultValue
+
       return messages['en-US']?.[key] ?? messages['pt-BR']?.[key] ?? defaultValue ?? key
     },
     [lang, customTranslations]
