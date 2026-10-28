@@ -207,7 +207,8 @@ class NativeLatencyClient extends EventEmitter {
     return res?.ok ? res.data : null
   }
 
-  /** {foregroundPid, processes:[{pid, name, wsMb}]} from one native call (~15 ms for 500 processes). */
+  /** {foregroundPid, foregroundMonitor, processes:[{pid, name, wsMb}]} from one native call (~15 ms for 500 processes).
+   *  foregroundMonitor: physical bounds {x, y, width, height} of the monitor showing the foreground window, or null. */
   async listProcesses() {
     const res = await this.sendCommand({ cmd: 'list_processes' }, 5000)
     if (!res?.ok || !Array.isArray(res.data?.rows)) return null
@@ -216,7 +217,9 @@ class NativeLatencyClient extends EventEmitter {
       const [pid, name, ws] = String(row).split('|')
       if (name) processes.push({ pid: Number(pid), name, wsMb: Number(ws) || 0 })
     }
-    return { foregroundPid: Number(res.data.foreground_pid) || -1, processes }
+    const m = String(res.data.foreground_monitor || '').split(',').map(Number)
+    const foregroundMonitor = m.length === 4 && m.every(Number.isFinite) ? { x: m[0], y: m[1], width: m[2] - m[0], height: m[3] - m[1] } : null
+    return { foregroundPid: Number(res.data.foreground_pid) || -1, foregroundMonitor, processes }
   }
 
   dispose() {

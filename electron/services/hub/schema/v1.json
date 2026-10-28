@@ -158,7 +158,7 @@
       "type": "array",
       "uniqueItems": true,
       "maxItems": 12,
-      "description": "Extensions only. What the extension may ask DarkHub for; the user sees and approves the list when installing. storage: its own key-value storage. hardware: PC facts (CPU, GPU, RAM, chassis). sensors: live temperatures, loads and clocks. network: HTTPS requests to the origins listed in \"network\". notifications: Windows notifications. clipboard: write text to the clipboard. packages: ask DarkHub to preview and install DarkHub packages (the user approves each one). tweaks.read: read which built-in tweaks are on.",
+      "description": "Extensions only. What the extension may ask DarkHub for; the user sees and approves the list when installing. storage: its own key-value storage. hardware: PC facts (CPU, GPU, RAM, chassis). sensors: live temperatures, loads and clocks. network: HTTPS requests to the origins listed in \"network\". notifications: Windows notifications. clipboard: write text to the clipboard. screen: pick the color of a point on the screen when the user clicks (only that color reaches the extension). packages: ask DarkHub to preview and install DarkHub packages (the user approves each one). tweaks.read: read which built-in tweaks are on.",
       "items": {
         "enum": [
           "storage",
@@ -167,6 +167,7 @@
           "network",
           "notifications",
           "clipboard",
+          "screen",
           "packages",
           "tweaks.read"
         ]

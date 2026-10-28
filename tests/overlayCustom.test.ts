@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
 // @ts-ignore - plain JS module
+import { normalizeSettings, pickDisplay } from '../electron/services/overlay/overlayModel.js'
+// @ts-ignore - plain JS module
 import { normalizeLayout, renderLayout, fromPreset, sampleContext, PRESETS, METRICS, cssValue } from '../electron/services/overlay/customModel.js'
 
 describe('custom overlay layouts', () => {
@@ -72,5 +74,28 @@ describe('custom overlay layouts', () => {
     expect(kinds).toEqual(['graph', 'graph', 'bars'])
     expect(r.canvases[0].series[0].values.length).toBe(120)
     expect(r.canvases[2].values).toHaveLength(16)
+  })
+})
+
+
+describe('overlay placement', () => {
+  const displays = [{ id: 1 }, { id: 2 }, { id: 3 }]
+  it('follows the game, falls back to the mouse and then the primary display', () => {
+    expect(pickDisplay('game', displays, { gameId: 2, cursorId: 3, primaryId: 1 })?.id).toBe(2)
+    expect(pickDisplay('game', displays, { gameId: null, cursorId: 3, primaryId: 1 })?.id).toBe(3)
+    expect(pickDisplay('game', displays, { primaryId: 1 })?.id).toBe(1)
+  })
+  it('uses a fixed display while it is connected', () => {
+    expect(pickDisplay('3', displays, { gameId: 2, primaryId: 1 })?.id).toBe(3)
+    expect(pickDisplay('9', displays, { gameId: 2, primaryId: 1 })?.id).toBe(2)
+    expect(pickDisplay('primary', displays, { gameId: 2, primaryId: 1 })?.id).toBe(1)
+  })
+  it('keeps the new positions, offsets and monitor choice', () => {
+    const s = normalizeSettings({ position: 'bc', offsetX: 12.4, offsetY: -99999, monitor: '2779098405' })
+    expect(s.position).toBe('bc')
+    expect(s.offsetX).toBe(12)
+    expect(s.offsetY).toBe(-4000)
+    expect(s.monitor).toBe('2779098405')
+    expect(normalizeSettings({ position: 'zz', monitor: 'evil' })).toMatchObject({ position: 'tl', monitor: 'game' })
   })
 })

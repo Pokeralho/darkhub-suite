@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Eye, EyeOff, Loader2, Info, AlertTriangle, FolderOpen, RefreshCw } from '../components/icons';
 import PageHeader from '../components/ui/PageHeader';
+import HotkeyCapture from '../components/HotkeyCapture';
 import { useI18n } from '../i18n/I18nProvider';
 import type { OverlayStatus, OverlaySettings } from '../global';
 
@@ -102,15 +103,8 @@ export default function GameOverlay({ onNavigate }: { onNavigate?: (page: string
       {s && (
         <section className="rounded-xl border border-zinc-800/80 p-4 space-y-4">
           <h2 className="dh-section-title">{t('ovl.look', 'Aparência')}</h2>
+          <PlacementPicker s={s} st={st} set={set} t={t} />
           <div className="flex flex-wrap items-center gap-x-5 gap-y-3 text-[12.5px] text-zinc-300">
-            <label className="flex items-center gap-2">{t('ovl.position', 'Posição')}
-              <select className="dh-input" value={s.position} onChange={(e) => void set({ position: e.target.value as OverlaySettings['position'] })}>
-                <option value="tl">{t('ovl.pos.tl', 'Canto superior esquerdo')}</option>
-                <option value="tr">{t('ovl.pos.tr', 'Canto superior direito')}</option>
-                <option value="bl">{t('ovl.pos.bl', 'Canto inferior esquerdo')}</option>
-                <option value="br">{t('ovl.pos.br', 'Canto inferior direito')}</option>
-              </select>
-            </label>
             <label className="flex items-center gap-2">{t('ovl.scale', 'Tamanho')}
               <input type="range" min={0.6} max={2.5} step={0.1} value={s.scale} onChange={(e) => void set({ scale: Number(e.target.value) })} />
               <span className="tabular-nums w-10">{Math.round(s.scale * 100)}%</span>
@@ -126,9 +120,9 @@ export default function GameOverlay({ onNavigate }: { onNavigate?: (page: string
                 <option value={250}>250 ms</option><option value={500}>500 ms</option><option value={1000}>1 s</option>
               </select>
             </label>
-            <label className="flex items-center gap-2">{t('ovl.hotkey', 'Atalho')}
-              <input className="dh-input w-36 font-mono" value={hotkey} onChange={(e) => setHotkey(e.target.value)} onBlur={() => hotkey !== s.hotkey && void set({ hotkey: hotkey.trim() })} />
-            </label>
+            <div className="flex items-center gap-2">{t('ovl.hotkey', 'Atalho')}
+              <HotkeyCapture value={s.hotkey || null} onChange={(k) => void set({ hotkey: k })} />
+            </div>
           </div>
           <div>
             <p className="dh-label mb-2">{t('ovl.layout', 'Layout')}</p>
@@ -183,6 +177,67 @@ export default function GameOverlay({ onNavigate }: { onNavigate?: (page: string
       <div className="space-y-1.5">
         <p className="flex items-start gap-2 dh-help"><Info size={13} className="mt-0.5 shrink-0" />{t('ovl.fullscreen', 'O overlay aparece por cima de jogos em janela ou tela cheia sem bordas. Em tela cheia exclusiva o Windows não desenha outras janelas por cima; nesse caso use o modo sem bordas (o FPS continua sendo medido).')}</p>
         <p className="flex items-start gap-2 dh-help"><Info size={13} className="mt-0.5 shrink-0" />{t('ovl.admin', 'O PresentMon precisa que o DarkHub rode como administrador para medir qualquer jogo (o app instalado já roda assim).')}</p>
+      </div>
+    </div>
+  );
+}
+
+const SPOTS: OverlaySettings['position'][] = ['tl', 'tc', 'tr', 'ml', 'mr', 'bl', 'bc', 'br'];
+
+/** Where the overlay goes: which monitor, a click on a miniature screen for the spot, and a fine offset. */
+function PlacementPicker({ s, st, set, t }: { s: OverlaySettings; st: OverlayStatus | null; set: (p: Partial<OverlaySettings>) => Promise<void>; t: (k: string, f?: string) => string }) {
+  const displays = st?.displays ?? [];
+  const current = displays.find((d) => d.id === st?.displayId);
+  const ratio = (() => { const d = current ?? displays.find((x) => x.primary) ?? displays[0]; return d ? d.width / d.height : 16 / 9; })();
+  const spotLabel = (p: string) => ({
+    tl: t('ovl.pos.tl', 'Canto superior esquerdo'), tc: t('ovl.pos.tc', 'Centro superior'), tr: t('ovl.pos.tr', 'Canto superior direito'),
+    ml: t('ovl.pos.ml', 'Meio à esquerda'), mr: t('ovl.pos.mr', 'Meio à direita'),
+    bl: t('ovl.pos.bl', 'Canto inferior esquerdo'), bc: t('ovl.pos.bc', 'Centro inferior'), br: t('ovl.pos.br', 'Canto inferior direito')
+  } as Record<string, string>)[p] ?? p;
+  const nudge = (k: 'offsetX' | 'offsetY', v: string) => { const n = Math.round(Number(v)); if (Number.isFinite(n)) void set({ [k]: n } as Partial<OverlaySettings>); };
+  return (
+    <div className="grid gap-5 md:grid-cols-[minmax(0,260px)_1fr] items-start">
+      <div>
+        <p className="dh-label mb-2">{t('ovl.position', 'Posição')}</p>
+        <div className="relative w-full rounded-lg border border-zinc-700 bg-zinc-900/70" style={{ aspectRatio: String(ratio) }} role="radiogroup" aria-label={t('ovl.position', 'Posição')}>
+          {SPOTS.map((p) => {
+            const col = p[1] === 'l' ? 0 : p[1] === 'c' ? 1 : 2;
+            const row = p[0] === 't' ? 0 : p[0] === 'm' ? 1 : 2;
+            const on = s.position === p;
+            return (
+              <button key={p} type="button" role="radio" aria-checked={on} title={spotLabel(p)} aria-label={spotLabel(p)} onClick={() => void set({ position: p, offsetX: 0, offsetY: 0 })}
+                className={`absolute h-[22%] w-[26%] rounded-md border transition-colors ${on ? 'border-blue-400 bg-blue-500/25' : 'border-zinc-700/80 bg-zinc-800/50 hover:border-zinc-500'}`}
+                style={{ left: `${[3, 37, 71][col]}%`, top: `${[5, 39, 73][row]}%` }}>
+                {on ? <span className="font-mono text-[10.5px] text-blue-200">FPS 144</span> : null}
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-2 flex items-center gap-3 text-[12px] text-zinc-400">
+          <label className="flex items-center gap-1.5">X
+            <input type="number" className="dh-input w-20 font-mono" step={10} value={s.offsetX} onChange={(e) => nudge('offsetX', e.target.value)} aria-label={t('ovl.offsetX', 'Deslocamento horizontal (px)')} />
+          </label>
+          <label className="flex items-center gap-1.5">Y
+            <input type="number" className="dh-input w-20 font-mono" step={10} value={s.offsetY} onChange={(e) => nudge('offsetY', e.target.value)} aria-label={t('ovl.offsetY', 'Deslocamento vertical (px)')} />
+          </label>
+          <span>px</span>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <p className="dh-label">{t('ovl.monitor', 'Monitor')}</p>
+        <select className="dh-input w-full max-w-sm" value={s.monitor} onChange={(e) => void set({ monitor: e.target.value })}>
+          <option value="game">{t('ovl.monitor.game', 'O monitor do jogo (acompanha o jogo)')}</option>
+          <option value="primary">{t('ovl.monitor.primary', 'Monitor principal')}</option>
+          <option value="cursor">{t('ovl.monitor.cursor', 'Onde o mouse estiver ao abrir')}</option>
+          {displays.map((d, i) => (
+            <option key={d.id} value={d.id}>{`${i + 1}. ${d.name} · ${d.width}×${d.height}${d.hz ? ` · ${d.hz} Hz` : ''}${d.primary ? ` · ${t('ovl.monitor.main', 'principal')}` : ''}`}</option>
+          ))}
+        </select>
+        <p className="dh-help">
+          {st?.visible && current
+            ? t('ovl.monitor.now', 'Agora em: {m}').replace('{m}', `${displays.indexOf(current) + 1}. ${current.name}`)
+            : t('ovl.monitor.help', 'Com mais de um monitor, o overlay fica na tela onde o jogo está e muda junto se você mover o jogo.')}
+        </p>
       </div>
     </div>
   );

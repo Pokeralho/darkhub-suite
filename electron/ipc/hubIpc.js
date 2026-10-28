@@ -10,7 +10,8 @@ import { ExtensionHost } from '../services/hub/ExtensionHost.js'
 import { packExtensionFolder } from '../services/hub/extensionPack.js'
 import HardwareService from '../services/HardwareService.js'
 import path from 'node:path'
-import { Notification, clipboard, shell } from 'electron'
+import { Notification, clipboard, shell, screen, desktopCapturer } from 'electron'
+import { ScreenPicker } from '../services/screenPicker/ScreenPicker.js'
 
 const PKG_ID = /^[a-z0-9][a-z0-9-]{1,38}\.[a-z0-9][a-z0-9-]{1,62}$/
 
@@ -36,12 +37,14 @@ export function registerHubIPC({ app, ipcMain, dialog, BrowserWindow, logger, ge
     focus()
     send({ type: 'approval', id, ...req })
   })
+  const picker = new ScreenPicker({ BrowserWindow, screen, desktopCapturer, ipcMain, getMainWindow })
   const host = new ExtensionHost({
     app, hub: svc, catalog, approve,
     sensors: { read: () => HardwareService.snapshot(), hold: (tag) => HardwareService.holdSensors(tag), release: (tag) => HardwareService.releaseSensors(tag) },
     notify: async (title, body) => { if (Notification.isSupported()) new Notification({ title, body }).show() },
     clipboard: (t) => clipboard.writeText(t),
-    openExternal: (url) => shell.openExternal(url)
+    openExternal: (url) => shell.openExternal(url),
+    pickColor: () => picker.pick()
   })
 
   // development: extensions loaded from a folder, rebuilt and reloaded when a file changes

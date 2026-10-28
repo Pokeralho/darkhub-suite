@@ -63,16 +63,12 @@ const darkhubApi = {
   },
   settings: {
     getConfig: () => ipcRenderer.invoke('settings:getConfig'),
-    updateTelemetry: (payload) => ipcRenderer.invoke('settings:updateTelemetry', payload),
     updateLiveServices: (payload) => ipcRenderer.invoke('settings:updateLiveServices', payload),
     updateWindowBehavior: (payload) => ipcRenderer.invoke('settings:updateWindowBehavior', payload),
     updateStartupBehavior: (payload) => ipcRenderer.invoke('settings:updateStartupBehavior', payload)
   },
   injector: {
     inject: (payload) => ipcRenderer.invoke('injector:inject', payload)
-  },
-  telemetry: {
-    testBugReport: () => ipcRenderer.invoke('telemetry:testBugReport')
   },
   
   optimizer: {
@@ -153,6 +149,17 @@ const darkhubApi = {
     getFailures: () => ipcRenderer.invoke('darkos:getFailures'),
     getRebootPending: () => ipcRenderer.invoke('darkos:getRebootPending'),
     exportDiagnostics: () => ipcRenderer.invoke('darkos:exportDiagnostics'),
+    usbDisks: () => ipcRenderer.invoke('darkos:usbDisks'),
+    usbFindIsos: () => ipcRenderer.invoke('darkos:usbFindIsos'),
+    usbPickIso: () => ipcRenderer.invoke('darkos:usbPickIso'),
+    usbHashIso: (payload) => ipcRenderer.invoke('darkos:usbHashIso', payload),
+    usbWrite: (payload) => ipcRenderer.invoke('darkos:usbWrite', payload),
+    usbCancel: () => ipcRenderer.invoke('darkos:usbCancel'),
+    onUsbEvent: (callback) => {
+      const listener = (_event, payload) => callback(payload)
+      ipcRenderer.on('darkos:usbEvent', listener)
+      return () => ipcRenderer.removeListener('darkos:usbEvent', listener)
+    },
     onRunEvent: (callback) => {
       const listener = (_event, payload) => callback(payload)
       ipcRenderer.on('darkos:runEvent', listener)
@@ -656,10 +663,6 @@ const darkhubApi = {
     snippetsList: () => ipcRenderer.invoke('powershell:snippetsList'),
     snippetSave: (payload) => ipcRenderer.invoke('powershell:snippetSave', payload),
     snippetDelete: (payload) => ipcRenderer.invoke('powershell:snippetDelete', payload)
-  },
-  discord: {
-    sendMessage: (payload) => ipcRenderer.invoke('discord:sendMessage', payload),
-    reportError: (payload) => ipcRenderer.invoke('discord:reportError', payload)
   },
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),

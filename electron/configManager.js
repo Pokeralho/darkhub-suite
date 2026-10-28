@@ -11,9 +11,11 @@ let _configCache = null
 
 function mergeDefaultConfig(config = {}) {
   const defaults = getDefaultConfig()
+  // telemetry: settings of the removed bug reporter, dropped from old files
+  const { telemetry: _removed, ...rest } = config
   return {
     ...defaults,
-    ...config,
+    ...rest,
     license: {
       ...defaults.license,
       ...(config.license || {})
@@ -21,10 +23,6 @@ function mergeDefaultConfig(config = {}) {
     app: {
       ...defaults.app,
       ...(config.app || {})
-    },
-    telemetry: {
-      ...defaults.telemetry,
-      ...(config.telemetry || {})
     },
     features: {
       ...defaults.features,
@@ -86,14 +84,7 @@ export function getDefaultConfig() {
       closeToTray: true
     },
 
-    telemetry: {
-      bugReportsEnabled: true,
-      bugWebhookUrl: '',
-      includeDiagnostics: true
-    },
-
     features: {
-      gamingOverlayEnabled: true,
       advancedOptimizerEnabled: true
     }
   }

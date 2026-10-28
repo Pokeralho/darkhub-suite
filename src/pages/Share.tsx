@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import HotkeyCapture from '../components/HotkeyCapture';
 import { Camera, Copy, ScreenRegion, ExternalLink, FolderOpen, Loader2, Trash2, UploadCloud, X, FileImage, Film, Music, FileText, FileArchive, Package } from '../components/icons';
 import PageHeader from '../components/ui/PageHeader';
 import { useI18n } from '../i18n/I18nProvider';
@@ -51,34 +52,14 @@ const TTL_HOURS = [1, 6, 24];
 
 const fmtBytes = (n: number) => (n < 1048576 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(n < 104857600 ? 1 : 0)} MB`);
 
-/** Electron accelerator from a keydown (Ctrl+Shift+F12...). Null until a non-modifier key is pressed. */
-function acceleratorOf(e: React.KeyboardEvent) {
-  const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
-  if (['Control', 'Shift', 'Alt', 'Meta'].includes(key)) return null;
-  const named: Record<string, string> = { ' ': 'Space', ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right', Escape: 'Esc' };
-  const parts = [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'Super'].filter(Boolean) as string[];
-  const k = named[key] || key;
-  // plain letters/digits need a modifier, or the shortcut would swallow normal typing in every app
-  if (!parts.length && !/^F\d{1,2}$|^PrintScreen$/.test(k)) return null;
-  return [...parts, k].join('+');
-}
-
-/** Read-only field that records a global shortcut when focused. */
+/** Records the hotkey: any key or combination; the game in front still gets the key. */
 function HotkeyField({ label, value, active, onChange }: { label: string; value: string; active: boolean; onChange: (acc: string) => void }) {
   const { t } = useI18n();
-  const [recording, setRecording] = useState(false);
   return (
-    <label className="block space-y-1 text-[12.5px]">
+    <div className="block space-y-1 text-[12.5px]">
       <span className="text-zinc-500">{label} {active ? '' : <span className="text-amber-200">· {t('share.hotkeyOff', 'inativo')}</span>}</span>
-      <input
-        readOnly
-        className={`dh-input w-full font-mono ${recording ? 'border-blue-400' : ''}`}
-        value={recording ? t('share.pressKeys', 'Pressione o atalho...') : value}
-        onFocus={() => setRecording(true)}
-        onBlur={() => setRecording(false)}
-        onKeyDown={(e) => { e.preventDefault(); const acc = acceleratorOf(e); if (acc) { setRecording(false); (e.target as HTMLInputElement).blur(); onChange(acc); } }}
-      />
-    </label>
+      <HotkeyCapture value={value || null} onChange={onChange} />
+    </div>
   );
 }
 

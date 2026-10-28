@@ -20,6 +20,13 @@ const ext = (over: any = {}) => ({
 })
 
 describe('extension packages', () => {
+  it('the color picker extension packs and validates', () => {
+    const pkg = packExtensionFolder(path.join(process.cwd(), 'docs', 'hub', 'extensions', 'pokeralho.conta-gotas'))
+    const r = validatePackage(JSON.stringify(pkg))
+    expect(r.errors).toEqual([])
+    expect(pkg.permissions).toEqual(['screen', 'clipboard', 'storage'])
+  })
+
   it('the example extension packs and validates', () => {
     const pkg = packExtensionFolder(EXAMPLE)
     const r = validatePackage(JSON.stringify(pkg))
@@ -77,15 +84,17 @@ describe('extension bridge permissions', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-ext-'))
   const app = { getPath: () => dir, getVersion: () => '0.7.3' }
   const installed: any = {
-    'ana.minha-ext': { pkg: ext({ permissions: ['storage', 'network'], network: ['https://api.example.com'] }) }
+    'ana.minha-ext': { pkg: ext({ permissions: ['storage', 'network'], network: ['https://api.example.com'] }) },
+    'ana.cores': { pkg: ext({ id: 'ana.cores', permissions: ['screen'] }) }
   }
+  let picks: any[] = [{ ok: true, hex: '#2ee6f2', rgb: [46, 230, 242], x: 10, y: 20, image: 'should not leak' }, { ok: false, canceled: true }]
   const fetched: string[] = []
   const host = new ExtensionHost({
     app,
     hub: { record: (id: string) => installed[id] || null, hardware: async () => ({ cpuVendor: 'amd' }) },
     catalog: {}, approve: async () => false,
     sensors: { read: () => ({}), hold: () => {}, release: () => {} },
-    notify: async () => {}, clipboard: () => {}, openExternal: async () => {},
+    notify: async () => {}, clipboard: () => {}, openExternal: async () => {}, pickColor: async () => picks.shift(),
     fetchImpl: async (u: string) => { fetched.push(u); return { ok: true, status: 200, headers: new Map([['content-type', 'application/json']]) as any, arrayBuffer: async () => new TextEncoder().encode('{"a":1}').buffer } }
   })
 
@@ -104,6 +113,12 @@ describe('extension bridge permissions', () => {
     await expect(host.call('ana.minha-ext', 'net.fetch', { url: 'https://evil.example.com/' })).rejects.toThrow(/não está na lista/)
     await expect(host.call('ana.minha-ext', 'net.fetch', { url: 'http://api.example.com/' })).rejects.toThrow(/não está na lista/)
     expect(fetched).toEqual(['https://api.example.com/v1?q=1'])
+  })
+
+  it('screen color: only with the "screen" permission, and only the chosen color', async () => {
+    await expect(host.call('ana.minha-ext', 'screen.pickColor')).rejects.toThrow(/permissão "screen"/)
+    expect(await host.call('ana.cores', 'screen.pickColor')).toEqual({ hex: '#2ee6f2', rgb: [46, 230, 242], x: 10, y: 20 })
+    expect(await host.call('ana.cores', 'screen.pickColor')).toBeNull()
   })
 
   it('storage is capped and per extension', async () => {

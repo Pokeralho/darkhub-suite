@@ -102,6 +102,7 @@
     }),
     notify: function (title, body) { return call('ui.notify', { title: title, body: body }); },
     clipboard: Object.freeze({ writeText: function (t) { return call('clipboard.write', { text: t }); } }),
+    screen: Object.freeze({ pickColor: function () { return call('screen.pickColor', {}); } }),
     packages: Object.freeze({
       preview: function (pkg, lang) { return call('packages.preview', { pkg: pkg, lang: lang }); },
       install: function (pkg) { return call('packages.install', { pkg: pkg }); },

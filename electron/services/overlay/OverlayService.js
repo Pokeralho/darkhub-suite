@@ -5,7 +5,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { FrameWindow, SessionStats } from './frameStats.js'
-import { normalizeSettings, readSensors, buildRows, buildPanel } from './overlayModel.js'
+import { normalizeSettings, readSensors, buildRows, buildPanel, pickDisplay } from './overlayModel.js'
 import { readLhm } from './lhmModel.js'
 import { normalizeLayout, renderLayout, fromPreset, sampleContext, PRESETS, METRICS, SERIES } from './customModel.js'
 
@@ -16,8 +16,8 @@ const STREAM_MS = 33 // frame times go to the overlay ~30 times a second; the pa
 const DEFAULT_LABELS = { fps: 'FPS', low1: '1% low', frametime: 'Frame', latency: 'Latência', cpuTemp: 'CPU °C', cpuPower: 'CPU W', gpuTemp: 'GPU °C', gpuClock: 'GPU clk' }
 
 export class OverlayService {
-  constructor({ app, BrowserWindow, screen, globalShortcut, presentMon, hardware, native, onEvent, lhmSource }) {
-    Object.assign(this, { app, BrowserWindow, screen, globalShortcut, presentMon, hardware, native, onEvent })
+  constructor({ app, BrowserWindow, screen, hotkeys, presentMon, hardware, native, onEvent, lhmSource }) {
+    Object.assign(this, { app, BrowserWindow, screen, hotkeys, presentMon, hardware, native, onEvent })
     this.lhm = null
     this.pendingFt = []
     this.sessionStats = new SessionStats()
@@ -28,6 +28,8 @@ export class OverlayService {
     this.win = null
     this.visible = false
     this.target = null // { pid, name }
+    this.gameDisplayId = null // display showing the foreground window (the overlay follows it in monitor: 'game')
+    this.placedOn = null
     this.mode = 'foreground'
     this.window = new FrameWindow()
     this.session = []
@@ -112,7 +114,8 @@ export class OverlayService {
     return {
       ok: true, visible: this.visible, settings: this.settings, target: this.target, mode: this.mode,
       capturing: this.presentMon.running, presentMonInstalled: this.presentMon.installed(), error: this.error,
-      stats: this.window.stats(), session: this.sessionStats.stats(), lastSession: this.lastSession
+      stats: this.window.stats(), session: this.sessionStats.stats(), lastSession: this.lastSession,
+      displays: this._displays(), displayId: this.visible ? this.placedOn : null
     }
   }
 
@@ -123,24 +126,46 @@ export class OverlayService {
     this._save()
     let hotkeyError = null
     if (this.settings.hotkey !== prevHotkey) hotkeyError = this._bindHotkey()
-    if (this.visible) { this._place(); this._restartLoop() }
+    if (this.visible) { this._place(true); this._restartLoop() }
     return { ...this.status(), hotkeyError }
   }
 
   _bindHotkey() {
-    if (this.hotkey) { try { this.globalShortcut.unregister(this.hotkey) } catch { /* gone */ } this.hotkey = null }
-    if (!this.settings.hotkey) return null
-    try {
-      if (!this.globalShortcut.register(this.settings.hotkey, () => { void this.toggle() })) return 'in-use'
-      this.hotkey = this.settings.hotkey
-      return null
-    } catch { return 'invalid' }
+    this.hotkey = null
+    const r = this.hotkeys.register('overlay', this.settings.hotkey, () => { void this.toggle() })
+    if (!r.ok) return r.error
+    this.hotkey = r.hotkey || null
+    return null
   }
 
-  _place() {
+  _displays() {
+    try {
+      const primaryId = this.screen.getPrimaryDisplay().id
+      return this.screen.getAllDisplays().map((d, i) => ({
+        id: String(d.id), name: d.label || `Monitor ${i + 1}`, primary: d.id === primaryId,
+        width: Math.round(d.size.width * d.scaleFactor), height: Math.round(d.size.height * d.scaleFactor), hz: d.displayFrequency || null
+      }))
+    } catch { return [] }
+  }
+
+  /** physical {x, y, width, height} of the monitor showing the foreground window -> id of that Electron display */
+  _displayIdFromPhysical(rect) {
+    if (!rect) return null
+    const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+    const dip = typeof this.screen.screenToDipPoint === 'function' ? this.screen.screenToDipPoint(center) : center
+    return String(this.screen.getDisplayNearestPoint(dip).id)
+  }
+
+  _place(force = false) {
     if (!this.win) return
-    const d = this.screen.getDisplayNearestPoint(this.screen.getCursorScreenPoint())
+    let cursorId = null
+    try { cursorId = String(this.screen.getDisplayNearestPoint(this.screen.getCursorScreenPoint()).id) } catch { /* no cursor */ }
+    const d = pickDisplay(this.settings.monitor, this.screen.getAllDisplays(), { gameId: this.gameDisplayId, cursorId: this.placedOn && this.settings.monitor === 'cursor' && !force ? this.placedOn : cursorId, primaryId: this.screen.getPrimaryDisplay().id })
+    if (!d) return
+    if (!force && String(d.id) === this.placedOn) return
     this.win.setBounds(d.bounds)
+    this.placedOn = String(d.id)
+    this._emit()
   }
 
   _ensureWindow() {
@@ -164,13 +189,14 @@ export class OverlayService {
     // fetch PresentMon now (first use), so the first game is measured at once and a download error shows up here
     try { await this.presentMon.ensure() } catch (e) { this.error = String(e?.message ?? e) }
     this._ensureWindow()
-    this._place()
+    this.mode = pid ? 'fixed' : 'foreground'
+    this.placedOn = null
+    await this._track() // finds the game's monitor (and, in foreground mode, the game)
+    this._place(true)
     this.win.showInactive()
     this.visible = true
-    this.mode = pid ? 'fixed' : 'foreground'
     this.hardware.holdSensors('overlay')
     if (pid) await this._attach(Number(pid))
-    else await this._follow()
     this._restartLoop()
     this._emit()
     return this.status()
@@ -215,9 +241,21 @@ export class OverlayService {
     this._emit()
   }
 
-  /** Foreground mode: attach to whatever app is in front (never DarkHub itself). */
-  async _follow() {
+  /** Every FOLLOW_MS while visible: which monitor shows the game, and in foreground mode which app to measure. */
+  async _track() {
     const list = await this.native.listProcesses().catch(() => null)
+    const fg = list?.foregroundPid
+    // DarkHub's own windows do not move the overlay (opening the app on the other monitor should not drag it along)
+    const own = fg === process.pid || this.BrowserWindow.getAllWindows().some((w) => { try { return w.webContents.getOSProcessId() === fg } catch { return false } })
+    if (!own && list?.foregroundMonitor) {
+      try { this.gameDisplayId = this._displayIdFromPhysical(list.foregroundMonitor) } catch { /* display gone */ }
+    }
+    if (this.visible) this._place()
+    if (this.mode === 'foreground') await this._follow(list)
+  }
+
+  /** Foreground mode: attach to whatever app is in front (never DarkHub itself). */
+  async _follow(list) {
     const fg = list?.foregroundPid
     if (!fg || fg <= 4 || fg === process.pid) return
     const isOwn = this.BrowserWindow.getAllWindows().some((w) => { try { return w.webContents.getOSProcessId() === fg } catch { return false } })
@@ -231,7 +269,7 @@ export class OverlayService {
     this._stopLoop()
     this.timers.push(setInterval(() => this._render(), this.settings.intervalMs))
     this.timers.push(setInterval(() => this._stream(), STREAM_MS))
-    if (this.mode === 'foreground') this.timers.push(setInterval(() => { void this._follow() }, FOLLOW_MS))
+    this.timers.push(setInterval(() => { void this._track() }, FOLLOW_MS))
   }
 
   _stopLoop() { for (const t of this.timers) clearInterval(t); this.timers = [] }
@@ -294,7 +332,7 @@ export class OverlayService {
 
   dispose() {
     this.hide()
-    if (this.hotkey) { try { this.globalShortcut.unregister(this.hotkey) } catch { /* gone */ } }
+    this.hotkeys.unregister('overlay')
     if (this.win && !this.win.isDestroyed()) this.win.destroy()
   }
 }

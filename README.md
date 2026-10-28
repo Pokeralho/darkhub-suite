@@ -166,10 +166,12 @@ Get-FileHash .\DarkHub*Setup*.exe -Algorithm SHA256   # run it in the folder whe
 [build-release.ps1](./scripts/build-release.ps1); they are not built in CI and not byte-for-byte reproducible yet (installer
 timestamps differ between builds). The small native helpers (`electron/services/*.exe`) are committed prebuilt so
 contributors do not need the .NET toolchain; each one is built from the `.cs` file next to it by `npm run build:native`,
-so you can rebuild them and read the source they come from. The plan, in order: build releases in GitHub Actions with
-[artifact attestations](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations) (so
-`gh attestation verify` proves an installer came from a given commit), then free open-source code signing
-([SignPath Foundation](https://signpath.org/)) so SmartScreen stops warning. Help with either is welcome.
+so you can rebuild them and read the source they come from. The repository now has a release workflow
+([release.yml](./.github/workflows/release.yml)) that builds everything, native helpers included, on GitHub's machines
+and records [artifact attestations](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations),
+so `gh attestation verify <file> --repo Pokeralho/darkhub-suite` proves a file came from a given commit; releases move
+to it as it is set up. Next: free open-source code signing ([SignPath Foundation](https://signpath.org/), plan in
+[docs/release/SIGNING.md](./docs/release/SIGNING.md)) so SmartScreen stops warning.
 
 ---
 

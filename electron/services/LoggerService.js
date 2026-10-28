@@ -35,7 +35,7 @@ class LoggerService {
 
     this.auditPath = path.join(app.getPath('userData'), 'optimizer_audit.jsonl');
     this._rotateLogIfNeeded();
-    this.info('LoggerService', 'Initialized Telemetry & Logging engine.');
+    this.info('LoggerService', 'Initialized local logging.');
   }
 
   _rotateLogIfNeeded() {

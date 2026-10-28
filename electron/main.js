@@ -36,7 +36,9 @@ import { registerPowerShellIPC } from './ipc/powershellIpc.js'
 import { registerVaultBridgeIPC } from './ipc/vaultBridgeIpc.js'
 import { upgradeWrapperIfWeak, backupVaultFile } from './services/vaultBridge/vaultHardening.js'
 import Logger from './services/LoggerService.js'
-import { runCommand, runPowerShell, runPowerShellJson, stripBom, encodePowerShellScript, powerShellArgsForEncodedScript } from './services/PowerShellRunner.js'
+import { runCommand, runPowerShell, runPowerShellJson, stripBom } from './services/PowerShellRunner.js'
+import { AutoClickerService } from './services/autoclicker/AutoClickerService.js'
+import { HotkeyService } from './services/hotkeys/HotkeyService.js'
 import { CpuLoadTracker } from './services/CpuLoadTracker.js'
 import HardwareService from './services/HardwareService.js'
 import HardwareHAL from './hal/HardwareHAL.js'
@@ -233,11 +235,14 @@ safeRegister('startup', () => registerStartupIPC({ app, ipcMain, logger: Logger 
 safeRegister('benchmark', () => registerBenchmarkIPC({ app, ipcMain, BrowserWindow, logger: Logger }))
 safeRegister('maintenance', () => registerMaintenanceIPC({ app, ipcMain, BrowserWindow, Notification, logger: Logger }))
 safeRegister('saves', () => registerSaveBackupIPC({ app, ipcMain, BrowserWindow, dialog, shell, logger: Logger }))
-safeRegister('overlay', () => registerOverlayIPC({ app, ipcMain, BrowserWindow, screen, globalShortcut, dialog, logger: Logger }))
+// app hotkeys are watched without taking the key from games (see HotkeyService)
+const hotkeys = new HotkeyService({ globalShortcut, logger: Logger })
+app.on('will-quit', () => hotkeys.dispose())
+safeRegister('overlay', () => registerOverlayIPC({ app, ipcMain, BrowserWindow, screen, hotkeys, dialog, logger: Logger }))
 safeRegister('usb', () => registerUsbIPC({ ipcMain, logger: Logger }))
 safeRegister('restore', () => registerRestoreIPC({ ipcMain, logger: Logger }))
 safeRegister('upscale', () => registerUpscaleIPC({ app, ipcMain, BrowserWindow, logger: Logger }))
-safeRegister('share', () => registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globalShortcut, BrowserWindow, Notification, logger: Logger }))
+safeRegister('share', () => registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotkeys, BrowserWindow, Notification, logger: Logger }))
 hubIpc = safeRegister('hub', () => registerHubIPC({ app, ipcMain, dialog, BrowserWindow, logger: Logger, getMainWindow: () => mainWindow, showMainWindow: () => showMainWindow() }))
 safeRegister('kakugan', () => registerKakuganIPC({
   app, ipcMain, shell, safeStorage, Notification, logger: Logger,
@@ -254,16 +259,6 @@ function isDev() {
   return !app.isPackaged
 }
 
-let appConfig = {
-  discordWebhookUrl: null,
-  bugTelemetry: {
-    enabled: false,
-    webhookUrl: null,
-    includeDiagnostics: true
-  }
-}
-let discordRate = { windowStart: 0, count: 0 }
-const discordDedup = new Map()
 let junkEstimateCache = { ts: 0, result: null, inFlight: null }
 const grantedFilePaths = new Set()
 const grantedDirectoryPaths = new Set()
@@ -347,146 +342,14 @@ function psSingleQuote(value) {
   return `'${String(value ?? '').replace(/'/g, "''")}'`
 }
 
-function normalizeWebhookUrl(value) {
-  if (typeof value !== 'string') return null
-  const trimmed = value.trim()
-  if (!trimmed) return null
-  try {
-    const parsed = new URL(trimmed)
-    if (parsed.protocol !== 'https:') return null
-    return parsed.toString()
-  } catch {
-    return null
-  }
-}
-
-const FIXED_BUG_WEBHOOK_URL = normalizeWebhookUrl(
-  process.env.DISCORD_BUG_WEBHOOK_URL ||
-  process.env.DARKHUB_DISCORD_WEBHOOK ||
-  null
-)
-
 async function loadRuntimeConfig() {
-  const envDiscordUrl = normalizeWebhookUrl(process.env.DARKHUB_DISCORD_WEBHOOK)
-  let persisted = null
-
   try {
     const { loadConfig: loadPersistedConfig } = await import('./configManager.js')
-    persisted = await loadPersistedConfig()
+    const persisted = await loadPersistedConfig()
+    closeToTrayEnabled = persisted?.app?.closeToTray !== false
   } catch (err) {
     log.warn('Failed to load persisted runtime config', err?.message ?? String(err))
   }
-
-  const telemetry = persisted?.telemetry ?? {}
-  const webhookUrl = FIXED_BUG_WEBHOOK_URL
-
-  closeToTrayEnabled = persisted?.app?.closeToTray !== false
-
-  appConfig = {
-    discordWebhookUrl: envDiscordUrl || webhookUrl || null,
-    bugTelemetry: {
-      enabled: telemetry.bugReportsEnabled !== false && Boolean(webhookUrl),
-      webhookUrl: webhookUrl || null,
-      includeDiagnostics: true
-    }
-  }
-}
-
-function canSendDiscord(key) {
-  const now = Date.now()
-  if (!discordRate.windowStart || now - discordRate.windowStart > 60_000) {
-    discordRate = { windowStart: now, count: 0 }
-  }
-  if (discordRate.count >= 10) return false
-
-  const last = discordDedup.get(key) ?? 0
-  if (now - last < 30_000) return false
-  discordDedup.set(key, now)
-  discordRate.count += 1
-  return true
-}
-
-function truncateDiscord(text) {
-  const s = String(text ?? '')
-  if (s.length <= 1800) return s
-  return s.slice(0, 1800) + '\n…'
-}
-
-function redactSensitive(value) {
-  let text = String(value ?? '')
-  const home = os.homedir?.()
-  if (home) text = text.split(home).join('%USERPROFILE%')
-  return text
-    .replace(/https:\/\/(?:canary\.|ptb\.)?discord(?:app)?\.com\/api\/webhooks\/[^\s"'`<>]+/gi, 'https://discord.com/api/webhooks/[redacted]')
-    .replace(/\b(authorization|cookie)\b\s*[:=]\s*[^\r\n]+/gi, '$1=[redacted]')
-    .replace(/\b(BOT_TOKEN|MP_ACCESS_TOKEN|DARKHUB_[A-Z_]*SECRET|DARKHUB_LICENSE_SECRET|password|secret|token)\b\s*[:=]\s*[^\s"'`]+/gi, '$1=[redacted]')
-    .replace(/DARKHUB-[A-Z0-9-]{8,}/gi, 'DARKHUB-[redacted]')
-}
-
-function normalizeTelemetryError(payload = {}) {
-  const source = redactSensitive(payload.source || 'unknown').slice(0, 80)
-  const page = redactSensitive(payload.page || payload.channel || '').slice(0, 120)
-  const message = redactSensitive(payload.message || payload.error || 'Unknown error').slice(0, 500)
-  const stack = redactSensitive(payload.stack || '').split(/\r?\n/).slice(0, 16).join('\n')
-  const details = redactSensitive(payload.details || '').slice(0, 600)
-  return { source, page, message, stack, details }
-}
-
-async function postDiscord(content, options = {}) {
-  const url = options.webhookUrl || appConfig?.discordWebhookUrl
-  if (typeof url !== 'string' || !url.startsWith('https://')) return { ok: false, error: 'Discord webhook not configured' }
-  const key = options.rateKey || crypto.createHash('sha1').update(content).digest('hex')
-  if (!canSendDiscord(key)) return { ok: false, error: 'Rate limited' }
-
-  const body = JSON.stringify({ content: truncateDiscord(content) })
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body
-    })
-    if (!res.ok) {
-      let detail = ''
-      try {
-        detail = await res.text()
-      } catch {}
-      log.warn('Discord webhook failed', { status: res.status, detail: detail?.slice?.(0, 500) ?? '' })
-      return { ok: false, error: `Discord HTTP ${res.status}` }
-    }
-    return { ok: true }
-  } catch (err) {
-    log.warn('Discord webhook exception', err?.message ?? String(err))
-    return { ok: false, error: err?.message ?? String(err) }
-  }
-}
-
-async function reportBugTelemetry(payload = {}) {
-  const config = appConfig?.bugTelemetry
-  if (!config?.enabled || !config?.webhookUrl) return { ok: false, error: 'Bug telemetry disabled' }
-
-  const data = normalizeTelemetryError(payload)
-  const diagnostics = [
-    `app=${app.getVersion()}`,
-    `platform=${process.platform}/${process.arch}`,
-    `electron=${process.versions.electron}`,
-    `node=${process.versions.node}`
-  ].join(' ')
-
-  const content = [
-    'DarkHub bug telemetry',
-    `source=${data.source}${data.page ? ` page=${data.page}` : ''}`,
-    diagnostics,
-    `message=${data.message}`,
-    data.details ? `details=${data.details}` : '',
-    data.stack ? `stack:\n${data.stack}` : ''
-  ].filter(Boolean).join('\n')
-
-  const rateKey = crypto
-    .createHash('sha1')
-    .update(`${data.source}|${data.page}|${data.message}|${data.stack.slice(0, 300)}`)
-    .digest('hex')
-
-  return postDiscord(content, { webhookUrl: config.webhookUrl, rateKey })
 }
 
 function isAllowedExternalProtocol(protocol) {
@@ -921,14 +784,8 @@ function createMainWindow() {
     log.warn('[session] failed to configure media partition headers', err?.message ?? String(err))
   }
 
-  win.webContents.on('render-process-gone', async (_event, details) => {
-    try {
-      await reportBugTelemetry({
-        source: 'renderer-crash',
-        message: details?.reason ?? 'renderer process gone',
-        details: `exitCode=${details?.exitCode ?? 'unknown'}`
-      })
-    } catch {}
+  win.webContents.on('render-process-gone', (_event, details) => {
+    log.error('renderer process gone', { reason: details?.reason, exitCode: details?.exitCode })
   })
 
   return win
@@ -1770,44 +1627,11 @@ ipcMain.handle('settings:getConfig', async () => {
           ...(config.app ?? {}),
           openAtLogin: startupEnabled
         },
-        telemetry: {
-          bugReportsEnabled: config.telemetry?.bugReportsEnabled !== false,
-          includeDiagnostics: true,
-          bugWebhookConfigured: Boolean(FIXED_BUG_WEBHOOK_URL)
-        },
         liveServices: {
           latencyGuardian: config.liveServices?.latencyGuardian !== false,
           overlay: config.liveServices?.overlay !== false,
           autoClicker: config.liveServices?.autoClicker !== false
         }
-      }
-    }
-  } catch (err) {
-    return { ok: false, error: err?.message ?? String(err) }
-  }
-})
-
-ipcMain.handle('settings:updateTelemetry', async (_event, payload) => {
-  try {
-    const { loadConfig: loadPersistedConfig, saveConfig } = await import('./configManager.js')
-    const current = await loadPersistedConfig()
-
-    const next = await saveConfig({
-      ...current,
-      telemetry: {
-        ...current.telemetry,
-        bugReportsEnabled: Boolean(payload?.bugReportsEnabled),
-        bugWebhookUrl: '',
-        includeDiagnostics: true
-      }
-    })
-    await loadRuntimeConfig()
-    return {
-      ok: true,
-      telemetry: {
-        bugReportsEnabled: next.telemetry?.bugReportsEnabled !== false,
-        includeDiagnostics: true,
-        bugWebhookConfigured: Boolean(FIXED_BUG_WEBHOOK_URL)
       }
     }
   } catch (err) {
@@ -1959,25 +1783,6 @@ ipcMain.handle('injector:inject', async (_event, payload) => {
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) };
   }
-})
-
-ipcMain.handle('telemetry:testBugReport', async () => {
-  return reportBugTelemetry({
-    source: 'settings-test',
-    message: 'Teste de telemetria de bugs do DarkHub',
-    details: 'Este evento confirma que o webhook configurado esta recebendo eventos.'
-  })
-})
-
-ipcMain.handle('discord:sendMessage', async (_event, payload) => {
-  const content = payload?.content
-  if (typeof content !== 'string' || !content.trim()) return { ok: false, error: 'Empty message' }
-  const res = await postDiscord(content)
-  return res
-})
-
-ipcMain.handle('discord:reportError', async (_event, payload) => {
-  return reportBugTelemetry(payload)
 })
 
 // ============================================================
@@ -2654,14 +2459,7 @@ ipcMain.handle('youtube:getVideoInfo', async (_event, payload) => {
 
     throw new Error(`yt-dlp falhou: ${ytDlpError}`)
   } catch (err) {
-    try {
-      await reportBugTelemetry({
-        source: 'main-ipc',
-        channel: 'youtube:getVideoInfo',
-        message: err?.message ?? String(err),
-        stack: err?.stack ?? ''
-      })
-    } catch {}
+    log.warn('youtube:getVideoInfo failed', err?.message ?? String(err))
     throw new Error(`Erro ao obter informações do vídeo/playlist: ${err.message}`)
   }
 })
@@ -2792,14 +2590,7 @@ ipcMain.handle('youtube:download', async (event, payload) => {
     if (code !== 0) throw new Error(stderr || 'Download via yt-dlp falhou.')
     return { ok: true, msg: isPlaylistMode ? 'Playlist baixada e convertida com sucesso!' : 'Download concluído com sucesso.' }
   } catch (err) {
-    try {
-      await reportBugTelemetry({
-        source: 'main-ipc',
-        channel: 'youtube:download',
-        message: err?.message ?? String(err),
-        stack: err?.stack ?? ''
-      })
-    } catch {}
+    log.warn('youtube:download failed', err?.message ?? String(err))
     throw new Error(`Download falhou: ${err.message}`)
   }
 })
@@ -3644,69 +3435,6 @@ ipcMain.handle('fs:writeFile', async (_event, payload) => {
   }
 })
 
-let autoClickerProc = null
-let autoClickerState = null
-let autoClickerHotkey = 'F6'
-let autoClickerTabActive = false
-
-function autoclickerConfigPath() {
-  return path.join(app.getPath('userData'), 'autoclicker.json')
-}
-
-async function loadAutoClickerConfig() {
-  try {
-    const raw = await fs.readFile(autoclickerConfigPath(), 'utf8')
-    const parsed = JSON.parse(raw)
-    if (typeof parsed?.hotkey === 'string') autoClickerHotkey = parsed.hotkey.trim() || null
-    if (parsed?.defaults && typeof parsed.defaults === 'object') {
-      const intervalMsRaw = Number(parsed.defaults.intervalMs)
-      const intervalMs = Number.isFinite(intervalMsRaw) ? Math.max(1, Math.min(10000, Math.trunc(intervalMsRaw))) : null
-      const button = parsed.defaults.button === 'right' ? 'right' : parsed.defaults.button === 'left' ? 'left' : null
-      if (intervalMs != null || button != null) {
-        autoClickerState = {
-          ...(autoClickerState ?? {}),
-          ...(intervalMs != null ? { intervalMs } : {}),
-          ...(button != null ? { button } : {})
-        }
-      }
-    }
-  } catch {}
-}
-
-async function saveAutoClickerConfig() {
-  const payload = {
-    hotkey: autoClickerHotkey ?? '',
-    defaults: {
-      intervalMs: autoClickerState?.intervalMs ?? 100,
-      button: autoClickerState?.button ?? 'left'
-    }
-  }
-  await fs.writeFile(autoclickerConfigPath(), JSON.stringify(payload, null, 2), 'utf8')
-}
-
-function unregisterAutoClickerHotkey() {
-  try {
-    if (autoClickerHotkey) globalShortcut.unregister(autoClickerHotkey)
-  } catch {}
-}
-
-function registerAutoClickerHotkey() {
-  if (!autoClickerHotkey) return { ok: true, enabled: false }
-  try {
-    unregisterAutoClickerHotkey()
-    const ok = globalShortcut.register(autoClickerHotkey, async () => {
-      try {
-        if (autoClickerProc) await stopAutoClicker()
-        else await startAutoClicker(autoClickerState ?? { intervalMs: 50, button: 'left' })
-      } catch {}
-    })
-    if (!ok) return { ok: false, error: 'Falha ao registrar atalho global (atalho inválido ou em uso).' }
-    return { ok: true, enabled: true, hotkey: autoClickerHotkey }
-  } catch (err) {
-    return { ok: false, error: err?.message ?? String(err) }
-  }
-}
-
 function getClickEnginePath() {
   const unpackedFromDir = __dirname.includes('app.asar')
     ? path.join(__dirname.replace('app.asar', 'app.asar.unpacked'), 'services', 'DarkHub.ClickEngine.exe')
@@ -3727,253 +3455,24 @@ function getClickEnginePath() {
   return null
 }
 
-async function startAutoClicker(payload) {
-  const button = payload?.button === 'right' || payload?.button === 'middle' || payload?.button === 'double' ? payload.button : 'left'
-  const intervalMsRaw = Number(payload?.intervalMs)
-  const intervalMs = Number.isFinite(intervalMsRaw) ? Math.max(1, Math.min(10000, Math.trunc(intervalMsRaw))) : 50
-
-  if (autoClickerProc) {
-    try {
-      if (autoClickerProc.stdin?.writable) {
-        autoClickerProc.stdin.write('STOP\nEXIT\n')
-      }
-      autoClickerProc.kill()
-    } catch {}
-    autoClickerProc = null
-  }
-
-  const nativeExe = getClickEnginePath()
-  if (nativeExe && fsRaw.existsSync(nativeExe)) {
-    try {
-      const p = spawn(nativeExe, [], {
-        windowsHide: true,
-        stdio: ['pipe', 'pipe', 'pipe']
-      })
-
-      p.on('error', (err) => {
-        log.warn('[AutoClicker] native engine process error:', err)
-        if (autoClickerProc === p) {
-          autoClickerProc = null
-          autoClickerState = null
-        }
-      })
-
-      p.on('exit', () => {
-        if (autoClickerProc !== p) return
-        autoClickerProc = null
-        autoClickerState = null
-        try {
-          mainWindow?.webContents?.send('autoclicker:changed', { running: false, state: null })
-        } catch {}
-      })
-
-      p.stdout?.on('data', (data) => {
-        const text = data.toString()
-        const lines = text.split('\n')
-        for (const line of lines) {
-          const trimmed = line.trim()
-          if (!trimmed) continue
-          try {
-            const parsed = JSON.parse(trimmed)
-            if (parsed.event === 'toggle') {
-              if (parsed.status === 'running') {
-                autoClickerState = {
-                  button: parsed.button || button,
-                  intervalMs: parsed.intervalMs || intervalMs,
-                  startedAt: Date.now(),
-                  isNative: true
-                }
-                mainWindow?.webContents?.send('autoclicker:changed', { running: true, state: autoClickerState })
-              } else {
-                autoClickerState = null
-                mainWindow?.webContents?.send('autoclicker:changed', { running: false, state: null })
-              }
-            }
-          } catch {}
-        }
-      })
-
-      autoClickerProc = p
-      autoClickerState = { button, intervalMs, startedAt: Date.now(), isNative: true }
-
-      if (autoClickerHotkey) {
-        p.stdin?.write(`HOTKEY ${autoClickerHotkey}\n`)
-      }
-      p.stdin?.write(`START ${button} ${intervalMs}\n`)
-
-      await saveAutoClickerConfig().catch(() => {})
-      return { ok: true, msg: 'AutoClicker iniciado com Engine Nativa C# (Baixo Nível)', state: autoClickerState }
-    } catch (err) {
-      log.warn('[AutoClicker] native spawn failed, falling back to powershell:', err)
-      autoClickerProc = null
-      autoClickerState = null
-    }
-  }
-
-  const ps = [
-    `$ErrorActionPreference='Stop'`,
-    `Add-Type @"`,
-    `using System;`,
-    `using System.Runtime.InteropServices;`,
-    `public static class Clicker {`,
-    `  [StructLayout(LayoutKind.Sequential)]`,
-    `  public struct INPUT { public UInt32 type; public MOUSEINPUT mi; }`,
-    `  [StructLayout(LayoutKind.Sequential)]`,
-    `  public struct MOUSEINPUT {`,
-    `    public Int32 dx; public Int32 dy; public UInt32 mouseData; public UInt32 dwFlags; public UInt32 time; public IntPtr dwExtraInfo;`,
-    `  }`,
-    `  [DllImport("user32.dll", SetLastError=true)] public static extern UInt32 SendInput(UInt32 nInputs, INPUT[] pInputs, Int32 cbSize);`,
-    `  [DllImport("user32.dll", SetLastError=true)] public static extern void mouse_event(UInt32 dwFlags, UInt32 dx, UInt32 dy, UInt32 dwData, Int32 dwExtraInfo);`,
-    `  public const UInt32 INPUT_MOUSE = 0;`,
-    `  public const UInt32 MOUSEEVENTF_LEFTDOWN = 0x0002;`,
-    `  public const UInt32 MOUSEEVENTF_LEFTUP = 0x0004;`,
-    `  public const UInt32 MOUSEEVENTF_RIGHTDOWN = 0x0008;`,
-    `  public const UInt32 MOUSEEVENTF_RIGHTUP = 0x0010;`,
-    `  public const UInt32 MOUSEEVENTF_MIDDLEDOWN = 0x0020;`,
-    `  public const UInt32 MOUSEEVENTF_MIDDLEUP = 0x0040;`,
-    `  public static void Click(string btn, int holdMs){`,
-    `    UInt32 down = MOUSEEVENTF_LEFTDOWN; UInt32 up = MOUSEEVENTF_LEFTUP;`,
-    `    if (btn == "right") { down = MOUSEEVENTF_RIGHTDOWN; up = MOUSEEVENTF_RIGHTUP; }`,
-    `    else if (btn == "middle") { down = MOUSEEVENTF_MIDDLEDOWN; up = MOUSEEVENTF_MIDDLEUP; }`,
-    `    var downIn = new INPUT { type = INPUT_MOUSE, mi = new MOUSEINPUT { dwFlags = down } };`,
-    `    var upIn   = new INPUT { type = INPUT_MOUSE, mi = new MOUSEINPUT { dwFlags = up   } };`,
-    `    UInt32 s1 = SendInput(1, new INPUT[] { downIn }, Marshal.SizeOf(typeof(INPUT)));`,
-    `    if (s1 == 0) mouse_event(down, 0, 0, 0, 0);`,
-    `    System.Threading.Thread.Sleep(holdMs);`,
-    `    UInt32 s2 = SendInput(1, new INPUT[] { upIn }, Marshal.SizeOf(typeof(INPUT)));`,
-    `    if (s2 == 0) mouse_event(up, 0, 0, 0, 0);`,
-    `  }`,
-    `}`,
-    `"@`,
-    `$btn = '${button}'`,
-    `$interval = ${intervalMs}`,
-    `$hold = [Math]::Max(1, [Math]::Min(12, [int]($interval / 3)))`,
-    `Start-Sleep -Milliseconds 200`,
-    `while($true){`,
-    `  if ($btn -eq 'double') { [Clicker]::Click('left', $hold); Start-Sleep -Milliseconds 20; [Clicker]::Click('left', $hold) }`,
-    `  else { [Clicker]::Click($btn, $hold) }`,
-    `  Start-Sleep -Milliseconds $interval`,
-    `}`
-  ].join('\n')
-
-  const p = spawn('powershell.exe', powerShellArgsForEncodedScript(encodePowerShellScript(ps)), {
-    windowsHide: true
-  })
-
-  autoClickerProc = p
-  autoClickerState = { button, intervalMs, startedAt: Date.now(), isNative: false }
-
-  p.on('error', (err) => {
-    log.warn('[AutoClicker] powershell fallback process error:', err)
-    if (autoClickerProc === p) {
-      autoClickerProc = null
-      autoClickerState = null
-    }
-  })
-
-  p.on('exit', () => {
-    if (autoClickerProc !== p) return
-    autoClickerProc = null
-    autoClickerState = null
-    try {
-      mainWindow?.webContents?.send('autoclicker:changed', { running: false, state: null })
-    } catch {}
-  })
-
-  await saveAutoClickerConfig().catch(() => {})
-  return { ok: true, msg: 'AutoClicker started', state: autoClickerState }
+const autoClicker = new AutoClickerService({
+  configFile: path.join(app.getPath('userData'), 'autoclicker.json'),
+  enginePath: getClickEnginePath,
+  onChange: (state) => { try { mainWindow?.webContents?.send('autoclicker:changed', state) } catch { /* closing */ } },
+  logger: log
+})
+const autoClickerCall = (fn) => async (_event, payload) => {
+  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
+  try { return await fn(payload) } catch (err) { return { ok: false, error: err?.message ?? String(err) } }
 }
 
-async function stopAutoClicker() {
-  if (autoClickerProc) {
-    // Capture the child: autoClickerProc is cleared below, so the delayed kill must not read it
-    // (previously it did and never killed anything — the PowerShell fallback kept clicking).
-    const proc = autoClickerProc
-    try {
-      if (proc.stdin?.writable) {
-        proc.stdin.write('STOP\nEXIT\n')
-      }
-      setTimeout(() => {
-        try { if (proc.exitCode === null) proc.kill() } catch {}
-      }, 100)
-    } catch {}
-    autoClickerProc = null
-    autoClickerState = null
-  }
-  return { ok: true, msg: 'AutoClicker stopped' }
-}
-
-ipcMain.handle('autoclicker:status', async () => {
-  return { ok: true, running: Boolean(autoClickerProc), state: autoClickerState, hotkey: autoClickerHotkey }
-})
-
-ipcMain.handle('autoclicker:start', async (_event, payload) => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
-  try {
-    return await startAutoClicker(payload)
-  } catch (err) {
-    autoClickerProc = null
-    autoClickerState = null
-    return { ok: false, error: err?.message ?? String(err) }
-  }
-})
-
-ipcMain.handle('autoclicker:stop', async () => {
-  try {
-    return await stopAutoClicker()
-  } catch (err) {
-    return { ok: false, error: err?.message ?? String(err) }
-  }
-})
-
-ipcMain.handle('autoclicker:toggle', async (_event, payload) => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
-  try {
-    if (autoClickerProc) return await stopAutoClicker()
-    const next = payload && typeof payload === 'object' ? payload : autoClickerState
-    return await startAutoClicker(next ?? { intervalMs: 50, button: 'left' })
-  } catch (err) {
-    return { ok: false, error: err?.message ?? String(err) }
-  }
-})
-
-ipcMain.handle('autoclicker:getHotkey', async () => {
-  return { ok: true, hotkey: autoClickerHotkey }
-})
-
-ipcMain.handle('autoclicker:setHotkey', async (_event, payload) => {
-  const hotkey = typeof payload?.hotkey === 'string' ? payload.hotkey.trim() : ''
-  // The hotkey is forwarded verbatim to the native engine's line-based stdin protocol, so
-  // reject whitespace/control characters that could smuggle extra commands (e.g. "F6\nSTART ...").
-  if (hotkey.length > 0 && !/^[\x21-\x7E]{1,64}$/.test(hotkey)) {
-    return { ok: false, error: 'Atalho inválido.' }
-  }
-  try {
-    if (hotkey.length === 0) {
-      unregisterAutoClickerHotkey()
-      autoClickerHotkey = null
-      if (autoClickerProc?.stdin?.writable) {
-        autoClickerProc.stdin.write('HOTKEY NONE\n')
-      }
-      await saveAutoClickerConfig().catch(() => {})
-      return { ok: true, enabled: false }
-    }
-    autoClickerHotkey = hotkey
-    const reg = registerAutoClickerHotkey()
-    if (autoClickerProc?.stdin?.writable) {
-      autoClickerProc.stdin.write(`HOTKEY ${autoClickerHotkey}\n`)
-    }
-    await saveAutoClickerConfig().catch(() => {})
-    return { ok: true, enabled: true, hotkey: autoClickerHotkey }
-  } catch (err) {
-    return { ok: false, error: err?.message ?? String(err) }
-  }
-})
-
-ipcMain.handle('autoclicker:setTabActive', (_event, active) => {
-  autoClickerTabActive = Boolean(active)
-  return { ok: true }
-})
+ipcMain.handle('autoclicker:status', async () => ({ ok: true, ...autoClicker.state() }))
+ipcMain.handle('autoclicker:start', autoClickerCall((p) => autoClicker.start(p)))
+ipcMain.handle('autoclicker:stop', autoClickerCall(() => autoClicker.stop()))
+ipcMain.handle('autoclicker:toggle', autoClickerCall((p) => autoClicker.toggle(p && typeof p === 'object' ? p : null)))
+ipcMain.handle('autoclicker:getHotkey', async () => ({ ok: true, hotkey: autoClicker.hotkey }))
+ipcMain.handle('autoclicker:setHotkey', autoClickerCall((p) => autoClicker.setHotkey(p?.hotkey)))
+ipcMain.handle('autoclicker:setTabActive', () => ({ ok: true }))
 
 ipcMain.handle('metadata:read', async (_event, imagePath) => {
   try {
@@ -4032,24 +3531,12 @@ ipcMain.handle('metadata:update', async (_event, payload) => {
   }
 })
 
-process.on('uncaughtException', async (err) => {
-  try {
-    await reportBugTelemetry({
-      source: 'main-uncaughtException',
-      message: err?.message ?? String(err),
-      stack: err?.stack ?? ''
-    })
-  } catch {}
+process.on('uncaughtException', (err) => {
+  log.error('uncaughtException', err?.stack ?? err?.message ?? String(err))
 })
 
-process.on('unhandledRejection', async (reason) => {
-  try {
-    await reportBugTelemetry({
-      source: 'main-unhandledRejection',
-      message: reason?.message ?? String(reason),
-      stack: reason?.stack ?? ''
-    })
-  } catch {}
+process.on('unhandledRejection', (reason) => {
+  log.error('unhandledRejection', reason?.stack ?? reason?.message ?? String(reason))
 })
 
 const WINGET_ID_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,127}$/;
@@ -4214,36 +3701,16 @@ app.whenReady().then(async () => {
 
     if (liveServices.autoClicker !== false) {
       try {
-        log.info('[startup-bg] loading autoclicker config')
-        await loadAutoClickerConfig()
-        log.info('[startup-bg] registering autoclicker hotkey')
-        registerAutoClickerHotkey()
+        autoClicker.load()
+        autoClicker.arm()
       } catch (err) {
         log.warn('[startup-bg] autoclicker init failed:', err?.message ?? String(err))
       }
     }
 
-    if (liveServices.overlay !== false) {
-      try {
-        log.info('[startup-bg] registering overlay hotkey')
-        globalShortcut.register('F8', () => {
-          import('./overlay.js').then(({ toggleGamingOverlay }) => {
-            toggleGamingOverlay()
-          }).catch((err) => log.warn('[overlay] toggle failed:', err?.message ?? String(err)))
-        })
-      } catch (err) {
-        log.warn('[startup-bg] overlay hotkey failed:', err?.message ?? String(err))
-      }
-    }
-
-    try {
-      log.info('[startup-bg] initializing machine marker')
-      const { ensureMachineMarker } = await import('./machineMarker.js')
-      await ensureMachineMarker()
-      log.info('[startup-bg] machine marker ready')
-    } catch (err) {
-      log.warn('[startup-bg] machine marker failed:', err?.message ?? String(err))
-    }
+    // Earlier versions kept a hidden hardware fingerprint; remove what they left behind.
+    fs.rm(path.join(process.env.ProgramData || 'C:\\ProgramData', 'DarkHub', 'm.dat'), { force: true }).catch(() => {})
+    runCommand('reg.exe', ['delete', 'HKCU\\Software\\DarkHub\\MM', '/f'], { timeoutMs: 8000 }).catch(() => {})
 
     if (liveServices.latencyGuardian === false) latencyServiceState = 'disabled'
     if (liveServices.latencyGuardian !== false) {
@@ -4276,13 +3743,17 @@ app.whenReady().then(async () => {
 
     if (liveServices.overlay !== false) {
 
-      try {
-        globalShortcut.register('CommandOrControl+Shift+F', () => {
-          toggleFramePacerOverlay()
-        })
-      } catch (e) {
-        log.warn('[startup-bg] failed to register FramePacer hotkey', e)
-      }
+      // Ctrl+Shift+F is a common shortcut (search in editors and browsers): it belongs to DarkHub only while the
+      // Frame Pacer runs, the only time its overlay is useful
+      const FP_HOTKEY = 'CommandOrControl+Shift+F'
+      FramePacerEngine.on('status', ({ isRunning }) => {
+        try {
+          if (isRunning && !globalShortcut.isRegistered(FP_HOTKEY)) globalShortcut.register(FP_HOTKEY, () => toggleFramePacerOverlay())
+          else if (!isRunning && globalShortcut.isRegistered(FP_HOTKEY)) globalShortcut.unregister(FP_HOTKEY)
+        } catch (e) {
+          log.warn('[framepacer] hotkey:', e?.message ?? e)
+        }
+      })
 
       FramePacerEngine.on('metrics', (metrics) => {
         if (mainWindow && !mainWindow.isDestroyed()) {

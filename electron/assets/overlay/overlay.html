@@ -261,12 +261,8 @@
     if (userStyle.textContent) userStyle.textContent = ''
     const s = d.settings
     box.style.setProperty('--bg', String(s.background))
-    box.style.opacity = String(s.opacity)
-    box.style.transform = `scale(${s.scale})`
-    const right = s.position.endsWith('r'), bottom = s.position.startsWith('b')
-    box.style.left = right ? '' : '0'; box.style.right = right ? '0' : ''
-    box.style.top = bottom ? '' : '0'; box.style.bottom = bottom ? '0' : ''
-    box.style.transformOrigin = `${bottom ? 'bottom' : 'top'} ${right ? 'right' : 'left'}`
+    // same anchor + offset rules as the editor's layouts: tl tc tr / ml mr / bl bc br
+    placeCustom({ anchor: s.position, offsetX: s.offsetX || 0, offsetY: s.offsetY || 0, scale: s.scale, opacity: s.opacity })
     if (d.panel) { renderPanel(d.panel, s.scale); return }
     const sig = 'compact|' + (d.graph ? 1 : 0)
     if (sig !== lastSig) {

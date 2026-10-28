@@ -72,11 +72,12 @@ export interface OvlLayout { version: 1; id: string; name: string; anchor: 'tl' 
 export interface OvlLayoutsState { ok: boolean; error?: string; active: string; layouts: OvlLayout[]; presets: Record<string, string>; metrics: { key: string; group: string; label: string; unit: string; decimals: number }[]; series: { key: string; label: string }[]; saved?: OvlLayout }
 export interface OvlCanvas { id: string; kind: 'graph' | 'bars'; series?: { color: string; values: number[] }[]; values?: number[]; floor?: number; ceil?: number; height: number; width?: number; fill?: boolean; lineWidth?: number; grid?: boolean; colors?: string[] }
 export interface OvlPreview { ok: boolean; error?: string; live: boolean; html: string; css: string; canvases: OvlCanvas[]; box: { anchor: string; offsetX: number; offsetY: number; scale: number; opacity: number } }
-export interface OverlaySettings { layout: 'compact' | 'advanced' | 'oc' | 'custom'; position: 'tl' | 'tr' | 'bl' | 'br'; scale: number; opacity: number; background: number; intervalMs: number; hotkey: string; metrics: string[]; logFolder: string }
+export interface OverlayDisplay { id: string; name: string; primary: boolean; width: number; height: number; hz: number | null }
+export interface OverlaySettings { layout: 'compact' | 'advanced' | 'oc' | 'custom'; position: 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br'; offsetX: number; offsetY: number; monitor: string; scale: number; opacity: number; background: number; intervalMs: number; hotkey: string; metrics: string[]; logFolder: string }
 export interface OverlayFrameStats { fps: number | null; frameTimeMs: number | null; low1: number | null; low01: number | null; maxFrameTimeMs: number; gpuBusyMs: number | null; latencyMs: number | null; presentMode: string; graph: number[] }
 export interface OverlayStatus {
   ok: boolean; error?: string | null; visible?: boolean; settings?: OverlaySettings; target?: { pid: number; name: string } | null; mode?: 'foreground' | 'fixed';
-  capturing?: boolean; presentMonInstalled?: boolean; stats?: OverlayFrameStats | null;
+  capturing?: boolean; presentMonInstalled?: boolean; stats?: OverlayFrameStats | null; displays?: OverlayDisplay[]; displayId?: string | null;
   lastSession?: { name: string; frames: number; seconds: number; avgFps: number; low1: number; low01: number; maxFrameTimeMs: number; at: number } | null;
 }
 
@@ -344,9 +345,6 @@ export interface DarkHubAPI {
   };
   settings: {
     getConfig: () => Promise<any>;
-    updateTelemetry: (payload: {
-      bugReportsEnabled: boolean;
-    }) => Promise<any>;
     updateLiveServices: (payload: {
       latencyGuardian?: boolean;
       overlay?: boolean;
@@ -362,9 +360,6 @@ export interface DarkHubAPI {
   };
   injector: {
     inject: (payload: { processName: string; dllPath: string }) => Promise<{ ok: boolean; message?: string; error?: string }>;
-  };
-  telemetry: {
-    testBugReport: () => Promise<any>;
   };
     optimizer: {
     listOperations: () => Promise<any>;
@@ -962,10 +957,6 @@ export interface DarkHubAPI {
     snippetsList: () => Promise<{ ok: boolean; snippets?: PsSnippet[]; error?: string }>;
     snippetSave: (payload: { id?: string; name: string; script: string; elevated?: boolean }) => Promise<{ ok: boolean; snippet?: PsSnippet; snippets?: PsSnippet[]; error?: string }>;
     snippetDelete: (payload: { id: string }) => Promise<{ ok: boolean; snippets?: PsSnippet[]; error?: string }>;
-  };
-  discord: {
-    sendMessage: (payload: any) => Promise<any>;
-    reportError: (payload: any) => Promise<any>;
   };
   window: {
     minimize: () => Promise<void>;

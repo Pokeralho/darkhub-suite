@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "DarkHub Vault",
   "short_name": "DarkHub Vault",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Fills logins from the DarkHub Suite password vault (local only, through native messaging).",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1U5XlVHLDJu0+4A1mjYGGXCLAT8CdYouvXjz9PQxowMyNxCBQ1cdNQDrFsaSjNF14odlqjBT9VUiJqynLd4GqMmsNXtE+s09pleGvACCnHTS/93eH1sJwjagyluXDDzsNtHxobf7MbIhp3/OVMHzDTG6WD6WB/wwIgeEmGcv2TUfUhfYA/NBp4PjVi+FO6RnrlLeELDb7ioxeNqhkhVy02B/LXJaC5daOaP/bj+enY8nvpoypZpFYRUeLYKWRaU0FL3SJFsWMYCxUbndm+hrt1j5adrB7TiP1D5VD5KWUypcaA2R0V37GHJ92oM1fAasKviTxolhhjUXHvZToXwpOwIDAQAB",
   "icons": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
@@ -28,7 +28,8 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "vault@darkhub.app",
-      "strict_min_version": "115.0"
+      "strict_min_version": "115.0",
+      "data_collection_permissions": { "required": ["none"] }
     }
   }
 }

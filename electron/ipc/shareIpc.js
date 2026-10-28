@@ -34,7 +34,7 @@ export function normalizeShareConfig(c = {}, picturesDir = '') {
 }
 
 /** `share:*`: Susuya uploads (direct download links) and native-resolution screenshots. */
-export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globalShortcut, BrowserWindow, Notification, logger } = {}) {
+export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotkeys, BrowserWindow, Notification, logger } = {}) {
   const userData = app.getPath('userData')
   const configFile = path.join(userData, 'share.json')
   const historyFile = path.join(userData, 'susuya-history.json')
@@ -109,21 +109,15 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globa
     return { ok: true, ...info }
   }
 
-  // two global shortcuts: full screen and region selection
+  // two hotkeys: full screen and region selection (watched without taking the key from the game)
   const registered = { hotkey: null, regionHotkey: null }
   const bindHotkey = (key, accelerator) => {
-    if (registered[key]) { try { globalShortcut.unregister(registered[key]) } catch { /* gone */ } registered[key] = null }
-    if (!accelerator) return { ok: true }
+    registered[key] = null
     const region = key === 'regionHotkey'
-    try {
-      if (!globalShortcut.register(accelerator, () => { capture(region).catch((e) => logger?.warn?.('Share', `capture: ${e?.message ?? e}`)) })) {
-        return { ok: false, error: 'atalho em uso por outro programa' }
-      }
-      registered[key] = accelerator
-      return { ok: true }
-    } catch (e) {
-      return { ok: false, error: `atalho inválido: ${e?.message ?? e}` }
-    }
+    const r = hotkeys.register(region ? 'shotRegion' : 'shot', accelerator, () => { capture(region).catch((e) => logger?.warn?.('Share', `capture: ${e?.message ?? e}`)) })
+    if (!r.ok) return { ok: false, error: r.error === 'in-use' ? 'atalho já usado por outra função do DarkHub' : 'atalho inválido' }
+    registered[key] = r.hotkey || null
+    return { ok: true }
   }
 
   const handle = (channel, fn) => ipcMain.handle(channel, async (event, payload) => {
@@ -218,7 +212,6 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, globa
   })
 
   app.whenReady().then(() => { bindHotkey('hotkey', config.hotkey); bindHotkey('regionHotkey', config.regionHotkey) })
-  app.on('will-quit', () => { for (const acc of Object.values(registered)) { if (acc) { try { globalShortcut.unregister(acc) } catch { /* gone */ } } } })
 }
 
 export default registerShareIPC

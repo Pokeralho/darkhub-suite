@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero dh-card">
+      <div class="swatch" id="swatch" aria-live="polite"><span id="swatch-hex">—</span></div>
+      <div class="side">
+        <button id="pick" class="dh-btn dh-btn-accent big" type="button"><span id="l-pick">Pegar cor da tela</span></button>
+        <p class="dh-help" id="l-how">A janela some, você clica no ponto (em qualquer monitor) e ela volta. Setas movem 1 pixel, Esc cancela.</p>
+        <label class="dh-row auto"><input type="checkbox" id="autocopy"> <span id="l-auto">Copiar automaticamente em</span>
+          <select id="fmt" class="dh-input">
+            <option value="hex">HEX</option><option value="rgb">RGB</option><option value="hsl">HSL</option><option value="oklch">OKLCH</option>
+          </select>
+        </label>
+        <p class="status" id="status" role="status"></p>
+      </div>
+    </section>
+
+    <section class="dh-card formats" id="formats" hidden></section>
+
+    <section class="dh-card">
+      <div class="dh-row head">
+        <h2 id="l-recent">Últimas cores</h2>
+        <button id="clear" class="dh-btn" type="button"><span id="l-clear">Limpar</span></button>
+      </div>
+      <div class="history" id="history"></div>
+      <p class="dh-help" id="empty">As cores que você pegar aparecem aqui.</p>
+    </section>
+  </main>
+  <script src="colors.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

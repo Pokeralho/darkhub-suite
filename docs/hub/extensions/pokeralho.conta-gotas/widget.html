@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+  <style>
+    body { padding: 2px; }
+    .top { display: flex; align-items: center; gap: 10px; }
+    .sw { width: 44px; height: 44px; border-radius: 8px; border: 1px solid var(--dh-border); flex: none; }
+    .hex { font: 600 15px var(--dh-mono); }
+    .row { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    .row button { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--dh-border); cursor: pointer; padding: 0; }
+    .grow { flex: 1; min-width: 0; }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div class="sw" id="sw"></div>
+    <div class="grow"><div class="hex" id="hex">—</div><div class="dh-help" id="msg"></div></div>
+    <button id="pick" class="dh-btn dh-btn-accent" type="button"></button>
+  </div>
+  <div class="row" id="recent"></div>
+  <script src="colors.js"></script>
+  <script src="widget.js"></script>
+</body>
+</html>

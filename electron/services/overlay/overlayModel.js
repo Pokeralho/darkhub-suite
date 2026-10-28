@@ -2,9 +2,14 @@
 
 export const METRICS = ['fps', 'low1', 'frametime', 'graph', 'cpu', 'cpuTemp', 'gpu', 'gpuTemp', 'vram', 'gpuClock', 'ram', 'cpuPower', 'latency']
 export const LAYOUTS = ['compact', 'advanced', 'oc', 'custom']
+export const POSITIONS = ['tl', 'tc', 'tr', 'ml', 'mr', 'bl', 'bc', 'br']
 export const DEFAULTS = {
   layout: 'compact',
   position: 'tl',
+  offsetX: 0,
+  offsetY: 0,
+  // 'game': the monitor showing the game (follows it), 'primary', 'cursor' (where the mouse is when it opens), or a display id
+  monitor: 'game',
   scale: 1,
   opacity: 1,
   background: 0.72,
@@ -19,7 +24,10 @@ export function normalizeSettings(s = {}) {
   const clamp = (v, lo, hi, d) => (Number.isFinite(Number(v)) ? Math.min(hi, Math.max(lo, Number(v))) : d)
   return {
     layout: LAYOUTS.includes(s.layout) ? s.layout : DEFAULTS.layout,
-    position: ['tl', 'tr', 'bl', 'br'].includes(s.position) ? s.position : DEFAULTS.position,
+    position: POSITIONS.includes(s.position) ? s.position : DEFAULTS.position,
+    offsetX: Math.round(clamp(s.offsetX, -4000, 4000, 0)),
+    offsetY: Math.round(clamp(s.offsetY, -4000, 4000, 0)),
+    monitor: ['game', 'primary', 'cursor'].includes(s.monitor) || /^\d{1,20}$/.test(String(s.monitor ?? '')) ? String(s.monitor) : DEFAULTS.monitor,
     scale: clamp(s.scale, 0.6, 2.5, DEFAULTS.scale),
     opacity: clamp(s.opacity, 0.2, 1, DEFAULTS.opacity),
     background: clamp(s.background, 0, 1, DEFAULTS.background),
@@ -28,6 +36,17 @@ export function normalizeSettings(s = {}) {
     metrics: Array.isArray(s.metrics) ? s.metrics.filter((m) => METRICS.includes(m)) : DEFAULTS.metrics,
     logFolder: typeof s.logFolder === 'string' ? s.logFolder : ''
   }
+}
+
+/** Display the overlay goes on. displays: Electron displays; gameId / cursorId: ids of the displays showing the game and
+ *  the mouse (null when unknown). A display that is no longer connected falls back to the game's, then the primary. */
+export function pickDisplay(monitor, displays, { gameId = null, cursorId = null, primaryId = null } = {}) {
+  const byId = (id) => (id == null ? null : displays.find((d) => String(d.id) === String(id)) || null)
+  const primary = byId(primaryId) || displays[0] || null
+  if (monitor === 'primary') return primary
+  if (monitor === 'cursor') return byId(cursorId) || primary
+  if (monitor !== 'game') { const fixed = byId(monitor); if (fixed) return fixed }
+  return byId(gameId) || byId(cursorId) || primary
 }
 
 const v = (x) => (x && typeof x === 'object' && 'value' in x ? x.value : x)

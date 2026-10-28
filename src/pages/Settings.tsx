@@ -19,12 +19,6 @@ export default function SettingsPage() {
     if (!Number.isFinite(n) || n < 0) return 10
     return Math.trunc(n)
   })
-  const [telemetry, setTelemetry] = useState({
-    bugReportsEnabled: true
-  })
-  const [telemetryBusy, setTelemetryBusy] = useState(false)
-  const [telemetryStatus, setTelemetryStatus] = useState<{ ok: boolean; msg: string } | null>(null)
-
   const [liveServices, setLiveServices] = useState({
     latencyGuardian: true,
     overlay: true,
@@ -45,12 +39,8 @@ export default function SettingsPage() {
     let alive = true
     window.darkhub?.settings?.getConfig?.().then((res) => {
       if (!alive || !res?.ok) return
-      const next = res.config?.telemetry ?? {}
       const ls = res.config?.liveServices ?? {}
       const appCfg = res.config?.app ?? {}
-      setTelemetry({
-        bugReportsEnabled: next.bugReportsEnabled !== false
-      })
       setLiveServices({
         latencyGuardian: ls.latencyGuardian !== false,
         overlay: ls.overlay !== false,
@@ -70,24 +60,6 @@ export default function SettingsPage() {
       window.darkhub.vault.setAutoLockMinutes(vaultAutoLockMinutes)
     }
   }, [vaultAutoLockMinutes])
-
-  const saveTelemetry = async () => {
-    setTelemetryBusy(true)
-    setTelemetryStatus(null)
-    try {
-      const res = await window.darkhub?.settings?.updateTelemetry?.(telemetry)
-      if (res?.ok) {
-        setTelemetry(res.telemetry)
-        setTelemetryStatus({ ok: true, msg: 'Telemetria de bugs salva.' })
-      } else {
-        setTelemetryStatus({ ok: false, msg: res?.error ?? 'Falha ao salvar telemetria.' })
-      }
-    } catch (err: any) {
-      setTelemetryStatus({ ok: false, msg: err?.message ?? String(err) })
-    } finally {
-      setTelemetryBusy(false)
-    }
-  }
 
   const saveLiveServices = async () => {
     setLiveServicesBusy(true)
@@ -363,32 +335,6 @@ export default function SettingsPage() {
       </SettingsGroup>
 
       <SettingsGroup title={t('settings.security')}>
-        <SettingRow
-          label="Telemetria de erros e bugs"
-          description={t('settings.crashLogsDesc', 'Envia logs anônimos de crashes e exceções para o canal de suporte.')}
-          control={
-            <label className="flex items-center gap-2 text-[12.5px] text-zinc-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={telemetry.bugReportsEnabled}
-                onChange={(e) => setTelemetry((prev) => ({ ...prev, bugReportsEnabled: e.target.checked }))}
-              />
-              <span>Ativar envio de bugs</span>
-            </label>
-          }
-        >
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <span className="dh-help">{t('settings.redactionNote', 'Dados sensíveis e caminhos de usuário são redigidos automaticamente.')}</span>
-            <div className="flex items-center gap-3">
-              <StatusLine status={telemetryStatus} />
-              <button onClick={saveTelemetry} disabled={telemetryBusy} className="dh-btn dh-btn-sm">
-                {telemetryBusy ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
-                <span>Salvar telemetria</span>
-              </button>
-            </div>
-          </div>
-        </SettingRow>
-
         <SettingRow
           label={t('settings.vaultAutoLock')}
           description={t('settings.securityHint')}

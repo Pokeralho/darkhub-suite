@@ -6,6 +6,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-10-28
+
+### Added
+- DarkOS screen: "Create installation USB" writes the DarkOS ISO to a USB drive without Rufus or Ventoy. It finds the
+  ISO in Downloads (or any you pick), can check it against the SHA-256 published on darkos.darkhub.ink, lists only USB
+  drives of 8 GB or more (never the system disk), erases only after a confirmation and re-checks the drive is the same
+  one before writing. The drive gets MBR + FAT32 (boots on UEFI and BIOS PCs); a Windows image over 4 GB (install.wim or
+  install.esd) is split into .swm parts. Copy progress per file and a final check of the boot files and the image.
+- Extensions: new `screen` permission and `darkhub.screen.pickColor()`. DarkHub hides, the user clicks a point on any
+  monitor (magnifier, arrow keys move one pixel, Esc cancels) and only that color reaches the extension.
+- Official extension "Conta-gotas" (color picker): HEX, RGB, HSL and OKLCH with copy buttons, automatic copy in the
+  format you choose, the last 24 colors, and a Dashboard card.
+- In-game overlay: choose the monitor (the game's monitor, following it when the game moves; the main one; where the
+  mouse is; or a specific one), eight positions picked on a miniature of the screen, and a fine X/Y offset in pixels.
+
+### Changed
+- Auto clicker: the hotkey can be any key or combination (Ctrl, Alt, Shift, Win + a key, including numpad and symbol
+  keys) or a side mouse button, recorded by pressing it, and it can be removed. The native engine watches the hotkey
+  without taking it: the game still receives the key (before, a Windows global shortcut swallowed F6 in every game).
+  The old default F6 becomes Ctrl+Shift+F6; a single key shows a warning that the game also gets it.
+- Frame Pacer: Ctrl+Shift+F (search in editors and browsers) is only taken while the Frame Pacer runs.
+- The in-game overlay and screenshot hotkeys are watched by a small native helper (DarkHub.HotkeyWatch.exe) instead of
+  Windows global shortcuts, so the game still receives those keys; both are recorded by pressing them, like the auto
+  clicker's. Two DarkHub features cannot share one hotkey.
+- Packages that ask for a newer DarkHub (`minApp`) are not installed; the preview says which version is needed.
+- Browser extension 0.2.1: Firefox Add-ons data collection declaration (`none`); the app accepts the extension ids the
+  Chrome and Edge stores will assign (list in nativeHost.js).
+- Release workflow on GitHub Actions with build attestations (docs/release/SIGNING.md has the code signing plan).
+
+### Fixed
+- `install-deps.ps1` was missing from the repository (gitignored), which broke CI on a clean checkout.
+- The bridge end-to-end tests have more time under heavy load.
+
+### Removed
+- Error reporting to a Discord webhook (crashes, failed downloads and renderer errors were sent when the build had a
+  webhook configured) and the "Telemetria de erros e bugs" setting. Errors now stay in the local log.
+- The hidden machine marker (a hardware fingerprint written to `C:\ProgramData\DarkHub\m.dat` and the registry); the
+  app deletes what earlier versions left.
+- The old F8 "gaming overlay" and its booster: F8 was registered as a global shortcut, so games never received the key.
+  The overlay is on Ctrl+Shift+F9.
+
 ## [0.7.3] - 2026-10-27
 
 ### Added

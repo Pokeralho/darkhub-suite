@@ -91,6 +91,7 @@ Every page gets `window.darkhub`. Calls return promises; a call without its perm
 | `darkhub.net.fetch(url, { method, headers, body })` | `network` | `{ ok, status, headers, body, json(), text() }`; only the origins in `network`, no cookies, 2 MB, 20 s |
 | `darkhub.notify(title, body)` | `notifications` | a Windows notification |
 | `darkhub.clipboard.writeText(text)` | `clipboard` | copies text |
+| `darkhub.screen.pickColor()` | `screen` | DarkHub hides, the user clicks a point on any monitor (magnifier, arrows, Esc cancels); returns `{ hex, rgb: [r, g, b], x, y }` or `null` if canceled. Only that color reaches the extension, never the screen image |
 | `darkhub.packages.preview(pkg)` | `packages` | the same preview the Presets screen shows, for this PC |
 | `darkhub.packages.install(pkg)` / `installFromHub(id)` | `packages` | asks the **user** to approve in DarkHub, then installs; `{ ok, error }` |
 
@@ -140,5 +141,8 @@ smallest list of permissions and network origins that works.
 
 ## 6. Example
 
-[extensions/pokeralho.painel-termico](extensions/pokeralho.painel-termico): a live CPU/GPU temperature chart with session
-peaks, an alert over a limit you choose, and a Dashboard card. Permissions: `sensors`, `storage`, `notifications`.
+- [extensions/pokeralho.painel-termico](extensions/pokeralho.painel-termico): a live CPU/GPU temperature chart with
+  session peaks, an alert over a limit you choose, and a Dashboard card. Permissions: `sensors`, `storage`,
+  `notifications`.
+- [extensions/pokeralho.conta-gotas](extensions/pokeralho.conta-gotas): a screen color picker with HEX/RGB/HSL/OKLCH,
+  history and a Dashboard card. Permissions: `screen`, `clipboard`, `storage`.

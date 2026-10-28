@@ -103,8 +103,19 @@ export interface DarkOSAPI {
   getFailures: () => Promise<DarkOSReadResponse<any>>;
   getRebootPending: () => Promise<DarkOSReadResponse<any>>;
   exportDiagnostics: () => Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>;
+  usbDisks: () => Promise<{ ok: boolean; error?: string; disks?: DarkOSUsbDisk[] }>;
+  usbFindIsos: () => Promise<{ ok: boolean; isos?: DarkOSIso[] }>;
+  usbPickIso: () => Promise<{ ok: boolean; canceled?: boolean; error?: string; iso?: DarkOSIso }>;
+  usbHashIso: (payload: { path: string }) => Promise<{ ok: boolean; error?: string; sha256?: string }>;
+  /** Erases the disk and writes the ISO; expectedSize is the size shown when the user confirmed. */
+  usbWrite: (payload: { diskNumber: number; expectedSize: number; isoPath: string }) => Promise<{ ok: boolean; drive?: string; error?: string; detail?: string }>;
+  usbCancel: () => Promise<{ ok: boolean }>;
+  onUsbEvent: (callback: (evt: { step?: string; percent?: number; file?: string }) => void) => () => void;
   onRunEvent: (callback: (evt: DarkOSRunEvent) => void) => () => void;
 }
+
+export interface DarkOSUsbDisk { number: number; name: string; size: number; bus: string; style: string; letters: string }
+export interface DarkOSIso { path: string; name: string; size: number; mtime: number }
 
 export interface DarkOSRelease {
   version: string | null;

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://darkhub.ink/schema/v1.json",
+  "schemaVersion": 1,
+  "type": "extension",
+  "id": "pokeralho.conta-gotas",
+  "version": "1.0.0",
+  "name": { "pt-BR": "Conta-gotas", "en-US": "Color picker" },
+  "description": {
+    "pt-BR": "Pega a cor de qualquer ponto da tela, em qualquer monitor, com lupa de precisão. Copia em HEX, RGB, HSL ou OKLCH e guarda as últimas cores.",
+    "en-US": "Picks the color of any point on the screen, on any monitor, with a precision magnifier. Copies it as HEX, RGB, HSL or OKLCH and keeps your recent colors."
+  },
+  "author": { "github": "Pokeralho", "name": "Pokeralho" },
+  "license": "MIT",
+  "tags": ["color", "picker", "design", "eyedropper"],
+  "minApp": "0.7.4",
+  "permissions": ["screen", "clipboard", "storage"],
+  "contributes": {
+    "pages": [{ "id": "main", "title": { "pt-BR": "Conta-gotas", "en-US": "Color picker" }, "icon": "image", "entry": "index.html" }],
+    "widgets": [{ "id": "quick", "title": { "pt-BR": "Conta-gotas", "en-US": "Color picker" }, "entry": "widget.html" }]
+  }
+}

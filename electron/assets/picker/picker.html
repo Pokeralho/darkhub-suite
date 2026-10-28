@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+<title>DarkHub color picker</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; cursor: crosshair; user-select: none; }
+  #shot { position: fixed; inset: 0; width: 100vw; height: 100vh; image-rendering: pixelated; }
+  #loupe { position: fixed; pointer-events: none; display: none; width: 154px; border-radius: 12px; overflow: hidden;
+    background: oklch(0.193 0.011 255); border: 1px solid oklch(0.34 0.013 255); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+    font: 600 12px/1 "Cascadia Mono", Consolas, monospace; color: oklch(0.945 0.006 255); }
+  #zoom { display: block; width: 154px; height: 154px; image-rendering: pixelated; }
+  #info { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
+  #swatch { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.25); }
+  #hint { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); pointer-events: none; padding: 7px 12px; border-radius: 8px;
+    background: oklch(0.193 0.011 255 / 0.92); border: 1px solid oklch(0.34 0.013 255); color: oklch(0.86 0.01 255);
+    font: 12.5px "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+</style>
+</head>
+<body>
+<canvas id="shot"></canvas>
+<div id="loupe"><canvas id="zoom" width="11" height="11"></canvas><div id="info"><span id="swatch"></span><span id="hex">#000000</span></div></div>
+<div id="hint"></div>
+<script>
+  const pt = (navigator.language || '').toLowerCase().startsWith('pt')
+  document.getElementById('hint').textContent = pt
+    ? 'Clique para escolher a cor · setas movem 1 pixel, Enter escolhe · Esc cancela'
+    : 'Click to pick the color · arrows move 1 pixel, Enter picks · Esc cancels'
+  const shot = document.getElementById('shot'), zoom = document.getElementById('zoom'), loupe = document.getElementById('loupe')
+  const zctx = zoom.getContext('2d')
+  let src = null, sctx = null, origin = { x: 0, y: 0 }, px = { x: 0, y: 0 }, ready = false
+
+  window.picker.onImage(({ image, origin: o }) => {
+    origin = o
+    const img = new Image()
+    img.onload = () => {
+      src = document.createElement('canvas')
+      src.width = img.naturalWidth; src.height = img.naturalHeight
+      sctx = src.getContext('2d', { willReadFrequently: true })
+      sctx.drawImage(img, 0, 0)
+      shot.width = img.naturalWidth; shot.height = img.naturalHeight
+      shot.getContext('2d').drawImage(img, 0, 0)
+      ready = true
+    }
+    img.src = image
+  })
+
+  const color = (x, y) => { const d = sctx.getImageData(x, y, 1, 1).data; return [d[0], d[1], d[2]] }
+  const hex = (c) => '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('')
+
+  function show(cssX, cssY) {
+    if (!ready) return
+    px.x = Math.max(0, Math.min(src.width - 1, Math.floor(cssX / innerWidth * src.width)))
+    px.y = Math.max(0, Math.min(src.height - 1, Math.floor(cssY / innerHeight * src.height)))
+    draw(cssX, cssY)
+  }
+  function draw(cssX, cssY) {
+    zctx.imageSmoothingEnabled = false
+    zctx.fillStyle = '#000'; zctx.fillRect(0, 0, 11, 11)
+    zctx.drawImage(src, px.x - 5, px.y - 5, 11, 11, 0, 0, 11, 11)
+    const c = color(px.x, px.y)
+    document.getElementById('hex').textContent = hex(c).toUpperCase()
+    document.getElementById('swatch').style.background = hex(c)
+    // the loupe sits beside the cursor and flips near the edges
+    const w = 156, h = 190
+    loupe.style.left = (cssX + 24 + w > innerWidth ? cssX - 24 - w : cssX + 24) + 'px'
+    loupe.style.top = (cssY + 24 + h > innerHeight ? cssY - 24 - h : cssY + 24) + 'px'
+    loupe.style.display = 'block'
+  }
+  // a crosshair on the center pixel of the magnifier
+  const cross = document.createElement('div')
+  cross.style.cssText = 'position:absolute;left:70px;top:70px;width:14px;height:14px;border:1.5px solid #fff;box-shadow:0 0 0 1px #000;pointer-events:none'
+  loupe.appendChild(cross)
+
+  let last = { x: 0, y: 0 }
+  addEventListener('mousemove', (e) => { last = { x: e.clientX, y: e.clientY }; show(e.clientX, e.clientY) })
+  function pick() {
+    if (!ready) return
+    window.picker.done({ ok: true, rgb: color(px.x, px.y), x: origin.x + px.x, y: origin.y + px.y })
+  }
+  addEventListener('mousedown', (e) => { if (e.button === 2) window.picker.done({ ok: false }); else if (e.button === 0) { show(e.clientX, e.clientY); pick() } })
+  addEventListener('contextmenu', (e) => e.preventDefault())
+  addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') return window.picker.done({ ok: false })
+    if (e.key === 'Enter') return pick()
+    const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key]
+    if (!step || !ready) return
+    e.preventDefault()
+    px.x = Math.max(0, Math.min(src.width - 1, px.x + step[0]))
+    px.y = Math.max(0, Math.min(src.height - 1, px.y + step[1]))
+    draw(last.x, last.y)
+  })
+</script>
+</body>
+</html>

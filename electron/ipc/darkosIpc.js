@@ -1,4 +1,5 @@
 import { DarkOSRecoveryService } from '../services/darkos/DarkOSRecoveryService.js'
+import { UsbMediaService } from '../services/darkos/UsbMediaService.js'
 
 /**
  * Registers the `darkos:*` IPC surface. Every handler returns { ok, ... } and never throws.
@@ -73,6 +74,22 @@ export function registerDarkOSIPC({ ipcMain, dialog, BrowserWindow, app, logger,
   handle('darkos:restoreSnapshot', (p, o) => pick().restoreSnapshot(p, o))
   handle('darkos:getFailures', (_p, o) => pick().getFailures(o))
   handle('darkos:getRebootPending', (_p, o) => pick().getRebootPending(o))
+
+  // Installation media. DARKHUB_USB_VHD=1 (dev builds only) also lists virtual disks, to test with a VHD.
+  const usb = new UsbMediaService({ app, allowVirtual: process.env.DARKHUB_USB_VHD === '1' && app && !app.isPackaged })
+  const usbEvent = (sender) => (evt) => { try { if (sender && !sender.isDestroyed()) sender.send('darkos:usbEvent', evt) } catch { /* closing */ } }
+  handle('darkos:usbDisks', () => usb.listDisks())
+  handle('darkos:usbFindIsos', () => usb.findIsos())
+  handle('darkos:usbPickIso', async (_p, _o, event) => {
+    const r = await dialog.showOpenDialog(BrowserWindow?.fromWebContents?.(event.sender) ?? undefined, {
+      title: 'Escolher a ISO do DarkOS', properties: ['openFile'], filters: [{ name: 'Imagem ISO', extensions: ['iso'] }]
+    })
+    if (r.canceled || !r.filePaths[0]) return { ok: false, canceled: true }
+    return { ok: true, iso: usb.allowIso(r.filePaths[0]) }
+  })
+  handle('darkos:usbHashIso', (p, _o, event) => usb.hashIso(String(p.path || ''), (percent) => usbEvent(event.sender)({ step: 'hash', percent })))
+  handle('darkos:usbWrite', (p, _o, event) => usb.write({ diskNumber: Number(p.diskNumber), expectedSize: Number(p.expectedSize), isoPath: String(p.isoPath || '') }, usbEvent(event.sender)))
+  handle('darkos:usbCancel', () => usb.cancel())
 
   // The destination is always chosen in the native dialog; a renderer-supplied path is ignored.
   handle('darkos:exportDiagnostics', async (_p, o, event) => {

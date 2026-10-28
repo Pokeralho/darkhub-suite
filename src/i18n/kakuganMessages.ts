@@ -96,7 +96,7 @@ export const kakuganMessages: Record<'pt-BR' | 'en-US', Record<string, string>> 
     'darkos.rel.date': 'Publicada',
     'darkos.rel.update': 'Saiu uma build mais nova do DarkOS.',
     'darkos.rel.current': 'Você está na build mais recente do DarkOS.',
-    'darkos.rel.verify': 'O download é conferido com o SHA-256 publicado no site. Grave num pendrive de 8 GB ou mais com o Rufus ou o Ventoy.'
+    'darkos.rel.verify': 'O download é conferido com o SHA-256 publicado no site. Para instalar, crie o pendrive logo abaixo (8 GB ou mais).'
   },
   'en-US': {
     'nav.cat.services': 'DarkHub services',
@@ -194,6 +194,6 @@ export const kakuganMessages: Record<'pt-BR' | 'en-US', Record<string, string>> 
     'darkos.rel.date': 'Published',
     'darkos.rel.update': 'A newer DarkOS build is out.',
     'darkos.rel.current': 'You are on the latest DarkOS build.',
-    'darkos.rel.verify': 'The download is checked against the SHA-256 published on the site. Write it to a USB drive of 8 GB or more with Rufus or Ventoy.'
+    'darkos.rel.verify': 'The download is checked against the SHA-256 published on the site. To install, create the USB drive just below (8 GB or more).'
   }
 };

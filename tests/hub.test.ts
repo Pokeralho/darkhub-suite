@@ -305,3 +305,16 @@ describe('hub: install and uninstall', () => {
     } finally { fs.rmSync(f, { force: true }) }
   }, 30000)
 })
+
+describe('minApp', () => {
+  it('asks for a newer DarkHub only when this one is older', async () => {
+    // @ts-ignore - plain JS module
+    const { newerAppNeeded } = await import('../electron/services/hub/hubModel.js')
+    expect(newerAppNeeded('0.7.4', '0.7.3')).toBe('0.7.4')
+    expect(newerAppNeeded('0.7.3', '0.7.3')).toBeNull()
+    expect(newerAppNeeded('0.7.3', '0.8.0')).toBeNull()
+    expect(newerAppNeeded('1.0.0', '0.10.2')).toBe('1.0.0')
+    expect(newerAppNeeded('0.10.0', '0.9.9')).toBe('0.10.0')
+    expect(newerAppNeeded(undefined, '0.7.3')).toBeNull()
+  })
+})

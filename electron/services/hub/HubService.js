@@ -8,8 +8,7 @@ import { runPowerShellJson } from '../PowerShellRunner.js'
 import ElevationHelper from '../optimizer/ElevationHelper.js'
 import { psQuote, regEntryId, regValueMatches, canonicalRegValue } from '../optimizer/OptimizerUtils.js'
 import {
-  validatePackage, resolvePackage, toChangeSet, touchedEntries, describeStep, textOf, hardwareFromRaw, presetFromState, serviceKey
-} from './hubModel.js'
+  validatePackage, resolvePackage, toChangeSet, touchedEntries, describeStep, textOf, hardwareFromRaw, presetFromState, serviceKey, newerAppNeeded } from './hubModel.js'
 import { buildBuiltins } from './builtins.js'
 import { describeExtension } from './extensionModel.js'
 
@@ -106,6 +105,13 @@ export class HubService {
     try { return (await this.optimizer.checkOperationsStatus()).status || {} } catch { return {} }
   }
 
+  /** "precisa do DarkHub 0.7.4 (este é o 0.7.3)" when the package asks for a newer app, else null. */
+  _tooOld(pkg, lang) {
+    const need = newerAppNeeded(pkg.minApp, this.app.getVersion?.())
+    if (!need) return null
+    return lang === 'en-US' ? `needs DarkHub ${need} or newer (this is ${this.app.getVersion()}); update DarkHub first` : `precisa do DarkHub ${need} ou mais novo (este é o ${this.app.getVersion()}); atualize o DarkHub antes`
+  }
+
   // ------------------------------------------------------------------ inspect (dry run)
   /**
    * Validates, resolves for this PC and reads the current state of everything the package touches. Changes nothing.
@@ -119,10 +125,11 @@ export class HubService {
     const installed = this._load().packages[pkg.id] || null
     const head = { id: pkg.id, version: pkg.version, type: pkg.type, name: textOf(pkg.name, lang), description: textOf(pkg.description, lang), author: pkg.author, tags: pkg.tags || [], evidence: pkg.evidence || [], expects: pkg.expects || [] }
     const installedInfo = installed ? { version: installed.pkg.version, installedAt: installed.installedAt, source: installed.source || null } : null
+    const tooOld = this._tooOld(pkg, lang)
     // an extension changes nothing in Windows: the preview is what it may ask for and where it shows up
     if (pkg.type === 'extension') {
       const rows = describeExtension(pkg, lang).map((x, i) => ({ index: i, ...x, note: '', current: null, done: false, missing: false, requiresReboot: false }))
-      return { ok: true, pkg: head, risk: v.risk, official, applicable: true, notFor: null, rows, skipped: [], findings: v.findings || [], installed: installedInfo, hardware: null }
+      return { ok: true, pkg: head, risk: v.risk, official, applicable: !tooOld, notFor: tooOld, rows, skipped: [], findings: v.findings || [], installed: installedInfo, hardware: null }
     }
     const hw = await this.hardware()
     const r = resolvePackage(pkg, hw, builtins)
@@ -168,8 +175,8 @@ export class HubService {
       pkg: head,
       risk: v.risk,
       official,
-      applicable: r.applicable,
-      notFor: r.notFor,
+      applicable: r.applicable && !tooOld,
+      notFor: tooOld || r.notFor,
       rows,
       skipped: r.skipped.map((s) => ({ index: s.index, reason: s.reason, ...describeStep(s.step, lang, builtins) })),
       installed: installedInfo,
@@ -196,6 +203,8 @@ export class HubService {
     const v = validatePackage(text, builtins, { official })
     if (!v.ok) return { ok: false, errors: v.errors, error: v.errors.map((e) => `${e.path}: ${e.message}`).join('; ') }
     const pkg = v.pkg
+    const tooOld = this._tooOld(pkg, 'pt-BR')
+    if (tooOld) return { ok: false, error: tooOld }
     if (pkg.type === 'extension') {
       const state = this._load()
       const prev = state.packages[pkg.id]

@@ -21,6 +21,7 @@ export const METHOD_PERMISSION = {
   'net.fetch': 'network',
   'ui.notify': 'notifications',
   'clipboard.write': 'clipboard',
+  'screen.pickColor': 'screen',
   'packages.preview': 'packages', 'packages.install': 'packages', 'packages.hubInstall': 'packages',
   'app.info': null, 'app.openExternal': null
 }
@@ -28,7 +29,7 @@ export const METHOD_PERMISSION = {
 export class ExtensionHost {
   /**
    * deps: { app, hub (HubService), catalog (HubCatalog), approve(request) -> Promise<boolean>, sensors: { read(), hold(tag), release(tag) },
-   *         notify(title, body), clipboard(text), openExternal(url), fetchImpl }
+   *         notify(title, body), clipboard(text), openExternal(url), pickColor() -> { ok, hex, rgb, x, y }, fetchImpl }
    */
   constructor(deps) {
     Object.assign(this, deps)
@@ -129,6 +130,10 @@ export class ExtensionHost {
       case 'net.fetch': return this._fetch(pkg, params)
       case 'ui.notify': await this.notify(String(params.title || name).slice(0, 80), String(params.body || '').slice(0, 300)); return true
       case 'clipboard.write': this.clipboard(String(params.text ?? '').slice(0, 100_000)); return true
+      case 'screen.pickColor': {
+        const r = await this.pickColor()
+        return r?.ok ? { hex: r.hex, rgb: r.rgb, x: r.x, y: r.y } : null
+      }
       case 'packages.preview': return this.hub.inspect(toText(params.pkg), params.lang === 'en-US' ? 'en-US' : 'pt-BR')
       case 'packages.install': {
         const text = toText(params.pkg)

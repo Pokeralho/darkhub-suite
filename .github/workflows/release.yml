@@ -1,0 +1,97 @@
+# Builds a release on GitHub's machines instead of a developer's PC, attests where every file came from and
+# attaches the files to a draft release. Run it by hand: Actions -> Release -> Run workflow, with the tag (vX.Y.Z).
+#
+# Anyone can then check a download with:  gh attestation verify "DarkHub-Setup-X.Y.Z.exe" --repo Pokeralho/darkhub-suite
+#
+# Needs two repository variables (Settings -> Secrets and variables -> Actions -> Variables), because the PGE Portable
+# bundle is not in Git: PGE_PORTABLE_URL (a direct download of PGEPortable.zip) and PGE_PORTABLE_SHA256 (its SHA-256).
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build (vX.Y.Z, must match package.json)
+        required: true
+
+permissions:
+  contents: write       # create the draft release and upload files
+  id-token: write       # sign the build attestations
+  attestations: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Tag matches package.json
+        shell: pwsh
+        run: |
+          $v = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ("v$v" -ne '${{ inputs.tag }}') { throw "tag ${{ inputs.tag }} does not match package.json $v" }
+          "VERSION=$v" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: PGE Portable (pinned download)
+        shell: pwsh
+        env:
+          URL: ${{ vars.PGE_PORTABLE_URL }}
+          SHA: ${{ vars.PGE_PORTABLE_SHA256 }}
+        run: |
+          if (-not $env:URL -or -not $env:SHA) { throw 'Set the PGE_PORTABLE_URL and PGE_PORTABLE_SHA256 repository variables.' }
+          Invoke-WebRequest -UseBasicParsing -Uri $env:URL -OutFile PGEPortable.zip
+          $got = (Get-FileHash PGEPortable.zip -Algorithm SHA256).Hash
+          if ($got -ne $env:SHA.ToUpper()) { throw "PGEPortable.zip SHA-256 $got does not match $($env:SHA)" }
+          Expand-Archive PGEPortable.zip -DestinationPath . -Force
+          if (-not (Test-Path 'PGE Portable\Pokeralho Games Launcher.bat')) { throw 'PGEPortable.zip must contain the "PGE Portable" folder' }
+
+      - run: npm ci
+
+      - name: Checks
+        run: |
+          npx tsc --noEmit -p .
+          npx vitest run
+
+      # every native helper is rebuilt here from its source, so the release does not depend on the committed binaries
+      - run: npm run build:native
+      - run: npm run build:pacer
+      - run: npm run build:renderer
+      - run: npx electron-builder --win --publish never
+
+      - name: Release files
+        shell: pwsh
+        run: |
+          $v = $env:VERSION
+          New-Item -ItemType Directory out | Out-Null
+          Copy-Item "dist_release\DarkHub Setup $v.exe" "out\DarkHub-Setup-$v.exe"
+          # older install.ps1 versions look for this name
+          Copy-Item "dist_release\DarkHub Setup $v.exe" "out\DarkHub.Setup.$v.exe"
+          Copy-Item "dist_release\DarkHub $v-portable.exe" "out\DarkHub.$v-portable.exe"
+          Copy-Item dist_release\latest.yml out\latest.yml
+          Get-ChildItem out | Get-FileHash -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } | Set-Content out\SHA256SUMS.txt
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            out/*.exe
+            out/latest.yml
+
+      - name: Draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ inputs.tag }}'
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) { gh release create $tag --draft --title "DarkHub Suite $tag" --notes "Built by GitHub Actions. Verify with: gh attestation verify <file> --repo ${{ github.repository }}" }
+          gh release upload $tag (Get-ChildItem out).FullName --clobber

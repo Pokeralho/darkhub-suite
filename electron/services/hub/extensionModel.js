@@ -13,6 +13,7 @@ export const PERMISSIONS = {
   'tweaks.read': { risk: 0, pt: 'Ver quais ajustes do DarkHub estão ligados', en: 'See which DarkHub tweaks are on' },
   notifications: { risk: 0, pt: 'Mostrar notificações do Windows', en: 'Show Windows notifications' },
   clipboard: { risk: 0, pt: 'Copiar texto para a área de transferência', en: 'Copy text to the clipboard' },
+  screen: { risk: 0, pt: 'Pegar a cor de um ponto da tela quando você clicar (só a cor escolhida chega à extensão)', en: 'Pick the color of a point on the screen when you click (only the chosen color reaches the extension)' },
   network: { risk: 1, pt: 'Acessar a internet, só nestes endereços', en: 'Use the internet, only these addresses' },
   packages: { risk: 1, pt: 'Pedir para instalar pacotes do DarkHub (você aprova cada um)', en: 'Ask to install DarkHub packages (you approve each one)' }
 }

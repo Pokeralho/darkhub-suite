@@ -353,3 +353,12 @@ export function presetFromState({ id, name, github, activeIds, activeOps = [], b
     items
   }
 }
+
+/** minApp of a package when this DarkHub is older than it (the package may use what this version lacks), else null. */
+export function newerAppNeeded(minApp, appVersion) {
+  const parse = (v) => String(v || '').split(/[.-]/).slice(0, 3).map((n) => Number.parseInt(n, 10) || 0)
+  if (!minApp || !appVersion) return null
+  const [a, b] = [parse(minApp), parse(appVersion)]
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i] ? String(minApp) : null
+  return null
+}

@@ -172,11 +172,13 @@ Get-FileHash .\DarkHub*Setup*.exe -Algorithm SHA256   # rode na pasta onde você
 [build-release.ps1](./scripts/build-release.ps1); ainda não são feitas no CI e não são reproduzíveis byte a byte (os carimbos de
 data do instalador mudam a cada build). Os pequenos auxiliares nativos (`electron/services/*.exe`) ficam no repositório
 já compilados para quem contribui não precisar do .NET; cada um sai do arquivo `.cs` ao lado dele com
-`npm run build:native`, então dá para recompilar e ler o código de origem. O plano, nesta ordem: compilar as releases no
-GitHub Actions com [artifact attestations](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations)
-(assim `gh attestation verify` prova que um instalador veio de um commit específico) e depois assinatura de código
-gratuita para projetos open source ([SignPath Foundation](https://signpath.org/)), para o SmartScreen parar de avisar.
-Ajuda com qualquer um dos dois é bem-vinda.
+`npm run build:native`, então dá para recompilar e ler o código de origem. O repositório agora tem um workflow de
+release ([release.yml](./.github/workflows/release.yml)) que compila tudo, inclusive os auxiliares nativos, nas máquinas
+do GitHub e registra [artifact attestations](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations):
+`gh attestation verify <arquivo> --repo Pokeralho/darkhub-suite` prova que um arquivo veio de um commit específico. As
+releases passam para ele assim que estiver configurado. Depois: assinatura de código gratuita para projetos open source
+([SignPath Foundation](https://signpath.org/), plano em [docs/release/SIGNING.md](./docs/release/SIGNING.md)), para o
+SmartScreen parar de avisar.
 
 ---
 

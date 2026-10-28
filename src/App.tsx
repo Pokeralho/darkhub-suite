@@ -73,9 +73,6 @@ const PageLoading = () => (
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState(pageFromHash);
-  const lastReportRef = useRef<number>(0)
-  const currentPageRef = useRef<string>(currentPage)
-  currentPageRef.current = currentPage
 
   useEffect(() => {
     if (window.location.hash.replace(/^#/, '') !== currentPage) window.history.replaceState(null, '', `#${currentPage}`);
@@ -94,57 +91,9 @@ const App = () => {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  useEffect(() => {
-    const report = async (payload: any) => {
-      const now = Date.now()
-      if (now - lastReportRef.current < 3000) return
-      lastReportRef.current = now
-      try {
-        const res = await window.darkhub?.discord?.reportError?.({
-          source: 'renderer',
-          page: currentPageRef.current,
-          ...payload
-        })
-        if (res && res.ok === false) {
-          console.warn('Discord error report failed:', res.error)
-        }
-      } catch {}
-    }
-
-    const onError = (event: any) => {
-      const message = event?.message ?? 'Unknown error'
-      const stack = event?.error?.stack ?? ''
-      report({ message, stack })
-    }
-
-    const onRejection = (event: any) => {
-      const reason = event?.reason
-      const message = reason?.message ?? String(reason ?? 'Unhandled rejection')
-      const stack = reason?.stack ?? ''
-      report({ message, stack })
-    }
-
-    window.addEventListener('error', onError)
-    window.addEventListener('unhandledrejection', onRejection)
-    return () => {
-      window.removeEventListener('error', onError)
-      window.removeEventListener('unhandledrejection', onRejection)
-    }
-  }, [])
-
+  // Errors stay on this PC: they go to the console and the local log, never anywhere else.
   const reportRenderError = (error: Error, componentStack?: string | null) => {
-    const now = Date.now()
-    if (now - lastReportRef.current < 3000) return
-    lastReportRef.current = now
-    try {
-      window.darkhub?.discord?.reportError?.({
-        source: 'renderer',
-        page: currentPageRef.current,
-        message: error?.message ?? 'Render error',
-        stack: `${error?.stack ?? ''}${componentStack ? `
-${componentStack}` : ''}`
-      })?.catch?.(() => {})
-    } catch {}
+    console.error('Render error', error, componentStack ?? '')
   }
 
   const renderPage = () => {

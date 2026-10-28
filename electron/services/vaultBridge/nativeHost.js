@@ -14,7 +14,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // so it is the same for every unpacked install; the Firefox ID from browser_specific_settings.gecko.id.
 export const CHROMIUM_EXTENSION_ID = 'dpibeiimcolhiofphhncmjbejgcfblgh'
 export const GECKO_EXTENSION_ID = 'vault@darkhub.app'
-export const ALLOWED_CALLERS = new Set([`chromium:${CHROMIUM_EXTENSION_ID}`, `gecko:${GECKO_EXTENSION_ID}`])
+// The Chrome Web Store and Edge Add-ons give a published extension its own id: add each one here once it exists.
+export const STORE_CHROMIUM_IDS = []
+export const CHROMIUM_EXTENSION_IDS = [CHROMIUM_EXTENSION_ID, ...STORE_CHROMIUM_IDS]
+export const ALLOWED_CALLERS = new Set([...CHROMIUM_EXTENSION_IDS.map((id) => `chromium:${id}`), `gecko:${GECKO_EXTENSION_ID}`])
 
 export const HOST_EXE_NAME = 'DarkHub.VaultBridgeHost.exe'
 
@@ -40,7 +43,7 @@ export function buildHostManifest(browser, exePath) {
   }
   return b.kind === 'gecko'
     ? { ...base, allowed_extensions: [GECKO_EXTENSION_ID] }
-    : { ...base, allowed_origins: [`chrome-extension://${CHROMIUM_EXTENSION_ID}/`] }
+    : { ...base, allowed_origins: CHROMIUM_EXTENSION_IDS.map((id) => `chrome-extension://${id}/`) }
 }
 
 export function manifestFileName(browser) {

@@ -4,6 +4,8 @@ import {
   MousePointerClick, Pause, Play, Zap, X, RotateCcw
 } from '../components/icons';
 import PageHeader from '../components/ui/PageHeader';
+import HotkeyCapture from '../components/HotkeyCapture';
+import { isBareKey } from '../utils/hotkey';
 import { useI18n } from '../i18n/I18nProvider';
 
 export default function AutoClicker() {
@@ -13,7 +15,7 @@ export default function AutoClicker() {
   const [running, setRunning] = useState(false);
   const [isNative, setIsNative] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
-  const [hotkey, setHotkey] = useState<string>('F6');
+  const [hotkey, setHotkey] = useState<string>('');
 
   // Interactive Live Click Tester / Prova Real State
   const [testClicks, setTestClicks] = useState(0);
@@ -42,10 +44,11 @@ export default function AutoClicker() {
         setRunning(Boolean(res.running));
         const adoptEngineState = initialLoadRef.current || Boolean(res.running);
         initialLoadRef.current = false;
-        if (adoptEngineState && res?.state?.intervalMs) setIntervalMs(Number(res.state.intervalMs));
-        if (adoptEngineState && res?.state?.button) setButton(res.state.button);
+        const engine = res?.state ?? res?.settings;
+        if (adoptEngineState && engine?.intervalMs) setIntervalMs(Number(engine.intervalMs));
+        if (adoptEngineState && engine?.button) setButton(engine.button);
         if (res?.state?.isNative !== undefined) setIsNative(Boolean(res.state.isNative));
-        if (typeof res?.hotkey === 'string') setHotkey(res.hotkey || 'F6');
+        setHotkey(typeof res?.hotkey === 'string' ? res.hotkey : '');
       }
     } catch (e: any) {
       // quiet
@@ -124,8 +127,10 @@ export default function AutoClicker() {
     try {
       const res = await window.darkhub.autoclicker.setHotkey({ hotkey: key });
       if (res?.ok) {
-        setHotkey(key);
-        setStatus(`Atalho global do motor atualizado para: ${key}`);
+        setHotkey(res.hotkey ?? '');
+        setStatus(res.hotkey ? t('autoclicker.hotkey.saved', 'Atalho: {k}').replace('{k}', res.hotkey) : t('autoclicker.hotkey.removed', 'Atalho removido. Use os botões desta tela para ligar e desligar.'));
+      } else {
+        setStatus(t('autoclicker.hotkey.invalid', 'Essa tecla não pode ser usada como atalho.'));
       }
     } catch (e: any) {
       setStatus(e?.message || 'Erro ao salvar atalho');
@@ -232,7 +237,7 @@ export default function AutoClicker() {
         <div className="px-4 py-3">
           <dt className="text-[11.5px] text-zinc-500">{t('autoclicker.hotkeyTitle', 'Atalho Global')}</dt>
           <dd className="mt-1.5 flex items-baseline gap-2">
-            <kbd className="font-mono text-[20px] leading-none text-zinc-50">{hotkey}</kbd>
+            <kbd className="font-mono text-[20px] leading-none text-zinc-50">{hotkey || '—'}</kbd>
             <span className="text-[12px] text-zinc-500">{t('autoclicker.hotkeyToggle', '(Liga / Desliga)')}</span>
           </dd>
           <dd className="mt-1.5 text-[11px] text-zinc-600">{t('autoclicker.hotkeyDesc', 'Funciona dentro de qualquer jogo ou app')}</dd>
@@ -323,26 +328,17 @@ export default function AutoClicker() {
             </div>
           </div>
 
-          <div className="pt-4 border-t border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[12.5px] font-medium text-zinc-200">Atalho de Teclado Rápido</div>
-              <div className="dh-help">Pressione a tecla configurada para ligar ou desligar o clique em qualquer janela ou jogo.</div>
+          <div className="pt-4 border-t border-zinc-800/80 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[12.5px] font-medium text-zinc-200">{t('autoclicker.hotkey.title', 'Atalho para ligar e desligar')}</div>
+                <div className="dh-help">{t('autoclicker.hotkey.help', 'Clique e pressione qualquer tecla ou combinação (Ctrl, Alt, Shift, Win) ou um botão lateral do mouse. O jogo continua recebendo a tecla.')}</div>
+              </div>
+              <HotkeyCapture value={hotkey || null} onChange={(k) => void handleSaveHotkey(k)} />
             </div>
-            <div className="flex items-center rounded-md border border-zinc-800 overflow-hidden shrink-0 divide-x divide-zinc-800">
-              {['F6', 'F7', 'F8', 'F9', 'F12'].map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => handleSaveHotkey(key)}
-                  aria-pressed={hotkey === key}
-                  className={`h-7 px-2.5 text-[12px] font-mono transition-colors duration-150 ${
-                    hotkey === key ? 'bg-zinc-100 text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'
-                  }`}
-                >
-                  {key}
-                </button>
-              ))}
-            </div>
+            {hotkey && isBareKey(hotkey) ? (
+              <p className="text-[12px] text-amber-300/90">{t('autoclicker.hotkey.bare', 'Tecla sozinha: ela também faz o que faz no jogo. Uma combinação (ex.: Ctrl+Shift+F6) evita isso.')}</p>
+            ) : null}
           </div>
         </section>
 

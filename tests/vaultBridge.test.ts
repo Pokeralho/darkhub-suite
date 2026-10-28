@@ -253,7 +253,8 @@ class FakeHost {
   close() { this.sock.destroy() }
 }
 
-describe('bridge server (loopback, end to end)', () => {
+// real sockets and timers: under heavy load (a VM, a build) 5 s was not always enough, and one run failed only then
+describe('bridge server (loopback, end to end)', { timeout: 20_000 }, () => {
   const servers: VaultBridgeServer[] = []
   afterEach(async () => { for (const s of servers.splice(0)) await s.stop() })
 

@@ -110,6 +110,44 @@ public class DarkHubLatencyEngine
         return (int)pid;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT { public int Left, Top, Right, Bottom; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MONITORINFO { public int cbSize; public RECT rcMonitor; public RECT rcWork; public uint dwFlags; }
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("user32.dll")]
+    public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr dpiContext);
+
+    // Physical bounds "left,top,right,bottom" of the monitor showing the foreground window (the overlay follows the game).
+    private static string ForegroundMonitor()
+    {
+        IntPtr hwnd = GetForegroundWindow();
+        if (hwnd == IntPtr.Zero) return "";
+        IntPtr previous = IntPtr.Zero;
+        // per-monitor aware for this call only, so the rectangle is in real pixels on every monitor
+        try { previous = SetThreadDpiAwarenessContext(new IntPtr(-4)); } catch (EntryPointNotFoundException) {}
+        try
+        {
+            IntPtr mon = MonitorFromWindow(hwnd, 2);
+            if (mon == IntPtr.Zero) return "";
+            var mi = new MONITORINFO();
+            mi.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+            if (!GetMonitorInfo(mon, ref mi)) return "";
+            return mi.rcMonitor.Left + "," + mi.rcMonitor.Top + "," + mi.rcMonitor.Right + "," + mi.rcMonitor.Bottom;
+        }
+        finally
+        {
+            if (previous != IntPtr.Zero) { try { SetThreadDpiAwarenessContext(previous); } catch {} }
+        }
+    }
+
     const uint PROCESS_SET_INFORMATION = 0x0200;
     const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
     const uint PROCESS_ALL_ACCESS = 0x1F0FFF;
@@ -545,6 +583,7 @@ public class DarkHubLatencyEngine
         return FormatResponse(true, "processes", new Dictionary<string, object>
         {
             { "foreground_pid", ForegroundPid() },
+            { "foreground_monitor", ForegroundMonitor() },
             { "rows", rows }
         });
     }

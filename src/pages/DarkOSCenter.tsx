@@ -9,6 +9,7 @@ import DarkOSProgress from '../components/darkos/DarkOSProgress';
 import DarkOSConfirmDialog from '../components/darkos/DarkOSConfirmDialog';
 import DarkOSSystemPanel from '../components/darkos/DarkOSSystemPanel';
 import DarkOSReleaseCard from '../components/darkos/DarkOSReleaseCard';
+import DarkOSUsbCard from '../components/darkos/DarkOSUsbCard';
 import type { DarkOSInfo, DarkOSManifest, DarkOSProfileId, DarkOSSnapshot } from '../types/darkos';
 import {
   DARKOS_PROFILES, DarkOSRow, DarkOSFailure, RemovedApp, countStatuses, mergeChanges, normalizeFailures,
@@ -302,6 +303,7 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
           </div>
         </div>
         <DarkOSReleaseCard onNavigate={onNavigate} />
+        <DarkOSUsbCard />
         <DarkOSSystemPanel onNavigate={onNavigate} />
       </div>
     );
@@ -337,6 +339,7 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
         </div>
       </section>
       <DarkOSReleaseCard installed={winMode ? null : { version: manifest?.darkosVersion, build: manifest?.osBuild }} onNavigate={onNavigate} />
+      <DarkOSUsbCard />
       <dl className="divide-y divide-zinc-800/80 border-y border-zinc-800/80 text-[12.5px]">
         <div className="flex items-center gap-4 py-2.5">
           <dt className="w-40 shrink-0 text-zinc-500">{t('darkos.ov.removedApps', 'Removed apps')}</dt>
