@@ -35,7 +35,7 @@ jobs:
           if ("v$v" -ne '${{ inputs.tag }}') { throw "tag ${{ inputs.tag }} does not match package.json $v" }
           "VERSION=$v" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
