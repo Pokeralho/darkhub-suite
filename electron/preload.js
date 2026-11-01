@@ -614,6 +614,31 @@ const darkhubApi = {
       return () => ipcRenderer.removeListener('diskscan:progress', listener)
     }
   },
+  recovery: {
+    listDrives: () => ipcRenderer.invoke('recovery:list-drives'),
+    inspectDisk: (payload) => ipcRenderer.invoke('recovery:inspect-disk', payload),
+    readSector: (payload) => ipcRenderer.invoke('recovery:read-sector', payload),
+    writeSector: (payload) => ipcRenderer.invoke('recovery:write-sector', payload),
+    repairHeader: (payload) => ipcRenderer.invoke('recovery:repair-header', payload),
+    setActive: (payload) => ipcRenderer.invoke('recovery:set-active', payload),
+    backupTable: (payload) => ipcRenderer.invoke('recovery:backup-table', payload),
+    restoreBackup: (payload) => ipcRenderer.invoke('recovery:restore-backup', payload),
+    clone: (payload) => ipcRenderer.invoke('recovery:clone', payload),
+    verify: (payload) => ipcRenderer.invoke('recovery:verify', payload),
+    surfaceTest: (payload) => ipcRenderer.invoke('recovery:surface-test', payload),
+    smart: () => ipcRenderer.invoke('recovery:smart'),
+    startCarve: (payload) => ipcRenderer.invoke('recovery:start-carve', payload),
+    cancelCarve: () => ipcRenderer.invoke('recovery:cancel-carve'),
+    cancel: () => ipcRenderer.invoke('recovery:cancel'),
+    status: () => ipcRenderer.invoke('recovery:status'),
+    pickFolder: () => ipcRenderer.invoke('recovery:pick-folder'),
+    pickImage: (payload) => ipcRenderer.invoke('recovery:pick-image', payload),
+    onProgress: (callback) => {
+      const listener = (_e, ev) => callback(ev)
+      ipcRenderer.on('recovery:progress', listener)
+      return () => ipcRenderer.removeListener('recovery:progress', listener)
+    }
+  },
   wintools: {
     listFeatures: () => ipcRenderer.invoke('wintools:listFeatures'),
     setFeature: (payload) => ipcRenderer.invoke('wintools:setFeature', payload),

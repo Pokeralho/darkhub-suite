@@ -1,4 +1,5 @@
 import { darkosMessages } from './darkosMessages';
+import { recoveryMessages } from './recoveryMessages';
 import { realtimeMessages } from './realtimeMessages';
 import { optimizerUiMessages } from './optimizerUiMessages';
 import { diskMapMessages } from './diskMapMessages';
@@ -3423,7 +3424,7 @@ export const messages: Record<string, Record<string, string>> = {
 
 };
 
-for (const extra of [darkosMessages, realtimeMessages, optimizerUiMessages, diskMapMessages, networkMessages, devToolsMessages, psToolsMessages, securityMessages, vaultMessages, metadataMessages, decryptMessages, ocrMessages, videoMessages, textEditorMessages, saveBackupMessages, overlayMessages, benchmarkMessages, startupMessages, usbMessages, maintenanceMessages, driverMessages, restoreMessages, kakuganMessages, overlayEditorMessages, hubMessages]) {
+for (const extra of [darkosMessages, realtimeMessages, optimizerUiMessages, diskMapMessages, networkMessages, devToolsMessages, psToolsMessages, securityMessages, vaultMessages, metadataMessages, decryptMessages, ocrMessages, videoMessages, textEditorMessages, saveBackupMessages, overlayMessages, benchmarkMessages, startupMessages, usbMessages, maintenanceMessages, driverMessages, restoreMessages, kakuganMessages, overlayEditorMessages, hubMessages, recoveryMessages]) {
   for (const [code, dict] of Object.entries(extra)) {
     messages[code] = { ...(messages[code] || {}), ...dict };
   }

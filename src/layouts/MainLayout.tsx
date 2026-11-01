@@ -7,7 +7,7 @@ import {
   Download, Fingerprint, Network, Code, ChevronLeft, ChevronRight,
   Cpu, Crosshair, Activity, Flame, Sparkles, Minus, Square, X, LifeBuoy, Gauge, UploadCloud,
   MonitorCog, Terminal, DarkHubMark, Archive, Layers, Rocket, Usb, History,
-  Wrench, Shield, Globe, Music, List, Clock, FolderOpen
+  Wrench, Shield, Globe, Music, List, Clock, FolderOpen, HardDrive
 } from '../components/icons';
 import { extPageId, textIn, useExtensions } from '../lib/extensions';
 import { useI18n } from '../i18n/I18nProvider';
@@ -116,6 +116,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
       category: t('nav.cat.utilities', 'Utilities & Tools'),
       items: [
         { id: 'spacesniffer', label: t('nav.diskmap', 'Disk map'), icon: LayoutGrid },
+        { id: 'disk-rescue', label: t('nav.diskrescue', 'Disk Studio & Rescue'), icon: HardDrive },
         { id: 'library', label: t('nav.library', 'Library'), icon: LibraryBig },
         { id: 'security', label: t('nav.security', 'Advanced Security'), icon: ShieldAlert },
         { id: 'passwords', label: t('nav.passwords', 'Password Vault'), icon: Lock },

@@ -71,6 +71,7 @@ Obs.: no `preload.js` o namespace do FramePacer é `darkpacer`, com o apelido `f
 | Rota | Tela | Backend principal |
 |---|---|---|
 | `spacesniffer` | `src/pages/SpaceSniffer/` (Mapa de disco: `index.tsx`, `TreemapCanvas.tsx`, `treemap.ts`) | `electron/ipc/diskScanIpc.js` → `electron/services/diskscan/` (`DiskScanService`, `ScanModel`, `filter`) → `electron/services/DarkHub.DiskScan.exe` |
+| `disk-rescue` | `src/pages/DiskRescue.tsx` + `src/components/recovery/*` | `electron/ipc/recoveryIpc.js` → `electron/services/recovery/DiskRecoveryService.js` → `electron/services/DarkHub.DiskRescue.exe` (Rust, `native_disk/`: `npm run build:disk`, `npm run test:disk`) |
 | `library` | `src/pages/Library.tsx` + `src/components/library/*` | `electron/libraryStore.js`, `CoverProviderService.js` |
 | `security` | `src/pages/AdvancedSecurity.tsx` | `electron/services/SecurityService.js` |
 | `passwords` | `src/pages/PasswordManager.tsx` | `electron/main.js` (`vault:*`) → `electron/vaultCrypto.js` |

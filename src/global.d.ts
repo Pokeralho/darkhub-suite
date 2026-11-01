@@ -291,6 +291,53 @@ export interface DevTraceEntry {
   result?: unknown;
 }
 
+// ---------------------------------------------------------------- Disk Studio & Rescue (recovery:*)
+export type RescueResult<T> = ({ ok: true } & T) | { ok: false; code?: string; error: string };
+export interface RescueDrive {
+  index: number; path: string; model: string; serial: string; bus: string; revision?: string; removable: boolean;
+  size: number; sector_size: number; physical_sector_size: number; media_type: string; is_system: boolean;
+  volumes: { volume: string; mount_points: string[]; offset: number; length: number }[];
+}
+export interface RescueLayoutItem {
+  kind: 'ntfs' | 'fat' | 'ext' | 'raw' | 'unallocated'; index?: number; start_lba: number; sectors: number; size: number;
+  fs?: string; label?: string; type_name?: string; type_id?: string; name?: string; boot?: boolean; beyond_disk?: boolean;
+}
+export interface RescueGptCopy { present: boolean; lba: number; valid?: boolean; header_crc_ok?: boolean; entries_crc_ok?: boolean; alternate_lba?: number; last_usable?: number; num_entries?: number; disk_guid?: string }
+export interface RescueInspect {
+  target: string; size: number; sector_size: number; total_sectors: number; scheme: 'gpt' | 'mbr' | 'none';
+  mbr: { signature_ok: boolean; disk_signature: string; boot_code_present: boolean; entries: { slot: number; boot: boolean; type: string; type_name: string; lba_start: number; sectors: number }[] };
+  gpt: { primary: RescueGptCopy; backup: RescueGptCopy };
+  layout: RescueLayoutItem[]; problems: string[];
+}
+export interface RescueSector {
+  target: string; lba: number; requested_lba: number; count: number; total_sectors: number; sector_size: number; raw_hex: string;
+  rows: { offset: number; hex: string; ascii: string }[];
+  decoded: {
+    signature_55aa: boolean; oem_id: string;
+    mbr_entries: { slot: number; boot_flag: boolean; type: string; type_name: string; lba_start: number; sectors: number }[];
+    vbr: { fs: string; sectors: number; label: string } | null;
+    gpt_header: { my_lba: number; alternate_lba: number; entries_lba: number; num_entries: number; crc_ok: boolean; disk_guid: string } | null;
+  };
+}
+export interface RescuePlanWrite { lba: number; sectors: number; what: string; changed_bytes: number; before_hex: string; after_hex: string }
+export interface RescuePlanResult { dry_run: boolean; plan: { writes: RescuePlanWrite[]; notes: string[] }; result?: { applied: number; backup_file: string; backup_bytes: number } }
+export interface RescueVolumeHit { fs: string; start_lba: number; sectors: number; size: number; label: string; sources: string[] }
+export interface RescueCloneResult {
+  dry_run?: boolean; bytes: number; total?: number; target_bytes?: number; cancelled?: boolean; source_sha256?: string; target_sha256?: string;
+  verified?: boolean; bad_sectors?: number; seconds?: number; gpt_resized?: string[]; warnings?: string[];
+}
+export interface RescueSurface { bytes_tested: number; complete: boolean; blocks: number; slow: number; very_slow: number; bad: number; max_latency_ms: number; map: string; seconds: number }
+export interface RescueSmart {
+  number: number; model: string; health: string; operational: string; mediaType: string; bus: string;
+  temperature?: number | null; temperatureMax?: number | null; wear?: number | null; powerOnHours?: number | null;
+  readErrorsTotal?: number | null; readErrorsUncorrected?: number | null; writeErrorsTotal?: number | null; writeErrorsUncorrected?: number | null;
+}
+export interface RescueCarvedFile { type: string; offset: number; lba: number; size: number; path: string; damaged: boolean }
+export interface RescueCarveResult { out_dir: string; total_files: number; total_bytes: number; by_type: Record<string, number>; files: RescueCarvedFile[]; cancelled: boolean; bad_sectors: number; seconds: number }
+export type RescueEvent =
+  | { kind: string; event: 'progress'; phase: string; bytes: number; total: number; percent: number; speed_bps: number; eta_s: number; files?: number; found?: number; bad_sectors?: number; slow?: number; very_slow?: number; bad?: number; map?: string | null }
+  | { kind: string; event: 'found'; file: RescueCarvedFile };
+
 export interface DarkHubAPI {
   darkos: import('./types/darkos').DarkOSAPI;
   hardware: {
@@ -888,6 +935,27 @@ export interface DarkHubAPI {
     trash: (payload: { id: string }) => Promise<{ ok: boolean; error?: string; path?: string }>;
     exportReport: (payload: { id?: string; format: 'txt' | 'csv'; filter?: string }) => Promise<{ ok: boolean; canceled?: boolean; error?: string; path?: string; rows?: number }>;
     onProgress: (callback: (status: DiskMapStatus) => void) => () => void;
+  };
+  recovery: {
+    listDrives: () => Promise<RescueResult<{ drives: RescueDrive[]; system_disks: number[] }>>;
+    inspectDisk: (payload: { target: string }) => Promise<RescueResult<RescueInspect>>;
+    readSector: (payload: { target: string; lba: number; count?: number }) => Promise<RescueResult<RescueSector>>;
+    writeSector: (payload: { target: string; lba: number; hex: string; apply?: boolean; confirmDisk?: number }) => Promise<RescueResult<RescuePlanResult>>;
+    repairHeader: (payload: { target: string; mode: 'gpt' | 'mbr' | 'scan'; gptMode?: 'auto' | 'primary' | 'backup'; active?: boolean; apply?: boolean; confirmDisk?: number }) => Promise<RescueResult<RescuePlanResult & { volumes?: RescueVolumeHit[] }>>;
+    setActive: (payload: { target: string; slot: number; apply?: boolean; confirmDisk?: number }) => Promise<RescueResult<RescuePlanResult>>;
+    backupTable: (payload: { target: string; out?: string }) => Promise<RescueResult<{ out: string; bytes: number }>>;
+    restoreBackup: (payload: { target: string; from: string; apply?: boolean; confirmDisk?: number }) => Promise<RescueResult<RescuePlanResult>>;
+    clone: (payload: { source: string; target: string; sourcePart?: number; targetPart?: number; createImage?: boolean; overwrite?: boolean; verify?: boolean; apply?: boolean; confirmDisk?: number }) => Promise<RescueResult<RescueCloneResult>>;
+    verify: (payload: { source: string; target: string; sourcePart?: number; targetPart?: number }) => Promise<RescueResult<{ match: boolean; source_sha256: string; target_sha256: string; bytes: number; cancelled?: boolean }>>;
+    surfaceTest: (payload: { target: string; part?: number }) => Promise<RescueResult<RescueSurface>>;
+    smart: () => Promise<RescueResult<{ disks: RescueSmart[] }>>;
+    startCarve: (payload: { target: string; out: string; types?: string[]; maxMb?: number; startLba?: number; endLba?: number }) => Promise<RescueResult<RescueCarveResult>>;
+    cancelCarve: () => Promise<{ ok: boolean; running?: boolean }>;
+    cancel: () => Promise<{ ok: boolean; running?: boolean }>;
+    status: () => Promise<{ ok: boolean; running: boolean; kind: string | null; startedAt: number | null }>;
+    pickFolder: () => Promise<{ ok: boolean; canceled?: boolean; path?: string }>;
+    pickImage: (payload?: { save?: boolean; defaultName?: string }) => Promise<{ ok: boolean; canceled?: boolean; path?: string }>;
+    onProgress: (callback: (ev: RescueEvent) => void) => () => void;
   };
   wintools: {
     listFeatures: () => Promise<{ ok: boolean; error?: string; features?: Record<string, 'enabled' | 'disabled' | 'pending' | 'unavailable'> }>;

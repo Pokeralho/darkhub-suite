@@ -37,6 +37,7 @@ const DllInjector = lazy(() => import('./pages/DllInjector'));
 const FramePacer = lazy(() => import('./pages/FramePacer'));
 const Home = lazy(() => import('./pages/Home'));
 const SpaceSniffer = lazy(() => import('./pages/SpaceSniffer'));
+const DiskRescue = lazy(() => import('./pages/DiskRescue'));
 const Maintenance = lazy(() => import('./pages/Maintenance'));
 const UsbControl = lazy(() => import('./pages/UsbControl'));
 const Kakugan = lazy(() => import('./pages/Kakugan'));
@@ -161,6 +162,8 @@ const App = () => {
         return <SetupHub onNavigate={(p: string) => setCurrentPage(p)} />;
       case 'spacesniffer':
         return <SpaceSniffer />;
+      case 'disk-rescue':
+        return <DiskRescue />;
       case 'dll-injector':
         return <DllInjector />;
       case 'dev-icons':

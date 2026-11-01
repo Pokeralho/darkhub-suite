@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- "Disk Studio & Rescue" (Utilities): a new low-level disk page backed by a native Rust engine
+  (`native_disk/` → `DarkHub.DiskRescue.exe`, talking straight to `\\.\PhysicalDriveN` through the Windows storage IOCTLs).
+  Health tab: proportional partition map, MBR/GPT state, SMART counters and a read-only surface test with a block map.
+  HeaderGuard: rebuilds a wiped primary or backup GPT from the other copy (both CRC32s checked and recomputed, protective
+  MBR added when LBA 0 is blank), finds lost NTFS/FAT/exFAT volumes even when their first sector is gone (through the NTFS
+  backup boot sector) and rebuilds the MBR from them. DiskEditor: HxD-style sector viewer with decoded MBR/GPT/VBR fields.
+  Deep Carving: signature recovery of JPEG, PNG, GIF, BMP, HEIC, PDF, DOCX/XLSX/PPTX, ZIP, 7z, SQLite, MP4/MOV with the real
+  size read from each format's structure. Cloning: disk to disk, partition to partition, disk/partition to image and image
+  back, tolerant of bad sectors, SHA-256 verified, with the GPT moved to the end when the target is larger. Every write
+  shows a before/after diff, saves the overwritten sectors to a `.dhbk` backup first and needs the disk number typed;
+  the Windows disk and the disk holding the boot (EFI) partition are refused. 512 and 4K-sector disks are supported.
+
 ## [0.7.4] - 2026-10-28
 
 ### Added
