@@ -26,7 +26,7 @@ import { SusuyaClient, links, mimeOf } from '../electron/services/susuya/SusuyaC
 // @ts-ignore
 import { normalizeShareConfig } from '../electron/ipc/shareIpc.js';
 // @ts-ignore
-import { physicalSize, screenshotName, cropRect, captureRegion, pickDisplays, layoutCanvas, matchSources, upscaleFactor } from '../electron/services/susuya/Screenshot.js';
+import { physicalSize, screenshotName, cropRect, captureRegion, pickDisplays, layoutCanvas, matchSources, upscaleFactor, displayKey } from '../electron/services/susuya/Screenshot.js';
 // @ts-ignore
 import { parseRegionTitle, REGION_PAGE } from '../electron/services/susuya/RegionPicker.js';
 
@@ -122,7 +122,7 @@ describe('screenshots and share settings', () => {
   it('names files by date and validates settings', () => {
     expect(screenshotName(new Date(2026, 9, 23, 9, 5, 7))).toBe('DarkHub_2026-10-23_09-05-07.png');
     const c = normalizeShareConfig({ ttl: 999, folder: 'relative', hotkey: 'Ctrl+Shift+P' }, 'C:\\Users\\x\\Pictures');
-    expect(c).toEqual({ hotkey: 'Ctrl+Shift+P', regionHotkey: 'Ctrl+Shift+F11', folder: 'C:\\Users\\x\\Pictures\\DarkHub Screenshots', autoUpload: false, copyImage: true, clip: 'image', sound: true, ttlChosen: false, ttl: 3600, monitor: 'cursor', regionMonitor: 'cursor', regionUpscale: 'auto', upscaleMethod: 'sharp', aiEnhance: 'region', aiQuality: 'fast', aiStyle: 'photo' });
+    expect(c).toEqual({ hotkey: 'Ctrl+Shift+P', regionHotkey: 'Ctrl+Shift+F11', folder: 'C:\\Users\\x\\Pictures\\DarkHub Screenshots', autoUpload: false, copyImage: true, clip: 'image', sound: true, ttlChosen: false, ttl: 3600, monitor: 'cursor', regionMonitorChosen: false, regionMonitor: 'all', regionUpscale: 'auto', upscaleMethod: 'sharp', aiEnhance: 'region', aiQuality: 'fast', aiStyle: 'photo' });
     // 24 h saved by the old default is reset to 1 h; a validity the user picked is kept
     expect(normalizeShareConfig({ ttl: 86400 }, 'C:/p').ttl).toBe(3600);
     // clipboard choice: old configs keep their behaviour (auto-upload copied the link, otherwise the image)
@@ -203,6 +203,17 @@ describe('multi-monitor screenshots', () => {
     expect(pickDisplays('all', all, 1, 1)).toEqual(all);
   });
 
+  it('remembers a monitor by name and position, not by the id Windows changes after a restart', () => {
+    expect(displayKey(side)).toBe('IPS0001@-1080,-650');
+    const rebooted = [{ ...main, id: 77 }, { ...side, id: 88 }];
+    expect(pickDisplays('IPS0001@-1080,-650', rebooted, 77, 77)).toEqual([rebooted[1]]);
+    // moved in Display settings: still found by name
+    const moved = [{ ...main, id: 77 }, { ...side, id: 88, bounds: { ...side.bounds, x: 2560, y: 0 } }];
+    expect(pickDisplays('IPS0001@-1080,-650', moved, 77, 77)).toEqual([moved[1]]);
+    // unplugged: the monitor under the mouse
+    expect(pickDisplays('Other@0,0', [main], 1, 1)).toEqual([main]);
+  });
+
   it('stitches every display on one canvas at its real position', () => {
     const l = layoutCanvas(all);
     expect([l.width, l.height]).toEqual([3640, 2090]);
@@ -224,8 +235,11 @@ describe('multi-monitor screenshots', () => {
   });
 
   it('keeps the monitor choice in the saved settings', () => {
-    expect(normalizeShareConfig({ monitor: 'all', regionMonitor: '619163098' }, 'C:/p')).toMatchObject({ monitor: 'all', regionMonitor: '619163098' });
-    expect(normalizeShareConfig({ monitor: '../x', regionMonitor: 5 }, 'C:/p')).toMatchObject({ monitor: 'cursor', regionMonitor: 'cursor' });
+    expect(normalizeShareConfig({ monitor: 'all', regionMonitor: 'IPS0001@-1080,-650', regionMonitorChosen: true }, 'C:/p')).toMatchObject({ monitor: 'all', regionMonitor: 'IPS0001@-1080,-650' });
+    expect(normalizeShareConfig({ monitor: '../x', regionMonitor: 5, regionMonitorChosen: true }, 'C:/p')).toMatchObject({ monitor: 'cursor', regionMonitor: 'all' });
+    // configs saved before this setting existed (or with the old "under the mouse" default) now select on every monitor
+    expect(normalizeShareConfig({ regionMonitor: 'cursor' }, 'C:/p').regionMonitor).toBe('all');
+    expect(normalizeShareConfig({ regionMonitor: 'cursor', regionMonitorChosen: true }, 'C:/p').regionMonitor).toBe('cursor');
   });
 });
 

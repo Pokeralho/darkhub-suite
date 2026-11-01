@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-01T15:01:50. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-01T18:28:34. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -182,7 +182,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ipc/shareIpc.js`
 
-`monitorMode`:16, `readJson`:18, `writeJson`:19, `normalizeShareConfig`:23, `registerShareIPC`:50, `broadcast`:63, `notify`:64, `liveHistory`:65, `upload`:67, `publicEntry`:97, `enhance`:102, `enhanceInBackground`:115, `capture`:145, `bindHotkey`:181, `handle`:190, `state`:197
+`monitorMode`:16, `readJson`:18, `writeJson`:19, `normalizeShareConfig`:23, `registerShareIPC`:53, `broadcast`:66, `notify`:67, `liveHistory`:68, `upload`:70, `publicEntry`:100, `enhance`:105, `enhanceInBackground`:118, `capture`:148, `bindHotkey`:184, `handle`:193, `state`:200
 
 ## `electron/ipc/startupIpc.js`
 
@@ -690,7 +690,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/susuya/Screenshot.js`
 
-`pad`:10, `screenshotName`:11, `physicalSize`:16, `cropRect`:25, `clampX`:29, `clampY`:30, `listDisplays`:40, `pickDisplays`:52, `byId`:53, `layoutCanvas`:64, `matchSources`:85, `captureSources`:93, `grabDisplay`:105, `upscaleFactor`:129, `enlarge`:138, `saveShot`:147, `captureScreen`:158, `captureRegion`:168, `grabRegionImage`:180
+`pad`:10, `screenshotName`:11, `physicalSize`:16, `cropRect`:25, `clampX`:29, `clampY`:30, `displayKey`:43, `listDisplays`:48, `pickDisplays`:60, `byId`:61, `layoutCanvas`:79, `matchSources`:100, `captureSources`:108, `grabDisplay`:120, `upscaleFactor`:144, `enlarge`:153, `saveShot`:162, `captureScreen`:173, `captureRegion`:183, `grabRegionImage`:195
 
 ## `electron/services/susuya/SusuyaClient.js`
 

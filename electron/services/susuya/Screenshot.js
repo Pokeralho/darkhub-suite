@@ -36,11 +36,19 @@ export function cropRect(sel, logical, image, minPx = 3) {
   return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 }
 }
 
+/**
+ * Stable name of a monitor for the saved setting: Windows hands out new display ids after a restart or reconnect, so
+ * a monitor is remembered by its name and position ("Odyssey G5@0,0"). Pure.
+ */
+export function displayKey(d) {
+  return `${String(d.label || 'Monitor').replace(/[@\r\n]/g, ' ').slice(0, 48)}@${d.bounds.x},${d.bounds.y}`
+}
+
 /** Monitors for the settings list. */
 export function listDisplays() {
   const primary = screen.getPrimaryDisplay().id
   return screen.getAllDisplays().map((d, i) => ({
-    id: String(d.id), label: d.label || `Monitor ${i + 1}`, primary: d.id === primary,
+    id: displayKey(d), label: d.label || `Monitor ${i + 1}`, primary: d.id === primary,
     ...physicalSize(d), x: d.bounds.x, y: d.bounds.y, scaleFactor: d.scaleFactor
   }))
 }
@@ -53,7 +61,14 @@ export function pickDisplays(mode, displays, primaryId, cursorDisplayId) {
   const byId = (id) => displays.find((d) => String(d.id) === String(id))
   if (mode === 'all') return displays.slice()
   if (mode === 'primary') return [byId(primaryId) || displays[0]].filter(Boolean)
-  if (mode && mode !== 'cursor' && byId(mode)) return [byId(mode)]
+  if (mode && mode !== 'cursor') {
+    // a saved monitor: same name and position, else same name (moved in Display settings), else an old numeric id
+    const label = String(mode).includes('@') ? String(mode).slice(0, String(mode).lastIndexOf('@')) : null
+    const hit = displays.find((d) => displayKey(d) === mode)
+      || (label ? displays.filter((d) => String(d.label || 'Monitor').replace(/[@\r\n]/g, ' ').slice(0, 48) === label) : []).at(0)
+      || byId(mode)
+    if (hit) return [hit]
+  }
   return [byId(cursorDisplayId) || byId(primaryId) || displays[0]].filter(Boolean)
 }
 

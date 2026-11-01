@@ -13,7 +13,7 @@ const DEFAULT_TTL = 3600
 const DEFAULT_HOTKEY = 'Ctrl+Shift+F12'
 const DEFAULT_REGION_HOTKEY = 'Ctrl+Shift+F11'
 // 'cursor' (display under the mouse), 'primary', 'all' (every display stitched) or a display id
-const monitorMode = (v) => (typeof v === 'string' && (['cursor', 'primary', 'all'].includes(v) || /^\d{1,12}$/.test(v)) ? v : 'cursor')
+const monitorMode = (v, fallback = 'cursor') => (typeof v === 'string' && (['cursor', 'primary', 'all'].includes(v) || /^\d{1,12}$/.test(v) || /^[^\r\n@]{1,48}@-?\d{1,6},-?\d{1,6}$/.test(v)) ? v : fallback)
 
 function readJson(file, fallback) { try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return fallback } }
 function writeJson(file, value) {
@@ -35,7 +35,10 @@ export function normalizeShareConfig(c = {}, picturesDir = '') {
     ttlChosen: c.ttlChosen === true,
     ttl: c.ttlChosen === true && TTLS.includes(Number(c.ttl)) ? Number(c.ttl) : DEFAULT_TTL,
     monitor: monitorMode(c.monitor),
-    regionMonitor: monitorMode(c.regionMonitor),
+    // Area selection spans every monitor by default, like the Snipping Tool ("under the mouse" never let the area
+    // button reach a second monitor). Saved configs from before only keep their value if the user picked it.
+    regionMonitorChosen: c.regionMonitorChosen === true,
+    regionMonitor: c.regionMonitorChosen === true ? monitorMode(c.regionMonitor, 'all') : 'all',
     // small region captures are enlarged so they stay sharp when pasted/viewed (see upscaleFactor)
     regionUpscale: ['off', 'auto', '2', '3', '4'].includes(String(c.regionUpscale)) ? String(c.regionUpscale) : 'auto',
     upscaleMethod: c.upscaleMethod === 'smooth' ? 'smooth' : 'sharp',
@@ -208,7 +211,7 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotke
   handle('share:setConfig', (patch) => {
     if (patch.hotkey && patch.hotkey === (patch.regionHotkey ?? config.regionHotkey)) return { ...state(), error: 'atalho já usado pelo print de área' }
     if (patch.regionHotkey && patch.regionHotkey === (patch.hotkey ?? config.hotkey)) return { ...state(), error: 'atalho já usado pelo print da tela inteira' }
-    const next = normalizeShareConfig({ ...config, ...patch, ...('ttl' in patch ? { ttlChosen: true } : {}) }, pictures)
+    const next = normalizeShareConfig({ ...config, ...patch, ...('ttl' in patch ? { ttlChosen: true } : {}), ...('regionMonitor' in patch ? { regionMonitorChosen: true } : {}) }, pictures)
     for (const key of ['hotkey', 'regionHotkey']) {
       if (next[key] === config[key] && registered[key]) continue
       const hk = bindHotkey(key, next[key])

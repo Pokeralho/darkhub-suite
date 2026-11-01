@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Susuya area screenshots now let you select on any monitor: the frozen screen spans every monitor by default, like
+  the Snipping Tool. Before, it opened only on the monitor under the mouse, so the "Select area" button (and the
+  hotkey with the mouse on the main screen) never reached a second monitor. A specific monitor is now remembered by
+  its name and position, because Windows gives monitors new ids after a restart.
+
 ## [0.8.1] - 2026-11-01
 
 ### Added

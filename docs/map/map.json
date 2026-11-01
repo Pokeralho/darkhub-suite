@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-01T15:01:50",
+ "generated_at": "2026-11-01T18:28:34",
  "bridge": "darkhub",
  "preload": "electron/preload.js",
  "features": [
@@ -170,7 +170,7 @@
      "api": "share.aiStatus",
      "from": "src/pages/Share.tsx:104",
      "channel": "share:aiStatus",
-     "handler": "electron/ipc/shareIpc.js:200",
+     "handler": "electron/ipc/shareIpc.js:203",
      "calls": [
       "ai.available"
      ]
@@ -179,7 +179,7 @@
      "api": "share.displays",
      "from": "src/pages/Share.tsx:103",
      "channel": "share:displays",
-     "handler": "electron/ipc/shareIpc.js:199",
+     "handler": "electron/ipc/shareIpc.js:202",
      "calls": [
       "listDisplays() (electron/services/susuya/Screenshot.js)"
      ]
@@ -195,7 +195,7 @@
      "api": "share.qr",
      "from": "src/pages/Share.tsx:19",
      "channel": "share:qr",
-     "handler": "electron/ipc/shareIpc.js:251",
+     "handler": "electron/ipc/shareIpc.js:254",
      "calls": [
       "s.startsWith",
       "QRCode.toDataURL"
@@ -205,7 +205,7 @@
      "api": "share.recentShots",
      "from": "src/pages/Share.tsx:99",
      "channel": "share:recentShots",
-     "handler": "electron/ipc/shareIpc.js:278",
+     "handler": "electron/ipc/shareIpc.js:281",
      "calls": [
       "i.test"
      ]
@@ -214,7 +214,7 @@
      "api": "share.state",
      "from": "src/pages/Share.tsx:98",
      "channel": "share:state",
-     "handler": "electron/ipc/shareIpc.js:198",
+     "handler": "electron/ipc/shareIpc.js:201",
      "calls": []
     },
     {
@@ -3042,7 +3042,7 @@
      "api": "share.grabRegion",
      "from": "src/pages/ImageTextExtractor.tsx:172",
      "channel": "share:grabRegion",
-     "handler": "electron/ipc/shareIpc.js:259",
+     "handler": "electron/ipc/shareIpc.js:262",
      "calls": [
       "img.toDataURL",
       "img.getSize",
@@ -3088,7 +3088,7 @@
      "api": "share.qr",
      "from": "src/components/vault/VaultTransferSection.tsx:20",
      "channel": "share:qr",
-     "handler": "electron/ipc/shareIpc.js:251",
+     "handler": "electron/ipc/shareIpc.js:254",
      "calls": [
       "s.startsWith",
       "QRCode.toDataURL"
@@ -11323,7 +11323,7 @@
    "handler": {
     "channel": "share:aiStatus",
     "file": "electron/ipc/shareIpc.js",
-    "line": 200,
+    "line": 203,
     "calls": [
      "ai.available"
     ]
@@ -11340,7 +11340,7 @@
    "handler": {
     "channel": "share:cancel",
     "file": "electron/ipc/shareIpc.js",
-    "line": 235,
+    "line": 238,
     "calls": [
      "jobs.get"
     ]
@@ -11355,7 +11355,7 @@
    "handler": {
     "channel": "share:capture",
     "file": "electron/ipc/shareIpc.js",
-    "line": 256,
+    "line": 259,
     "calls": []
    },
    "used_by": []
@@ -11368,7 +11368,7 @@
    "handler": {
     "channel": "share:captureRegion",
     "file": "electron/ipc/shareIpc.js",
-    "line": 257,
+    "line": 260,
     "calls": []
    },
    "used_by": []
@@ -11381,7 +11381,7 @@
    "handler": {
     "channel": "share:copy",
     "file": "electron/ipc/shareIpc.js",
-    "line": 244,
+    "line": 247,
     "calls": [
      "s.startsWith",
      "clipboard.writeText"
@@ -11397,7 +11397,7 @@
    "handler": {
     "channel": "share:displays",
     "file": "electron/ipc/shareIpc.js",
-    "line": 199,
+    "line": 202,
     "calls": [
      "listDisplays() (electron/services/susuya/Screenshot.js)"
     ]
@@ -11414,7 +11414,7 @@
    "handler": {
     "channel": "share:enhance",
     "file": "electron/ipc/shareIpc.js",
-    "line": 202,
+    "line": 205,
     "calls": [
      "i.test"
     ]
@@ -11429,7 +11429,7 @@
    "handler": {
     "channel": "share:grabRegion",
     "file": "electron/ipc/shareIpc.js",
-    "line": 259,
+    "line": 262,
     "calls": [
      "img.toDataURL",
      "img.getSize",
@@ -11459,7 +11459,7 @@
    "handler": {
     "channel": "share:openFolder",
     "file": "electron/ipc/shareIpc.js",
-    "line": 271,
+    "line": 274,
     "calls": []
    },
    "used_by": []
@@ -11472,7 +11472,7 @@
    "handler": {
     "channel": "share:pickAndUpload",
     "file": "electron/ipc/shareIpc.js",
-    "line": 221,
+    "line": 224,
     "calls": [
      "results.push"
     ]
@@ -11487,7 +11487,7 @@
    "handler": {
     "channel": "share:qr",
     "file": "electron/ipc/shareIpc.js",
-    "line": 251,
+    "line": 254,
     "calls": [
      "s.startsWith",
      "QRCode.toDataURL"
@@ -11506,7 +11506,7 @@
    "handler": {
     "channel": "share:recentShots",
     "file": "electron/ipc/shareIpc.js",
-    "line": 278,
+    "line": 281,
     "calls": [
      "i.test"
     ]
@@ -11523,7 +11523,7 @@
    "handler": {
     "channel": "share:delete",
     "file": "electron/ipc/shareIpc.js",
-    "line": 236,
+    "line": 239,
     "calls": [
      "history.find",
      "client.remove",
@@ -11541,7 +11541,7 @@
    "handler": {
     "channel": "share:setConfig",
     "file": "electron/ipc/shareIpc.js",
-    "line": 208,
+    "line": 211,
     "calls": []
    },
    "used_by": []
@@ -11554,7 +11554,7 @@
    "handler": {
     "channel": "share:state",
     "file": "electron/ipc/shareIpc.js",
-    "line": 198,
+    "line": 201,
     "calls": []
    },
    "used_by": [
@@ -11569,7 +11569,7 @@
    "handler": {
     "channel": "share:uploadPaths",
     "file": "electron/ipc/shareIpc.js",
-    "line": 229,
+    "line": 232,
     "calls": [
      "results.push"
     ]
@@ -11584,7 +11584,7 @@
    "handler": {
     "channel": "share:uploadFile",
     "file": "electron/ipc/shareIpc.js",
-    "line": 272,
+    "line": 275,
     "calls": []
    },
    "used_by": []
@@ -15489,62 +15489,62 @@
    {
     "name": "registerShareIPC",
     "kind": "function",
-    "line": 50
+    "line": 53
    },
    {
     "name": "broadcast",
     "kind": "function",
-    "line": 63
+    "line": 66
    },
    {
     "name": "notify",
     "kind": "function",
-    "line": 64
+    "line": 67
    },
    {
     "name": "liveHistory",
     "kind": "function",
-    "line": 65
+    "line": 68
    },
    {
     "name": "upload",
     "kind": "function",
-    "line": 67
+    "line": 70
    },
    {
     "name": "publicEntry",
     "kind": "function",
-    "line": 97
+    "line": 100
    },
    {
     "name": "enhance",
     "kind": "function",
-    "line": 102
+    "line": 105
    },
    {
     "name": "enhanceInBackground",
     "kind": "function",
-    "line": 115
+    "line": 118
    },
    {
     "name": "capture",
     "kind": "function",
-    "line": 145
+    "line": 148
    },
    {
     "name": "bindHotkey",
     "kind": "function",
-    "line": 181
+    "line": 184
    },
    {
     "name": "handle",
     "kind": "function",
-    "line": 190
+    "line": 193
    },
    {
     "name": "state",
     "kind": "function",
-    "line": 197
+    "line": 200
    }
   ],
   "electron/ipc/startupIpc.js": [
@@ -25946,69 +25946,74 @@
     "line": 30
    },
    {
+    "name": "displayKey",
+    "kind": "function",
+    "line": 43
+   },
+   {
     "name": "listDisplays",
     "kind": "function",
-    "line": 40
+    "line": 48
    },
    {
     "name": "pickDisplays",
     "kind": "function",
-    "line": 52
+    "line": 60
    },
    {
     "name": "byId",
     "kind": "function",
-    "line": 53
+    "line": 61
    },
    {
     "name": "layoutCanvas",
     "kind": "function",
-    "line": 64
+    "line": 79
    },
    {
     "name": "matchSources",
     "kind": "function",
-    "line": 85
+    "line": 100
    },
    {
     "name": "captureSources",
     "kind": "function",
-    "line": 93
+    "line": 108
    },
    {
     "name": "grabDisplay",
     "kind": "function",
-    "line": 105
+    "line": 120
    },
    {
     "name": "upscaleFactor",
     "kind": "function",
-    "line": 129
+    "line": 144
    },
    {
     "name": "enlarge",
     "kind": "function",
-    "line": 138
+    "line": 153
    },
    {
     "name": "saveShot",
     "kind": "function",
-    "line": 147
+    "line": 162
    },
    {
     "name": "captureScreen",
     "kind": "function",
-    "line": 158
+    "line": 173
    },
    {
     "name": "captureRegion",
     "kind": "function",
-    "line": 168
+    "line": 183
    },
    {
     "name": "grabRegionImage",
     "kind": "function",
-    "line": 180
+    "line": 195
    }
   ],
   "electron/services/susuya/SusuyaClient.js": [
