@@ -38,6 +38,7 @@ const FramePacer = lazy(() => import('./pages/FramePacer'));
 const Home = lazy(() => import('./pages/Home'));
 const SpaceSniffer = lazy(() => import('./pages/SpaceSniffer'));
 const DiskRescue = lazy(() => import('./pages/DiskRescue'));
+const Cleaner = lazy(() => import('./pages/Cleaner'));
 const Maintenance = lazy(() => import('./pages/Maintenance'));
 const UsbControl = lazy(() => import('./pages/UsbControl'));
 const Kakugan = lazy(() => import('./pages/Kakugan'));
@@ -164,6 +165,8 @@ const App = () => {
         return <SpaceSniffer />;
       case 'disk-rescue':
         return <DiskRescue />;
+      case 'cleaner':
+        return <Cleaner />;
       case 'dll-injector':
         return <DllInjector />;
       case 'dev-icons':

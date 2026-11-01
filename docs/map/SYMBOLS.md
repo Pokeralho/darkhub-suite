@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-01T13:15:07. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-01T15:01:50. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -30,7 +30,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/devSelfTest.js`
 
-`short`:19, `withTimeout`:25, `sleep`:26, `mainWindow`:28, `run`:40, `call`:69, `callLong`:128
+`short`:19, `withTimeout`:25, `sleep`:26, `mainWindow`:28, `run`:40, `call`:69, `callLong`:134
 
 ## `electron/devSelfTestMutate.js`
 
@@ -115,6 +115,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `electron/ipc/benchmarkIpc.js`
 
 `registerBenchmarkIPC`:4, `broadcast`:5, `handle`:7
+
+## `electron/ipc/cleanerIpc.js`
+
+`registerCleanerIPC`:5, `handle`:7
 
 ## `electron/ipc/codeRunnerIpc.js`
 
@@ -210,7 +214,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/main.js`
 
-`getSystemInformation`:128, `get`:134, `getSharp`:143, `getOcrWorker`:152, `getExiftool`:172, `getFfmpegPath`:180, `getLibraryStore`:212, `safeRegister`:219, `getYtDlpTools`:256, `isDev`:261, `normalizeAccessPath`:285, `isPathInside`:295, `grantFilePath`:301, `grantDirectoryPath`:306, `hasFileAccessGrant`:311, `assertOutputDirGranted`:323, `assertFileAccessGranted`:329, `assertFileAccessGrantedMany`:338, `psSingleQuote`:344, `loadRuntimeConfig`:348, `isAllowedExternalProtocol`:358, `getAllowedExternalUrl`:362, `openAllowedExternalUrlDetached`:372, `isEmbeddedExternalProtocol`:383, `handleEmbeddedExternalNavigation`:387, `isTrustedAppNavigation`:399, `getAppIconPath`:409, `showMainWindow`:424, `ensureTray`:437, `hideWindowToBackground`:464, `estimateDirectoryBytes`:469, `computeJunkEstimate`:513, `work`:527, `createMainWindow`:594, `kickWindowsPaint`:659, `showWhenReady`:731, `eventSender`:816, `measureLatency`:843, `getActiveAdapterName`:873, `getMainCpuLoad`:1109, `broadcastLibraryEvent`:1253, `scoreExecutable`:1329, `key`:1334, `scanDirectoryForBestExe`:1355, `walk`:1358, `findPgeBat`:1499, `launchPgeBat`:1519, `isStartupTaskEnabled`:1595, `setStartupTask`:1605, `refreshLiveCounts`:1716, `sendEvent`:1972, `findLibreOfficeSoffice`:2204, `toXml`:2296, `buildArgs`:2389, `vaultFilePath`:2663, `setVaultAutoLockMinutes`:2671, `clearVaultAutoLock`:2678, `scheduleVaultAutoLock`:2685, `touchVault`:2694, `vaultFileExists`:2698, `readVaultFile`:2707, `writeVaultFile`:2712, `lockVault`:2720, `ensureUnlocked`:2727, `loadVaultUsingWrapper`:2732, `persistVaultData`:2753, `getSecurityScoreV2`:3125, `add`:3130, `isValidHostname`:3307, `getClickEnginePath`:3441, `autoClickerCall`:3467, `isValidWingetId`:3547, `installGithubReleaseMsi`:3559, `installFromOfficialUrl`:3587, `progress`:3623, `runWinget`:3648, `runDeferredStartup`:3730
+`getSystemInformation`:129, `get`:135, `getSharp`:144, `getOcrWorker`:153, `getExiftool`:173, `getFfmpegPath`:181, `getLibraryStore`:213, `safeRegister`:220, `getYtDlpTools`:258, `isDev`:263, `normalizeAccessPath`:287, `isPathInside`:297, `grantFilePath`:303, `grantDirectoryPath`:308, `hasFileAccessGrant`:313, `assertOutputDirGranted`:325, `assertFileAccessGranted`:331, `assertFileAccessGrantedMany`:340, `psSingleQuote`:346, `loadRuntimeConfig`:350, `isAllowedExternalProtocol`:360, `getAllowedExternalUrl`:364, `openAllowedExternalUrlDetached`:374, `isEmbeddedExternalProtocol`:385, `handleEmbeddedExternalNavigation`:389, `isTrustedAppNavigation`:401, `getAppIconPath`:411, `showMainWindow`:426, `ensureTray`:439, `hideWindowToBackground`:466, `estimateDirectoryBytes`:471, `computeJunkEstimate`:515, `work`:529, `createMainWindow`:596, `kickWindowsPaint`:661, `showWhenReady`:733, `eventSender`:818, `measureLatency`:845, `getActiveAdapterName`:875, `getMainCpuLoad`:1111, `broadcastLibraryEvent`:1255, `scoreExecutable`:1331, `key`:1336, `scanDirectoryForBestExe`:1357, `walk`:1360, `findPgeBat`:1501, `launchPgeBat`:1521, `isStartupTaskEnabled`:1597, `setStartupTask`:1607, `refreshLiveCounts`:1718, `sendEvent`:1974, `findLibreOfficeSoffice`:2206, `toXml`:2298, `buildArgs`:2391, `vaultFilePath`:2665, `setVaultAutoLockMinutes`:2673, `clearVaultAutoLock`:2680, `scheduleVaultAutoLock`:2687, `touchVault`:2696, `vaultFileExists`:2700, `readVaultFile`:2709, `writeVaultFile`:2714, `lockVault`:2722, `ensureUnlocked`:2729, `loadVaultUsingWrapper`:2734, `persistVaultData`:2755, `getSecurityScoreV2`:3127, `add`:3132, `isValidHostname`:3309, `getClickEnginePath`:3443, `autoClickerCall`:3469, `isValidWingetId`:3549, `installGithubReleaseMsi`:3561, `installFromOfficialUrl`:3589, `progress`:3625, `runWinget`:3650, `runDeferredStartup`:3732
 
 ## `electron/networkIPC.js`
 
@@ -222,7 +226,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:284, `handler`:303, `handler`:313, `handler`:325, `listener`:368, `handler`:420, `handler`:446, `handler`:452, `handler`:458, `handler`:464, `listener`:473, `listener`:484, `handler`:509, `listener`:522, `listener`:539, `handler`:577, `handler`:592, `listener`:615, `listener`:640, `listener`:661, `listener`:688, `handler`:729
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:284, `handler`:303, `handler`:313, `handler`:325, `listener`:368, `handler`:420, `handler`:446, `handler`:452, `handler`:458, `handler`:464, `listener`:473, `listener`:484, `handler`:509, `listener`:522, `listener`:539, `handler`:577, `handler`:592, `listener`:615, `listener`:640, `listener`:675, `listener`:702, `handler`:743
 
 ## `electron/services/CodeRunner.js`
 
@@ -343,6 +347,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `electron/services/benchmark/benchWorker.js`
 
 `emit`:12, `now`:13, `kernel`:17, `cpuSingle`:28, `cpuMulti`:35, `memBandwidth`:53, `memLatency`:63, `timerJitter`:81, `tick`:85, `diskSeqWrite`:101, `disk4kSyncWrite`:113
+
+## `electron/services/cleaner/CleanerService.js`
+
+`defaultExe`:16, `sanitizeIds`:22, `validateWinapp2`:31, `CleanerService`:44 _class_, `available`:55, `winapp2Path`:57, `metaPath`:58, `backupDir`:61, `run`:73, `_withIds`:84, `_exclusive`:91, `_winapp2Args`:98, `definitions`:100, `status`:109, `updateDefinitions`:116, `removeDefinitions`:141, `listTargets`:146, `scan`:148, `clean`:153, `browsers`:163, `regScan`:172, `regClean`:175, `listBackups`:185, `restoreBackup`:196
 
 ## `electron/services/darkos/DarkOS.Cli.ps1`
 
@@ -756,6 +764,38 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `Start-DarkHubInstall`:6
 
+## `native_cleaner/src/browsers.rs`
+
+`is_sqlite`:20, `chromium`:25, `find`:44, `in_use`:78, `file_len`:91, `one`:95, `vacuum`:133
+
+## `native_cleaner/src/files.rs`
+
+`is_reparse`:10, `shred_file`:40, `delete_file`:72, `walk`:91, `run`:144
+
+## `native_cleaner/src/main.rs`
+
+`parse`:37, `get`:57, `flag`:60, `env_of`:65, `read_winapp2`:73, `read_ids`:82, `reg_exists`:88, `reg_sources`:99, `run`:106, `main`:157
+
+## `native_cleaner/src/registry.rs`
+
+`drop`:17, `wide`:22, `hive`:26, `split`:37, `open`:42, `exists`:49, `text`:61, `info`:71, `values`:79, `value`:97, `subkeys`:101, `delete_value`:115, `delete_tree`:119, `set`:124, `create`:130, `sz`:139, `esc`:145, `hex_list`:149, `value_line`:163, `write_reg_file`:202, `system`:232, `test`:256, `id`:283, `to_json`:286, `expand_env`:291, `absolute`:316, `missing`:322, `command_target`:330, `scan`:350, `clean`:415
+
+## `native_cleaner/src/safety.rs`
+
+`from_process`:32, `rooted`:71, `one`:95, `roots`:99, `check_rule`:125, `denied_programdata`:167, `is_protected_file`:180, `is_protected_pattern`:187, `is_protected_dir`:191, `norm`:196, `is_plain_absolute`:205, `depth_under`:211
+
+## `native_cleaner/src/tests.rs`
+
+`tmp`:12, `put`:19, `no_reg`:24, `wildcard_matching`:29, `rules_outside_expected_folders_are_refused`:39, `winapp2_parsing_detection_and_validation`:60, `protected_files_survive_and_shred_unlinks`:121, `shred_overwrites_before_unlink`:142, `builtin_targets_parse`:157, `make_db`:165, `browser_vacuum_shrinks_and_keeps_rows`:176, `values_of`:211, `command_lines`:218, `scan_backup_clean_and_restore`:227, `test_root_is_confined`:305, `rules_aimed_at_passwords_are_refused`:312
+
+## `native_cleaner/src/util.rs`
+
+`from`:18, `emit`:35, `wild_match`:43, `has_wild`:69, `seeded`:77, `fill`:81
+
+## `native_cleaner/src/winapp2.rs`
+
+`excluded`:124, `to_json`:135, `parse`:148, `category_of`:166, `expand`:184, `expand_wild`:207, `exists_wild`:234, `detected`:238, `build`:279, `load_all`:353
+
 ## `native_disk/src/carve.rs`
 
 `get`:48, `u8`:64, `be16`:67, `be32`:70, `le32`:73, `le64`:76, `find`:80, `jpeg_len`:99, `png_len`:138, `gif_sub_blocks`:156, `gif_len`:169, `bmp_len`:200, `pdf_len`:209, `zip_len`:228, `zip_kind`:243, `sqlite_len`:263, `sevenz_len`:274, `mp4_len`:281, `measure`:318, `type_enabled`:345, `carve`:349
@@ -810,7 +850,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/App.tsx`
 
-`pageFromHash`:55, `PageLoading`:60 _component_, `App`:75 _component_, `onHash`:90, `reportRenderError`:96, `renderPage`:100
+`pageFromHash`:56, `PageLoading`:61 _component_, `App`:76 _component_, `onHash`:91, `reportRenderError`:97, `renderPage`:101
 
 ## `src/components/DetailedHardwareInfo.tsx`
 
@@ -1098,7 +1138,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/i18n/messages.ts`
 
-`SupportedLang`:28 _type_, `LanguageOption`:30 _type_, `getTranslationTemplate`:3433
+`SupportedLang`:29 _type_, `LanguageOption`:31 _type_, `getTranslationTemplate`:3434
 
 ## `src/i18n/overlayEditorMessages.ts`
 
@@ -1106,7 +1146,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/layouts/MainLayout.tsx`
 
-`MainLayoutProps`:17 _type_, `NavSection`:23 _type_, `MainLayout`:33 _component_, `handleMenuClick`:148, `handleNavKeyDown`:171, `navButton`:186, `rail`:192
+`MainLayoutProps`:17 _type_, `NavSection`:23 _type_, `MainLayout`:33 _component_, `handleMenuClick`:149, `handleNavKeyDown`:172, `navButton`:187, `rail`:193
 
 ## `src/lib/cipherTools.ts`
 
@@ -1135,6 +1175,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `src/pages/Benchmark.tsx`
 
 `CompareResult`:7 _type_, `fmt`:10, `Benchmark`:12 _component_, `api`:25, `metricName`:26, `load`:37, `run`:53, `remove`:69, `runLabel`:77, `warningName`:82
+
+## `src/pages/Cleaner.tsx`
+
+`api`:8, `Tab`:9 _type_, `Cleaner`:18 _component_, `ConfirmModal`:64 _component_, `onKey`:72, `Stat`:99 _component_, `FilesTab`:110 _component_, `warnOf`:137, `toggle`:151, `runScan`:153, `runClean`:161, `BrowsersTab`:285 _component_, `run`:293, `status`:302, `RegistryTab`:383 _component_, `apply`:407, `restore`:412, `DefsTab`:502 _component_, `update`:507, `remove`:515
 
 ## `src/pages/DarkOSCenter.tsx`
 
@@ -1343,6 +1387,14 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/autoclickerHotkey.test.ts`
 
 `svc`:45
+
+## `tests/cleaner.test.ts`
+
+`tmpDir`:13, `fakeIni`:16, `fakeFetch`:21, `put`:81, `execFileImpl`:154
+
+## `tests/cleanerPage.test.tsx`
+
+`target`:7, `mockApi`:13
 
 ## `tests/darkosService.test.ts`
 

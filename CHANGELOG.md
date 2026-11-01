@@ -6,6 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- "Deep clean" page (Utilities), backed by a new native Rust engine, DarkHub Cleaner Core (`native_cleaner/` →
+  `DarkHub.Cleaner.exe`, `npm run build:cleaner`). Everything starts as a simulation; applying always asks for an
+  on-screen confirmation.
+  - Files: scan and clean of temporary files, Windows Update downloads, memory dumps, error reports, thumbnails, logs
+    and the caches of Chrome, Edge, Brave, Firefox and Zen. The analysis lists sample files of what will be deleted;
+    the clean button only unlocks after an analysis of the same selection. Optional secure deletion (1, 3 or 7 passes:
+    overwrite, flush, rename, then unlink). Links and junctions are never followed; shader caches, browser passwords,
+    keys and bookmarks are never deleted.
+  - Browser databases: VACUUM of the SQLite databases of Chrome, Edge, Brave, Firefox and Zen (history, favicons,
+    cookies, forms...), after an integrity check. Databases the browser has open are skipped and reported.
+  - Registry: finds missing shared DLLs, orphan App Paths and dead startup entries (Run/RunOnce, StartupApproved,
+    Startup folder). Paths on disconnected drives are not reported. Removing writes a `.reg` restore file to the
+    DarkHub backup folder (`%ProgramData%\DarkHub\Cleaner\backups`) and reads it back before any key is touched; the
+    page lists the backups and restores them with `reg import`. Only findings of a fresh scan can be removed.
+  - winapp2.ini: "Update definitions" downloads the community file on request (never automatically), checks that it
+    is a real winapp2.ini, and records its version and SHA-256. Its rules extend the clean to third-party programs, as
+    untrusted data: nothing in it is executed, RegKey entries are ignored, and paths outside AppData, Temp, ProgramData
+    and the Windows log folders, whole program folders and rules aimed at passwords are refused (and shown as refused).
+
+### Fixed
+- `npm run dev`: Vite no longer crashes (EBUSY) when a Rust engine is rebuilt while it runs (`native_*/target` is not
+  watched).
+
 ## [0.8.0] - 2026-11-01
 
 ### Added

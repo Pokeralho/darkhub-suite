@@ -72,6 +72,7 @@ Obs.: no `preload.js` o namespace do FramePacer é `darkpacer`, com o apelido `f
 |---|---|---|
 | `spacesniffer` | `src/pages/SpaceSniffer/` (Mapa de disco: `index.tsx`, `TreemapCanvas.tsx`, `treemap.ts`) | `electron/ipc/diskScanIpc.js` → `electron/services/diskscan/` (`DiskScanService`, `ScanModel`, `filter`) → `electron/services/DarkHub.DiskScan.exe` |
 | `disk-rescue` | `src/pages/DiskRescue.tsx` + `src/components/recovery/*` | `electron/ipc/recoveryIpc.js` → `electron/services/recovery/DiskRecoveryService.js` → `electron/services/DarkHub.DiskRescue.exe` (Rust, `native_disk/`: `npm run build:disk`, `npm run test:disk`) |
+| `cleaner` | `src/pages/Cleaner.tsx` (Limpeza profunda: arquivos, VACUUM dos navegadores, registro, winapp2.ini) | `electron/ipc/cleanerIpc.js` → `electron/services/cleaner/CleanerService.js` → `electron/services/DarkHub.Cleaner.exe` (Rust, `native_cleaner/`: `npm run build:cleaner`, `npm run test:cleaner`). Regras de segurança dos caminhos em `native_cleaner/src/safety.rs`; parser do winapp2 e itens embutidos em `winapp2.rs`; backup .reg em `registry.rs` |
 | `library` | `src/pages/Library.tsx` + `src/components/library/*` | `electron/libraryStore.js`, `CoverProviderService.js` |
 | `security` | `src/pages/AdvancedSecurity.tsx` | `electron/services/SecurityService.js` |
 | `passwords` | `src/pages/PasswordManager.tsx` | `electron/main.js` (`vault:*`) → `electron/vaultCrypto.js` |

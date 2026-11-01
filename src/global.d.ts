@@ -291,6 +291,22 @@ export interface DevTraceEntry {
   result?: unknown;
 }
 
+// ---------------------------------------------------------------- DarkHub Cleaner Core (cleaner:*)
+export type CleanerResult<T> = ({ ok: true } & T) | { ok: false; code?: string; error: string };
+export interface CleanerRule { dir: string; patterns: string[]; recurse: boolean; remove_self: boolean }
+export interface CleanerTarget {
+  id: string; name: string; category: string; source: 'builtin' | 'winapp2'; warning: string | null;
+  rules: CleanerRule[]; rejected: { rule: string; reason: string }[]; ignored_registry: number;
+}
+export interface CleanerTotals { files: number; bytes: number; locked: number; denied: number; protected: number; links: number }
+export interface CleanerTargetResult extends CleanerTotals { id: string; name: string; sample: string[]; refused: { dir: string; reason: string }[] }
+export interface CleanerRunResult { dry_run: boolean; shred: number; targets: CleanerTargetResult[]; total: CleanerTotals; unknown_ids: string[] }
+export interface CleanerDb { browser: string; profile: string; path: string; bytes: number; status: 'ok' | 'vacuumed' | 'in_use' | 'corrupt' | 'error'; reclaimable?: number; after?: number; saved?: number; error?: string }
+export interface CleanerVacuumResult { dry_run: boolean; databases: CleanerDb[]; total: { count: number; bytes: number; reclaimable: number; saved: number; in_use: number } }
+export interface CleanerFinding { id: string; kind: 'shared_dll' | 'app_path' | 'run' | 'startup_approved' | 'startup_folder'; hive: string; key: string; value: string | null; data: string; missing: string }
+export interface CleanerRegCleanResult { dry_run: boolean; findings: CleanerFinding[]; stale: number; removed: number; backup?: string; removed_ids?: string[]; failed?: { id: string; error: string }[] }
+export interface CleanerDefinitions { installed: boolean; version?: string; sections?: number; bytes?: number; sha256?: string; downloadedAt?: string; url?: string }
+
 // ---------------------------------------------------------------- Disk Studio & Rescue (recovery:*)
 export type RescueResult<T> = ({ ok: true } & T) | { ok: false; code?: string; error: string };
 export interface RescueDrive {
@@ -938,6 +954,20 @@ export interface DarkHubAPI {
     trash: (payload: { id: string }) => Promise<{ ok: boolean; error?: string; path?: string }>;
     exportReport: (payload: { id?: string; format: 'txt' | 'csv'; filter?: string }) => Promise<{ ok: boolean; canceled?: boolean; error?: string; path?: string; rows?: number }>;
     onProgress: (callback: (status: DiskMapStatus) => void) => () => void;
+  };
+  cleaner: {
+    status: () => Promise<{ ok: boolean; engine: boolean; busy: string | null; backupDir: string | null; winapp2: CleanerDefinitions; url: string }>;
+    updateDefinitions: () => Promise<CleanerResult<Omit<CleanerDefinitions, 'installed'>>>;
+    removeDefinitions: () => Promise<{ ok: boolean; error?: string }>;
+    listTargets: () => Promise<CleanerResult<{ targets: CleanerTarget[]; stats: { builtin: number; winapp2_sections: number; winapp2_detected: number; rejected_rules: number } }>>;
+    scan: (payload: { ids: string[] }) => Promise<CleanerResult<CleanerRunResult>>;
+    clean: (payload: { ids: string[]; apply?: boolean; confirm?: boolean; shred?: number }) => Promise<CleanerResult<CleanerRunResult>>;
+    browsers: (payload: { browsers?: string[]; apply?: boolean; confirm?: boolean }) => Promise<CleanerResult<CleanerVacuumResult>>;
+    regScan: () => Promise<CleanerResult<{ findings: CleanerFinding[] }>>;
+    regClean: (payload: { ids: string[]; apply?: boolean; confirm?: boolean }) => Promise<CleanerResult<CleanerRegCleanResult>>;
+    listBackups: () => Promise<CleanerResult<{ dir: string; backups: { name: string; bytes: number; modified: string }[] }>>;
+    restoreBackup: (payload: { name: string }) => Promise<{ ok: boolean; error?: string; file?: string }>;
+    openBackups: () => Promise<{ ok: boolean; error?: string }>;
   };
   recovery: {
     listDrives: () => Promise<RescueResult<{ drives: RescueDrive[]; system_disks: number[] }>>;

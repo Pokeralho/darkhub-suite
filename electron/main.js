@@ -31,6 +31,7 @@ import { registerDarkOSIPC } from './ipc/darkosIpc.js'
 import { registerWinToolsIPC } from './ipc/winToolsIpc.js'
 import { registerDiskScanIPC } from './ipc/diskScanIpc.js'
 import { registerRecoveryIPC } from './ipc/recoveryIpc.js'
+import { registerCleanerIPC } from './ipc/cleanerIpc.js'
 import { registerHwSensorsIPC } from './ipc/hwSensorsIpc.js'
 import { registerDriverIPC } from './ipc/driverIpc.js'
 import { registerPowerShellIPC } from './ipc/powershellIpc.js'
@@ -231,6 +232,7 @@ safeRegister('powershell', () => registerPowerShellIPC({ ipcMain, logger: Logger
 safeRegister('wintools', () => registerWinToolsIPC({ ipcMain, logger: Logger }))
 safeRegister('diskscan', () => registerDiskScanIPC({ ipcMain, dialog, shell, BrowserWindow, logger: Logger }))
 safeRegister('recovery', () => registerRecoveryIPC({ ipcMain, dialog, BrowserWindow, logger: Logger }))
+safeRegister('cleaner', () => registerCleanerIPC({ app, ipcMain, shell, logger: Logger }))
 safeRegister('hwsensors', () => registerHwSensorsIPC({ app, ipcMain, logger: Logger }))
 safeRegister('realtime', () => registerRealtimeIPC({ app, ipcMain, dialog, BrowserWindow, Notification, logger: Logger }))
 safeRegister('code', () => registerCodeRunnerIPC({ ipcMain, logger: Logger }))

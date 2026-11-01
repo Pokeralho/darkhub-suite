@@ -642,6 +642,20 @@ const darkhubApi = {
       return () => ipcRenderer.removeListener('recovery:progress', listener)
     }
   },
+  cleaner: {
+    status: () => ipcRenderer.invoke('cleaner:status'),
+    updateDefinitions: () => ipcRenderer.invoke('cleaner:update-definitions'),
+    removeDefinitions: () => ipcRenderer.invoke('cleaner:remove-definitions'),
+    listTargets: () => ipcRenderer.invoke('cleaner:list-targets'),
+    scan: (payload) => ipcRenderer.invoke('cleaner:scan', payload),
+    clean: (payload) => ipcRenderer.invoke('cleaner:clean', payload),
+    browsers: (payload) => ipcRenderer.invoke('cleaner:browsers', payload),
+    regScan: () => ipcRenderer.invoke('cleaner:reg-scan'),
+    regClean: (payload) => ipcRenderer.invoke('cleaner:reg-clean', payload),
+    listBackups: () => ipcRenderer.invoke('cleaner:list-backups'),
+    restoreBackup: (payload) => ipcRenderer.invoke('cleaner:restore-backup', payload),
+    openBackups: () => ipcRenderer.invoke('cleaner:open-backups')
+  },
   wintools: {
     listFeatures: () => ipcRenderer.invoke('wintools:listFeatures'),
     setFeature: (payload) => ipcRenderer.invoke('wintools:setFeature', payload),

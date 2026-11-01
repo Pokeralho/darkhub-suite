@@ -95,6 +95,12 @@ export async function run(listeners) {
     ['optiscaler:analyze', [{ exePath: 'C:\\Windows\\notepad.exe' }], (r) => (r && r.ok !== false ? null : 'analysis failed')],
     ...(Array.isArray(steam) && steam[0] ? [['dlss5:scanGame', [{ path: steam[0].installDir }], (r) => (r && r.ok !== false ? null : 'scan failed')]] : []),
     ['security:scanProcesses', [], (r) => (r ? null : 'empty')],
+    // Cleaner Core: simulations only (no apply), on this machine.
+    ['cleaner:scan', [{ ids: ['dh:user-temp'] }], (r) => (r?.ok && r.dry_run === true && r.targets?.length === 1 ? (console.log(`[selftest]   cleaner: ${r.total.files} files, ${r.total.bytes} bytes (simulação)`), null) : `scan failed (${r?.error})`)],
+    ['cleaner:clean', [{ ids: ['dh:user-temp'] }], (r) => (r?.ok && r.dry_run === true ? null : `clean without apply must be a simulation (${r?.error})`)],
+    ['cleaner:browsers', [{}], (r) => (r?.ok && r.dry_run === true ? (console.log(`[selftest]   cleaner: ${r.total.count} browser databases, ${r.total.reclaimable} bytes reclaimable`), null) : `vacuum dry-run failed (${r?.error})`)],
+    ['cleaner:reg-scan', [], (r) => (r?.ok && Array.isArray(r.findings) ? (console.log(`[selftest]   cleaner: ${r.findings.length} registry findings`), null) : `reg-scan failed (${r?.error})`)],
+    ['cleaner:reg-clean', [{ ids: ['run|HKCU\\nope|x'] }], (r) => (r?.ok && r.dry_run === true && r.removed === 0 ? null : `reg-clean without apply must not remove (${r?.error})`)],
     // Disk map: a real (read-only) scan of the system drive; the scan stays loaded so the screen pass shows the map.
     ['diskscan:start', [{ root: process.env.SELFTEST_DISKSCAN_ROOT || `${process.env.SystemDrive || 'C:'}\\` }], async (r) => {
       const t0 = Date.now()
@@ -149,10 +155,10 @@ export async function run(listeners) {
   for (const r of routes) {
     consoleBuf = []
     const since = Date.now()
-    // "route@Button text" opens the route, then clicks the button with that text (inner tabs)
-    const [route, click] = r.split('@')
+    // "route@Button text[@Another button]" opens the route, then clicks those buttons in order (inner tabs)
+    const [route, ...clicks] = r.split('@')
     await win.webContents.executeJavaScript(`location.hash = '#${route}'`).catch(() => {})
-    if (click) {
+    for (const click of clicks) {
       await sleep(2500)
       await win.webContents.executeJavaScript(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === ${JSON.stringify(click)})?.click()`).catch(() => {})
     }
