@@ -19,7 +19,8 @@
     "test:pacer": "cargo test --manifest-path native_pacer/Cargo.toml -- --test-threads=1",
     "build:disk": "cargo build --release --manifest-path native_disk/Cargo.toml && powershell -NoProfile -Command \"Copy-Item native_disk/target/release/DarkHub_DiskRescue.exe electron/services/DarkHub.DiskRescue.exe -Force\"",
     "test:disk": "cargo test --manifest-path native_disk/Cargo.toml",
-    "build": "npm run build:native && npm run build:pacer && npm run build:disk && npm run build:renderer && electron-builder",
+    "build:upscaler": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-realesrgan.ps1",
+    "build": "npm run build:native && npm run build:pacer && npm run build:disk && npm run build:upscaler && npm run build:renderer && electron-builder",
     "build:setup-sfx": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create-sfx-setup.ps1",
     "build:setup-nsis": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$nsis=Join-Path $env:LOCALAPPDATA 'electron-builder\\Cache\\nsis\\nsis-3.0.4.1-nsis-3.0.4.1\\Bin\\makensis.exe'; & $nsis installer\\darkhub.nsi\"",
     "build:setup-inno": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-inno-setup.ps1",
@@ -131,6 +132,10 @@
       {
         "from": "build/deps",
         "to": "deps"
+      },
+      {
+        "from": "vendor/realesrgan",
+        "to": "realesrgan"
       }
     ],
     "win": {

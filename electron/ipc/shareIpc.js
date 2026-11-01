@@ -4,6 +4,8 @@ import path from 'node:path'
 import { SusuyaClient, SUSUYA_ORIGIN } from '../services/susuya/SusuyaClient.js'
 import { captureScreen, captureRegion, grabRegionImage, listDisplays } from '../services/susuya/Screenshot.js'
 import { makeRegionPicker } from '../services/susuya/RegionPicker.js'
+import { AiUpscaler } from '../services/susuya/AiUpscaler.js'
+import { nativeImage } from 'electron'
 
 const HISTORY_MAX = 100
 const TTLS = [3600, 21600, 86400]
@@ -36,7 +38,11 @@ export function normalizeShareConfig(c = {}, picturesDir = '') {
     regionMonitor: monitorMode(c.regionMonitor),
     // small region captures are enlarged so they stay sharp when pasted/viewed (see upscaleFactor)
     regionUpscale: ['off', 'auto', '2', '3', '4'].includes(String(c.regionUpscale)) ? String(c.regionUpscale) : 'auto',
-    upscaleMethod: c.upscaleMethod === 'smooth' ? 'smooth' : 'sharp'
+    upscaleMethod: c.upscaleMethod === 'smooth' ? 'smooth' : 'sharp',
+    // Real-ESRGAN enhancement: 'off', 'region' (area selections, under a second) or 'all' (full screens too)
+    aiEnhance: ['off', 'region', 'all'].includes(c.aiEnhance) ? c.aiEnhance : 'region',
+    aiQuality: c.aiQuality === 'max' ? 'max' : 'fast',
+    aiStyle: c.aiStyle === 'anime' ? 'anime' : 'photo'
   }
 }
 
@@ -50,6 +56,7 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotke
   let config = normalizeShareConfig(readJson(configFile, {}), pictures)
   let history = readJson(historyFile, [])
   const client = new SusuyaClient()
+  const ai = new AiUpscaler()
   const jobs = new Map() // jobId -> AbortController
   let seq = 0
 
@@ -91,17 +98,67 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotke
 
   const pickRegion = makeRegionPicker(BrowserWindow)
 
+  /** Real-ESRGAN on a saved shot; progress goes to the screen as 'enhance' events. Resolves the result or { error }. */
+  async function enhance(file, region) {
+    broadcast({ type: 'enhance', file, percent: 0 })
+    try {
+      const r = await ai.enhance(file, { region, quality: config.aiQuality, style: config.aiStyle }, (percent) => broadcast({ type: 'enhance', file, percent }))
+      broadcast({ type: 'enhance', file, percent: 100, done: true, out: r.file, width: r.width, height: r.height, ms: r.ms })
+      return r
+    } catch (e) {
+      const error = String(e?.message ?? e)
+      broadcast({ type: 'enhance', file, error })
+      return { error }
+    }
+  }
+
+  async function enhanceInBackground(shot, region) {
+    const r = await enhance(shot.file, region)
+    let file = shot.file
+    let image = shot.image
+    if (!r.error) {
+      file = r.file
+      image = nativeImage.createFromPath(r.file)
+      // swap the clipboard picture only if it is still the one this shot put there
+      if (config.clip === 'image' || config.clip === 'both' || (config.clip === 'link' && !config.autoUpload)) {
+        try {
+          const cur = clipboard.readImage()
+          const a = cur.getSize(), b = shot.image.getSize()
+          if (!cur.isEmpty() && a.width === b.width && a.height === b.height) clipboard.writeImage(image)
+        } catch { /* clipboard busy */ }
+      }
+    }
+    if (config.autoUpload) {
+      const u = await upload(file, 'screenshot')
+      if (u.ok) {
+        try {
+          if (config.clip === 'link') clipboard.writeText(u.entry.directUrl)
+          else if (config.clip === 'both') clipboard.write({ image, text: u.entry.directUrl })
+        } catch { /* clipboard busy */ }
+      }
+      notify(u.ok ? 'DarkHub: print aprimorado enviado ao Susuya' : 'DarkHub: print salvo', r.error ? `IA falhou: ${r.error}` : u.ok ? `${r.width}x${r.height} · link copiado` : `Falha ao enviar: ${u.error}`)
+      return
+    }
+    notify(r.error ? 'DarkHub: IA falhou' : 'DarkHub: print aprimorado', r.error ? r.error : `${r.width}x${r.height} · ${path.basename(r.file)}`)
+  }
+
   async function capture(region = false) {
+    const useAi = ai.available() && (config.aiEnhance === 'all' || (config.aiEnhance === 'region' && region))
     const shot = region
-      ? await captureRegion(config.folder, pickRegion, config.regionMonitor, { upscale: config.regionUpscale, method: config.upscaleMethod })
+      // with AI on, the plain pixel enlargement is skipped: the AI result replaces it
+      ? await captureRegion(config.folder, pickRegion, config.regionMonitor, { upscale: useAi ? 'off' : config.regionUpscale, method: config.upscaleMethod })
       : await captureScreen(config.folder, config.monitor)
     if (!shot) return { ok: true, cancelled: true }
+    // the main window plays the shutter sound right away (also when DarkHub is in the tray), before any AI work
+    broadcast({ type: 'screenshot', file: shot.file, width: shot.width, height: shot.height, bytes: shot.bytes, ms: shot.ms, scale: shot.scale || 1, sound: config.sound })
+    // AI runs in the background: the plain shot is copied/saved now, the enhanced one replaces it when ready
+    // (and is what gets uploaded when auto-upload is on).
+    if (useAi) setImmediate(() => { enhanceInBackground(shot, region).catch((e) => logger?.warn?.('Share', `enhance: ${e?.message ?? e}`)) })
+    const aiNote = useAi ? ' · aprimorando com IA...' : ''
     if (config.clip === 'image' || config.clip === 'both' || (config.clip === 'link' && !config.autoUpload)) { try { clipboard.writeImage(shot.image) } catch { /* clipboard busy */ } }
     const info = { file: shot.file, width: shot.width, height: shot.height, bytes: shot.bytes, ms: shot.ms, scale: shot.scale || 1 }
-    const size = shot.scale > 1 ? `${shot.width}x${shot.height} (ampliado ${shot.scale}x)` : `${shot.width}x${shot.height}`
-    // the main window plays the shutter sound (also when DarkHub is in the tray)
-    broadcast({ type: 'screenshot', ...info, sound: config.sound })
-    if (config.autoUpload) {
+    const size = (shot.scale > 1 ? `${shot.width}x${shot.height} (ampliado ${Math.round(shot.scale * 10) / 10}x)` : `${shot.width}x${shot.height}`) + aiNote
+    if (config.autoUpload && !useAi) {
       const r = await upload(shot.file, 'screenshot')
       if (r.ok) {
         try {
@@ -140,6 +197,14 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotke
   const state = () => ({ ok: true, config, hotkeyActive: Boolean(registered.hotkey), regionHotkeyActive: Boolean(registered.regionHotkey), history: liveHistory().map(publicEntry), uploading: jobs.size })
   handle('share:state', state)
   handle('share:displays', () => ({ ok: true, displays: listDisplays() }))
+  handle('share:aiStatus', () => ({ ok: true, available: ai.available() }))
+  // AI enhancement of a screenshot DarkHub saved (same folder rule as share:uploadFile)
+  handle('share:enhance', async ({ file }) => {
+    const f = String(file || '')
+    if (path.dirname(path.resolve(f)) !== path.resolve(config.folder) || !fs.existsSync(f) || /_ultra\.png$/i.test(f)) return { ok: false, error: 'invalid file' }
+    const r = await enhance(f, false)
+    return r.error ? { ok: false, error: r.error } : { ok: true, file: r.file, width: r.width, height: r.height, ms: r.ms }
+  })
   handle('share:setConfig', (patch) => {
     if (patch.hotkey && patch.hotkey === (patch.regionHotkey ?? config.regionHotkey)) return { ...state(), error: 'atalho já usado pelo print de área' }
     if (patch.regionHotkey && patch.regionHotkey === (patch.hotkey ?? config.hotkey)) return { ...state(), error: 'atalho já usado pelo print da tela inteira' }

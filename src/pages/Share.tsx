@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import HotkeyCapture from '../components/HotkeyCapture';
-import { Camera, Copy, ScreenRegion, ExternalLink, FolderOpen, Loader2, Trash2, UploadCloud, X, FileImage, Film, Music, FileText, FileArchive, Package } from '../components/icons';
+import { Camera, Copy, ScreenRegion, Sparkles, ExternalLink, FolderOpen, Loader2, Trash2, UploadCloud, X, FileImage, Film, Music, FileText, FileArchive, Package } from '../components/icons';
 import PageHeader from '../components/ui/PageHeader';
 import { useI18n } from '../i18n/I18nProvider';
 import type { ShareDisplay, ShareEntry, ShareEvent, ShareShotResult, ShareState } from '../global';
@@ -92,6 +92,8 @@ export default function Share() {
   const [busy, setBusy] = useState<string | null>(null);
   const now = useRef(Date.now());
   const [displays, setDisplays] = useState<ShareDisplay[]>([]);
+  const [aiAvailable, setAiAvailable] = useState(false);
+  const [enhancing, setEnhancing] = useState<Record<string, number>>({});
 
   const refresh = useCallback(async () => { const s = await api()?.state().catch(() => null); if (s?.ok) setSt(s); }, []);
   const refreshShots = useCallback(async () => { const r = await api()?.recentShots().catch(() => null); if (r?.ok) setShots(r.files || []); }, []);
@@ -99,6 +101,7 @@ export default function Share() {
   useEffect(() => {
     void refresh(); void refreshShots();
     void api()?.displays?.().then((r) => { if (r?.ok) setDisplays(r.displays || []); }).catch(() => {});
+    void api()?.aiStatus?.().then((r) => setAiAvailable(Boolean(r?.available))).catch(() => {});
     const off = api()?.onEvent((e: ShareEvent) => {
       if (e.type === 'start') setJobs((j) => ({ ...j, [e.jobId]: { name: e.name, sent: 0, total: 1 } }));
       else if (e.type === 'progress') setJobs((j) => (j[e.jobId] ? { ...j, [e.jobId]: { ...j[e.jobId], sent: e.sent, total: e.total } } : j));
@@ -107,6 +110,13 @@ export default function Share() {
         if (e.type === 'error' && e.error !== 'cancelled') setNotice({ tone: 'err', text: `${e.name}: ${e.error}` });
         void refresh();
       } else if (e.type === 'screenshot') void refreshShots();
+      else if (e.type === 'enhance') {
+        if (e.done || e.error) {
+          setEnhancing((m) => { const n = { ...m }; delete n[e.file]; return n; });
+          if (e.error) setNotice({ tone: 'err', text: e.error });
+          void refreshShots();
+        } else setEnhancing((m) => ({ ...m, [e.file]: e.percent ?? 0 }));
+      }
     });
     return () => off?.();
   }, [refresh, refreshShots]);
@@ -221,6 +231,38 @@ export default function Share() {
           <HotkeyField label={t('share.hotkey', 'Atalho: tela inteira')} value={c.hotkey} active={st.hotkeyActive} onChange={(acc) => void setConfig({ hotkey: acc })} />
           <MonitorSelect label={t('share.monitor', 'Monitor do print da tela inteira')} value={c.monitor} displays={displays} onChange={(v) => void setConfig({ monitor: v })} />
           <MonitorSelect label={t('share.regionMonitor', 'Monitor da seleção de área')} value={c.regionMonitor} displays={displays} onChange={(v) => void setConfig({ regionMonitor: v })} />
+          {aiAvailable ? (
+            <div className="space-y-2.5 border-t border-zinc-800/80 pt-3">
+              <label className="flex items-center justify-between gap-2.5 text-[12.5px] text-zinc-300">
+                <span className="inline-flex items-center gap-1.5"><Sparkles size={14} className="text-zinc-500" />{t('share.ai', 'Aprimorar com IA')}</span>
+                <select className="dh-input max-w-[190px]" value={c.aiEnhance} onChange={(e) => void setConfig({ aiEnhance: e.target.value as typeof c.aiEnhance })}>
+                  <option value="region">{t('share.ai.region', 'Seleções de área')}</option>
+                  <option value="all">{t('share.ai.all', 'Todos os prints')}</option>
+                  <option value="off">{t('share.ai.off', 'Desligado')}</option>
+                </select>
+              </label>
+              {c.aiEnhance !== 'off' ? (
+                <label className="flex items-center justify-between gap-2.5 text-[12.5px] text-zinc-300">
+                  {t('share.aiStyle', 'Tipo de imagem')}
+                  <select className="dh-input max-w-[190px]" value={c.aiStyle} onChange={(e) => void setConfig({ aiStyle: e.target.value as typeof c.aiStyle })}>
+                    <option value="photo">{t('share.aiStyle.photo', 'Jogos realistas e fotos')}</option>
+                    <option value="anime">{t('share.aiStyle.anime', 'Anime, desenho e jogos estilizados')}</option>
+                  </select>
+                </label>
+              ) : null}
+              {c.aiEnhance !== 'off' ? (
+                <label className="flex items-center justify-between gap-2.5 text-[12.5px] text-zinc-300">
+                  {t('share.aiQuality', 'Qualidade da IA')}
+                  <select className="dh-input max-w-[190px]" value={c.aiQuality} onChange={(e) => void setConfig({ aiQuality: e.target.value as typeof c.aiQuality })}>
+                    <option value="fast">{t('share.aiQuality.fast', 'Rápida (poucos segundos)')}</option>
+                    <option value="max">{t('share.aiQuality.max', 'Máxima (lenta: até 1 min com jogo aberto)')}</option>
+                  </select>
+                </label>
+              ) : null}
+              <p className="dh-help">{t('share.aiHelp', 'A IA (Real-ESRGAN, na placa de vídeo, offline) reconstrói bordas e texturas em resolução maior: dá para ampliar o print sem ver pixels. Ela recria detalhe plausível, não informação que a tela não tinha. Roda em segundo plano: o print sai na hora e é trocado pelo aprimorado (_ultra.png) quando ficar pronto.')}</p>
+            </div>
+          ) : null}
+          {!aiAvailable || c.aiEnhance === 'off' ? (<>
           <label className="flex items-center justify-between gap-2.5 text-[12.5px] text-zinc-300">
             {t('share.upscale', 'Ampliar seleções pequenas')}
             <select className="dh-input max-w-[190px]" value={c.regionUpscale} onChange={(e) => void setConfig({ regionUpscale: e.target.value as typeof c.regionUpscale })}>
@@ -241,6 +283,7 @@ export default function Share() {
             </label>
           ) : null}
           <p className="dh-help">{t('share.upscaleHelp', 'Um recorte pequeno tem poucos pixels e fica borrado quando o Discord ou um visualizador o estica. Ampliado aqui em 2x a 4x, cada pixel da tela vira um quadrado nítido. No automático, só áreas menores que 1200 px são ampliadas.')}</p>
+          </>) : null}
           <label className="flex items-center gap-2.5 text-[12.5px] text-zinc-300">
             <input type="checkbox" checked={c.autoUpload} onChange={(e) => setConfig({ autoUpload: e.target.checked })} />
             {t('share.autoUpload', 'Enviar ao Susuya e copiar o link')}
@@ -265,6 +308,13 @@ export default function Share() {
               <li key={s.file} className="flex items-center gap-2 text-[12px]">
                 <span className="truncate flex-1 text-zinc-300" title={s.file}>{s.name}</span>
                 <span className="text-zinc-500 font-mono">{fmtBytes(s.bytes)}</span>
+                {enhancing[s.file] !== undefined ? <span className="font-mono text-[11px] text-blue-300">{Math.floor(enhancing[s.file])}%</span> : null}
+                {aiAvailable && !/_ultra\.png$/i.test(s.name) ? (
+                  <button type="button" className="dh-btn dh-btn-ghost dh-btn-sm" disabled={enhancing[s.file] !== undefined} title={t('share.aiEnhanceOne', 'Aprimorar com IA')} aria-label={t('share.aiEnhanceOne', 'Aprimorar com IA')}
+                    onClick={async () => { setEnhancing((m) => ({ ...m, [s.file]: 0 })); const r = await api()!.enhance(s.file); if (r.ok) setNotice({ tone: 'ok', text: `${t('share.aiDone', 'Aprimorado')}: ${r.width}x${r.height}` }); }}>
+                    {enhancing[s.file] !== undefined ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  </button>
+                ) : null}
                 <button type="button" className="dh-btn dh-btn-ghost dh-btn-sm" title={t('share.send', 'Enviar ao Susuya')} aria-label={t('share.send', 'Enviar ao Susuya')} onClick={async () => { const r = await api()!.uploadScreenshot(s.file); report([r]); }}><UploadCloud size={14} /></button>
               </li>
             ))}

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- AI screenshot enhancement (Susuya page): Real-ESRGAN rebuilds edges and textures at a higher resolution on the GPU
+  (Vulkan: NVIDIA, AMD and Intel), offline, so a game screenshot can be zoomed into without seeing pixels. Area
+  selections by default, or every screenshot; "fast" (compact model, a few seconds) or "maximum" (large model, slow);
+  realistic or stylised/anime models. It runs in the background: the shot is copied and saved at once and replaced by
+  `<name>_ultra.png` when ready (that is the one uploaded with auto-upload). Recent screenshots get an "Enhance with
+  AI" button. The upscaler ships inside the installer (`npm run build:upscaler`, SHA-256 pinned, BSD-3/MIT licences
+  included); users never download it.
 - "Diagnose Windows Update" (Optimizer > Windows tools, and in the Driver Center when a Windows Update driver fails):
   a read-only check of what stops Windows Update from downloading. It covers disabled or missing services, blocking
   policies and WSUS, hosts file redirects, a DNS that does not resolve or answers 0.0.0.0, blocked ports 443/80 to the

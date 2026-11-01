@@ -571,6 +571,8 @@ const darkhubApi = {
     openFolder: () => ipcRenderer.invoke('share:openFolder'),
     recentShots: () => ipcRenderer.invoke('share:recentShots'),
     displays: () => ipcRenderer.invoke('share:displays'),
+    aiStatus: () => ipcRenderer.invoke('share:aiStatus'),
+    enhance: (file) => ipcRenderer.invoke('share:enhance', { file }),
     onEvent: (callback) => {
       const handler = (_e, msg) => callback(msg)
       ipcRenderer.on('share:event', handler)

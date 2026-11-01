@@ -903,6 +903,8 @@ export interface DarkHubAPI {
     openFolder: () => Promise<{ ok: boolean; error?: string }>;
     recentShots: () => Promise<{ ok: boolean; error?: string; files?: { file: string; name: string; bytes: number; at: number }[] }>;
     displays: () => Promise<{ ok: boolean; error?: string; displays?: ShareDisplay[] }>;
+    aiStatus: () => Promise<{ ok: boolean; available: boolean }>;
+    enhance: (file: string) => Promise<{ ok: boolean; error?: string; file?: string; width?: number; height?: number; ms?: number }>;
     onEvent: (callback: (e: ShareEvent) => void) => () => void;
   };
   realtime: {
@@ -1085,7 +1087,7 @@ declare global {
 export interface DlssFile { file: string; name: string; kind: 'sr' | 'rr' | 'fg'; version: string | null; hasOriginal: boolean; x64: boolean; behind: boolean }
 export interface DlssGameInfo { latest?: string; tag?: string; anticheat?: string | null; files?: DlssFile[] }
 export type ShareShotResult = { ok: boolean; error?: string; file?: string; width?: number; height?: number; bytes?: number; ms?: number; scale?: number; entry?: ShareEntry; uploadError?: string; cancelled?: boolean };
-export interface ShareConfig { hotkey: string; regionHotkey: string; folder: string; autoUpload: boolean; copyImage: boolean; clip: 'image' | 'link' | 'both' | 'none'; sound: boolean; ttl: number; monitor: string; regionMonitor: string; regionUpscale: 'off' | 'auto' | '2' | '3' | '4'; upscaleMethod: 'sharp' | 'smooth' }
+export interface ShareConfig { hotkey: string; regionHotkey: string; folder: string; autoUpload: boolean; copyImage: boolean; clip: 'image' | 'link' | 'both' | 'none'; sound: boolean; ttl: number; monitor: string; regionMonitor: string; regionUpscale: 'off' | 'auto' | '2' | '3' | '4'; upscaleMethod: 'sharp' | 'smooth'; aiEnhance: 'off' | 'region' | 'all'; aiQuality: 'fast' | 'max'; aiStyle: 'photo' | 'anime' }
 export interface ShareEntry { id: string; name: string; size: number; kind?: string; createdAt: number; expiresAt: number; pageUrl: string; directUrl: string; origin?: string }
 export interface ShareUploadResult { ok: boolean; error?: string; entry?: ShareEntry }
 export interface ShareDisplay { id: string; label: string; primary: boolean; width: number; height: number; x: number; y: number; scaleFactor: number }
@@ -1095,7 +1097,8 @@ export type ShareEvent =
   | { type: 'progress'; jobId: string; sent: number; total: number }
   | { type: 'done'; jobId: string; entry: ShareEntry }
   | { type: 'error'; jobId: string; name: string; error: string }
-  | { type: 'screenshot'; file: string; width: number; height: number; bytes: number; ms: number };
+  | { type: 'screenshot'; file: string; width: number; height: number; bytes: number; ms: number }
+  | { type: 'enhance'; file: string; percent?: number; done?: boolean; out?: string; width?: number; height?: number; ms?: number; error?: string };
 export interface RealtimeRule { name: string; action: 'lower' | 'close' }
 export interface RealtimeConfig {
   optimizer: { enabled: boolean; smart: boolean; memory: boolean; memoryThresholdPct: number; minProcessMb: number; cooldownMin: number; rules: RealtimeRule[] };

@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-01T12:53:00. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-01T13:15:07. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -178,7 +178,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ipc/shareIpc.js`
 
-`monitorMode`:14, `readJson`:16, `writeJson`:17, `normalizeShareConfig`:21, `registerShareIPC`:44, `broadcast`:56, `notify`:57, `liveHistory`:58, `upload`:60, `publicEntry`:90, `capture`:94, `bindHotkey`:124, `handle`:133, `state`:140
+`monitorMode`:16, `readJson`:18, `writeJson`:19, `normalizeShareConfig`:23, `registerShareIPC`:50, `broadcast`:63, `notify`:64, `liveHistory`:65, `upload`:67, `publicEntry`:97, `enhance`:102, `enhanceInBackground`:115, `capture`:145, `bindHotkey`:181, `handle`:190, `state`:197
 
 ## `electron/ipc/startupIpc.js`
 
@@ -222,7 +222,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:284, `handler`:303, `handler`:313, `handler`:325, `listener`:368, `handler`:420, `handler`:446, `handler`:452, `handler`:458, `handler`:464, `listener`:473, `listener`:484, `handler`:509, `listener`:522, `listener`:539, `handler`:575, `handler`:590, `listener`:613, `listener`:638, `listener`:659, `listener`:686, `handler`:727
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:284, `handler`:303, `handler`:313, `handler`:325, `listener`:368, `handler`:420, `handler`:446, `handler`:452, `handler`:458, `handler`:464, `listener`:473, `listener`:484, `handler`:509, `listener`:522, `listener`:539, `handler`:577, `handler`:592, `listener`:615, `listener`:640, `listener`:661, `listener`:688, `handler`:729
 
 ## `electron/services/CodeRunner.js`
 
@@ -671,6 +671,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `electron/services/startup/startupModel.js`
 
 `decodeApproved`:8, `encodeApproved`:21, `exeFromCommand`:32, `num`:40, `parseBootEvents`:47, `baseName`:63, `impactFor`:66, `sensitivity`:76
+
+## `electron/services/susuya/AiUpscaler.js`
+
+`defaultDir`:14, `planEnhance`:25, `parseProgress`:34, `buildArgs`:39, `ultraName`:43, `AiUpscaler`:45 _class_, `exe`:53, `available`:54, `sharp`:56, `_run`:61, `onData`:68, `_enhance`:97
 
 ## `electron/services/susuya/RegionPicker.js`
 
@@ -1262,7 +1266,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/Share.tsx`
 
-`api`:8, `LinkRow`:13 _component_, `toggleQr`:18, `fmtBytes`:53, `HotkeyField`:56 _component_, `MonitorSelect`:67 _component_, `Share`:85 _component_, `setConfig`:118, `copy`:123, `report`:127, `onDrop`:132, `expiresIn`:136, `capture`:140
+`api`:8, `LinkRow`:13 _component_, `toggleQr`:18, `fmtBytes`:53, `HotkeyField`:56 _component_, `MonitorSelect`:67 _component_, `Share`:85 _component_, `setConfig`:128, `copy`:133, `report`:137, `onDrop`:142, `expiresIn`:146, `capture`:150
 
 ## `src/pages/SpaceSniffer/TreemapCanvas.tsx`
 

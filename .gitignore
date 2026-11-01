@@ -124,3 +124,5 @@ desktop.ini
 
 # graphify code map: generated locally by `npm run map`, not versioned
 graphify-out/
+# Real-ESRGAN, fetched at build time (npm run build:upscaler)
+vendor/realesrgan/

@@ -122,7 +122,7 @@ describe('screenshots and share settings', () => {
   it('names files by date and validates settings', () => {
     expect(screenshotName(new Date(2026, 9, 23, 9, 5, 7))).toBe('DarkHub_2026-10-23_09-05-07.png');
     const c = normalizeShareConfig({ ttl: 999, folder: 'relative', hotkey: 'Ctrl+Shift+P' }, 'C:\\Users\\x\\Pictures');
-    expect(c).toEqual({ hotkey: 'Ctrl+Shift+P', regionHotkey: 'Ctrl+Shift+F11', folder: 'C:\\Users\\x\\Pictures\\DarkHub Screenshots', autoUpload: false, copyImage: true, clip: 'image', sound: true, ttlChosen: false, ttl: 3600, monitor: 'cursor', regionMonitor: 'cursor', regionUpscale: 'auto', upscaleMethod: 'sharp' });
+    expect(c).toEqual({ hotkey: 'Ctrl+Shift+P', regionHotkey: 'Ctrl+Shift+F11', folder: 'C:\\Users\\x\\Pictures\\DarkHub Screenshots', autoUpload: false, copyImage: true, clip: 'image', sound: true, ttlChosen: false, ttl: 3600, monitor: 'cursor', regionMonitor: 'cursor', regionUpscale: 'auto', upscaleMethod: 'sharp', aiEnhance: 'region', aiQuality: 'fast', aiStyle: 'photo' });
     // 24 h saved by the old default is reset to 1 h; a validity the user picked is kept
     expect(normalizeShareConfig({ ttl: 86400 }, 'C:/p').ttl).toBe(3600);
     // clipboard choice: old configs keep their behaviour (auto-upload copied the link, otherwise the image)
@@ -244,6 +244,6 @@ describe('enlarging small region captures', () => {
   });
   it('keeps the setting valid', () => {
     expect(normalizeShareConfig({ regionUpscale: '4', upscaleMethod: 'smooth' }, 'C:/p')).toMatchObject({ regionUpscale: '4', upscaleMethod: 'smooth' });
-    expect(normalizeShareConfig({ regionUpscale: 9, upscaleMethod: 'x' }, 'C:/p')).toMatchObject({ regionUpscale: 'auto', upscaleMethod: 'sharp' });
+    expect(normalizeShareConfig({ regionUpscale: 9, upscaleMethod: 'x' }, 'C:/p')).toMatchObject({ regionUpscale: 'auto', upscaleMethod: 'sharp', aiEnhance: 'region', aiQuality: 'fast', aiStyle: 'photo' });
   });
 });
