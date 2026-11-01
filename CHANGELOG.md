@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-01
+
 ### Added
 - "Deep clean" page (Utilities), backed by a new native Rust engine, DarkHub Cleaner Core (`native_cleaner/` →
   `DarkHub.Cleaner.exe`, `npm run build:cleaner`). Everything starts as a simulation; applying always asks for an

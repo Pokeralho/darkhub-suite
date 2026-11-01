@@ -66,6 +66,7 @@ jobs:
       - run: npm run build:native
       - run: npm run build:pacer
       - run: npm run build:disk
+      - run: npm run build:cleaner
       # Real-ESRGAN AI upscaler shipped in resources/realesrgan (pinned release, SHA-256 checked)
       - run: npm run build:upscaler
       - run: npm run build:renderer
