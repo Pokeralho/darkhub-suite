@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-01T12:01:53. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-01T12:39:01. NAO edite a mao: rode `npm run map`. -->
 
 # Mapa de funcionalidades (tela -> IPC -> backend)
 Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/preload.js` -> canal IPC -> handler -> servico.
@@ -38,14 +38,15 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 ### Susuya  (rota `share`)
 - Tela: `src/pages/Share.tsx`
 - Componentes/hooks usados: `src/components/HotkeyCapture.tsx`, `src/components/icons/index.tsx`, `src/components/ui/PageHeader.tsx`, `src/utils/hotkey.ts`
-- Arquivos de backend: `electron/ipc/shareIpc.js`, `electron/main.js`
+- Arquivos de backend: `electron/ipc/shareIpc.js`, `electron/main.js`, `electron/services/susuya/Screenshot.js`
 
 | API | canal | handler | chama |
 |---|---|---|---|
+| `share.displays` | `share:displays` | `electron/ipc/shareIpc.js:136` | `listDisplays() (electron/services/susuya/Screenshot.js)` |
 | `share.onEvent` | `share:event` | `nao encontrado` |  |
-| `share.qr` | `share:qr` | `electron/ipc/shareIpc.js:175` | `s.startsWith`<br>`QRCode.toDataURL` |
-| `share.recentShots` | `share:recentShots` | `electron/ipc/shareIpc.js:202` | `i.test` |
-| `share.state` | `share:state` | `electron/ipc/shareIpc.js:131` |  |
+| `share.qr` | `share:qr` | `electron/ipc/shareIpc.js:180` | `s.startsWith`<br>`QRCode.toDataURL` |
+| `share.recentShots` | `share:recentShots` | `electron/ipc/shareIpc.js:207` | `i.test` |
+| `share.state` | `share:state` | `electron/ipc/shareIpc.js:135` |  |
 | `shell.openExternal` | `shell:openExternal` | `electron/main.js:1481` | `RENDERER_SYSTEM_URIS.has`<br>`raw.toLowerCase`<br>`parsed.toString`<br>`cp.spawn` |
 
 ## Diagnostics & Hardware
@@ -510,7 +511,7 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 |---|---|---|---|
 | `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1856` |  |
 | `ocr.extractText` | `ocr:extractText` | `electron/main.js:2611` | `base64Data.replace`<br>`img.resize`<br>`img.grayscale`<br>`img.clone` |
-| `share.grabRegion` | `share:grabRegion` | `electron/ipc/shareIpc.js:183` | `img.toDataURL`<br>`img.getSize`<br>`grabRegionImage() (electron/services/susuya/Screenshot.js)` |
+| `share.grabRegion` | `share:grabRegion` | `electron/ipc/shareIpc.js:188` | `img.toDataURL`<br>`img.getSize`<br>`grabRegionImage() (electron/services/susuya/Screenshot.js)` |
 
 ### Password Vault  (rota `passwords`)
 - Tela: `src/pages/PasswordManager.tsx`
@@ -521,7 +522,7 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 |---|---|---|---|
 | `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1856` |  |
 | `dialog.selectFolder` | `dialog:selectFolder` | `electron/main.js:1867` |  |
-| `share.qr` | `share:qr` | `electron/ipc/shareIpc.js:175` | `s.startsWith`<br>`QRCode.toDataURL` |
+| `share.qr` | `share:qr` | `electron/ipc/shareIpc.js:180` | `s.startsWith`<br>`QRCode.toDataURL` |
 | `vault.add` | `vault:add` | `electron/main.js:2857` | `crypto.randomUUID` |
 | `vault.bridgeStatus` | `vaultx:bridgeStatus` | `electron/ipc/vaultBridgeIpc.js:185` |  |
 | `vault.copyPassword` | `vault:copyPassword` | `electron/main.js:2920` | `clipboard.writeText`<br>`clipboard.readText`<br>`clipboard.clear` |

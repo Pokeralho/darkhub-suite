@@ -3,7 +3,7 @@ import HotkeyCapture from '../components/HotkeyCapture';
 import { Camera, Copy, ScreenRegion, ExternalLink, FolderOpen, Loader2, Trash2, UploadCloud, X, FileImage, Film, Music, FileText, FileArchive, Package } from '../components/icons';
 import PageHeader from '../components/ui/PageHeader';
 import { useI18n } from '../i18n/I18nProvider';
-import type { ShareEntry, ShareEvent, ShareShotResult, ShareState } from '../global';
+import type { ShareDisplay, ShareEntry, ShareEvent, ShareShotResult, ShareState } from '../global';
 
 const api = () => window.darkhub?.share;
 const SUSUYA = 'https://susuya.darkhub.ink';
@@ -63,6 +63,25 @@ function HotkeyField({ label, value, active, onChange }: { label: string; value:
   );
 }
 
+/** Which monitor a screenshot covers: under the mouse, the primary, a specific one or all of them in one image. */
+function MonitorSelect({ label, value, displays, onChange }: { label: string; value: string; displays: ShareDisplay[]; onChange: (v: string) => void }) {
+  const { t } = useI18n();
+  return (
+    <label className="flex items-center justify-between gap-2.5 text-[12.5px] text-zinc-300">
+      {label}
+      <select className="dh-input max-w-[190px]" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="cursor">{t('share.monitor.cursor', 'Onde está o mouse')}</option>
+        <option value="primary">{t('share.monitor.primary', 'Monitor principal')}</option>
+        {displays.length > 1 ? <option value="all">{t('share.monitor.all', 'Todos os monitores')}</option> : null}
+        {displays.map((d, i) => (
+          <option key={d.id} value={d.id}>{`${i + 1}. ${d.label} · ${d.width}x${d.height}${d.primary ? ` (${t('share.monitor.main', 'principal')})` : ''}`}</option>
+        ))}
+        {value !== 'cursor' && value !== 'primary' && value !== 'all' && !displays.some((d) => d.id === value) ? <option value={value}>{t('share.monitor.gone', 'Monitor desconectado (usa o do mouse)')}</option> : null}
+      </select>
+    </label>
+  );
+}
+
 export default function Share() {
   const { t } = useI18n();
   const [st, setSt] = useState<ShareState | null>(null);
@@ -72,12 +91,14 @@ export default function Share() {
   const [drag, setDrag] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const now = useRef(Date.now());
+  const [displays, setDisplays] = useState<ShareDisplay[]>([]);
 
   const refresh = useCallback(async () => { const s = await api()?.state().catch(() => null); if (s?.ok) setSt(s); }, []);
   const refreshShots = useCallback(async () => { const r = await api()?.recentShots().catch(() => null); if (r?.ok) setShots(r.files || []); }, []);
 
   useEffect(() => {
     void refresh(); void refreshShots();
+    void api()?.displays?.().then((r) => { if (r?.ok) setDisplays(r.displays || []); }).catch(() => {});
     const off = api()?.onEvent((e: ShareEvent) => {
       if (e.type === 'start') setJobs((j) => ({ ...j, [e.jobId]: { name: e.name, sent: 0, total: 1 } }));
       else if (e.type === 'progress') setJobs((j) => (j[e.jobId] ? { ...j, [e.jobId]: { ...j[e.jobId], sent: e.sent, total: e.total } } : j));
@@ -198,6 +219,8 @@ export default function Share() {
           </div>
           <HotkeyField label={t('share.regionHotkey', 'Atalho: área')} value={c.regionHotkey} active={st.regionHotkeyActive} onChange={(acc) => void setConfig({ regionHotkey: acc })} />
           <HotkeyField label={t('share.hotkey', 'Atalho: tela inteira')} value={c.hotkey} active={st.hotkeyActive} onChange={(acc) => void setConfig({ hotkey: acc })} />
+          <MonitorSelect label={t('share.monitor', 'Monitor do print da tela inteira')} value={c.monitor} displays={displays} onChange={(v) => void setConfig({ monitor: v })} />
+          <MonitorSelect label={t('share.regionMonitor', 'Monitor da seleção de área')} value={c.regionMonitor} displays={displays} onChange={(v) => void setConfig({ regionMonitor: v })} />
           <label className="flex items-center gap-2.5 text-[12.5px] text-zinc-300">
             <input type="checkbox" checked={c.autoUpload} onChange={(e) => setConfig({ autoUpload: e.target.checked })} />
             {t('share.autoUpload', 'Enviar ao Susuya e copiar o link')}

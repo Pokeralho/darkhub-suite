@@ -570,6 +570,7 @@ const darkhubApi = {
     grabRegion: () => ipcRenderer.invoke('share:grabRegion'),
     openFolder: () => ipcRenderer.invoke('share:openFolder'),
     recentShots: () => ipcRenderer.invoke('share:recentShots'),
+    displays: () => ipcRenderer.invoke('share:displays'),
     onEvent: (callback) => {
       const handler = (_e, msg) => callback(msg)
       ipcRenderer.on('share:event', handler)

@@ -39,7 +39,11 @@ export default function DiskRescue() {
     setLoadingInfo(true); setInfoError(null);
     try {
       const r = await api()?.inspectDisk({ target });
-      if (r?.ok) setInfo(r); else { setInfo(null); setInfoError(r?.error || t('rescue.inspectFail', 'Não foi possível ler o disco.')); }
+      if (r?.ok) setInfo(r);
+      else {
+        setInfo(null);
+        setInfoError(r?.code === 'access_denied' ? t('rescue.needAdmin', 'Ler o disco direto exige administrador. Abra o DarkHub como administrador (o app instalado já abre assim).') : r?.error || t('rescue.inspectFail', 'Não foi possível ler o disco.'));
+      }
     } finally { setLoadingInfo(false); }
   }, [target, t]);
 

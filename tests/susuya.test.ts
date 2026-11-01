@@ -15,14 +15,18 @@ const fakeShot = {
 };
 vi.mock('electron', () => ({
   desktopCapturer: { getSources: async () => [{ display_id: '1', thumbnail: fakeShot }] },
-  screen: { getCursorScreenPoint: () => ({ x: 0, y: 0 }), getDisplayNearestPoint: () => ({ id: 1, size: { width: 2560, height: 1440 }, scaleFactor: 1.5, bounds: { x: 0, y: 0, width: 2560, height: 1440 } }) }
+  screen: (() => {
+    const d = { id: 1, size: { width: 2560, height: 1440 }, scaleFactor: 1.5, bounds: { x: 0, y: 0, width: 2560, height: 1440 } };
+    return { getCursorScreenPoint: () => ({ x: 0, y: 0 }), getDisplayNearestPoint: () => d, getAllDisplays: () => [d], getPrimaryDisplay: () => d };
+  })(),
+  nativeImage: { createFromBuffer: () => null }
 }));
 // @ts-ignore plain JS modules
 import { SusuyaClient, links, mimeOf } from '../electron/services/susuya/SusuyaClient.js';
 // @ts-ignore
 import { normalizeShareConfig } from '../electron/ipc/shareIpc.js';
 // @ts-ignore
-import { physicalSize, screenshotName, cropRect, captureRegion } from '../electron/services/susuya/Screenshot.js';
+import { physicalSize, screenshotName, cropRect, captureRegion, pickDisplays, layoutCanvas, matchSources } from '../electron/services/susuya/Screenshot.js';
 // @ts-ignore
 import { parseRegionTitle, REGION_PAGE } from '../electron/services/susuya/RegionPicker.js';
 
@@ -118,7 +122,7 @@ describe('screenshots and share settings', () => {
   it('names files by date and validates settings', () => {
     expect(screenshotName(new Date(2026, 9, 23, 9, 5, 7))).toBe('DarkHub_2026-10-23_09-05-07.png');
     const c = normalizeShareConfig({ ttl: 999, folder: 'relative', hotkey: 'Ctrl+Shift+P' }, 'C:\\Users\\x\\Pictures');
-    expect(c).toEqual({ hotkey: 'Ctrl+Shift+P', regionHotkey: 'Ctrl+Shift+F11', folder: 'C:\\Users\\x\\Pictures\\DarkHub Screenshots', autoUpload: false, copyImage: true, clip: 'image', sound: true, ttlChosen: false, ttl: 3600 });
+    expect(c).toEqual({ hotkey: 'Ctrl+Shift+P', regionHotkey: 'Ctrl+Shift+F11', folder: 'C:\\Users\\x\\Pictures\\DarkHub Screenshots', autoUpload: false, copyImage: true, clip: 'image', sound: true, ttlChosen: false, ttl: 3600, monitor: 'cursor', regionMonitor: 'cursor' });
     // 24 h saved by the old default is reset to 1 h; a validity the user picked is kept
     expect(normalizeShareConfig({ ttl: 86400 }, 'C:/p').ttl).toBe(3600);
     // clipboard choice: old configs keep their behaviour (auto-upload copied the link, otherwise the image)
@@ -182,5 +186,45 @@ describe('Susuya QR code', () => {
     expect(data.startsWith('data:image/png;base64,')).toBe(true);
     const segments = QRCode.create(url, { errorCorrectionLevel: 'M' });
     expect(segments.modules.size).toBeGreaterThanOrEqual(21);
+  });
+});
+
+describe('multi-monitor screenshots', () => {
+  // The owner's layout: 2560x1440 primary, 1080x1920 portrait monitor to its left and 650 px higher.
+  const main = { id: 1, label: 'Odyssey G5', bounds: { x: 0, y: 0, width: 2560, height: 1440 }, size: { width: 2560, height: 1440 }, scaleFactor: 1 };
+  const side = { id: 2, label: 'IPS0001', bounds: { x: -1080, y: -650, width: 1080, height: 1920 }, size: { width: 1080, height: 1920 }, scaleFactor: 1 };
+  const all = [main, side];
+
+  it('picks the display by setting, falling back to the one under the mouse', () => {
+    expect(pickDisplays('cursor', all, 1, 2)).toEqual([side]);
+    expect(pickDisplays('primary', all, 1, 2)).toEqual([main]);
+    expect(pickDisplays('2', all, 1, 1)).toEqual([side]);
+    expect(pickDisplays('99', all, 1, 2)).toEqual([side]);
+    expect(pickDisplays('all', all, 1, 1)).toEqual(all);
+  });
+
+  it('stitches every display on one canvas at its real position', () => {
+    const l = layoutCanvas(all);
+    expect([l.width, l.height]).toEqual([3640, 2090]);
+    expect(l.parts.map((p: any) => [p.left, p.top])).toEqual([[1080, 650], [0, 0]]);
+    expect(l.bounds).toEqual({ x: -1080, y: -650, width: 3640, height: 2090 });
+    // 4K at 150% next to a 1080p at 100%: no overlap, full resolution of each
+    const k4 = { id: 3, bounds: { x: 0, y: 0, width: 2560, height: 1440 }, size: { width: 2560, height: 1440 }, scaleFactor: 1.5 };
+    const hd = { id: 4, bounds: { x: 2560, y: 0, width: 1920, height: 1080 }, size: { width: 1920, height: 1080 }, scaleFactor: 1 };
+    const m = layoutCanvas([k4, hd]);
+    expect(m.parts[0]).toMatchObject({ left: 0, width: 3840, height: 2160 });
+    expect(m.parts[1].left).toBeGreaterThanOrEqual(3840);
+  });
+
+  it('matches capture sources by display id, or by order when the id is missing', () => {
+    const s1 = { id: 'screen:1:0', display_id: '1' }, s2 = { id: 'screen:0:0', display_id: '2' };
+    expect(matchSources(all, [s2, s1])).toEqual([s1, s2]);
+    const n0 = { id: 'screen:0:0', display_id: '' }, n1 = { id: 'screen:1:0', display_id: '' };
+    expect(matchSources(all, [n1, n0])).toEqual([n0, n1]);
+  });
+
+  it('keeps the monitor choice in the saved settings', () => {
+    expect(normalizeShareConfig({ monitor: 'all', regionMonitor: '619163098' }, 'C:/p')).toMatchObject({ monitor: 'all', regionMonitor: '619163098' });
+    expect(normalizeShareConfig({ monitor: '../x', regionMonitor: 5 }, 'C:/p')).toMatchObject({ monitor: 'cursor', regionMonitor: 'cursor' });
   });
 });

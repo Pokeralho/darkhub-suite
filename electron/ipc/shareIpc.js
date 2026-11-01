@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import QRCode from 'qrcode'
 import path from 'node:path'
 import { SusuyaClient, SUSUYA_ORIGIN } from '../services/susuya/SusuyaClient.js'
-import { captureScreen, captureRegion, grabRegionImage } from '../services/susuya/Screenshot.js'
+import { captureScreen, captureRegion, grabRegionImage, listDisplays } from '../services/susuya/Screenshot.js'
 import { makeRegionPicker } from '../services/susuya/RegionPicker.js'
 
 const HISTORY_MAX = 100
@@ -10,6 +10,8 @@ const TTLS = [3600, 21600, 86400]
 const DEFAULT_TTL = 3600
 const DEFAULT_HOTKEY = 'Ctrl+Shift+F12'
 const DEFAULT_REGION_HOTKEY = 'Ctrl+Shift+F11'
+// 'cursor' (display under the mouse), 'primary', 'all' (every display stitched) or a display id
+const monitorMode = (v) => (typeof v === 'string' && (['cursor', 'primary', 'all'].includes(v) || /^\d{1,12}$/.test(v)) ? v : 'cursor')
 
 function readJson(file, fallback) { try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return fallback } }
 function writeJson(file, value) {
@@ -29,7 +31,9 @@ export function normalizeShareConfig(c = {}, picturesDir = '') {
     sound: c.sound !== false,
     // 1 h by default: longer links only when the user picked them (old configs saved 24 h without asking)
     ttlChosen: c.ttlChosen === true,
-    ttl: c.ttlChosen === true && TTLS.includes(Number(c.ttl)) ? Number(c.ttl) : DEFAULT_TTL
+    ttl: c.ttlChosen === true && TTLS.includes(Number(c.ttl)) ? Number(c.ttl) : DEFAULT_TTL,
+    monitor: monitorMode(c.monitor),
+    regionMonitor: monitorMode(c.regionMonitor)
   }
 }
 
@@ -85,7 +89,7 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotke
   const pickRegion = makeRegionPicker(BrowserWindow)
 
   async function capture(region = false) {
-    const shot = region ? await captureRegion(config.folder, pickRegion) : await captureScreen(config.folder)
+    const shot = region ? await captureRegion(config.folder, pickRegion, config.regionMonitor) : await captureScreen(config.folder, config.monitor)
     if (!shot) return { ok: true, cancelled: true }
     if (config.clip === 'image' || config.clip === 'both' || (config.clip === 'link' && !config.autoUpload)) { try { clipboard.writeImage(shot.image) } catch { /* clipboard busy */ } }
     const info = { file: shot.file, width: shot.width, height: shot.height, bytes: shot.bytes, ms: shot.ms }
@@ -129,6 +133,7 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotke
 
   const state = () => ({ ok: true, config, hotkeyActive: Boolean(registered.hotkey), regionHotkeyActive: Boolean(registered.regionHotkey), history: liveHistory().map(publicEntry), uploading: jobs.size })
   handle('share:state', state)
+  handle('share:displays', () => ({ ok: true, displays: listDisplays() }))
   handle('share:setConfig', (patch) => {
     if (patch.hotkey && patch.hotkey === (patch.regionHotkey ?? config.regionHotkey)) return { ...state(), error: 'atalho já usado pelo print de área' }
     if (patch.regionHotkey && patch.regionHotkey === (patch.hotkey ?? config.hotkey)) return { ...state(), error: 'atalho já usado pelo print da tela inteira' }
@@ -185,7 +190,7 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotke
     win?.minimize()
     await new Promise((r) => setTimeout(r, 350))
     try {
-      const img = await grabRegionImage(pickRegion)
+      const img = await grabRegionImage(pickRegion, config.regionMonitor)
       return img ? { ok: true, dataUrl: img.toDataURL(), width: img.getSize().width, height: img.getSize().height } : { ok: true, cancelled: true }
     } finally {
       win?.restore()

@@ -3,6 +3,7 @@ import {
   DownloadCloud, CheckCircle2, AlertCircle, X, ShieldCheck,
   RefreshCw, FileCode, Check, ChevronDown, DarkHubMark, Power
 } from './icons';
+import ReleaseNotes from './ReleaseNotes';
 
 type UpdateStage = 'idle' | 'checking' | 'available' | 'downloading' | 'verifying' | 'downloaded' | 'error';
 
@@ -231,8 +232,8 @@ export default function UpdaterOverlay() {
               </button>
 
               {showChangelog && (
-                <div className="mt-2 px-3 py-2.5 rounded-md bg-zinc-900 border border-zinc-800/80 text-zinc-400 text-[11.5px] leading-relaxed font-mono max-h-36 overflow-y-auto custom-scrollbar whitespace-pre-line animate-in">
-                  {updateInfo.releaseNotes}
+                <div className="mt-2 px-3 py-2.5 rounded-md bg-zinc-900 border border-zinc-800/80 max-h-72 overflow-y-auto custom-scrollbar animate-in">
+                  <ReleaseNotes source={updateInfo.releaseNotes} />
                 </div>
               )}
             </div>

@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-01T12:01:53. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-01T12:39:01. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -178,7 +178,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ipc/shareIpc.js`
 
-`readJson`:14, `writeJson`:15, `normalizeShareConfig`:19, `registerShareIPC`:37, `broadcast`:49, `notify`:50, `liveHistory`:51, `upload`:53, `publicEntry`:83, `capture`:87, `bindHotkey`:114, `handle`:123, `state`:130
+`monitorMode`:14, `readJson`:16, `writeJson`:17, `normalizeShareConfig`:21, `registerShareIPC`:41, `broadcast`:53, `notify`:54, `liveHistory`:55, `upload`:57, `publicEntry`:87, `capture`:91, `bindHotkey`:118, `handle`:127, `state`:134
 
 ## `electron/ipc/startupIpc.js`
 
@@ -222,7 +222,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:284, `handler`:303, `handler`:313, `handler`:325, `listener`:368, `handler`:420, `handler`:446, `handler`:452, `handler`:458, `handler`:464, `listener`:473, `listener`:484, `handler`:509, `listener`:522, `listener`:539, `handler`:574, `handler`:589, `listener`:612, `listener`:637, `listener`:658, `listener`:685, `handler`:726
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:284, `handler`:303, `handler`:313, `handler`:325, `listener`:368, `handler`:420, `handler`:446, `handler`:452, `handler`:458, `handler`:464, `listener`:473, `listener`:484, `handler`:509, `listener`:522, `listener`:539, `handler`:575, `handler`:590, `listener`:613, `listener`:638, `listener`:659, `listener`:686, `handler`:727
 
 ## `electron/services/CodeRunner.js`
 
@@ -678,7 +678,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/susuya/Screenshot.js`
 
-`pad`:9, `screenshotName`:10, `physicalSize`:15, `cropRect`:24, `clampX`:28, `clampY`:29, `grabDisplay`:39, `saveShot`:48, `captureScreen`:59, `captureRegion`:69, `grabRegionImage`:79
+`pad`:10, `screenshotName`:11, `physicalSize`:16, `cropRect`:25, `clampX`:29, `clampY`:30, `listDisplays`:40, `pickDisplays`:52, `byId`:53, `layoutCanvas`:64, `matchSources`:85, `captureSources`:93, `grabDisplay`:105, `saveShot`:123, `captureScreen`:134, `captureRegion`:144, `grabRegionImage`:154
 
 ## `electron/services/susuya/SusuyaClient.js`
 
@@ -848,13 +848,17 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `OptimizerProgressProps`:5 _type_, `OptimizerProgress`:11 _component_
 
+## `src/components/ReleaseNotes.tsx`
+
+`Text`:4 _component_, `ReleaseNotes`:19 _component_
+
 ## `src/components/SystemInfoCard.tsx`
 
 `SystemInfoCardProps`:5 _type_, `tone`:11, `SystemInfoCard`:13 _component_
 
 ## `src/components/UpdaterOverlay.tsx`
 
-`UpdateStage`:7 _type_, `UpdaterOverlay`:9 _component_, `handleEvent`:20, `initUpdater`:65, `handleStartDownload`:93, `handleApplyInstall`:111
+`UpdateStage`:8 _type_, `UpdaterOverlay`:10 _component_, `handleEvent`:21, `initUpdater`:66, `handleStartDownload`:94, `handleApplyInstall`:112
 
 ## `src/components/darkos/DarkOSConfirmDialog.tsx`
 
@@ -991,6 +995,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `src/components/recovery/rescueUtils.tsx`
 
 `api`:4, `fmtBytes`:6, `fmtEta`:13, `ProgressEv`:30 _type_, `JobProgress`:32 _component_, `ErrorLine`:56 _component_
+
+## `src/components/releaseNotesParser.ts`
+
+`Inline`:4 _type_, `Block`:5 _type_, `decode`:14, `htmlToMarkdown`:20, `looksHtml`:32, `parseInline`:35, `cells`:52, `parseNotes`:54, `flush`:59
 
 ## `src/components/security/BlocklistsPanel.tsx`
 
@@ -1142,7 +1150,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/DiskRescue.tsx`
 
-`Tab`:13 _type_, `Guard`:14 _type_, `diskOf`:16, `DiskRescue`:18 _component_, `openImage`:52, `HealthTab`:119 _component_, `runSurface`:135, `Stat`:237 _component_, `GuardTab`:248 _component_, `wrap`:261, `planGpt`:267, `scan`:274, `planMbr`:279, `backup`:287, `restore`:292, `copyState`:303, `BootTab`:358 _component_, `planActive`:365
+`Tab`:13 _type_, `Guard`:14 _type_, `diskOf`:16, `DiskRescue`:18 _component_, `openImage`:56, `HealthTab`:123 _component_, `runSurface`:139, `Stat`:241 _component_, `GuardTab`:252 _component_, `wrap`:265, `planGpt`:271, `scan`:278, `planMbr`:283, `backup`:291, `restore`:296, `copyState`:307, `BootTab`:362 _component_, `planActive`:369
 
 ## `src/pages/DllInjector.tsx`
 
@@ -1254,7 +1262,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/Share.tsx`
 
-`api`:8, `LinkRow`:13 _component_, `toggleQr`:18, `fmtBytes`:53, `HotkeyField`:56 _component_, `Share`:66 _component_, `setConfig`:97, `copy`:102, `report`:106, `onDrop`:111, `expiresIn`:115, `capture`:119
+`api`:8, `LinkRow`:13 _component_, `toggleQr`:18, `fmtBytes`:53, `HotkeyField`:56 _component_, `MonitorSelect`:67 _component_, `Share`:85 _component_, `setConfig`:118, `copy`:123, `report`:127, `onDrop`:132, `expiresIn`:136, `capture`:140
 
 ## `src/pages/SpaceSniffer/TreemapCanvas.tsx`
 
@@ -1434,7 +1442,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `tests/susuya.test.ts`
 
-`crop`:14, `fakeSusuya`:30, `send`:37, `tmpFile`:73
+`crop`:14, `fakeSusuya`:34, `send`:41, `tmpFile`:77
 
 ## `tests/templateBackslash.test.ts`
 

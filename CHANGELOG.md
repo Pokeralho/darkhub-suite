@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the Windows disk and the disk holding the boot (EFI) partition are refused. 512 and 4K-sector disks are supported.
 
 ### Fixed
+- Susuya screenshots: the monitor is now a setting, separately for full-screen shots and region selection: the one
+  under the mouse (as before), the primary, a specific monitor, or all monitors stitched into one image at their real
+  positions (the region overlay then spans every monitor). Capture sources are matched by display id with a fallback
+  to list order, for systems where Windows reports no id.
+- Update notes are formatted (headings, lists, bold, code, tables and links) instead of raw Markdown/HTML in a
+  monospace box; nothing from the release is injected as HTML.
+- Disk Studio & Rescue: reading a disk without administrator rights explains how to fix it instead of showing the raw
+  "os error 5".
 - Post-Install Hub: apps whose vendor replaces the installer behind the same URL before winget's catalog catches up
   (Google Chrome today) failed with "Installer hash does not match". DarkHub now downloads that installer from the
   package's own official URL over HTTPS and runs it silently only with a valid Authenticode signature of the same
