@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-01
+
 ### Added
 - AI screenshot enhancement (Susuya page): Real-ESRGAN rebuilds edges and textures at a higher resolution on the GPU
   (Vulkan: NVIDIA, AMD and Intel), offline, so a game screenshot can be zoomed into without seeing pixels. Area

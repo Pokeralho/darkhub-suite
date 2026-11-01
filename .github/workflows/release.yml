@@ -65,6 +65,9 @@ jobs:
       # every native helper is rebuilt here from its source, so the release does not depend on the committed binaries
       - run: npm run build:native
       - run: npm run build:pacer
+      - run: npm run build:disk
+      # Real-ESRGAN AI upscaler shipped in resources/realesrgan (pinned release, SHA-256 checked)
+      - run: npm run build:upscaler
       - run: npm run build:renderer
       - run: npx electron-builder --win --publish never
 
