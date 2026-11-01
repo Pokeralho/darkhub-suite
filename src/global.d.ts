@@ -1084,8 +1084,8 @@ declare global {
 
 export interface DlssFile { file: string; name: string; kind: 'sr' | 'rr' | 'fg'; version: string | null; hasOriginal: boolean; x64: boolean; behind: boolean }
 export interface DlssGameInfo { latest?: string; tag?: string; anticheat?: string | null; files?: DlssFile[] }
-export type ShareShotResult = { ok: boolean; error?: string; file?: string; width?: number; height?: number; bytes?: number; ms?: number; entry?: ShareEntry; uploadError?: string; cancelled?: boolean };
-export interface ShareConfig { hotkey: string; regionHotkey: string; folder: string; autoUpload: boolean; copyImage: boolean; clip: 'image' | 'link' | 'both' | 'none'; sound: boolean; ttl: number; monitor: string; regionMonitor: string }
+export type ShareShotResult = { ok: boolean; error?: string; file?: string; width?: number; height?: number; bytes?: number; ms?: number; scale?: number; entry?: ShareEntry; uploadError?: string; cancelled?: boolean };
+export interface ShareConfig { hotkey: string; regionHotkey: string; folder: string; autoUpload: boolean; copyImage: boolean; clip: 'image' | 'link' | 'both' | 'none'; sound: boolean; ttl: number; monitor: string; regionMonitor: string; regionUpscale: 'off' | 'auto' | '2' | '3' | '4'; upscaleMethod: 'sharp' | 'smooth' }
 export interface ShareEntry { id: string; name: string; size: number; kind?: string; createdAt: number; expiresAt: number; pageUrl: string; directUrl: string; origin?: string }
 export interface ShareUploadResult { ok: boolean; error?: string; entry?: ShareEntry }
 export interface ShareDisplay { id: string; label: string; primary: boolean; width: number; height: number; x: number; y: number; scaleFactor: number }

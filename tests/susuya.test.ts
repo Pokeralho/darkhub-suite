@@ -26,7 +26,7 @@ import { SusuyaClient, links, mimeOf } from '../electron/services/susuya/SusuyaC
 // @ts-ignore
 import { normalizeShareConfig } from '../electron/ipc/shareIpc.js';
 // @ts-ignore
-import { physicalSize, screenshotName, cropRect, captureRegion, pickDisplays, layoutCanvas, matchSources } from '../electron/services/susuya/Screenshot.js';
+import { physicalSize, screenshotName, cropRect, captureRegion, pickDisplays, layoutCanvas, matchSources, upscaleFactor } from '../electron/services/susuya/Screenshot.js';
 // @ts-ignore
 import { parseRegionTitle, REGION_PAGE } from '../electron/services/susuya/RegionPicker.js';
 
@@ -122,7 +122,7 @@ describe('screenshots and share settings', () => {
   it('names files by date and validates settings', () => {
     expect(screenshotName(new Date(2026, 9, 23, 9, 5, 7))).toBe('DarkHub_2026-10-23_09-05-07.png');
     const c = normalizeShareConfig({ ttl: 999, folder: 'relative', hotkey: 'Ctrl+Shift+P' }, 'C:\\Users\\x\\Pictures');
-    expect(c).toEqual({ hotkey: 'Ctrl+Shift+P', regionHotkey: 'Ctrl+Shift+F11', folder: 'C:\\Users\\x\\Pictures\\DarkHub Screenshots', autoUpload: false, copyImage: true, clip: 'image', sound: true, ttlChosen: false, ttl: 3600, monitor: 'cursor', regionMonitor: 'cursor' });
+    expect(c).toEqual({ hotkey: 'Ctrl+Shift+P', regionHotkey: 'Ctrl+Shift+F11', folder: 'C:\\Users\\x\\Pictures\\DarkHub Screenshots', autoUpload: false, copyImage: true, clip: 'image', sound: true, ttlChosen: false, ttl: 3600, monitor: 'cursor', regionMonitor: 'cursor', regionUpscale: 'auto', upscaleMethod: 'sharp' });
     // 24 h saved by the old default is reset to 1 h; a validity the user picked is kept
     expect(normalizeShareConfig({ ttl: 86400 }, 'C:/p').ttl).toBe(3600);
     // clipboard choice: old configs keep their behaviour (auto-upload copied the link, otherwise the image)
@@ -226,5 +226,24 @@ describe('multi-monitor screenshots', () => {
   it('keeps the monitor choice in the saved settings', () => {
     expect(normalizeShareConfig({ monitor: 'all', regionMonitor: '619163098' }, 'C:/p')).toMatchObject({ monitor: 'all', regionMonitor: '619163098' });
     expect(normalizeShareConfig({ monitor: '../x', regionMonitor: 5 }, 'C:/p')).toMatchObject({ monitor: 'cursor', regionMonitor: 'cursor' });
+  });
+});
+
+describe('enlarging small region captures', () => {
+  it('auto enlarges only small selections, by a whole factor up to 4x', () => {
+    expect(upscaleFactor(300, 80, 'auto')).toBe(4);
+    expect(upscaleFactor(600, 200, 'auto')).toBe(2);
+    expect(upscaleFactor(1199, 300, 'auto')).toBe(2);
+    expect(upscaleFactor(1200, 300, 'auto')).toBe(1);
+    expect(upscaleFactor(2560, 1440, 'auto')).toBe(1);
+  });
+  it('fixed factors and off', () => {
+    expect(upscaleFactor(2000, 1000, '3')).toBe(3);
+    expect(upscaleFactor(100, 100, 'off')).toBe(1);
+    expect(upscaleFactor(0, 100, '2')).toBe(1);
+  });
+  it('keeps the setting valid', () => {
+    expect(normalizeShareConfig({ regionUpscale: '4', upscaleMethod: 'smooth' }, 'C:/p')).toMatchObject({ regionUpscale: '4', upscaleMethod: 'smooth' });
+    expect(normalizeShareConfig({ regionUpscale: 9, upscaleMethod: 'x' }, 'C:/p')).toMatchObject({ regionUpscale: 'auto', upscaleMethod: 'sharp' });
   });
 });

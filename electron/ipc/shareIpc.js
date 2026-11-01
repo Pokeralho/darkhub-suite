@@ -33,7 +33,10 @@ export function normalizeShareConfig(c = {}, picturesDir = '') {
     ttlChosen: c.ttlChosen === true,
     ttl: c.ttlChosen === true && TTLS.includes(Number(c.ttl)) ? Number(c.ttl) : DEFAULT_TTL,
     monitor: monitorMode(c.monitor),
-    regionMonitor: monitorMode(c.regionMonitor)
+    regionMonitor: monitorMode(c.regionMonitor),
+    // small region captures are enlarged so they stay sharp when pasted/viewed (see upscaleFactor)
+    regionUpscale: ['off', 'auto', '2', '3', '4'].includes(String(c.regionUpscale)) ? String(c.regionUpscale) : 'auto',
+    upscaleMethod: c.upscaleMethod === 'smooth' ? 'smooth' : 'sharp'
   }
 }
 
@@ -89,10 +92,13 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotke
   const pickRegion = makeRegionPicker(BrowserWindow)
 
   async function capture(region = false) {
-    const shot = region ? await captureRegion(config.folder, pickRegion, config.regionMonitor) : await captureScreen(config.folder, config.monitor)
+    const shot = region
+      ? await captureRegion(config.folder, pickRegion, config.regionMonitor, { upscale: config.regionUpscale, method: config.upscaleMethod })
+      : await captureScreen(config.folder, config.monitor)
     if (!shot) return { ok: true, cancelled: true }
     if (config.clip === 'image' || config.clip === 'both' || (config.clip === 'link' && !config.autoUpload)) { try { clipboard.writeImage(shot.image) } catch { /* clipboard busy */ } }
-    const info = { file: shot.file, width: shot.width, height: shot.height, bytes: shot.bytes, ms: shot.ms }
+    const info = { file: shot.file, width: shot.width, height: shot.height, bytes: shot.bytes, ms: shot.ms, scale: shot.scale || 1 }
+    const size = shot.scale > 1 ? `${shot.width}x${shot.height} (ampliado ${shot.scale}x)` : `${shot.width}x${shot.height}`
     // the main window plays the shutter sound (also when DarkHub is in the tray)
     broadcast({ type: 'screenshot', ...info, sound: config.sound })
     if (config.autoUpload) {
@@ -103,13 +109,13 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotke
           else if (config.clip === 'both') clipboard.write({ image: shot.image, text: r.entry.directUrl })
         } catch { /* clipboard busy */ }
         const copied = config.clip === 'link' ? 'link direto copiado' : config.clip === 'both' ? 'imagem e link copiados' : config.clip === 'image' ? 'imagem copiada' : 'link no histórico'
-        notify('DarkHub: print enviado ao Susuya', `${shot.width}x${shot.height} · ${copied}`)
+        notify('DarkHub: print enviado ao Susuya', `${size} · ${copied}`)
         return { ok: true, ...info, entry: r.entry }
       }
       notify('DarkHub: print salvo', `Falha ao enviar: ${r.error}`)
       return { ok: true, ...info, uploadError: r.error }
     }
-    notify('DarkHub: print salvo', `${shot.width}x${shot.height} · ${path.basename(shot.file)}`)
+    notify('DarkHub: print salvo', `${size} · ${path.basename(shot.file)}`)
     return { ok: true, ...info }
   }
 

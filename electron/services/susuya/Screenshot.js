@@ -120,6 +120,30 @@ export async function grabDisplay(mode = 'cursor') {
   return { display, image: nativeImage.createFromBuffer(png) }
 }
 
+/**
+ * How much to enlarge a region capture. A crop can never hold more detail than the screen showed, but a small crop
+ * pasted in Discord or opened in a viewer gets stretched with blur. Enlarging it here by a whole factor keeps every
+ * screen pixel a sharp square (or smooth, for photos). `mode`: 'off', 'auto' (small selections only, so the longer
+ * side reaches about 1600 px, at most 4x) or a fixed '2' / '3' / '4'. Pure.
+ */
+export function upscaleFactor(width, height, mode) {
+  if (!mode || mode === 'off' || !(width > 0) || !(height > 0)) return 1
+  if (['2', '3', '4'].includes(String(mode))) return Number(mode)
+  const long = Math.max(width, height)
+  if (long >= 1200) return 1
+  return Math.max(2, Math.min(4, Math.floor(1600 / long)))
+}
+
+/** Enlarges a capture by a whole factor: 'sharp' (nearest neighbour, crisp text and UI) or 'smooth' (Lanczos + light sharpening). */
+export async function enlarge(image, factor, method = 'sharp') {
+  if (factor <= 1) return image
+  const { width, height } = image.getSize()
+  const { default: sharp } = await import('sharp')
+  let pipe = sharp(image.toPNG()).resize(width * factor, height * factor, { kernel: method === 'smooth' ? 'lanczos3' : 'nearest' })
+  if (method === 'smooth') pipe = pipe.sharpen({ sigma: 0.6 })
+  return nativeImage.createFromBuffer(await pipe.png({ compressionLevel: 6 }).toBuffer())
+}
+
 function saveShot(folder, image, started) {
   const png = image.toPNG()
   fs.mkdirSync(folder, { recursive: true })
@@ -141,13 +165,15 @@ export async function captureScreen(folder, mode = 'cursor') {
  * `pick(display, image)` shows the selection overlay over the frozen capture and resolves the dragged rectangle
  * (logical pixels relative to the display), or null when cancelled. Resolves null on cancel, the saved shot otherwise.
  */
-export async function captureRegion(folder, pick, mode = 'cursor') {
+export async function captureRegion(folder, pick, mode = 'cursor', { upscale = 'off', method = 'sharp' } = {}) {
   const { display, image } = await grabDisplay(mode)
   const sel = await pick(display, image)
   const started = Date.now()
   const rect = cropRect(sel, display.size, image.getSize())
   if (!rect) return null
-  return saveShot(folder, image.crop(rect), started)
+  const factor = upscaleFactor(rect.width, rect.height, upscale)
+  const shot = saveShot(folder, await enlarge(image.crop(rect), factor, method), started)
+  return { ...shot, scale: factor, sourceWidth: rect.width, sourceHeight: rect.height }
 }
 
 /** Region selection without saving a file (e.g. OCR of a screen area). Resolves the cropped image, or null on cancel. */

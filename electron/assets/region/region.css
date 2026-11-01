@@ -16,3 +16,8 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
   border: 1px solid #2a313b; clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px), 0 8px);
 }
 #hint.hide { display: none; }
+/* magnifier: real screen pixels around the cursor, for exact edges on small text */
+#loupe { position: fixed; left: 0; top: 0; width: 150px; pointer-events: none; border: 1px solid #8fd3f4; background: #0d1014; box-shadow: 0 6px 18px rgba(0, 0, 0, .55); }
+#loupe[hidden] { display: none; }
+#loupeCanvas { display: block; width: 150px; height: 150px; image-rendering: pixelated; }
+#loupeInfo { display: block; padding: 3px 6px; font: 500 11px/16px "Geist Mono", ui-monospace, Consolas, monospace; color: #c9d4de; border-top: 1px solid #2a313b; white-space: nowrap; }

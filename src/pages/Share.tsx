@@ -221,6 +221,26 @@ export default function Share() {
           <HotkeyField label={t('share.hotkey', 'Atalho: tela inteira')} value={c.hotkey} active={st.hotkeyActive} onChange={(acc) => void setConfig({ hotkey: acc })} />
           <MonitorSelect label={t('share.monitor', 'Monitor do print da tela inteira')} value={c.monitor} displays={displays} onChange={(v) => void setConfig({ monitor: v })} />
           <MonitorSelect label={t('share.regionMonitor', 'Monitor da seleção de área')} value={c.regionMonitor} displays={displays} onChange={(v) => void setConfig({ regionMonitor: v })} />
+          <label className="flex items-center justify-between gap-2.5 text-[12.5px] text-zinc-300">
+            {t('share.upscale', 'Ampliar seleções pequenas')}
+            <select className="dh-input max-w-[190px]" value={c.regionUpscale} onChange={(e) => void setConfig({ regionUpscale: e.target.value as typeof c.regionUpscale })}>
+              <option value="auto">{t('share.upscale.auto', 'Automático')}</option>
+              <option value="off">{t('share.upscale.off', 'Não ampliar')}</option>
+              <option value="2">2x</option>
+              <option value="3">3x</option>
+              <option value="4">4x</option>
+            </select>
+          </label>
+          {c.regionUpscale !== 'off' ? (
+            <label className="flex items-center justify-between gap-2.5 text-[12.5px] text-zinc-300">
+              {t('share.upscaleMethod', 'Modo de ampliação')}
+              <select className="dh-input max-w-[190px]" value={c.upscaleMethod} onChange={(e) => void setConfig({ upscaleMethod: e.target.value as typeof c.upscaleMethod })}>
+                <option value="sharp">{t('share.upscaleMethod.sharp', 'Nítido (texto e interface)')}</option>
+                <option value="smooth">{t('share.upscaleMethod.smooth', 'Suave (fotos)')}</option>
+              </select>
+            </label>
+          ) : null}
+          <p className="dh-help">{t('share.upscaleHelp', 'Um recorte pequeno tem poucos pixels e fica borrado quando o Discord ou um visualizador o estica. Ampliado aqui em 2x a 4x, cada pixel da tela vira um quadrado nítido. No automático, só áreas menores que 1200 px são ampliadas.')}</p>
           <label className="flex items-center gap-2.5 text-[12.5px] text-zinc-300">
             <input type="checkbox" checked={c.autoUpload} onChange={(e) => setConfig({ autoUpload: e.target.checked })} />
             {t('share.autoUpload', 'Enviar ao Susuya e copiar o link')}

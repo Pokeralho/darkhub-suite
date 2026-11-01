@@ -38,9 +38,10 @@ let active = null // one overlay at a time (hotkey pressed twice)
 export function makeRegionPicker(BrowserWindow) {
   return function pick(display, image) {
     if (active) return Promise.resolve(null)
-    // JPEG is only the backdrop the user sees; the crop comes from the lossless capture.
-    const tmp = path.join(os.tmpdir(), `darkhub-region-${process.pid}-${Date.now()}.jpg`)
-    fs.writeFileSync(tmp, image.toJPEG(92))
+    // PNG backdrop: the magnifier shows the real screen pixels (JPEG would add artifacts around small text).
+    // The crop itself always comes from the lossless capture in memory.
+    const tmp = path.join(os.tmpdir(), `darkhub-region-${process.pid}-${Date.now()}.png`)
+    fs.writeFileSync(tmp, image.toPNG())
     const { x, y, width, height } = display.bounds
     const win = new BrowserWindow({
       x, y, width, height,

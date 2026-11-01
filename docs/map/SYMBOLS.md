@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-01T12:39:01. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-01T12:53:00. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -18,7 +18,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/assets/region/region.js`
 
-`report`:12, `cancel`:13, `draw`:18
+`report`:12, `cancel`:13, `draw`:18, `drawLoupe`:38
 
 ## `electron/configManager.js`
 
@@ -178,7 +178,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ipc/shareIpc.js`
 
-`monitorMode`:14, `readJson`:16, `writeJson`:17, `normalizeShareConfig`:21, `registerShareIPC`:41, `broadcast`:53, `notify`:54, `liveHistory`:55, `upload`:57, `publicEntry`:87, `capture`:91, `bindHotkey`:118, `handle`:127, `state`:134
+`monitorMode`:14, `readJson`:16, `writeJson`:17, `normalizeShareConfig`:21, `registerShareIPC`:44, `broadcast`:56, `notify`:57, `liveHistory`:58, `upload`:60, `publicEntry`:90, `capture`:94, `bindHotkey`:124, `handle`:133, `state`:140
 
 ## `electron/ipc/startupIpc.js`
 
@@ -674,11 +674,11 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/susuya/RegionPicker.js`
 
-`parseRegionTitle`:22, `makeRegionPicker`:38, `finish`:55
+`parseRegionTitle`:22, `makeRegionPicker`:38, `finish`:56
 
 ## `electron/services/susuya/Screenshot.js`
 
-`pad`:10, `screenshotName`:11, `physicalSize`:16, `cropRect`:25, `clampX`:29, `clampY`:30, `listDisplays`:40, `pickDisplays`:52, `byId`:53, `layoutCanvas`:64, `matchSources`:85, `captureSources`:93, `grabDisplay`:105, `saveShot`:123, `captureScreen`:134, `captureRegion`:144, `grabRegionImage`:154
+`pad`:10, `screenshotName`:11, `physicalSize`:16, `cropRect`:25, `clampX`:29, `clampY`:30, `listDisplays`:40, `pickDisplays`:52, `byId`:53, `layoutCanvas`:64, `matchSources`:85, `captureSources`:93, `grabDisplay`:105, `upscaleFactor`:129, `enlarge`:138, `saveShot`:147, `captureScreen`:158, `captureRegion`:168, `grabRegionImage`:180
 
 ## `electron/services/susuya/SusuyaClient.js`
 

@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the Windows disk and the disk holding the boot (EFI) partition are refused. 512 and 4K-sector disks are supported.
 
 ### Fixed
+- Susuya region screenshots stay sharp when small: a crop has only the pixels the screen showed, and apps that stretch
+  a small image blur it. Small selections are now enlarged 2x to 4x by whole factors (automatic below 1200 px, or a
+  fixed factor), "sharp" (every screen pixel a crisp square, for text and UI) or "smooth" (Lanczos, for photos). The
+  region selector has a magnifier with the real pixels at 10x and their coordinates, and its backdrop is now lossless
+  PNG instead of JPEG.
 - Susuya screenshots: the monitor is now a setting, separately for full-screen shots and region selection: the one
   under the mouse (as before), the primary, a specific monitor, or all monitors stitched into one image at their real
   positions (the region overlay then spans every monitor). Capture sources are matched by display id with a fallback
