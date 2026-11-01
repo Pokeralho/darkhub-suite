@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- "Diagnose Windows Update" (Optimizer > Windows tools, and in the Driver Center when a Windows Update driver fails):
+  a read-only check of what stops Windows Update from downloading. It covers disabled or missing services, blocking
+  policies and WSUS, hosts file redirects, a DNS that does not resolve or answers 0.0.0.0, blocked ports 443/80 to the
+  update servers, a WinHTTP proxy, a wrong clock, low disk space and outbound firewall blocks. It also checks whether
+  DarkHub's own IP blocking is catching an update server. Each problem says what to do; "Reset Windows Update" now
+  also turns disabled update services back on with their Windows defaults.
 - "Disk Studio & Rescue" (Utilities): a new low-level disk page backed by a native Rust engine
   (`native_disk/` → `DarkHub.DiskRescue.exe`, talking straight to `\\.\PhysicalDriveN` through the Windows storage IOCTLs).
   Health tab: proportional partition map, MBR/GPT state, SMART counters and a read-only surface test with a block map.
@@ -18,6 +24,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   back, tolerant of bad sectors, SHA-256 verified, with the GPT moved to the end when the target is larger. Every write
   shows a before/after diff, saves the overwritten sectors to a `.dhbk` backup first and needs the disk number typed;
   the Windows disk and the disk holding the boot (EFI) partition are refused. 512 and 4K-sector disks are supported.
+
+### Fixed
+- Post-Install Hub: apps whose vendor replaces the installer behind the same URL before winget's catalog catches up
+  (Google Chrome today) failed with "Installer hash does not match". DarkHub now downloads that installer from the
+  package's own official URL over HTTPS and runs it silently only with a valid Authenticode signature of the same
+  publisher. "Already installed" counts as done, Microsoft Store apps say when the Store is missing, and failures show
+  winget's code. The Chocolatey fallback that guessed a package name from the last part of the id (and could install an
+  unrelated package) was removed. All 137 catalog ids were checked against winget; new "Cloud & Sync" category (Google
+  Drive, Dropbox, OneDrive, MEGA) plus Microsoft Teams and Signal.
+- Accented text read from PowerShell (device names, update titles: "Controlador de comunicação") arrived broken
+  ("comunica��o"): every script now writes UTF-8.
+- Driver Center, Windows Update drivers: a failed download showed only the overall code 80240022 ("all updates
+  failed"). It now shows the update's own error with a plain explanation (network/DNS/hosts, clock, disabled service,
+  Delivery Optimization, BITS, policy, component store, disk space), retries once with Delivery Optimization in simple
+  HTTP mode (restored afterwards), and also unlocks CryptSvc and TrustedInstaller when a stripped system disabled them.
 
 ## [0.7.4] - 2026-10-28
 

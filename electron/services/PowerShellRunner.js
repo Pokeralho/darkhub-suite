@@ -152,6 +152,10 @@ export async function runPowerShell(script, {
   maxBuffer,
   trim = false
 } = {}) {
+  // output is read as UTF-8: without this, Windows PowerShell writes in the console code page and accented text
+  // (device names, update titles...) arrives broken ("comunica��o")
+  if (!/OutputEncoding/.test(script)) script = `[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+${script}`
   const encodedScript = encodePowerShellScript(script)
   const spawnOptions = {
     windowsHide: hidden,

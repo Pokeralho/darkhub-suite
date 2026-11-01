@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-10-28T14:00:19. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-01T12:01:53. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -164,6 +164,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `registerRealtimeIPC`:17, `getHashDb`:25, `broadcast`:28, `refreshClam`:47, `apply`:57, `defenderRunning`:81, `handle`:89, `status`:96, `ensureClamAv`:108
 
+## `electron/ipc/recoveryIpc.js`
+
+`registerRecoveryIPC`:4, `handle`:6, `winOf`:12, `sender`:13
+
 ## `electron/ipc/restoreIpc.js`
 
 `registerRestoreIPC`:4, `handle`:6
@@ -194,7 +198,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ipc/winToolsIpc.js`
 
-`registerWinToolsIPC`:4, `handle`:5
+`registerWinToolsIPC`:6, `handle`:7
 
 ## `electron/latencyGuardian.js`
 
@@ -206,7 +210,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/main.js`
 
-`getSystemInformation`:126, `get`:132, `getSharp`:141, `getOcrWorker`:150, `getExiftool`:170, `getFfmpegPath`:178, `getLibraryStore`:210, `safeRegister`:217, `getYtDlpTools`:253, `isDev`:258, `normalizeAccessPath`:282, `isPathInside`:292, `grantFilePath`:298, `grantDirectoryPath`:303, `hasFileAccessGrant`:308, `assertOutputDirGranted`:320, `assertFileAccessGranted`:326, `assertFileAccessGrantedMany`:335, `psSingleQuote`:341, `loadRuntimeConfig`:345, `isAllowedExternalProtocol`:355, `getAllowedExternalUrl`:359, `openAllowedExternalUrlDetached`:369, `isEmbeddedExternalProtocol`:380, `handleEmbeddedExternalNavigation`:384, `isTrustedAppNavigation`:396, `getAppIconPath`:406, `showMainWindow`:421, `ensureTray`:434, `hideWindowToBackground`:461, `estimateDirectoryBytes`:466, `computeJunkEstimate`:510, `work`:524, `createMainWindow`:591, `kickWindowsPaint`:656, `showWhenReady`:728, `eventSender`:813, `measureLatency`:840, `getActiveAdapterName`:870, `getMainCpuLoad`:1106, `broadcastLibraryEvent`:1250, `scoreExecutable`:1326, `key`:1331, `scanDirectoryForBestExe`:1352, `walk`:1355, `findPgeBat`:1496, `launchPgeBat`:1516, `isStartupTaskEnabled`:1592, `setStartupTask`:1602, `refreshLiveCounts`:1713, `sendEvent`:1969, `findLibreOfficeSoffice`:2201, `toXml`:2293, `buildArgs`:2386, `vaultFilePath`:2660, `setVaultAutoLockMinutes`:2668, `clearVaultAutoLock`:2675, `scheduleVaultAutoLock`:2682, `touchVault`:2691, `vaultFileExists`:2695, `readVaultFile`:2704, `writeVaultFile`:2709, `lockVault`:2717, `ensureUnlocked`:2724, `loadVaultUsingWrapper`:2729, `persistVaultData`:2750, `getSecurityScoreV2`:3122, `add`:3127, `isValidHostname`:3304, `getClickEnginePath`:3438, `autoClickerCall`:3464, `isValidWingetId`:3544, `installGithubReleaseMsi`:3556, `progress`:3585, `tryInstall`:3613, `runDeferredStartup`:3686
+`getSystemInformation`:128, `get`:134, `getSharp`:143, `getOcrWorker`:152, `getExiftool`:172, `getFfmpegPath`:180, `getLibraryStore`:212, `safeRegister`:219, `getYtDlpTools`:256, `isDev`:261, `normalizeAccessPath`:285, `isPathInside`:295, `grantFilePath`:301, `grantDirectoryPath`:306, `hasFileAccessGrant`:311, `assertOutputDirGranted`:323, `assertFileAccessGranted`:329, `assertFileAccessGrantedMany`:338, `psSingleQuote`:344, `loadRuntimeConfig`:348, `isAllowedExternalProtocol`:358, `getAllowedExternalUrl`:362, `openAllowedExternalUrlDetached`:372, `isEmbeddedExternalProtocol`:383, `handleEmbeddedExternalNavigation`:387, `isTrustedAppNavigation`:399, `getAppIconPath`:409, `showMainWindow`:424, `ensureTray`:437, `hideWindowToBackground`:464, `estimateDirectoryBytes`:469, `computeJunkEstimate`:513, `work`:527, `createMainWindow`:594, `kickWindowsPaint`:659, `showWhenReady`:731, `eventSender`:816, `measureLatency`:843, `getActiveAdapterName`:873, `getMainCpuLoad`:1109, `broadcastLibraryEvent`:1253, `scoreExecutable`:1329, `key`:1334, `scanDirectoryForBestExe`:1355, `walk`:1358, `findPgeBat`:1499, `launchPgeBat`:1519, `isStartupTaskEnabled`:1595, `setStartupTask`:1605, `refreshLiveCounts`:1716, `sendEvent`:1972, `findLibreOfficeSoffice`:2204, `toXml`:2296, `buildArgs`:2389, `vaultFilePath`:2663, `setVaultAutoLockMinutes`:2671, `clearVaultAutoLock`:2678, `scheduleVaultAutoLock`:2685, `touchVault`:2694, `vaultFileExists`:2698, `readVaultFile`:2707, `writeVaultFile`:2712, `lockVault`:2720, `ensureUnlocked`:2727, `loadVaultUsingWrapper`:2732, `persistVaultData`:2753, `getSecurityScoreV2`:3125, `add`:3130, `isValidHostname`:3307, `getClickEnginePath`:3441, `autoClickerCall`:3467, `isValidWingetId`:3547, `installGithubReleaseMsi`:3559, `installFromOfficialUrl`:3587, `progress`:3623, `runWinget`:3648, `runDeferredStartup`:3730
 
 ## `electron/networkIPC.js`
 
@@ -218,7 +222,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:284, `handler`:303, `handler`:313, `handler`:325, `listener`:368, `handler`:420, `handler`:446, `handler`:452, `handler`:458, `handler`:464, `listener`:473, `listener`:484, `handler`:509, `listener`:522, `listener`:539, `handler`:574, `handler`:589, `listener`:612, `listener`:632, `listener`:659, `handler`:700
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:284, `handler`:303, `handler`:313, `handler`:325, `listener`:368, `handler`:420, `handler`:446, `handler`:452, `handler`:458, `handler`:464, `listener`:473, `listener`:484, `handler`:509, `listener`:522, `listener`:539, `handler`:574, `handler`:589, `listener`:612, `listener`:637, `listener`:658, `listener`:685, `handler`:726
 
 ## `electron/services/CodeRunner.js`
 
@@ -306,7 +310,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/PowerShellRunner.js`
 
-`runCommand`:13, `finish`:31, `appendChunk`:38, `stripBom`:93, `encodePowerShellScript`:98, `powerShellArgsForEncodedScript`:105, `parseJsonOutput`:116, `psSingleQuote`:141, `runPowerShell`:145, `runPowerShellJson`:222
+`runCommand`:13, `finish`:31, `appendChunk`:38, `stripBom`:93, `encodePowerShellScript`:98, `powerShellArgsForEncodedScript`:105, `parseJsonOutput`:116, `psSingleQuote`:141, `runPowerShell`:145, `runPowerShellJson`:226
 
 ## `electron/services/PowerShellToolsService.js`
 
@@ -394,7 +398,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/drivers/DriverInstallService.js`
 
-`foreach`:82, `foreach`:92, `foreach`:104, `foreach`:105, `dhpFunc`:130, `wuSearchScript`:140, `wuSearchElevatedScript`:151, `buildInstallScript`:170, `foreach`:248, `readWuOutput`:280, `wuErrorKind`:290, `fetchText`:298, `driversDir`:315, `sha256File`:322, `DriverInstallService`:328 _class_, `scan`:339, `searchWindowsUpdate`:355, `lookupVendor`:377, `findDrivers`:413, `download`:439, `signature`:481, `note`:501, `pump`:546
+`foreach`:83, `foreach`:93, `foreach`:126, `foreach`:127, `dhpFunc`:152, `wuSearchScript`:162, `wuSearchElevatedScript`:173, `buildInstallScript`:192, `foreach`:283, `readWuOutput`:315, `wuErrorKind`:325, `fetchText`:333, `driversDir`:350, `sha256File`:357, `DriverInstallService`:363 _class_, `scan`:374, `searchWindowsUpdate`:390, `lookupVendor`:412, `findDrivers`:448, `download`:474, `signature`:516, `note`:536, `pump`:581
 
 ## `electron/services/drivers/driverPlan.js`
 
@@ -550,7 +554,11 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/optimizer/WindowsToolsEngine.js`
 
-`featureById`:46, `summarizeFeatureState`:51, `parseFeatureLines`:60, `featureReadScript`:71, `launch`:82, `finish`:85, `WindowsToolsEngine`:95 _class_, `listFeatures`:101, `setFeature`:108, `openPanel`:147, `run`:154, `resetWindowsUpdate`:161, `repairWinget`:178, `cleanupComponentStore`:194, `removeEdge`:206, `installEdge`:219, `decryptSystemDrive`:229, `autologon`:248
+`featureById`:46, `summarizeFeatureState`:51, `parseFeatureLines`:60, `featureReadScript`:71, `launch`:82, `finish`:85, `WindowsToolsEngine`:95 _class_, `listFeatures`:101, `setFeature`:108, `openPanel`:147, `run`:154, `resetWindowsUpdate`:161, `repairWinget`:184, `cleanupComponentStore`:200, `removeEdge`:212, `installEdge`:225, `decryptSystemDrive`:235, `autologon`:254
+
+## `electron/services/optimizer/wuDiagnose.js`
+
+`ipv4`:11, `ipInRange`:16, `wuFindings`:33, `diagnoseWindowsUpdate`:70
 
 ## `electron/services/overlay/OverlayService.js`
 
@@ -608,6 +616,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `clamp`:7, `normalizeRule`:11, `effectiveRules`:37, `normalizeFolder`:43, `defaults`:48, `normalize`:73, `ConfigStore`:104 _class_, `read`:111, `update`:115
 
+## `electron/services/recovery/DiskRecoveryService.js`
+
+`defaultExe`:10, `normalizeTarget`:16, `diskNumberOf`:24, `int`:29, `createLineParser`:36, `parseLine`:46, `DiskRecoveryService`:55 _class_, `available`:65, `_missing`:69, `run`:74, `finish`:104, `status`:118, `cancel`:123, `_backupPath`:131, `_writeFlags`:141, `listDrives`:152, `inspectDisk`:154, `readSector`:156, `writeSector`:160, `repairHeader`:168, `setActive`:179, `backupTable`:184, `restoreBackup`:190, `clone`:199, `verify`:217, `surfaceTest`:224, `startCarving`:230, `smart`:243
+
 ## `electron/services/restore/RestoreService.js`
 
 `DETECT_SCRIPT`:14, `foreach`:49, `run`:57, `RestoreService`:61 _class_, `status`:67, `install`:77, `_elevated`:100, `_capability`:106, `_feature`:123, `_store`:141, `_msStore`:152, `_winget`:166
@@ -647,6 +659,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `electron/services/security/hardeningCatalog.js`
 
 `getHardeningItem`:61, `allRegistryEntries`:65, `buildHardeningStatusScript`:70, `defenderActive`:94, `registryMap`:101, `asrState`:106, `count`:111, `evaluateHardening`:119, `regApplied`:121, `regSnapshotPs`:159, `buildHardeningApplyScript`:168, `parseHardeningSnapshot`:220, `buildHardeningRestoreScript`:253
+
+## `electron/services/setup/wingetFallback.js`
+
+`wingetOutcome`:15, `parseWingetShow`:26, `pick`:27, `silentInstall`:36, `norm`:52, `signerMatches`:58, `isFetchableUrl`:66
 
 ## `electron/services/startup/StartupService.js`
 
@@ -736,6 +752,42 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `Start-DarkHubInstall`:6
 
+## `native_disk/src/carve.rs`
+
+`get`:48, `u8`:64, `be16`:67, `be32`:70, `le32`:73, `le64`:76, `find`:80, `jpeg_len`:99, `png_len`:138, `gif_sub_blocks`:156, `gif_len`:169, `bmp_len`:200, `pdf_len`:209, `zip_len`:228, `zip_kind`:243, `sqlite_len`:263, `sevenz_len`:274, `mp4_len`:281, `measure`:318, `type_enabled`:345, `carve`:349
+
+## `native_disk/src/copy.rs`
+
+`mark`:24, `tolerant_read`:33, `copy_region`:68, `hash_region`:96, `surface_test`:122
+
+## `native_disk/src/device.rs`
+
+`size`:8, `sector_size`:10, `read_at`:12, `write_at`:14, `flush`:15, `total_sectors`:16, `open`:28, `create`:35, `pread`:43, `pread`:48, `pwrite`:53, `pwrite`:58, `read_full`:63, `write_full`:77, `size`:90, `sector_size`:93, `read_at`:96, `write_at`:99, `flush`:105, `read_sectors`:111, `read_bytes`:120, `parse`:143, `display`:154, `open_target`:162, `as_slice`:186, `as_mut_slice`:189
+
+## `native_disk/src/main.rs`
+
+`parse`:30, `get`:53, `flag`:56, `need`:59, `num`:62, `target`:65, `sector`:69, `system_disks`:74, `guard_write`:83, `region_of`:95, `plan_result`:110, `hex_rows`:123, `read_sector_cmd`:136, `write_sector_cmd`:171, `clone_cmd`:189, `finish_copy`:238, `run`:272, `main`:396
+
+## `native_disk/src/parts.rs`
+
+`u16le`:6, `u32le`:9, `u64le`:12, `parse_mbr`:34, `mbr_type_name`:48, `build_mbr`:65, `valid`:122, `guid_str`:127, `gpt_type_name`:137, `header_crc`:156, `read_gpt_at`:162, `parse_gpt_entries`:198, `relocate_header`:223, `read_gpt_state`:244, `detect_vbr`:277, `detect_fs`:313, `fs_kind`:336, `partitions`:357, `gpt_json`:397, `inspect`:411
+
+## `native_disk/src/repair.rs`
+
+`describe`:24, `save_backup`:44, `load_backup`:63, `apply`:90, `plan_restore_gpt`:117, `plan_fix_gpt_after_grow`:184, `scan_vbrs`:219, `plan_rebuild_mbr`:269, `plan_set_active`:322
+
+## `native_disk/src/tests.rs`
+
+`tmp`:15, `gpt_header`:23, `ntfs_vbr`:42, `build_gpt`:55, `open`:83, `inspect_reads_gpt_and_ntfs`:88, `restores_wiped_primary_gpt_and_protective_mbr`:104, `rebuilds_backup_gpt_from_primary`:136, `dry_run_plan_does_not_write`:150, `scan_finds_ntfs_from_backup_boot_sector_and_rebuilds_mbr`:164, `clone_to_larger_image_moves_gpt_backup_and_verifies`:191, `partition_region_and_image_roundtrip`:216, `guard_refuses_system_disk_and_unconfirmed_writes`:232, `jpeg`:242, `png`:251, `zip_docx`:265, `sqlite`:296, `pdf`:304, `carves_planted_files_with_exact_sizes`:309, `surface_test_maps_whole_image`:340
+
+## `native_disk/src/util.rs`
+
+`from`:20, `cancelled`:42, `reset_cancel`:47, `listen_for_cancel`:52, `emit`:64, `silent`:82, `elapsed`:85, `tick`:88, `event`:112, `hex`:119, `unhex`:123
+
+## `native_disk/src/win.rs`
+
+`ioctl`:30, `u32le`:51, `u64le`:54, `disk_path`:58, `open_query`:63, `geometry`:74, `bus_name`:105, `descriptor_string`:129, `device_info`:138, `wide`:163, `from_wide`:166, `volume_extents`:171, `volumes`:186, `system_disks`:219, `list_drives`:239, `disk_of_path`:270, `lock_volumes`:286, `open`:325, `size`:347, `sector_size`:350, `read_at`:353, `write_at`:371, `flush`:384
+
 ## `native_pacer/src/lib.rs`
 
 `CreateWindowExA`:66, `DestroyWindow`:80, `timeBeginPeriod`:85, `timeEndPeriod`:86, `QueryPerformanceCounter`:90, `QueryPerformanceFrequency`:91, `VirtualProtect`:92, `CreateFileMappingW`:93, `OpenFileMappingW`:94, `MapViewOfFile`:95, `CloseHandle`:96, `GetCurrentProcessId`:97, `Sleep`:98, `LoadLibraryA`:99, `GetProcAddress`:100, `CreateThread`:101, `CreateWaitableTimerExW`:102, `SetWaitableTimer`:103, `WaitForSingleObject`:104, `get_qpc_ms`:218, `precision_wait`:228, `hist_recent`:254, `push_sample`:258, `compute_stats`:267, `publish`:317, `is_main_swapchain`:356, `perform_pacing`:407, `hooked_present`:478, `hooked_present1`:488, `map_named`:502, `setup_shared_memory`:519, `patch_slot`:547, `com_release`:560, `install_vtable_hooks`:571, `remove_vtable_hooks`:659, `init_thread`:671, `DllMain`:687, `reset`:729, `stats_come_only_from_real_samples`:735, `low01_unavailable_with_few_samples`:754, `telemetry_layout_matches_reader`:766
@@ -754,7 +806,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/App.tsx`
 
-`pageFromHash`:54, `PageLoading`:59 _component_, `App`:74 _component_, `onHash`:89, `reportRenderError`:95, `renderPage`:99
+`pageFromHash`:55, `PageLoading`:60 _component_, `App`:75 _component_, `onHash`:90, `reportRenderError`:96, `renderPage`:100
 
 ## `src/components/DetailedHardwareInfo.tsx`
 
@@ -826,7 +878,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/components/drivers/MissingDrivers.tsx`
 
-`api`:8, `fill`:9, `mb`:11, `ItemState`:13 _type_, `MissingDrivers`:17 _component_, `itemTitle`:73, `toggle`:75, `runInstall`:81, `reasonText`:108, `sourceText`:114, `statusLine`:116, `itemRow`:136
+`api`:9, `fill`:10, `mb`:12, `ItemState`:14 _type_, `MissingDrivers`:18 _component_, `itemTitle`:75, `toggle`:77, `runInstall`:83, `reasonText`:110, `sourceText`:116, `statusLine`:118, `itemRow`:139, `wuHintKey`:350
 
 ## `src/components/hub/HubApproval.tsx`
 
@@ -882,7 +934,11 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/components/optimizer/WindowsToolsPanel.tsx`
 
-`FeatureState`:5 _type_, `api`:14, `WindowsToolsPanel`:17 _component_, `exec`:36, `toggleFeature`:48, `stateLabel`:54
+`FeatureState`:6 _type_, `api`:15, `WindowsToolsPanel`:18 _component_, `exec`:37, `toggleFeature`:49, `stateLabel`:55
+
+## `src/components/optimizer/WuDiagnosis.tsx`
+
+`Finding`:5 _type_, `fill`:7, `WuDiagnosis`:13 _component_, `diagnose`:19, `fix`:28
 
 ## `src/components/overlay/OverlayStage.tsx`
 
@@ -911,6 +967,30 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `src/components/pstools/psSchema.ts`
 
 `ParamType`:4 _type_, `ParamDef`:5 _type_, `ToolDef`:18 _type_, `ParamValues`:32 _type_, `toolsIn`:36, `toolById`:37, `defaultsFor`:39, `flagsFor`:45, `hit`:46, `validateParam`:54, `validateAll`:89, `toPayload`:99, `columnsOf`:108, `cellText`:114, `rowsToCsv`:120, `esc`:122
+
+## `src/components/recovery/CarvingManager.tsx`
+
+`CarvingManager`:14 _component_, `pick`:30, `start`:35, `toggle`:43
+
+## `src/components/recovery/CloneWizard.tsx`
+
+`Mode`:7 _type_, `diskTarget`:9, `CloneWizard`:15 _component_, `dryRun`:57, `run`:63, `pickImage`:71, `DriveSelect`:76 _component_, `PartSelect`:90 _component_
+
+## `src/components/recovery/HeaderGuardModal.tsx`
+
+`ApplyResult`:5 _type_, `HeaderGuardModal`:12 _component_, `onKey`:27, `apply`:35, `WriteDiff`:108 _component_, `grid`:122
+
+## `src/components/recovery/PartitionMapBar.tsx`
+
+`PartitionMapBar`:10 _component_
+
+## `src/components/recovery/SectorHexViewer.tsx`
+
+`SectorHexViewer`:8 _component_, `go`:26, `ascii`:30, `Field`:138 _component_
+
+## `src/components/recovery/rescueUtils.tsx`
+
+`api`:4, `fmtBytes`:6, `fmtEta`:13, `ProgressEv`:30 _type_, `JobProgress`:32 _component_, `ErrorLine`:56 _component_
 
 ## `src/components/security/BlocklistsPanel.tsx`
 
@@ -1006,7 +1086,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/i18n/messages.ts`
 
-`SupportedLang`:27 _type_, `LanguageOption`:29 _type_, `getTranslationTemplate`:3432
+`SupportedLang`:28 _type_, `LanguageOption`:30 _type_, `getTranslationTemplate`:3433
 
 ## `src/i18n/overlayEditorMessages.ts`
 
@@ -1014,7 +1094,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/layouts/MainLayout.tsx`
 
-`MainLayoutProps`:17 _type_, `NavSection`:23 _type_, `MainLayout`:33 _component_, `handleMenuClick`:147, `handleNavKeyDown`:170, `navButton`:185, `rail`:191
+`MainLayoutProps`:17 _type_, `NavSection`:23 _type_, `MainLayout`:33 _component_, `handleMenuClick`:148, `handleNavKeyDown`:171, `navButton`:186, `rail`:192
 
 ## `src/lib/cipherTools.ts`
 
@@ -1059,6 +1139,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `src/pages/DevTools.tsx`
 
 `ToolId`:12 _type_, `DevTools`:14 _component_, `runJson`:33, `generateHashes`:46
+
+## `src/pages/DiskRescue.tsx`
+
+`Tab`:13 _type_, `Guard`:14 _type_, `diskOf`:16, `DiskRescue`:18 _component_, `openImage`:52, `HealthTab`:119 _component_, `runSurface`:135, `Stat`:237 _component_, `GuardTab`:248 _component_, `wrap`:261, `planGpt`:267, `scan`:274, `planMbr`:279, `backup`:287, `restore`:292, `copyState`:303, `BootTab`:358 _component_, `planActive`:365
 
 ## `src/pages/DllInjector.tsx`
 
@@ -1166,7 +1250,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/SetupHub.tsx`
 
-`SetupHub`:234 _component_, `toggleApp`:254, `toggleCategory`:260, `applyPreset`:270, `handleInstallApps`:333, `detectHardware`:362, `toggleOpen`:483, `joinParts`:736, `HardwareCard`:738 _component_, `getGpuDriverLinks`:779, `getCpuChipsetLinks`:797, `getMoboDriverLinks`:810
+`SetupHub`:242 _component_, `toggleApp`:262, `toggleCategory`:268, `applyPreset`:278, `handleInstallApps`:341, `detectHardware`:370, `toggleOpen`:491, `joinParts`:744, `HardwareCard`:746 _component_, `getGpuDriverLinks`:787, `getCpuChipsetLinks`:805, `getMoboDriverLinks`:818
 
 ## `src/pages/Share.tsx`
 
@@ -1255,6 +1339,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/diskMap.test.ts`
 
 `file`:15, `ok`:18, `build`:61
+
+## `tests/diskRescue.test.ts`
+
+`tmpDir`:11, `fakeSpawn`:13
 
 ## `tests/dlss5.test.ts`
 
@@ -1355,6 +1443,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/vaultBridge.test.ts`
 
 `mkTmp`:23, `makeServer`:185, `FakeHost`:212 _class_, `connect`:219, `next`:231, `raw`:237, `handshake`:238, `call`:249, `close`:253, `setup`:261, `pair`:270, `runReg`:392, `readFile`:434, `writeFile`:435
+
+## `tests/wuDiagnose.test.ts`
+
+`ids`:17
 
 ## `vite.config.js`
 

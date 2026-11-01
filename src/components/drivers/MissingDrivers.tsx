@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import WuDiagnosis from '../optimizer/WuDiagnosis';
 import {
   AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Cpu, DownloadCloud, Info, Loader2, RefreshCw, ShieldCheck, XCircle
 } from '../icons';
@@ -56,7 +57,8 @@ export default function MissingDrivers({ onInstalled }: { onInstalled?: () => vo
   useEffect(() => {
     const off = api()?.onInstallEvent?.((ev) => {
       if (!mounted.current || !ev?.id) return;
-      setStates((prev) => ({ ...prev, [ev.id]: { status: ev.status, detail: ev.detail, received: ev.received, total: ev.total } }));
+      // 'info' lines (a retry, the fallback) only go to the log; the item keeps its current state
+      if (ev.status !== 'info') setStates((prev) => ({ ...prev, [ev.id]: { status: ev.status, detail: ev.detail, received: ev.received, total: ev.total } }));
       if (ev.status !== 'downloading' || !ev.received) {
         setLog((prev) => [...prev.slice(-300), `${new Date().toLocaleTimeString()}  ${ev.id}  ${ev.status}${ev.detail ? `  ${ev.detail}` : ''}`]);
       }
@@ -126,6 +128,7 @@ export default function MissingDrivers({ onInstalled }: { onInstalled?: () => vo
           {pct !== null ? <span className="font-mono">{pct}% · {mb(st.received ?? 0)} / {mb(st.total ?? 0)} MB</span> : null}
           {st.status === 'failed' && st.detail ? <span className="font-mono break-all">{st.detail}</span> : null}
         </p>
+        {st.status === 'failed' && wuHintKey(st.detail) ? <p className="text-[11.5px] text-zinc-400 max-w-[70ch]">{t(`drvx.wuHint.${wuHintKey(st.detail)}`, '')}</p> : null}
         {pct !== null ? (
           <div className="h-1 w-full max-w-sm rounded bg-zinc-800 overflow-hidden"><div className="h-full bg-blue-400 transition-[width]" style={{ width: `${pct}%` }} /></div>
         ) : null}
@@ -322,6 +325,13 @@ export default function MissingDrivers({ onInstalled }: { onInstalled?: () => vo
         </div>
       ) : null}
 
+      {Object.entries(states).some(([id, st]) => id.startsWith('wu:') && st.status === 'failed') ? (
+        <div className="mt-3 rounded-lg border border-zinc-800 p-3 space-y-2">
+          <p className="text-[12.5px] text-zinc-300">{t('wudiag.fromDrivers', '')}</p>
+          <WuDiagnosis compact />
+        </div>
+      ) : null}
+
       {log.length ? (
         <div className="mt-3">
           <button className="text-[12px] text-zinc-400 hover:text-zinc-200 flex items-center gap-1" aria-expanded={logOpen} onClick={() => setLogOpen((o) => !o)}>
@@ -334,4 +344,20 @@ export default function MissingDrivers({ onInstalled }: { onInstalled?: () => vo
       ) : null}
     </section>
   );
+}
+
+/** Windows Update error code in a failure detail -> the kind of problem, for a plain explanation. */
+export function wuHintKey(detail: string): string | null {
+  const h = /\b(8[0-9A-F]{7})\b/i.exec(detail || '')?.[1]?.toUpperCase();
+  if (!h) return null;
+  if (['80072EE7', '80072EFD', '80072EE2', '80072F8F', '8024401C', '80244022', '8024402C', '8024402F', '80244017'].includes(h)) return h === '80072F8F' ? 'clock' : 'network';
+  if (['800B0101', '800B0109', '800B010A', '80096004'].includes(h)) return 'clock';
+  if (['80070422', '8024A000', '80070426'].includes(h)) return 'service';
+  if (h.startsWith('80D0')) return 'delivery';
+  if (h.startsWith('80200') || ['80246007', '80246008'].includes(h)) return 'bits';
+  if (['8024002E', '80240438', '80240025'].includes(h)) return 'policy';
+  if (['80073712', '800F081F', '800F0922', '8007000D'].includes(h)) return 'store';
+  if (h === '80070005') return 'denied';
+  if (h === '80070070' || h === '80070008') return 'space';
+  return 'other';
 }

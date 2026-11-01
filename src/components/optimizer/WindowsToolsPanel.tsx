@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle, ExternalLink, Loader2, RefreshCw, Wrench, XCircle } from '../icons';
 import { useI18n } from '../../i18n/I18nProvider';
+import WuDiagnosis from './WuDiagnosis';
 
 type FeatureState = 'enabled' | 'disabled' | 'pending' | 'unavailable';
 
@@ -120,6 +121,11 @@ export default function WindowsToolsPanel() {
               </button>
             </li>
           ))}
+          <li className="px-4 py-3 space-y-2">
+            <div className="text-[13px] text-zinc-200">{t('wudiag.title', 'Windows Update is not downloading?')}</div>
+            <div className="dh-help">{t('wudiag.desc', '')}</div>
+            <WuDiagnosis />
+          </li>
         </ul>
       </section>
 

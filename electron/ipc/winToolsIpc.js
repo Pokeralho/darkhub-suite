@@ -1,4 +1,6 @@
 import WindowsToolsEngine from '../services/optimizer/WindowsToolsEngine.js'
+import { diagnoseWindowsUpdate } from '../services/optimizer/wuDiagnose.js'
+import { runPowerShell } from '../services/PowerShellRunner.js'
 
 /** `wintools:*`: Windows features, repairs and classic panels. Inputs are ids checked against whitelists in the engine. */
 export function registerWinToolsIPC({ ipcMain, logger, engine = WindowsToolsEngine } = {}) {
@@ -12,6 +14,7 @@ export function registerWinToolsIPC({ ipcMain, logger, engine = WindowsToolsEngi
   handle('wintools:setFeature', (p) => engine.setFeature(String(p.id || ''), p.enable === true))
   handle('wintools:run', (p) => engine.run(String(p.action || '')))
   handle('wintools:openPanel', (p) => engine.openPanel(String(p.id || '')))
+  handle('wintools:diagnoseWu', () => diagnoseWindowsUpdate(runPowerShell))
 }
 
 export default registerWinToolsIPC

@@ -40,6 +40,7 @@ import Logger from './services/LoggerService.js'
 import { runCommand, runPowerShell, runPowerShellJson, stripBom } from './services/PowerShellRunner.js'
 import { AutoClickerService } from './services/autoclicker/AutoClickerService.js'
 import { HotkeyService } from './services/hotkeys/HotkeyService.js'
+import { wingetOutcome, parseWingetShow, silentInstall, signerMatches, isFetchableUrl } from './services/setup/wingetFallback.js'
 import { CpuLoadTracker } from './services/CpuLoadTracker.js'
 import HardwareService from './services/HardwareService.js'
 import HardwareHAL from './hal/HardwareHAL.js'
@@ -229,8 +230,8 @@ safeRegister('driver', () => registerDriverIPC({
 safeRegister('powershell', () => registerPowerShellIPC({ ipcMain, logger: Logger }))
 safeRegister('wintools', () => registerWinToolsIPC({ ipcMain, logger: Logger }))
 safeRegister('diskscan', () => registerDiskScanIPC({ ipcMain, dialog, shell, BrowserWindow, logger: Logger }))
-safeRegister('hwsensors', () => registerHwSensorsIPC({ app, ipcMain, logger: Logger }))
 safeRegister('recovery', () => registerRecoveryIPC({ ipcMain, dialog, BrowserWindow, logger: Logger }))
+safeRegister('hwsensors', () => registerHwSensorsIPC({ app, ipcMain, logger: Logger }))
 safeRegister('realtime', () => registerRealtimeIPC({ app, ipcMain, dialog, BrowserWindow, Notification, logger: Logger }))
 safeRegister('code', () => registerCodeRunnerIPC({ ipcMain, logger: Logger }))
 safeRegister('startup', () => registerStartupIPC({ app, ipcMain, logger: Logger }))
@@ -3581,6 +3582,41 @@ async function installGithubReleaseMsi(repo, progress) {
   }
 }
 
+// winget refused the installer (hash mismatch): the vendor replaced it behind the same URL. Download it from the
+// package's own official URL and run it only with a valid Authenticode signature of that same publisher.
+async function installFromOfficialUrl(id, progress) {
+  const show = await runCommand('winget', ['show', '--id', id, '--exact', '--source', 'winget', '--accept-source-agreements', '--disable-interactivity'], { timeoutMs: 60000 })
+  const info = parseWingetShow(show.stdout)
+  if (!info.url || !isFetchableUrl(info.url)) throw new Error('sem endereço oficial de download no catálogo')
+  const dir = path.join(app.getPath('temp'), 'darkhub-setup')
+  await fs.mkdir(dir, { recursive: true })
+  const ext = info.type === 'msi' || info.type === 'wix' ? '.msi' : '.exe'
+  const file = path.join(dir, `${id.replace(/[^\w.-]/g, '_')}${ext}`)
+  const plan = silentInstall(info.type, file)
+  if (!plan) throw new Error(`o instalador (${info.type || '?'}) não tem modo silencioso conhecido; baixe pelo site do fabricante`)
+  try {
+    const res = await fetch(info.url, { redirect: 'follow', headers: { 'user-agent': 'DarkHubSuite' } })
+    if (!res.ok) throw new Error(`download HTTP ${res.status}`)
+    if (new URL(res.url).protocol !== 'https:') throw new Error('o download saiu do HTTPS')
+    const size = Number(res.headers.get('content-length') || 0)
+    if (size > 4 * 1024 ** 3) throw new Error('instalador grande demais')
+    await fs.writeFile(file, Buffer.from(await res.arrayBuffer()))
+    const sig = await runPowerShell(`$s = Get-AuthenticodeSignature -LiteralPath ${psSingleQuote(file)}; Write-Output ("$($s.Status)|$($s.SignerCertificate.Subject)")`, { timeoutMs: 60000, trim: true })
+    const [status, subject = ''] = String(sig.stdout || '').split('|')
+    if (status !== 'Valid') throw new Error(`assinatura digital inválida (${status || 'sem assinatura'}); instalação recusada`)
+    if (!signerMatches(subject, info.publisher)) throw new Error(`assinado por "${subject}", não por ${info.publisher}; instalação recusada`)
+    progress(`[AppStore] Assinatura válida de ${info.publisher}. Instalando...`)
+    const code = await new Promise((resolve) => {
+      const p = spawn(plan.cmd, plan.args, { windowsHide: true })
+      p.on('close', resolve)
+      p.on('error', () => resolve(-1))
+    })
+    if (![0, 3010, 1641].includes(code)) throw new Error(`o instalador terminou com código ${code}`)
+  } finally {
+    await fs.rm(file, { force: true }).catch(() => {})
+  }
+}
+
 ipcMain.handle('setup:installWinget', async (event, appIds) => {
   if (!Array.isArray(appIds) || appIds.length === 0) return { ok: false, error: 'Lista vazia' };
   // The window may be closed mid-queue; a send on a destroyed webContents would reject the handler.
@@ -3609,39 +3645,45 @@ ipcMain.handle('setup:installWinget', async (event, appIds) => {
     }
   }
 
+  const runWinget = (args) => new Promise((resolve) => {
+    let text = ''
+    const p = spawn('winget', args, { windowsHide: true })
+    p.stdout.on('data', (d) => {
+      const txt = d.toString()
+      text += txt
+      // winget redraws a spinner and a progress bar with \r: show only the real lines
+      for (const line of txt.split(/\r?\n|\r/)) {
+        const l = line.trim()
+        if (l && !/^[-\\|/]$/.test(l) && !/[█▒]/.test(l)) progress(`[Winget] ${l}`)
+      }
+    })
+    p.stderr?.on('data', (d) => { text += d.toString() })
+    p.on('close', (code) => resolve({ code: code | 0, text }))
+    p.on('error', (e) => resolve({ code: -1, text: String(e?.message ?? e) }))
+  })
+
   for (const id of validIds) {
     progress(`[AppStore] Preparando: ${id}...`);
+    // ids without a dot are Microsoft Store products (e.g. WhatsApp); they need the Store
+    const store = !id.includes('.')
+    const r = await runWinget(['install', '-e', '--id', id, '--source', store ? 'msstore' : 'winget', '--accept-package-agreements', '--accept-source-agreements', '--silent', '--disable-interactivity'])
+    let outcome = wingetOutcome(r.code, r.text)
 
-    const tryInstall = (provider, command, args) => {
-      return new Promise((resolve) => {
-        progress(`[${provider}] Baixando/Instalando ${id}...`);
-        const p = spawn(command, args, { windowsHide: true });
-        p.stdout.on('data', d => {
-          const txt = d.toString().trim();
-          if (txt) progress(`[${provider}] ${txt}`);
-        });
-        p.stderr?.resume(); // drain stderr so a chatty installer can't stall on a full pipe
-        p.on('close', (code) => resolve(code === 0));
-        p.on('error', () => resolve(false));
-      });
-    };
-
-    let success = await tryInstall('Winget', 'winget', ['install', '-e', '--id', id, '--accept-package-agreements', '--accept-source-agreements', '--silent']);
-
-    if (!success) {
-      progress(`[Winget] Falhou para ${id}. Tentando via Chocolatey...`);
-
-      const chocoId = id.split('.').pop().toLowerCase();
-      if (isValidWingetId(chocoId)) {
-        success = await tryInstall('Choco', 'choco', ['install', chocoId, '-y']);
+    if (outcome === 'hash') {
+      progress(`[AppStore] O fabricante trocou o instalador de ${id} antes do catálogo do winget ser atualizado. Baixando do endereço oficial e conferindo a assinatura digital...`)
+      try {
+        await installFromOfficialUrl(id, progress)
+        outcome = 'ok'
+      } catch (err) {
+        progress(`[AppStore] ${id}: ${err?.message ?? err}`)
       }
     }
 
-    if (success) {
-      progress(`[AppStore] ${id} instalado com sucesso!`);
-    } else {
-      progress(`[AppStore] FALHA TOTAL: Não foi possível instalar ${id} por nenhum provedor.`);
-    }
+    if (outcome === 'ok') progress(`[AppStore] ${id} instalado com sucesso!`)
+    else if (outcome === 'installed') progress(`[AppStore] ${id} já está instalado e atualizado.`)
+    else if (outcome === 'store') progress(`[AppStore] FALHA: ${id} vem da Microsoft Store, que não está disponível neste Windows. Instale a Loja (Pós-Formatação > Restaurar componentes) ou baixe o app no site oficial.`)
+    else if (outcome === 'notFound') progress(`[AppStore] FALHA: ${id} não existe mais no catálogo do winget.`)
+    else progress(`[AppStore] FALHA: não foi possível instalar ${id} (winget ${r.code ? '0x' + (r.code >>> 0).toString(16).toUpperCase() : 'erro'}).`)
   }
 
   progress(`[AppStore] Fila concluída!`);

@@ -1,19 +1,19 @@
-<!-- GERADO por electron_feature_map.py em 2026-10-28T14:00:19. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-01T12:01:53. NAO edite a mao: rode `npm run map`. -->
 
-# Canais IPC (480)
+# Canais IPC (500)
 
 | API (`window.darkhub.`) | canal | handler | chama | usado em |
 |---|---|---|---|---|
-| `app.getAbout` | `app:getAbout` | `electron/main.js:1572` | `runCommand() (electron/services/PowerShellRunner.js)` | _nao usado_ |
-| `app.getResourceUsage` | `app:getResourceUsage` | `electron/main.js:1551` | `metrics.map`<br>`processes.reduce` | `src/pages/Settings.tsx`<br>`src/pages/SystemMonitor.tsx` |
-| `autoclicker.getHotkey` | `autoclicker:getHotkey` | `electron/main.js:3473` |  | _nao usado_ |
+| `app.getAbout` | `app:getAbout` | `electron/main.js:1575` | `runCommand() (electron/services/PowerShellRunner.js)` | _nao usado_ |
+| `app.getResourceUsage` | `app:getResourceUsage` | `electron/main.js:1554` | `metrics.map`<br>`processes.reduce` | `src/pages/Settings.tsx`<br>`src/pages/SystemMonitor.tsx` |
+| `autoclicker.getHotkey` | `autoclicker:getHotkey` | `electron/main.js:3476` |  | _nao usado_ |
 | `autoclicker.onChanged` | `autoclicker:changed` | _evento main->tela_ |  | `src/pages/AutoClicker.tsx` |
-| `autoclicker.setHotkey` | `autoclicker:setHotkey` | `electron/main.js:3474` | `autoClicker.setHotkey` | `src/pages/AutoClicker.tsx` |
-| `autoclicker.setTabActive` | `autoclicker:setTabActive` | `electron/main.js:3475` |  | `src/pages/AutoClicker.tsx` |
-| `autoclicker.start` | `autoclicker:start` | `electron/main.js:3470` | `autoClicker.start` | `src/pages/AutoClicker.tsx` |
-| `autoclicker.status` | `autoclicker:status` | `electron/main.js:3469` | `autoClicker.state` | `src/pages/AutoClicker.tsx` |
-| `autoclicker.stop` | `autoclicker:stop` | `electron/main.js:3471` | `autoClicker.stop` | `src/pages/AutoClicker.tsx` |
-| `autoclicker.toggle` | `autoclicker:toggle` | `electron/main.js:3472` | `autoClicker.toggle` | `src/i18n/messages.ts` |
+| `autoclicker.setHotkey` | `autoclicker:setHotkey` | `electron/main.js:3477` | `autoClicker.setHotkey` | `src/pages/AutoClicker.tsx` |
+| `autoclicker.setTabActive` | `autoclicker:setTabActive` | `electron/main.js:3478` |  | `src/pages/AutoClicker.tsx` |
+| `autoclicker.start` | `autoclicker:start` | `electron/main.js:3473` | `autoClicker.start` | `src/pages/AutoClicker.tsx` |
+| `autoclicker.status` | `autoclicker:status` | `electron/main.js:3472` | `autoClicker.state` | `src/pages/AutoClicker.tsx` |
+| `autoclicker.stop` | `autoclicker:stop` | `electron/main.js:3474` | `autoClicker.stop` | `src/pages/AutoClicker.tsx` |
+| `autoclicker.toggle` | `autoclicker:toggle` | `electron/main.js:3475` | `autoClicker.toggle` | `src/i18n/messages.ts` |
 | `bench.cancel` | `bench:cancel` | `electron/ipc/benchmarkIpc.js:14` | `svc.cancel` | `src/pages/Benchmark.tsx` |
 | `bench.compare` | `bench:compare` | `electron/ipc/benchmarkIpc.js:16` | `svc.compare` | `src/pages/Benchmark.tsx` |
 | `bench.history` | `bench:history` | `electron/ipc/benchmarkIpc.js:15` | `svc.history` | `src/pages/Benchmark.tsx` |
@@ -50,21 +50,21 @@
 | `darkos.usbHashIso` | `darkos:usbHashIso` | `electron/ipc/darkosIpc.js:90` | `usb.hashIso` | `src/components/darkos/DarkOSUsbCard.tsx` |
 | `darkos.usbPickIso` | `darkos:usbPickIso` | `electron/ipc/darkosIpc.js:83` | `usb.allowIso` | `src/components/darkos/DarkOSUsbCard.tsx` |
 | `darkos.usbWrite` | `darkos:usbWrite` | `electron/ipc/darkosIpc.js:91` | `usb.write` | `src/components/darkos/DarkOSUsbCard.tsx` |
-| `darkpacer.closeOverlay` | `framepacer:closeOverlay` | `electron/main.js:1812` | `closeFramePacerOverlay() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
-| `darkpacer.createOverlay` | `framepacer:createOverlay` | `electron/main.js:1807` | `createFramePacerOverlay() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
-| `darkpacer.getMetrics` | `framepacer:getMetrics` | `electron/main.js:1803` | `FramePacerEngine.getMetrics (electron/services/FramePacerEngine.js)` | _nao usado_ |
-| `darkpacer.getOverlayStatus` | `framepacer:getOverlayStatus` | `electron/main.js:1829` | `getOverlayStatus() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
+| `darkpacer.closeOverlay` | `framepacer:closeOverlay` | `electron/main.js:1815` | `closeFramePacerOverlay() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
+| `darkpacer.createOverlay` | `framepacer:createOverlay` | `electron/main.js:1810` | `createFramePacerOverlay() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
+| `darkpacer.getMetrics` | `framepacer:getMetrics` | `electron/main.js:1806` | `FramePacerEngine.getMetrics (electron/services/FramePacerEngine.js)` | _nao usado_ |
+| `darkpacer.getOverlayStatus` | `framepacer:getOverlayStatus` | `electron/main.js:1832` | `getOverlayStatus() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
 | `darkpacer.onMetrics` | `framepacer:metrics` | _evento main->tela_ |  | _nao usado_ |
-| `darkpacer.setOverlayClickThrough` | `framepacer:setOverlayClickThrough` | `electron/main.js:1821` | `setOverlayClickThrough() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
-| `darkpacer.setOverlayConfig` | `framepacer:setOverlayConfig` | `electron/main.js:1825` | `setOverlayConfig() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
-| `darkpacer.start` | `framepacer:start` | `electron/main.js:1791` | `FramePacerEngine.start (electron/services/FramePacerEngine.js)` | _nao usado_ |
-| `darkpacer.stop` | `framepacer:stop` | `electron/main.js:1795` | `FramePacerEngine.stop (electron/services/FramePacerEngine.js)` | _nao usado_ |
-| `darkpacer.toggleOverlay` | `framepacer:toggleOverlay` | `electron/main.js:1817` | `toggleFramePacerOverlay() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
-| `darkpacer.updateConfig` | `framepacer:updateConfig` | `electron/main.js:1799` | `FramePacerEngine.updateConfig (electron/services/FramePacerEngine.js)` | _nao usado_ |
-| `dialog.grantDroppedFiles` | `dialog:grantDroppedFiles` | `electron/main.js:1839` | `filePaths.slice`<br>`granted.push` | `src/pages/FileConverter.tsx`<br>`src/pages/MetaDataEditor.tsx` |
-| `dialog.saveFile` | `dialog:saveFile` | `electron/main.js:1874` |  | `src/pages/MetaDataEditor.tsx`<br>`src/pages/TextEditor.tsx` |
-| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1853` |  | `src/pages/DllInjector.tsx`<br>`src/pages/FileConverter.tsx`<br>`src/pages/ImageTextExtractor.tsx`<br>`src/pages/Library.tsx`<br>`src/pages/MetaDataEditor.tsx`<br>`src/pages/OptiScalerManager.tsx`<br>`src/pages/Optimizer.tsx`<br>`src/pages/PasswordManager.tsx`<br>`src/pages/TextEditor.tsx`<br>`src/pages/TextSummarizer.tsx`<br>`src/pages/UltraLowLatency.tsx`<br>`src/pages/YoutubeDownloader.tsx` |
-| `dialog.selectFolder` | `dialog:selectFolder` | `electron/main.js:1864` |  | `src/components/setup/RestoreComponentsPanel.tsx`<br>`src/pages/FileConverter.tsx`<br>`src/pages/Library.tsx`<br>`src/pages/PasswordManager.tsx`<br>`src/pages/YoutubeDownloader.tsx` |
+| `darkpacer.setOverlayClickThrough` | `framepacer:setOverlayClickThrough` | `electron/main.js:1824` | `setOverlayClickThrough() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
+| `darkpacer.setOverlayConfig` | `framepacer:setOverlayConfig` | `electron/main.js:1828` | `setOverlayConfig() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
+| `darkpacer.start` | `framepacer:start` | `electron/main.js:1794` | `FramePacerEngine.start (electron/services/FramePacerEngine.js)` | _nao usado_ |
+| `darkpacer.stop` | `framepacer:stop` | `electron/main.js:1798` | `FramePacerEngine.stop (electron/services/FramePacerEngine.js)` | _nao usado_ |
+| `darkpacer.toggleOverlay` | `framepacer:toggleOverlay` | `electron/main.js:1820` | `toggleFramePacerOverlay() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
+| `darkpacer.updateConfig` | `framepacer:updateConfig` | `electron/main.js:1802` | `FramePacerEngine.updateConfig (electron/services/FramePacerEngine.js)` | _nao usado_ |
+| `dialog.grantDroppedFiles` | `dialog:grantDroppedFiles` | `electron/main.js:1842` | `filePaths.slice`<br>`granted.push` | `src/pages/FileConverter.tsx`<br>`src/pages/MetaDataEditor.tsx` |
+| `dialog.saveFile` | `dialog:saveFile` | `electron/main.js:1877` |  | `src/pages/MetaDataEditor.tsx`<br>`src/pages/TextEditor.tsx` |
+| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1856` |  | `src/pages/DllInjector.tsx`<br>`src/pages/FileConverter.tsx`<br>`src/pages/ImageTextExtractor.tsx`<br>`src/pages/Library.tsx`<br>`src/pages/MetaDataEditor.tsx`<br>`src/pages/OptiScalerManager.tsx`<br>`src/pages/Optimizer.tsx`<br>`src/pages/PasswordManager.tsx`<br>`src/pages/TextEditor.tsx`<br>`src/pages/TextSummarizer.tsx`<br>`src/pages/UltraLowLatency.tsx`<br>`src/pages/YoutubeDownloader.tsx` |
+| `dialog.selectFolder` | `dialog:selectFolder` | `electron/main.js:1867` |  | `src/components/setup/RestoreComponentsPanel.tsx`<br>`src/pages/FileConverter.tsx`<br>`src/pages/Library.tsx`<br>`src/pages/PasswordManager.tsx`<br>`src/pages/YoutubeDownloader.tsx` |
 | `diskscan.cancel` | `diskscan:cancel` | `electron/ipc/diskScanIpc.js:22` | `svc.cancel` | `src/pages/SpaceSniffer/index.tsx` |
 | `diskscan.drives` | `diskscan:drives` | `electron/ipc/diskScanIpc.js:14` | `svc.drives` | `src/pages/SpaceSniffer/index.tsx` |
 | `diskscan.exportReport` | `diskscan:export` | `electron/ipc/diskScanIpc.js:31` | `svc.pathOf`<br>`svc.exportTo` | _nao usado_ |
@@ -114,24 +114,24 @@
 | `ext.doc` | `ext:doc` | `electron/ipc/hubIpc.js:128` | `host.doc` | `src/components/ExtensionFrame.tsx` |
 | `ext.log` | `ext:log` | `electron/ipc/hubIpc.js:132` | `host.log` | `src/components/ExtensionFrame.tsx` |
 | `ext.logs` | `ext:logs` | `electron/ipc/hubIpc.js:133` | `host.getLogs` | `src/pages/ExtensionPage.tsx` |
-| `files.archiveOperation` | `files:archiveOperation` | `electron/main.js:2338` | `inputFiles.map`<br>`runCommand() (electron/services/PowerShellRunner.js)` | `src/pages/FileConverter.tsx` |
-| `files.checkLibreOffice` | `files:checkLibreOffice` | `electron/main.js:2224` |  | _nao usado_ |
-| `files.convertDocuments` | `files:convertDocuments` | `electron/main.js:2229` | `outputDir.trim`<br>`outputFormat.trim`<br>`outputFormat.toLowerCase` | `src/pages/FileConverter.tsx` |
-| `files.convertImages` | `files:convertImages` | `electron/main.js:2086` | `outputDir.trim`<br>`outputFormat.toLowerCase`<br>`supported.has` | `src/pages/FileConverter.tsx` |
-| `files.convertMedia` | `files:convertMedia` | `electron/main.js:2138` | `outputDir.trim`<br>`outputFormat.trim`<br>`ffmpegPath.trim` | `src/pages/FileConverter.tsx` |
-| `framepacer.closeOverlay` | `framepacer:closeOverlay` | `electron/main.js:1812` | `closeFramePacerOverlay() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
-| `framepacer.createOverlay` | `framepacer:createOverlay` | `electron/main.js:1807` | `createFramePacerOverlay() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
-| `framepacer.getMetrics` | `framepacer:getMetrics` | `electron/main.js:1803` | `FramePacerEngine.getMetrics (electron/services/FramePacerEngine.js)` | `src/pages/FramePacer.tsx` |
-| `framepacer.getOverlayStatus` | `framepacer:getOverlayStatus` | `electron/main.js:1829` | `getOverlayStatus() (electron/services/FramePacerOverlay.js)` | `src/pages/FramePacer.tsx` |
+| `files.archiveOperation` | `files:archiveOperation` | `electron/main.js:2341` | `inputFiles.map`<br>`runCommand() (electron/services/PowerShellRunner.js)` | `src/pages/FileConverter.tsx` |
+| `files.checkLibreOffice` | `files:checkLibreOffice` | `electron/main.js:2227` |  | _nao usado_ |
+| `files.convertDocuments` | `files:convertDocuments` | `electron/main.js:2232` | `outputDir.trim`<br>`outputFormat.trim`<br>`outputFormat.toLowerCase` | `src/pages/FileConverter.tsx` |
+| `files.convertImages` | `files:convertImages` | `electron/main.js:2089` | `outputDir.trim`<br>`outputFormat.toLowerCase`<br>`supported.has` | `src/pages/FileConverter.tsx` |
+| `files.convertMedia` | `files:convertMedia` | `electron/main.js:2141` | `outputDir.trim`<br>`outputFormat.trim`<br>`ffmpegPath.trim` | `src/pages/FileConverter.tsx` |
+| `framepacer.closeOverlay` | `framepacer:closeOverlay` | `electron/main.js:1815` | `closeFramePacerOverlay() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
+| `framepacer.createOverlay` | `framepacer:createOverlay` | `electron/main.js:1810` | `createFramePacerOverlay() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
+| `framepacer.getMetrics` | `framepacer:getMetrics` | `electron/main.js:1806` | `FramePacerEngine.getMetrics (electron/services/FramePacerEngine.js)` | `src/pages/FramePacer.tsx` |
+| `framepacer.getOverlayStatus` | `framepacer:getOverlayStatus` | `electron/main.js:1832` | `getOverlayStatus() (electron/services/FramePacerOverlay.js)` | `src/pages/FramePacer.tsx` |
 | `framepacer.onMetrics` | `framepacer:metrics` | _evento main->tela_ |  | `src/pages/FramePacer.tsx` |
-| `framepacer.setOverlayClickThrough` | `framepacer:setOverlayClickThrough` | `electron/main.js:1821` | `setOverlayClickThrough() (electron/services/FramePacerOverlay.js)` | `src/pages/FramePacer.tsx` |
-| `framepacer.setOverlayConfig` | `framepacer:setOverlayConfig` | `electron/main.js:1825` | `setOverlayConfig() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
-| `framepacer.start` | `framepacer:start` | `electron/main.js:1791` | `FramePacerEngine.start (electron/services/FramePacerEngine.js)` | `src/pages/FramePacer.tsx` |
-| `framepacer.stop` | `framepacer:stop` | `electron/main.js:1795` | `FramePacerEngine.stop (electron/services/FramePacerEngine.js)` | `src/pages/FramePacer.tsx` |
-| `framepacer.toggleOverlay` | `framepacer:toggleOverlay` | `electron/main.js:1817` | `toggleFramePacerOverlay() (electron/services/FramePacerOverlay.js)` | `src/pages/FramePacer.tsx` |
-| `framepacer.updateConfig` | `framepacer:updateConfig` | `electron/main.js:1799` | `FramePacerEngine.updateConfig (electron/services/FramePacerEngine.js)` | `src/pages/FramePacer.tsx` |
-| `fs.readFile` | `fs:readFile` | `electron/main.js:3413` |  | `src/pages/TextEditor.tsx`<br>`src/pages/TextSummarizer.tsx` |
-| `fs.writeFile` | `fs:writeFile` | `electron/main.js:3425` | `devPath.includes` | `src/pages/TextEditor.tsx` |
+| `framepacer.setOverlayClickThrough` | `framepacer:setOverlayClickThrough` | `electron/main.js:1824` | `setOverlayClickThrough() (electron/services/FramePacerOverlay.js)` | `src/pages/FramePacer.tsx` |
+| `framepacer.setOverlayConfig` | `framepacer:setOverlayConfig` | `electron/main.js:1828` | `setOverlayConfig() (electron/services/FramePacerOverlay.js)` | _nao usado_ |
+| `framepacer.start` | `framepacer:start` | `electron/main.js:1794` | `FramePacerEngine.start (electron/services/FramePacerEngine.js)` | `src/pages/FramePacer.tsx` |
+| `framepacer.stop` | `framepacer:stop` | `electron/main.js:1798` | `FramePacerEngine.stop (electron/services/FramePacerEngine.js)` | `src/pages/FramePacer.tsx` |
+| `framepacer.toggleOverlay` | `framepacer:toggleOverlay` | `electron/main.js:1820` | `toggleFramePacerOverlay() (electron/services/FramePacerOverlay.js)` | `src/pages/FramePacer.tsx` |
+| `framepacer.updateConfig` | `framepacer:updateConfig` | `electron/main.js:1802` | `FramePacerEngine.updateConfig (electron/services/FramePacerEngine.js)` | `src/pages/FramePacer.tsx` |
+| `fs.readFile` | `fs:readFile` | `electron/main.js:3416` |  | `src/pages/TextEditor.tsx`<br>`src/pages/TextSummarizer.tsx` |
+| `fs.writeFile` | `fs:writeFile` | `electron/main.js:3428` | `devPath.includes` | `src/pages/TextEditor.tsx` |
 | `getTrace` | `dev:getTrace` | **sem handler** |  | _nao usado_ |
 | `hardware.onUpdate` | `hardware:update` | _evento main->tela_ |  | `src/hooks/useSystemMetrics.ts` |
 | `hardware.startPolling` | `hardware:startPolling` | `electron/services/HardwareService.js:51` | `hookedSenders.has`<br>`hookedSenders.add`<br>`sender.once` | `src/hooks/useSystemMetrics.ts` |
@@ -161,7 +161,7 @@
 | `hub.uninstall` | `hub:uninstall` | `electron/ipc/hubIpc.js:113` | `svc.uninstall` | `src/pages/Presets.tsx` |
 | `hwsensors.setEnabled` | `hwsensors:setEnabled` | `electron/ipc/hwSensorsIpc.js:49` | `SensorBus.setAdvanced (electron/hal/collectors/SensorBus.js)`<br>`HwSensorsDaemon.status (electron/hal/collectors/HwSensorsDaemon.js)`<br>`isPawnIoInstalled() (electron/hal/collectors/HwSensorsDaemon.js)` | _nao usado_ |
 | `hwsensors.status` | `hwsensors:status` | `electron/ipc/hwSensorsIpc.js:46` | `HwSensorsDaemon.status (electron/hal/collectors/HwSensorsDaemon.js)` | `src/components/monitor/AdvancedSensorsPanel.tsx` |
-| `injector.inject` | `injector:inject` | `electron/main.js:1755` | `i.test`<br>`dllPath.trim`<br>`stdout.includes` | `src/pages/DllInjector.tsx` |
+| `injector.inject` | `injector:inject` | `electron/main.js:1758` | `i.test`<br>`dllPath.trim`<br>`stdout.includes` | `src/pages/DllInjector.tsx` |
 | `kakugan.accountInput` | `kakugan:accountInput` | `electron/ipc/kakuganIpc.js:128` | `client.accountInput` | _nao usado_ |
 | `kakugan.dashboard` | `kakugan:dashboard` | `electron/ipc/kakuganIpc.js:114` | `client.dashboard` | `src/pages/Kakugan.tsx` |
 | `kakugan.gameNames` | `kakugan:gameNames` | `electron/ipc/kakuganIpc.js:135` | `client.gameNames` | `src/pages/Kakugan.tsx` |
@@ -188,23 +188,23 @@
 | `latency.queryTimer` | `latency:queryTimer` | `electron/latencyGuardian.js:1056` | `nativeLatencyClient.queryTimer (electron/services/NativeLatencyClient.js)` | _nao usado_ |
 | `latency.setConfig` | `latency:setConfig` | `electron/latencyGuardian.js:1074` |  | `src/components/GuardianWidget.tsx`<br>`src/pages/UltraLowLatency.tsx` |
 | `latency.toggleUltra` | `latency:toggleUltra` | `electron/latencyGuardian.js:1166` |  | _nao usado_ |
-| `library.discover` | `library:discover` | `electron/main.js:1378` | `content.matchAll`<br>`steamPaths.push`<br>`steamPaths.map` | `src/pages/Library.tsx` |
-| `library.fetchCover` | `library:fetchCover` | `electron/main.js:1307` | `service.fetchCover`<br>`i.test`<br>`folder.startsWith` | `src/components/library/GameCard.tsx` |
-| `library.list` | `library:list` | `electron/main.js:1244` | `webContents.send` | `src/pages/Library.tsx`<br>`src/pages/OptiScalerManager.tsx` |
+| `library.discover` | `library:discover` | `electron/main.js:1381` | `content.matchAll`<br>`steamPaths.push`<br>`steamPaths.map` | `src/pages/Library.tsx` |
+| `library.fetchCover` | `library:fetchCover` | `electron/main.js:1310` | `service.fetchCover`<br>`i.test`<br>`folder.startsWith` | `src/components/library/GameCard.tsx` |
+| `library.list` | `library:list` | `electron/main.js:1247` | `webContents.send` | `src/pages/Library.tsx`<br>`src/pages/OptiScalerManager.tsx` |
 | `library.onActivityLogged` | `library:activityLogged` | _evento main->tela_ |  | `src/hooks/useRecentActivity.ts` |
 | `library.onGameStarted` | `library:gameStarted` | _evento main->tela_ |  | `src/hooks/useRecentActivity.ts` |
 | `library.onGameStopped` | `library:gameStopped` | _evento main->tela_ |  | `src/hooks/useRecentActivity.ts` |
 | `library.onUpdated` | `library:updated` | _evento main->tela_ |  | `src/pages/Library.tsx` |
-| `library.remove` | `library:remove` | `electron/main.js:1292` |  | `src/pages/Library.tsx`<br>`src/pages/OptiScalerManager.tsx` |
-| `library.upsert` | `library:upsert` | `electron/main.js:1256` |  | `src/pages/Library.tsx`<br>`src/pages/OptiScalerManager.tsx` |
-| `library.upsertBulk` | `library:upsertBulk` | `electron/main.js:1274` |  | `src/pages/Library.tsx` |
+| `library.remove` | `library:remove` | `electron/main.js:1295` |  | `src/pages/Library.tsx`<br>`src/pages/OptiScalerManager.tsx` |
+| `library.upsert` | `library:upsert` | `electron/main.js:1259` |  | `src/pages/Library.tsx`<br>`src/pages/OptiScalerManager.tsx` |
+| `library.upsertBulk` | `library:upsertBulk` | `electron/main.js:1277` |  | `src/pages/Library.tsx` |
 | `maint.onEvent` | `maint:event` | _evento main->tela_ |  | `src/pages/Maintenance.tsx` |
 | `maint.runNow` | `maint:runNow` | `electron/ipc/maintenanceIpc.js:40` | `svc.runTask`<br>`svc.start`<br>`svc.stop` | `src/pages/Maintenance.tsx` |
 | `maint.setTask` | `maint:setTask` | `electron/ipc/maintenanceIpc.js:39` | `svc.setTask` | `src/pages/Maintenance.tsx` |
 | `maint.state` | `maint:state` | `electron/ipc/maintenanceIpc.js:38` | `svc.state` | `src/pages/Maintenance.tsx` |
-| `metadata.read` | `metadata:read` | `electron/main.js:3477` | `exifr.parse`<br>`exiftool.read` | _nao usado_ |
-| `metadata.remove` | `metadata:remove` | `electron/main.js:3494` | `exiftool.write` | _nao usado_ |
-| `metadata.update` | `metadata:update` | `electron/main.js:3514` | `exiftool.write`<br>`WINGET_ID_RE.test`<br>`id.trim` | _nao usado_ |
+| `metadata.read` | `metadata:read` | `electron/main.js:3480` | `exifr.parse`<br>`exiftool.read` | _nao usado_ |
+| `metadata.remove` | `metadata:remove` | `electron/main.js:3497` | `exiftool.write` | _nao usado_ |
+| `metadata.update` | `metadata:update` | `electron/main.js:3517` | `exiftool.write`<br>`WINGET_ID_RE.test`<br>`id.trim` | _nao usado_ |
 | `metax.read` | `metax:read` | `electron/ipc/metadataIpc.js:38` | `service.read` | `src/pages/MetaDataEditor.tsx` |
 | `metax.removeStream` | `metax:removeStream` | `electron/ipc/metadataIpc.js:59` | `service.removeStream` | `src/pages/MetaDataEditor.tsx` |
 | `metax.setFileProps` | `metax:setFileProps` | `electron/ipc/metadataIpc.js:54` | `service.setFileProps` | `src/pages/MetaDataEditor.tsx` |
@@ -225,61 +225,61 @@
 | `network.restoreLatencyTweak` | `network:restoreLatencyTweak` | `electron/networkIPC.js:130` | `NetLatencyService.restoreTweak (electron/services/NetLatencyService.js)` | `src/components/network/LatencyLab.tsx` |
 | `network.traceHops` | `network:traceHops` | `electron/networkIPC.js:125` | `NetLatencyService.traceroute (electron/services/NetLatencyService.js)` | `src/components/network/LatencyLab.tsx` |
 | `network.tracert` | `network:tracert` | `electron/networkIPC.js:136` | `runCommand() (electron/services/PowerShellRunner.js)` | `src/pages/NetworkTools.tsx` |
-| `ocr.extractText` | `ocr:extractText` | `electron/main.js:2608` | `base64Data.replace`<br>`img.resize`<br>`img.grayscale` | `src/pages/ImageTextExtractor.tsx` |
+| `ocr.extractText` | `ocr:extractText` | `electron/main.js:2611` | `base64Data.replace`<br>`img.resize`<br>`img.grayscale` | `src/pages/ImageTextExtractor.tsx` |
 | `onIpcTrace` | `dev:ipcTrace` | _evento main->tela_ |  | _nao usado_ |
-| `optimizer.advancedNetworkApply` | `optimizer:advancedNetworkApply` | `electron/main.js:1903` | `NetworkEngine.advancedNetworkApply (electron/services/optimizer/NetworkEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.advancedNetworkRevert` | `optimizer:advancedNetworkRevert` | `electron/main.js:1904` | `NetworkEngine.advancedNetworkRevert (electron/services/optimizer/NetworkEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.analyze` | `optimizer:analyze` | `electron/main.js:806` | `SystemOptimizerService.analyze (electron/services/optimizer/SystemOptimizerService.js)` | _nao usado_ |
-| `optimizer.applyCpuUnpark` | `optimizer:applyCpuUnpark` | `electron/main.js:2082` | `SystemEngine.applyCpuUnpark (electron/services/optimizer/SystemEngine.js)` | _nao usado_ |
-| `optimizer.applyDefenderControl` | `optimizer:applyDefenderControl` | `electron/main.js:2058` | `DefenderControlEngine.runNativeDefenderControl (electron/services/optimizer/DefenderControlEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.applyDns` | `optimizer:applyDns` | `electron/main.js:1947` | `DnsEngine.apply (electron/services/optimizer/DnsEngine.js)` | `src/components/network/LatencyLab.tsx`<br>`src/components/security/ProtectiveDnsPanel.tsx`<br>`src/pages/Optimizer.tsx` |
-| `optimizer.applyExtremeKernelMod` | `optimizer:applyExtremeKernelMod` | `electron/main.js:2070` | `SystemEngine.applyExtremeKernelMod (electron/services/optimizer/SystemEngine.js)` | _nao usado_ |
-| `optimizer.applyExtremeNetworkMod` | `optimizer:applyExtremeNetworkMod` | `electron/main.js:2079` | `SystemEngine.applyExtremeNetworkMod (electron/services/optimizer/SystemEngine.js)` | _nao usado_ |
-| `optimizer.applyMsiMode` | `optimizer:applyMsiMode` | `electron/main.js:2067` | `SystemEngine.applyMsiMode (electron/services/optimizer/SystemEngine.js)` | _nao usado_ |
-| `optimizer.applyTweak` | `optimizer:applyTweak` | `electron/main.js:1907` | `MemoryEngine.optimizeRAM (electron/services/optimizer/MemoryEngine.js)`<br>`StorageEngine.cleanTempFiles (electron/services/optimizer/StorageEngine.js)`<br>`SystemEngine.repairWindows (electron/services/optimizer/SystemEngine.js)` | `src/pages/Dashboard.tsx` |
-| `optimizer.checkIsAdmin` | `optimizer:checkIsAdmin` | `electron/main.js:821` | `SystemOptimizerService.checkIsAdmin (electron/services/optimizer/SystemOptimizerService.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.checkOperationsStatus` | `optimizer:checkOperationsStatus` | `electron/main.js:802` | `SystemOptimizerService.checkOperationsStatus (electron/services/optimizer/SystemOptimizerService.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.createRestorePoint` | `optimizer:createRestorePoint` | `electron/main.js:825` | `SystemEngine.createRestorePoint (electron/services/optimizer/SystemEngine.js)` | `src/pages/Dashboard.tsx`<br>`src/pages/Optimizer.tsx` |
-| `optimizer.deepTweaksAnalyze` | `optimizer:deepTweaksAnalyze` | `electron/main.js:1920` | `DeepTweaksEngine.listTweaks (electron/services/optimizer/DeepTweaksEngine.js)`<br>`ids.includes`<br>`selected.flatMap` | _nao usado_ |
-| `optimizer.deepTweaksApply` | `optimizer:deepTweaksApply` | `electron/main.js:1926` | `DeepTweaksEngine.applyTweaks (electron/services/optimizer/DeepTweaksEngine.js)`<br>`sender.send` | `src/pages/Optimizer.tsx` |
-| `optimizer.deepTweaksList` | `optimizer:deepTweaksList` | `electron/main.js:1906` | `DeepTweaksEngine.listTweaks (electron/services/optimizer/DeepTweaksEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.deepTweaksRevert` | `optimizer:deepTweaksRevert` | `electron/main.js:1927` | `DeepTweaksEngine.revertTweaks (electron/services/optimizer/DeepTweaksEngine.js)`<br>`sender.send` | `src/pages/Optimizer.tsx` |
-| `optimizer.deepTweaksStatus` | `optimizer:deepTweaksStatus` | `electron/main.js:1919` | `DeepTweaksEngine.checkTweaksStatus (electron/services/optimizer/DeepTweaksEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.deepTweaksUndo` | `optimizer:deepTweaksUndo` | `electron/main.js:1928` | `DeepTweaksEngine.undoTweaks (electron/services/optimizer/DeepTweaksEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.disableService` | `optimizer:disableService` | `electron/main.js:1887` | `AppManagerEngine.disableService (electron/services/optimizer/AppManagerEngine.js)` | _nao usado_ |
-| `optimizer.disableStartupItem` | `optimizer:disableStartupItem` | `electron/main.js:1885` | `AppManagerEngine.disableStartupItem (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.dnsBenchmark` | `optimizer:dnsBenchmark` | `electron/main.js:1957` | `DnsEngine.benchmark (electron/services/optimizer/DnsEngine.js)` | `src/components/network/LatencyLab.tsx`<br>`src/pages/Optimizer.tsx` |
-| `optimizer.getAuditLog` | `optimizer:getAuditLog` | `electron/main.js:829` | `runCommand() (electron/services/PowerShellRunner.js)`<br>`runPowerShell() (electron/services/PowerShellRunner.js)`<br>`stripBom() (electron/services/PowerShellRunner.js)` | _nao usado_ |
-| `optimizer.getDefenderControlStatus` | `optimizer:getDefenderControlStatus` | `electron/main.js:2055` | `DefenderControlEngine.getStatus (electron/services/optimizer/DefenderControlEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.getDnsState` | `optimizer:getDnsState` | `electron/main.js:1938` | `DnsEngine.getState (electron/services/optimizer/DnsEngine.js)` | `src/components/network/LatencyLab.tsx`<br>`src/components/security/ProtectiveDnsPanel.tsx`<br>`src/pages/Optimizer.tsx` |
-| `optimizer.getGpuInfo` | `optimizer:getGpuInfo` | `electron/main.js:1897` | `AppManagerEngine.getGpuInfo (electron/services/optimizer/AppManagerEngine.js)` | `src/components/darkos/DarkOSSystemPanel.tsx`<br>`src/pages/Optimizer.tsx` |
-| `optimizer.getGpuPreferences` | `optimizer:getGpuPreferences` | `electron/main.js:1894` | `AppManagerEngine.getGpuPreferences (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.getHagsStatus` | `optimizer:getHagsStatus` | `electron/main.js:1898` | `AppManagerEngine.getHagsStatus (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.getInstalledPrograms` | `optimizer:getInstalledPrograms` | `electron/main.js:1888` | `AppManagerEngine.getInstalledPrograms (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.getRunningProcesses` | `optimizer:getRunningProcesses` | `electron/main.js:1892` | `AppManagerEngine.getRunningProcesses (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.getServices` | `optimizer:getServices` | `electron/main.js:1886` | `AppManagerEngine.getServices (electron/services/optimizer/AppManagerEngine.js)` | _nao usado_ |
-| `optimizer.getStartupItems` | `optimizer:getStartupItems` | `electron/main.js:1884` | `AppManagerEngine.getStartupItems (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.globalRecommendedTweaks` | `optimizer:globalRecommendedTweaks` | `electron/main.js:1929` | `DeepTweaksEngine.applyRecommended (electron/services/optimizer/DeepTweaksEngine.js)`<br>`sender.send` | _nao usado_ |
-| `optimizer.listBloatware` | `optimizer:listBloatware` | `electron/main.js:1890` | `AppManagerEngine.listBloatware (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.listOperations` | `optimizer:listOperations` | `electron/main.js:798` | `SystemOptimizerService.listOperations (electron/services/optimizer/SystemOptimizerService.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.listProfiles` | `optimizer:listProfiles` | `electron/main.js:817` | `SystemOptimizerService.listProfiles (electron/services/optimizer/SystemOptimizerService.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.advancedNetworkApply` | `optimizer:advancedNetworkApply` | `electron/main.js:1906` | `NetworkEngine.advancedNetworkApply (electron/services/optimizer/NetworkEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.advancedNetworkRevert` | `optimizer:advancedNetworkRevert` | `electron/main.js:1907` | `NetworkEngine.advancedNetworkRevert (electron/services/optimizer/NetworkEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.analyze` | `optimizer:analyze` | `electron/main.js:809` | `SystemOptimizerService.analyze (electron/services/optimizer/SystemOptimizerService.js)` | _nao usado_ |
+| `optimizer.applyCpuUnpark` | `optimizer:applyCpuUnpark` | `electron/main.js:2085` | `SystemEngine.applyCpuUnpark (electron/services/optimizer/SystemEngine.js)` | _nao usado_ |
+| `optimizer.applyDefenderControl` | `optimizer:applyDefenderControl` | `electron/main.js:2061` | `DefenderControlEngine.runNativeDefenderControl (electron/services/optimizer/DefenderControlEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.applyDns` | `optimizer:applyDns` | `electron/main.js:1950` | `DnsEngine.apply (electron/services/optimizer/DnsEngine.js)` | `src/components/network/LatencyLab.tsx`<br>`src/components/security/ProtectiveDnsPanel.tsx`<br>`src/pages/Optimizer.tsx` |
+| `optimizer.applyExtremeKernelMod` | `optimizer:applyExtremeKernelMod` | `electron/main.js:2073` | `SystemEngine.applyExtremeKernelMod (electron/services/optimizer/SystemEngine.js)` | _nao usado_ |
+| `optimizer.applyExtremeNetworkMod` | `optimizer:applyExtremeNetworkMod` | `electron/main.js:2082` | `SystemEngine.applyExtremeNetworkMod (electron/services/optimizer/SystemEngine.js)` | _nao usado_ |
+| `optimizer.applyMsiMode` | `optimizer:applyMsiMode` | `electron/main.js:2070` | `SystemEngine.applyMsiMode (electron/services/optimizer/SystemEngine.js)` | _nao usado_ |
+| `optimizer.applyTweak` | `optimizer:applyTweak` | `electron/main.js:1910` | `MemoryEngine.optimizeRAM (electron/services/optimizer/MemoryEngine.js)`<br>`StorageEngine.cleanTempFiles (electron/services/optimizer/StorageEngine.js)`<br>`SystemEngine.repairWindows (electron/services/optimizer/SystemEngine.js)` | `src/pages/Dashboard.tsx` |
+| `optimizer.checkIsAdmin` | `optimizer:checkIsAdmin` | `electron/main.js:824` | `SystemOptimizerService.checkIsAdmin (electron/services/optimizer/SystemOptimizerService.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.checkOperationsStatus` | `optimizer:checkOperationsStatus` | `electron/main.js:805` | `SystemOptimizerService.checkOperationsStatus (electron/services/optimizer/SystemOptimizerService.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.createRestorePoint` | `optimizer:createRestorePoint` | `electron/main.js:828` | `SystemEngine.createRestorePoint (electron/services/optimizer/SystemEngine.js)` | `src/pages/Dashboard.tsx`<br>`src/pages/Optimizer.tsx` |
+| `optimizer.deepTweaksAnalyze` | `optimizer:deepTweaksAnalyze` | `electron/main.js:1923` | `DeepTweaksEngine.listTweaks (electron/services/optimizer/DeepTweaksEngine.js)`<br>`ids.includes`<br>`selected.flatMap` | _nao usado_ |
+| `optimizer.deepTweaksApply` | `optimizer:deepTweaksApply` | `electron/main.js:1929` | `DeepTweaksEngine.applyTweaks (electron/services/optimizer/DeepTweaksEngine.js)`<br>`sender.send` | `src/pages/Optimizer.tsx` |
+| `optimizer.deepTweaksList` | `optimizer:deepTweaksList` | `electron/main.js:1909` | `DeepTweaksEngine.listTweaks (electron/services/optimizer/DeepTweaksEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.deepTweaksRevert` | `optimizer:deepTweaksRevert` | `electron/main.js:1930` | `DeepTweaksEngine.revertTweaks (electron/services/optimizer/DeepTweaksEngine.js)`<br>`sender.send` | `src/pages/Optimizer.tsx` |
+| `optimizer.deepTweaksStatus` | `optimizer:deepTweaksStatus` | `electron/main.js:1922` | `DeepTweaksEngine.checkTweaksStatus (electron/services/optimizer/DeepTweaksEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.deepTweaksUndo` | `optimizer:deepTweaksUndo` | `electron/main.js:1931` | `DeepTweaksEngine.undoTweaks (electron/services/optimizer/DeepTweaksEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.disableService` | `optimizer:disableService` | `electron/main.js:1890` | `AppManagerEngine.disableService (electron/services/optimizer/AppManagerEngine.js)` | _nao usado_ |
+| `optimizer.disableStartupItem` | `optimizer:disableStartupItem` | `electron/main.js:1888` | `AppManagerEngine.disableStartupItem (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.dnsBenchmark` | `optimizer:dnsBenchmark` | `electron/main.js:1960` | `DnsEngine.benchmark (electron/services/optimizer/DnsEngine.js)` | `src/components/network/LatencyLab.tsx`<br>`src/pages/Optimizer.tsx` |
+| `optimizer.getAuditLog` | `optimizer:getAuditLog` | `electron/main.js:832` | `runCommand() (electron/services/PowerShellRunner.js)`<br>`runPowerShell() (electron/services/PowerShellRunner.js)`<br>`stripBom() (electron/services/PowerShellRunner.js)` | _nao usado_ |
+| `optimizer.getDefenderControlStatus` | `optimizer:getDefenderControlStatus` | `electron/main.js:2058` | `DefenderControlEngine.getStatus (electron/services/optimizer/DefenderControlEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.getDnsState` | `optimizer:getDnsState` | `electron/main.js:1941` | `DnsEngine.getState (electron/services/optimizer/DnsEngine.js)` | `src/components/network/LatencyLab.tsx`<br>`src/components/security/ProtectiveDnsPanel.tsx`<br>`src/pages/Optimizer.tsx` |
+| `optimizer.getGpuInfo` | `optimizer:getGpuInfo` | `electron/main.js:1900` | `AppManagerEngine.getGpuInfo (electron/services/optimizer/AppManagerEngine.js)` | `src/components/darkos/DarkOSSystemPanel.tsx`<br>`src/pages/Optimizer.tsx` |
+| `optimizer.getGpuPreferences` | `optimizer:getGpuPreferences` | `electron/main.js:1897` | `AppManagerEngine.getGpuPreferences (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.getHagsStatus` | `optimizer:getHagsStatus` | `electron/main.js:1901` | `AppManagerEngine.getHagsStatus (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.getInstalledPrograms` | `optimizer:getInstalledPrograms` | `electron/main.js:1891` | `AppManagerEngine.getInstalledPrograms (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.getRunningProcesses` | `optimizer:getRunningProcesses` | `electron/main.js:1895` | `AppManagerEngine.getRunningProcesses (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.getServices` | `optimizer:getServices` | `electron/main.js:1889` | `AppManagerEngine.getServices (electron/services/optimizer/AppManagerEngine.js)` | _nao usado_ |
+| `optimizer.getStartupItems` | `optimizer:getStartupItems` | `electron/main.js:1887` | `AppManagerEngine.getStartupItems (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.globalRecommendedTweaks` | `optimizer:globalRecommendedTweaks` | `electron/main.js:1932` | `DeepTweaksEngine.applyRecommended (electron/services/optimizer/DeepTweaksEngine.js)`<br>`sender.send` | _nao usado_ |
+| `optimizer.listBloatware` | `optimizer:listBloatware` | `electron/main.js:1893` | `AppManagerEngine.listBloatware (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.listOperations` | `optimizer:listOperations` | `electron/main.js:801` | `SystemOptimizerService.listOperations (electron/services/optimizer/SystemOptimizerService.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.listProfiles` | `optimizer:listProfiles` | `electron/main.js:820` | `SystemOptimizerService.listProfiles (electron/services/optimizer/SystemOptimizerService.js)` | `src/pages/Optimizer.tsx` |
 | `optimizer.onRunEvent` | `optimizer:runEvent` | _evento main->tela_ |  | `src/hooks/useOptimizerProgress.ts`<br>`src/pages/Optimizer.tsx` |
-| `optimizer.openTamperSettings` | `optimizer:openTamperSettings` | `electron/main.js:2064` | `DefenderControlEngine.openTamperSettings (electron/services/optimizer/DefenderControlEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.removeGpuPreference` | `optimizer:removeGpuPreference` | `electron/main.js:1896` | `AppManagerEngine.removeGpuPreference (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.removeSelectedBloatware` | `optimizer:removeSelectedBloatware` | `electron/main.js:1891` | `AppManagerEngine.removeSelectedBloatware (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.restoreImageDefender` | `optimizer:restoreImageDefender` | `electron/main.js:2061` | `DefenderControlEngine.restoreImageDefender (electron/services/optimizer/DefenderControlEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.revertExtremeKernelMod` | `optimizer:revertExtremeKernelMod` | `electron/main.js:2073` | `SystemEngine.revertExtremeKernelMod (electron/services/optimizer/SystemEngine.js)` | _nao usado_ |
-| `optimizer.revertHags` | `optimizer:revertHags` | `electron/main.js:1900` | `AppManagerEngine.revertHags (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.revertServicesTweak` | `optimizer:revertServicesTweak` | `electron/main.js:2076` | `ServicesEngine.revertServicesTweak (electron/services/optimizer/ServicesEngine.js)` | _nao usado_ |
-| `optimizer.run` | `optimizer:run` | `electron/main.js:810` | `sender.send`<br>`SystemOptimizerService.runTasks (electron/services/optimizer/SystemOptimizerService.js)` | `src/components/darkos/DarkOSSystemPanel.tsx`<br>`src/pages/Optimizer.tsx` |
-| `optimizer.runRoutine` | `optimizer:runRoutine` | `electron/main.js:1967` | `sender.send`<br>`routineId.startsWith`<br>`routineId.split` | _nao usado_ |
-| `optimizer.setDnsServers` | `optimizer:setDnsServers` | `electron/main.js:1943` | `DnsEngine.apply (electron/services/optimizer/DnsEngine.js)` | _nao usado_ |
-| `optimizer.setGpuPreference` | `optimizer:setGpuPreference` | `electron/main.js:1895` | `AppManagerEngine.setGpuPreference (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.setHagsStatus` | `optimizer:setHagsStatus` | `electron/main.js:1899` | `AppManagerEngine.setHagsStatus (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.setProcessPriority` | `optimizer:setProcessPriority` | `electron/main.js:1893` | `AppManagerEngine.setProcessPriority (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
-| `optimizer.undoDns` | `optimizer:undoDns` | `electron/main.js:1952` | `DnsEngine.undo (electron/services/optimizer/DnsEngine.js)` | `src/components/network/LatencyLab.tsx`<br>`src/components/security/ProtectiveDnsPanel.tsx`<br>`src/pages/Optimizer.tsx` |
-| `optimizer.uninstallProgram` | `optimizer:uninstallProgram` | `electron/main.js:1889` | `AppManagerEngine.uninstallProgram (electron/services/optimizer/AppManagerEngine.js)` | _nao usado_ |
-| `optimizer.uninstallProgramWithLeftovers` | `optimizer:uninstallProgramWithLeftovers` | `electron/main.js:1902` | `AppManagerEngine.uninstallProgramWithLeftovers (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.openTamperSettings` | `optimizer:openTamperSettings` | `electron/main.js:2067` | `DefenderControlEngine.openTamperSettings (electron/services/optimizer/DefenderControlEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.removeGpuPreference` | `optimizer:removeGpuPreference` | `electron/main.js:1899` | `AppManagerEngine.removeGpuPreference (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.removeSelectedBloatware` | `optimizer:removeSelectedBloatware` | `electron/main.js:1894` | `AppManagerEngine.removeSelectedBloatware (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.restoreImageDefender` | `optimizer:restoreImageDefender` | `electron/main.js:2064` | `DefenderControlEngine.restoreImageDefender (electron/services/optimizer/DefenderControlEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.revertExtremeKernelMod` | `optimizer:revertExtremeKernelMod` | `electron/main.js:2076` | `SystemEngine.revertExtremeKernelMod (electron/services/optimizer/SystemEngine.js)` | _nao usado_ |
+| `optimizer.revertHags` | `optimizer:revertHags` | `electron/main.js:1903` | `AppManagerEngine.revertHags (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.revertServicesTweak` | `optimizer:revertServicesTweak` | `electron/main.js:2079` | `ServicesEngine.revertServicesTweak (electron/services/optimizer/ServicesEngine.js)` | _nao usado_ |
+| `optimizer.run` | `optimizer:run` | `electron/main.js:813` | `sender.send`<br>`SystemOptimizerService.runTasks (electron/services/optimizer/SystemOptimizerService.js)` | `src/components/darkos/DarkOSSystemPanel.tsx`<br>`src/pages/Optimizer.tsx` |
+| `optimizer.runRoutine` | `optimizer:runRoutine` | `electron/main.js:1970` | `sender.send`<br>`routineId.startsWith`<br>`routineId.split` | _nao usado_ |
+| `optimizer.setDnsServers` | `optimizer:setDnsServers` | `electron/main.js:1946` | `DnsEngine.apply (electron/services/optimizer/DnsEngine.js)` | _nao usado_ |
+| `optimizer.setGpuPreference` | `optimizer:setGpuPreference` | `electron/main.js:1898` | `AppManagerEngine.setGpuPreference (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.setHagsStatus` | `optimizer:setHagsStatus` | `electron/main.js:1902` | `AppManagerEngine.setHagsStatus (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.setProcessPriority` | `optimizer:setProcessPriority` | `electron/main.js:1896` | `AppManagerEngine.setProcessPriority (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
+| `optimizer.undoDns` | `optimizer:undoDns` | `electron/main.js:1955` | `DnsEngine.undo (electron/services/optimizer/DnsEngine.js)` | `src/components/network/LatencyLab.tsx`<br>`src/components/security/ProtectiveDnsPanel.tsx`<br>`src/pages/Optimizer.tsx` |
+| `optimizer.uninstallProgram` | `optimizer:uninstallProgram` | `electron/main.js:1892` | `AppManagerEngine.uninstallProgram (electron/services/optimizer/AppManagerEngine.js)` | _nao usado_ |
+| `optimizer.uninstallProgramWithLeftovers` | `optimizer:uninstallProgramWithLeftovers` | `electron/main.js:1905` | `AppManagerEngine.uninstallProgramWithLeftovers (electron/services/optimizer/AppManagerEngine.js)` | `src/pages/Optimizer.tsx` |
 | `optiscaler.analyze` | `optiscaler:analyze` | `electron/optiscalerManager.js:1226` |  | `src/pages/OptiScalerManager.tsx` |
 | `optiscaler.apply` | `optiscaler:apply` | `electron/optiscalerManager.js:1234` |  | `src/pages/Library.tsx`<br>`src/pages/OptiScalerManager.tsx` |
 | `optiscaler.checkUpdate` | `optiscaler:checkUpdate` | `electron/optiscalerManager.js:1274` | `i.test`<br>`fetchJson() (electron/services/SecureDownload.js)`<br>`assetSha256() (electron/services/SecureDownload.js)` | `src/pages/OptiScalerManager.tsx` |
@@ -301,7 +301,7 @@
 | `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:32` |  | `src/pages/GameOverlay.tsx`<br>`src/pages/OverlayEditor.tsx` |
 | `overlay.show` | `overlay:show` | `electron/ipc/overlayIpc.js:30` |  | `src/pages/GameOverlay.tsx`<br>`src/pages/SystemMonitor.tsx` |
 | `overlay.status` | `overlay:status` | `electron/ipc/overlayIpc.js:29` |  | `src/pages/GameOverlay.tsx` |
-| `pge.openPortable` | `pge:openPortable` | `electron/main.js:1542` |  | `src/layouts/MainLayout.tsx`<br>`src/pages/Home.tsx` |
+| `pge.openPortable` | `pge:openPortable` | `electron/main.js:1545` |  | `src/layouts/MainLayout.tsx`<br>`src/pages/Home.tsx` |
 | `powershell.customStart` | `powershell:customStart` | `electron/ipc/powershellIpc.js:95` | `kit.startCustom`<br>`sender.isDestroyed`<br>`sender.send` | `src/components/pstools/CustomScriptRunner.tsx` |
 | `powershell.customStatus` | `powershell:customStatus` | `electron/ipc/powershellIpc.js:100` | `kit.isCustomRunning` | `src/components/pstools/CustomScriptRunner.tsx` |
 | `powershell.customStop` | `powershell:customStop` | `electron/ipc/powershellIpc.js:99` | `kit.stopCustom` | `src/components/pstools/CustomScriptRunner.tsx` |
@@ -335,6 +335,25 @@
 | `realtime.scanFiles` | `realtime:scanFiles` | `electron/ipc/realtimeIpc.js:141` | `protection.scanNow`<br>`clamav.status`<br>`clamav.update` | _nao usado_ |
 | `realtime.setConfig` | `realtime:setConfig` | `electron/ipc/realtimeIpc.js:119` | `store.update` | `src/pages/Realtime.tsx` |
 | `realtime.status` | `realtime:status` | `electron/ipc/realtimeIpc.js:104` | `clamav.status`<br>`clamav.install`<br>`clamav.update` | `src/pages/Realtime.tsx` |
+| `recovery.backupTable` | `recovery:backup-table` | `electron/ipc/recoveryIpc.js:23` | `svc.backupTable` | _nao usado_ |
+| `recovery.cancel` | `recovery:cancel` | `electron/ipc/recoveryIpc.js:31` | `svc.cancel` | _nao usado_ |
+| `recovery.cancelCarve` | `recovery:cancel-carve` | `electron/ipc/recoveryIpc.js:30` | `svc.cancel` | _nao usado_ |
+| `recovery.clone` | `recovery:clone` | `electron/ipc/recoveryIpc.js:25` | `svc.clone` | _nao usado_ |
+| `recovery.inspectDisk` | `recovery:inspect-disk` | `electron/ipc/recoveryIpc.js:18` | `svc.inspectDisk` | _nao usado_ |
+| `recovery.listDrives` | `recovery:list-drives` | `electron/ipc/recoveryIpc.js:17` | `svc.listDrives` | _nao usado_ |
+| `recovery.onProgress` | `recovery:progress` | _evento main->tela_ |  | _nao usado_ |
+| `recovery.pickFolder` | `recovery:pick-folder` | `electron/ipc/recoveryIpc.js:35` |  | _nao usado_ |
+| `recovery.pickImage` | `recovery:pick-image` | `electron/ipc/recoveryIpc.js:39` |  | _nao usado_ |
+| `recovery.readSector` | `recovery:read-sector` | `electron/ipc/recoveryIpc.js:19` | `svc.readSector` | _nao usado_ |
+| `recovery.repairHeader` | `recovery:repair-header` | `electron/ipc/recoveryIpc.js:21` | `svc.repairHeader` | _nao usado_ |
+| `recovery.restoreBackup` | `recovery:restore-backup` | `electron/ipc/recoveryIpc.js:24` | `svc.restoreBackup` | _nao usado_ |
+| `recovery.setActive` | `recovery:set-active` | `electron/ipc/recoveryIpc.js:22` | `svc.setActive` | _nao usado_ |
+| `recovery.smart` | `recovery:smart` | `electron/ipc/recoveryIpc.js:28` | `svc.smart` | _nao usado_ |
+| `recovery.startCarve` | `recovery:start-carve` | `electron/ipc/recoveryIpc.js:29` | `svc.startCarving` | _nao usado_ |
+| `recovery.status` | `recovery:status` | `electron/ipc/recoveryIpc.js:32` | `svc.status` | _nao usado_ |
+| `recovery.surfaceTest` | `recovery:surface-test` | `electron/ipc/recoveryIpc.js:27` | `svc.surfaceTest` | _nao usado_ |
+| `recovery.verify` | `recovery:verify` | `electron/ipc/recoveryIpc.js:26` | `svc.verify` | _nao usado_ |
+| `recovery.writeSector` | `recovery:write-sector` | `electron/ipc/recoveryIpc.js:20` | `svc.writeSector` | _nao usado_ |
 | `restore.install` | `restore:install` | `electron/ipc/restoreIpc.js:13` | `svc.install` | `src/components/setup/RestoreComponentsPanel.tsx` |
 | `restore.status` | `restore:status` | `electron/ipc/restoreIpc.js:12` | `svc.status` | `src/components/drivers/MissingDrivers.tsx`<br>`src/components/setup/RestoreComponentsPanel.tsx` |
 | `saves.addCustom` | `saves:addCustom` | `electron/ipc/saveBackupIpc.js:49` | `svc.settings`<br>`svc.setSettings`<br>`custom.filter` | _nao usado_ |
@@ -362,8 +381,8 @@
 | `security.advSetFeedEnabled` | `security:advSetFeedEnabled` | `electron/services/SecurityService.js:81` | `adv.setEnabled` | `src/components/security/BlocklistsPanel.tsx` |
 | `security.advStatus` | `security:advStatus` | `electron/services/SecurityService.js:80` | `adv.status` | `src/pages/AdvancedSecurity.tsx` |
 | `security.advUpdateFeeds` | `security:advUpdateFeeds` | `electron/services/SecurityService.js:82` | `adv.updateFeeds`<br>`ids.map` | `src/components/security/BlocklistsPanel.tsx` |
-| `security.auditTracking` | `security:auditTracking` | `electron/main.js:3214` | `custom.map`<br>`content.split`<br>`l.trim` | `src/pages/AdvancedSecurity.tsx` |
-| `security.blockTracking` | `security:blockTracking` | `electron/main.js:3321` | `custom.map`<br>`d.toLowerCase`<br>`content.split` | `src/pages/AdvancedSecurity.tsx` |
+| `security.auditTracking` | `security:auditTracking` | `electron/main.js:3217` | `custom.map`<br>`content.split`<br>`l.trim` | `src/pages/AdvancedSecurity.tsx` |
+| `security.blockTracking` | `security:blockTracking` | `electron/main.js:3324` | `custom.map`<br>`d.toLowerCase`<br>`content.split` | `src/pages/AdvancedSecurity.tsx` |
 | `security.checkRansomwareArmor` | `security:checkRansomwareArmor` | `electron/services/SecurityService.js:123` |  | _nao usado_ |
 | `security.disablePhishingShield` | `security:disablePhishingShield` | `electron/services/SecurityService.js:111` |  | `src/pages/AdvancedSecurity.tsx` |
 | `security.enablePhishingShield` | `security:enablePhishingShield` | `electron/services/SecurityService.js:107` |  | _nao usado_ |
@@ -371,23 +390,23 @@
 | `security.getCommunityRules` | `security:getCommunityRules` | `electron/services/SecurityService.js:131` |  | `src/pages/AdvancedSecurity.tsx` |
 | `security.getLiveNetworkConnections` | `security:getLiveNetworkConnections` | `electron/services/SecurityService.js:119` |  | `src/pages/AdvancedSecurity.tsx` |
 | `security.getPhishingShieldStatus` | `security:getPhishingShieldStatus` | `electron/services/SecurityService.js:115` |  | `src/pages/AdvancedSecurity.tsx` |
-| `security.getSecurityScore` | `security:getSecurityScore` | `electron/main.js:3210` |  | `src/hooks/useSecurityScore.ts` |
-| `security.getTrackingDomains` | `security:getTrackingDomains` | `electron/main.js:3264` | `custom.map`<br>`HOSTNAME_RE.test` | `src/pages/AdvancedSecurity.tsx` |
+| `security.getSecurityScore` | `security:getSecurityScore` | `electron/main.js:3213` |  | `src/hooks/useSecurityScore.ts` |
+| `security.getTrackingDomains` | `security:getTrackingDomains` | `electron/main.js:3267` | `custom.map`<br>`HOSTNAME_RE.test` | `src/pages/AdvancedSecurity.tsx` |
 | `security.importCommunityRules` | `security:importCommunityRules` | `electron/services/SecurityService.js:135` |  | `src/pages/AdvancedSecurity.tsx` |
-| `security.killProcess` | `security:killProcess` | `electron/main.js:3400` |  | `src/pages/AdvancedSecurity.tsx` |
-| `security.optimizeLatency` | `security:optimizeLatency` | `electron/main.js:3389` | `runPowerShell() (electron/services/PowerShellRunner.js)` | _nao usado_ |
+| `security.killProcess` | `security:killProcess` | `electron/main.js:3403` |  | `src/pages/AdvancedSecurity.tsx` |
+| `security.optimizeLatency` | `security:optimizeLatency` | `electron/main.js:3392` | `runPowerShell() (electron/services/PowerShellRunner.js)` | _nao usado_ |
 | `security.resetCommunityRules` | `security:resetCommunityRules` | `electron/services/SecurityService.js:139` | `promises.stat`<br>`entropyCache.has`<br>`entropyCache.get` | `src/pages/AdvancedSecurity.tsx` |
-| `security.scanMalware` | `security:scanMalware` | `electron/main.js:3082` | `si.processes`<br>`safeRegex.test`<br>`reason.push` | _nao usado_ |
+| `security.scanMalware` | `security:scanMalware` | `electron/main.js:3085` | `si.processes`<br>`safeRegex.test`<br>`reason.push` | _nao usado_ |
 | `security.scanProcesses` | `security:scanProcesses` | `electron/services/SecurityService.js:99` |  | `src/pages/AdvancedSecurity.tsx` |
 | `security.scanUrl` | `security:scanUrl` | `electron/services/SecurityService.js:103` |  | `src/pages/AdvancedSecurity.tsx` |
-| `security.setCustomTrackingDomains` | `security:setCustomTrackingDomains` | `electron/main.js:3308` |  | `src/pages/AdvancedSecurity.tsx` |
-| `security.unblockTracking` | `security:unblockTracking` | `electron/main.js:3373` |  | `src/pages/AdvancedSecurity.tsx` |
-| `settings.getConfig` | `settings:getConfig` | `electron/main.js:1618` | `loadPersistedConfig() (electron/configManager.js)` | `src/components/darkos/DarkOSSystemPanel.tsx`<br>`src/pages/Settings.tsx` |
-| `settings.updateLiveServices` | `settings:updateLiveServices` | `electron/main.js:1642` | `loadPersistedConfig() (electron/configManager.js)`<br>`saveConfig() (electron/configManager.js)` | `src/pages/Settings.tsx` |
-| `settings.updateStartupBehavior` | `settings:updateStartupBehavior` | `electron/main.js:1685` | `runPowerShell() (electron/services/PowerShellRunner.js)`<br>`stripBom() (electron/services/PowerShellRunner.js)`<br>`loadPersistedConfig() (electron/configManager.js)` | `src/components/darkos/DarkOSSystemPanel.tsx`<br>`src/pages/Settings.tsx` |
-| `settings.updateWindowBehavior` | `settings:updateWindowBehavior` | `electron/main.js:1666` | `loadPersistedConfig() (electron/configManager.js)`<br>`saveConfig() (electron/configManager.js)` | `src/pages/Settings.tsx` |
-| `setup.detectHardware` | `setup:detectHardware` | `electron/main.js:3649` | `si.cpu`<br>`si.graphics`<br>`si.baseboard` | `src/pages/SetupHub.tsx` |
-| `setup.installWinget` | `setup:installWinget` | `electron/main.js:3582` | `sender.isDestroyed`<br>`sender.send`<br>`appIds.map` | `src/pages/SetupHub.tsx` |
+| `security.setCustomTrackingDomains` | `security:setCustomTrackingDomains` | `electron/main.js:3311` |  | `src/pages/AdvancedSecurity.tsx` |
+| `security.unblockTracking` | `security:unblockTracking` | `electron/main.js:3376` |  | `src/pages/AdvancedSecurity.tsx` |
+| `settings.getConfig` | `settings:getConfig` | `electron/main.js:1621` | `loadPersistedConfig() (electron/configManager.js)` | `src/components/darkos/DarkOSSystemPanel.tsx`<br>`src/pages/Settings.tsx` |
+| `settings.updateLiveServices` | `settings:updateLiveServices` | `electron/main.js:1645` | `loadPersistedConfig() (electron/configManager.js)`<br>`saveConfig() (electron/configManager.js)` | `src/pages/Settings.tsx` |
+| `settings.updateStartupBehavior` | `settings:updateStartupBehavior` | `electron/main.js:1688` | `runPowerShell() (electron/services/PowerShellRunner.js)`<br>`stripBom() (electron/services/PowerShellRunner.js)`<br>`loadPersistedConfig() (electron/configManager.js)` | `src/components/darkos/DarkOSSystemPanel.tsx`<br>`src/pages/Settings.tsx` |
+| `settings.updateWindowBehavior` | `settings:updateWindowBehavior` | `electron/main.js:1669` | `loadPersistedConfig() (electron/configManager.js)`<br>`saveConfig() (electron/configManager.js)` | `src/pages/Settings.tsx` |
+| `setup.detectHardware` | `setup:detectHardware` | `electron/main.js:3693` | `si.cpu`<br>`si.graphics`<br>`si.baseboard` | `src/pages/SetupHub.tsx` |
+| `setup.installWinget` | `setup:installWinget` | `electron/main.js:3620` | `sender.isDestroyed`<br>`sender.send`<br>`appIds.map` | `src/pages/SetupHub.tsx` |
 | `setup.onInstallProgress` | `setup:installProgress` | _evento main->tela_ |  | `src/pages/SetupHub.tsx` |
 | `share.cancel` | `share:cancel` | `electron/ipc/shareIpc.js:159` | `jobs.get` | _nao usado_ |
 | `share.capture` | `share:capture` | `electron/ipc/shareIpc.js:180` |  | _nao usado_ |
@@ -404,27 +423,27 @@
 | `share.state` | `share:state` | `electron/ipc/shareIpc.js:131` |  | `src/pages/Share.tsx` |
 | `share.uploadFiles` | `share:uploadPaths` | `electron/ipc/shareIpc.js:153` | `results.push` | _nao usado_ |
 | `share.uploadScreenshot` | `share:uploadFile` | `electron/ipc/shareIpc.js:196` |  | _nao usado_ |
-| `shell.openExternal` | `shell:openExternal` | `electron/main.js:1478` | `RENDERER_SYSTEM_URIS.has`<br>`raw.toLowerCase`<br>`parsed.toString` | `src/components/darkos/DarkOSReleaseCard.tsx`<br>`src/components/hub/HubPreview.tsx`<br>`src/pages/Dashboard.tsx`<br>`src/pages/Dlss5Manager.tsx`<br>`src/pages/Presets.tsx`<br>`src/pages/Share.tsx` |
+| `shell.openExternal` | `shell:openExternal` | `electron/main.js:1481` | `RENDERER_SYSTEM_URIS.has`<br>`raw.toLowerCase`<br>`parsed.toString` | `src/components/darkos/DarkOSReleaseCard.tsx`<br>`src/components/hub/HubPreview.tsx`<br>`src/pages/Dashboard.tsx`<br>`src/pages/Dlss5Manager.tsx`<br>`src/pages/Presets.tsx`<br>`src/pages/Share.tsx` |
 | `startup.list` | `startup:list` | `electron/ipc/startupIpc.js:12` | `svc.list` | _nao usado_ |
 | `startup.setEnabled` | `startup:setEnabled` | `electron/ipc/startupIpc.js:13` | `svc.setEnabled` | _nao usado_ |
 | `startup.undo` | `startup:undo` | `electron/ipc/startupIpc.js:14` | `svc.undo` | _nao usado_ |
-| `system.enableProcessTracking` | `system:enableProcessTracking` | `electron/main.js:952` |  | `src/pages/SystemMonitor.tsx` |
-| `system.getAdvancedHardware` | `system:getAdvancedHardware` | `electron/main.js:966` | `si.graphics`<br>`si.baseboard`<br>`si.bios` | _nao usado_ |
-| `system.getBios` | `system:getBios` | `electron/main.js:1024` | `si.baseboard`<br>`si.bios` | `src/components/DetailedHardwareInfo.tsx` |
-| `system.getDeepCategory` | `system:getDeepCategory` | `electron/main.js:945` | `DeepHardwareService.getCategory (electron/services/DeepHardwareService.js)` | _nao usado_ |
-| `system.getDeepHardwareInfo` | `system:getDeepHardwareInfo` | `electron/main.js:941` | `DeepHardwareService.getDeepInfo (electron/services/DeepHardwareService.js)` | _nao usado_ |
-| `system.getGraphics` | `system:getGraphics` | `electron/main.js:1013` | `si.graphics` | `src/components/DetailedHardwareInfo.tsx` |
-| `system.getInfo` | `system:getInfo` | `electron/main.js:883` | `cpuModel.includes`<br>`si.cpu`<br>`runCommand() (electron/services/PowerShellRunner.js)` | `src/components/DetailedHardwareInfo.tsx`<br>`src/pages/Home.tsx` |
-| `system.getJunkEstimate` | `system:getJunkEstimate` | `electron/main.js:1236` |  | `src/hooks/useJunkScanner.ts` |
-| `system.getLatency` | `system:getLatency` | `electron/main.js:1055` |  | _nao usado_ |
-| `system.getLiveStats` | `system:getLiveStats` | `electron/main.js:1730` | `liveCpu.sample` | `src/components/darkos/DarkOSSystemPanel.tsx` |
-| `system.getMemory` | `system:getMemory` | `electron/main.js:1725` |  | `src/pages/Home.tsx` |
-| `system.getMetrics` | `system:getMetrics` | `electron/main.js:1131` | `si.networkStats`<br>`si.fsStats` | _nao usado_ |
-| `system.getNetwork` | `system:getNetwork` | `electron/main.js:1194` | `si.networkInterfaces`<br>`si.networkStats` | _nao usado_ |
-| `system.getSnapshot` | `system:getSnapshot` | `electron/main.js:794` | `HardwareHAL.getSnapshot (electron/hal/HardwareHAL.js)` | _nao usado_ |
-| `system.getStorage` | `system:getStorage` | `electron/main.js:1221` | `si.fsSize` | `src/components/DetailedHardwareInfo.tsx` |
-| `system.getTemperatures` | `system:getTemperatures` | `electron/main.js:1047` | `si.sensorsTemperatures` | `src/components/DetailedHardwareInfo.tsx` |
-| `system.runBenchmark` | `system:runBenchmark` | `electron/main.js:1059` | `hrtime.bigint`<br>`parentPort.postMessage`<br>`mops.toFixed` | `src/pages/SystemMonitor.tsx` |
+| `system.enableProcessTracking` | `system:enableProcessTracking` | `electron/main.js:955` |  | `src/pages/SystemMonitor.tsx` |
+| `system.getAdvancedHardware` | `system:getAdvancedHardware` | `electron/main.js:969` | `si.graphics`<br>`si.baseboard`<br>`si.bios` | _nao usado_ |
+| `system.getBios` | `system:getBios` | `electron/main.js:1027` | `si.baseboard`<br>`si.bios` | `src/components/DetailedHardwareInfo.tsx` |
+| `system.getDeepCategory` | `system:getDeepCategory` | `electron/main.js:948` | `DeepHardwareService.getCategory (electron/services/DeepHardwareService.js)` | _nao usado_ |
+| `system.getDeepHardwareInfo` | `system:getDeepHardwareInfo` | `electron/main.js:944` | `DeepHardwareService.getDeepInfo (electron/services/DeepHardwareService.js)` | _nao usado_ |
+| `system.getGraphics` | `system:getGraphics` | `electron/main.js:1016` | `si.graphics` | `src/components/DetailedHardwareInfo.tsx` |
+| `system.getInfo` | `system:getInfo` | `electron/main.js:886` | `cpuModel.includes`<br>`si.cpu`<br>`runCommand() (electron/services/PowerShellRunner.js)` | `src/components/DetailedHardwareInfo.tsx`<br>`src/pages/Home.tsx` |
+| `system.getJunkEstimate` | `system:getJunkEstimate` | `electron/main.js:1239` |  | `src/hooks/useJunkScanner.ts` |
+| `system.getLatency` | `system:getLatency` | `electron/main.js:1058` |  | _nao usado_ |
+| `system.getLiveStats` | `system:getLiveStats` | `electron/main.js:1733` | `liveCpu.sample` | `src/components/darkos/DarkOSSystemPanel.tsx` |
+| `system.getMemory` | `system:getMemory` | `electron/main.js:1728` |  | `src/pages/Home.tsx` |
+| `system.getMetrics` | `system:getMetrics` | `electron/main.js:1134` | `si.networkStats`<br>`si.fsStats` | _nao usado_ |
+| `system.getNetwork` | `system:getNetwork` | `electron/main.js:1197` | `si.networkInterfaces`<br>`si.networkStats` | _nao usado_ |
+| `system.getSnapshot` | `system:getSnapshot` | `electron/main.js:797` | `HardwareHAL.getSnapshot (electron/hal/HardwareHAL.js)` | _nao usado_ |
+| `system.getStorage` | `system:getStorage` | `electron/main.js:1224` | `si.fsSize` | `src/components/DetailedHardwareInfo.tsx` |
+| `system.getTemperatures` | `system:getTemperatures` | `electron/main.js:1050` | `si.sensorsTemperatures` | `src/components/DetailedHardwareInfo.tsx` |
+| `system.runBenchmark` | `system:runBenchmark` | `electron/main.js:1062` | `hrtime.bigint`<br>`parentPort.postMessage`<br>`mops.toFixed` | `src/pages/SystemMonitor.tsx` |
 | `updater.check` | `updater:check` | `electron/services/UpdateService.js:357` |  | `src/components/darkos/DarkOSSystemPanel.tsx`<br>`src/pages/Settings.tsx` |
 | `updater.download` | `updater:download` | `electron/services/UpdateService.js:358` |  | `src/components/UpdaterOverlay.tsx`<br>`src/components/darkos/DarkOSSystemPanel.tsx` |
 | `updater.getStatus` | `updater:getStatus` | `electron/services/UpdateService.js:351` |  | `src/components/UpdaterOverlay.tsx`<br>`src/components/darkos/DarkOSSystemPanel.tsx`<br>`src/pages/Settings.tsx` |
@@ -446,43 +465,44 @@
 | `usb.setSelectiveSuspend` | `usb:setSelectiveSuspend` | `electron/ipc/usbIpc.js:17` | `svc.setSelectiveSuspend` | _nao usado_ |
 | `usb.setStorageBlocked` | `usb:setStorageBlocked` | `electron/ipc/usbIpc.js:15` | `svc.setStorageBlocked` | _nao usado_ |
 | `usb.setWriteProtect` | `usb:setWriteProtect` | `electron/ipc/usbIpc.js:16` | `svc.setWriteProtect` | _nao usado_ |
-| `vault.add` | `vault:add` | `electron/main.js:2854` | `crypto.randomUUID` | `src/pages/PasswordManager.tsx` |
+| `vault.add` | `vault:add` | `electron/main.js:2857` | `crypto.randomUUID` | `src/pages/PasswordManager.tsx` |
 | `vault.bridgeStatus` | `vaultx:bridgeStatus` | `electron/ipc/vaultBridgeIpc.js:185` |  | `src/components/vault/BrowserExtensionSection.tsx` |
-| `vault.changeMasterPassword` | `vault:changeMasterPassword` | `electron/main.js:2930` | `buildKdf() (electron/vaultCrypto.js)`<br>`unwrapVaultKeyWithPassword() (electron/vaultCrypto.js)`<br>`wrapVaultKeyWithPassword() (electron/vaultCrypto.js)` | _nao usado_ |
-| `vault.copyPassword` | `vault:copyPassword` | `electron/main.js:2917` | `clipboard.writeText`<br>`clipboard.readText`<br>`clipboard.clear` | `src/pages/PasswordManager.tsx` |
-| `vault.export` | `vault:export` | `electron/main.js:2974` |  | `src/pages/PasswordManager.tsx` |
-| `vault.import` | `vault:import` | `electron/main.js:2983` | `backupVaultFile() (electron/services/vaultBridge/vaultHardening.js)` | `src/pages/PasswordManager.tsx` |
-| `vault.init` | `vault:init` | `electron/main.js:2774` | `crypto.randomBytes`<br>`recoveryWords.join`<br>`buildKdf() (electron/vaultCrypto.js)` | `src/pages/PasswordManager.tsx` |
-| `vault.list` | `vault:list` | `electron/main.js:2839` |  | `src/pages/PasswordManager.tsx` |
-| `vault.lock` | `vault:lock` | `electron/main.js:2834` |  | `src/pages/PasswordManager.tsx` |
+| `vault.changeMasterPassword` | `vault:changeMasterPassword` | `electron/main.js:2933` | `buildKdf() (electron/vaultCrypto.js)`<br>`unwrapVaultKeyWithPassword() (electron/vaultCrypto.js)`<br>`wrapVaultKeyWithPassword() (electron/vaultCrypto.js)` | _nao usado_ |
+| `vault.copyPassword` | `vault:copyPassword` | `electron/main.js:2920` | `clipboard.writeText`<br>`clipboard.readText`<br>`clipboard.clear` | `src/pages/PasswordManager.tsx` |
+| `vault.export` | `vault:export` | `electron/main.js:2977` |  | `src/pages/PasswordManager.tsx` |
+| `vault.import` | `vault:import` | `electron/main.js:2986` | `backupVaultFile() (electron/services/vaultBridge/vaultHardening.js)` | `src/pages/PasswordManager.tsx` |
+| `vault.init` | `vault:init` | `electron/main.js:2777` | `crypto.randomBytes`<br>`recoveryWords.join`<br>`buildKdf() (electron/vaultCrypto.js)` | `src/pages/PasswordManager.tsx` |
+| `vault.list` | `vault:list` | `electron/main.js:2842` |  | `src/pages/PasswordManager.tsx` |
+| `vault.lock` | `vault:lock` | `electron/main.js:2837` |  | `src/pages/PasswordManager.tsx` |
 | `vault.onBridgeChanged` | `vaultx:changed` | _evento main->tela_ |  | `src/components/vault/BrowserExtensionSection.tsx` |
 | `vault.openExtensionFolder` | `vaultx:openExtensionFolder` | `electron/ipc/vaultBridgeIpc.js:211` |  | `src/components/vault/BrowserExtensionSection.tsx` |
-| `vault.regenerateRecoveryWords` | `vault:regenerateRecoveryWords` | `electron/main.js:2956` | `recoveryWords.join`<br>`buildKdf() (electron/vaultCrypto.js)`<br>`derivePasswordFromRecoveryWords() (electron/vaultCrypto.js)` | _nao usado_ |
+| `vault.regenerateRecoveryWords` | `vault:regenerateRecoveryWords` | `electron/main.js:2959` | `recoveryWords.join`<br>`buildKdf() (electron/vaultCrypto.js)`<br>`derivePasswordFromRecoveryWords() (electron/vaultCrypto.js)` | _nao usado_ |
 | `vault.registerBrowserHost` | `vaultx:registerHost` | `electron/ipc/vaultBridgeIpc.js:187` | `registry.register`<br>`isBrowserId() (electron/services/vaultBridge/nativeHost.js)` | `src/components/vault/BrowserExtensionSection.tsx` |
-| `vault.remove` | `vault:remove` | `electron/main.js:2900` |  | `src/pages/PasswordManager.tsx` |
-| `vault.reveal` | `vault:reveal` | `electron/main.js:2909` |  | `src/pages/PasswordManager.tsx` |
+| `vault.remove` | `vault:remove` | `electron/main.js:2903` |  | `src/pages/PasswordManager.tsx` |
+| `vault.reveal` | `vault:reveal` | `electron/main.js:2912` |  | `src/pages/PasswordManager.tsx` |
 | `vault.revokeBrowserClient` | `vaultx:revokeClient` | `electron/ipc/vaultBridgeIpc.js:203` | `pairingStore.revoke`<br>`server.disconnectClient` | `src/components/vault/BrowserExtensionSection.tsx` |
-| `vault.setAutoLockMinutes` | `vault:setAutoLockMinutes` | `electron/main.js:2769` |  | `src/pages/Settings.tsx` |
+| `vault.setAutoLockMinutes` | `vault:setAutoLockMinutes` | `electron/main.js:2772` |  | `src/pages/Settings.tsx` |
 | `vault.setBridgeLanguage` | `vaultx:setLanguage` | `electron/ipc/vaultBridgeIpc.js:218` | `lang.toLowerCase` | `src/components/vault/BrowserExtensionSection.tsx` |
-| `vault.status` | `vault:status` | `electron/main.js:2764` |  | `src/pages/PasswordManager.tsx` |
-| `vault.transferCancel` | `vault:transferCancel` | `electron/main.js:3025` |  | _nao usado_ |
-| `vault.transferReceive` | `vault:transferReceive` | `electron/main.js:3037` | `bytes.toString`<br>`crypto.randomUUID`<br>`registerVaultBridgeIPC() (electron/ipc/vaultBridgeIpc.js)` | _nao usado_ |
-| `vault.transferSend` | `vault:transferSend` | `electron/main.js:3005` | `crypto.randomUUID`<br>`sealVault() (electron/services/vaultTransfer/vaultTransfer.js)`<br>`makeCode() (electron/services/vaultTransfer/vaultTransfer.js)` | _nao usado_ |
-| `vault.unlock` | `vault:unlock` | `electron/main.js:2809` |  | `src/pages/PasswordManager.tsx` |
-| `vault.unlockWithRecoveryWords` | `vault:unlockWithRecoveryWords` | `electron/main.js:2821` | `words.trim`<br>`derivePasswordFromRecoveryWords() (electron/vaultCrypto.js)` | `src/pages/PasswordManager.tsx` |
+| `vault.status` | `vault:status` | `electron/main.js:2767` |  | `src/pages/PasswordManager.tsx` |
+| `vault.transferCancel` | `vault:transferCancel` | `electron/main.js:3028` |  | _nao usado_ |
+| `vault.transferReceive` | `vault:transferReceive` | `electron/main.js:3040` | `bytes.toString`<br>`crypto.randomUUID`<br>`registerVaultBridgeIPC() (electron/ipc/vaultBridgeIpc.js)` | _nao usado_ |
+| `vault.transferSend` | `vault:transferSend` | `electron/main.js:3008` | `crypto.randomUUID`<br>`sealVault() (electron/services/vaultTransfer/vaultTransfer.js)`<br>`makeCode() (electron/services/vaultTransfer/vaultTransfer.js)` | _nao usado_ |
+| `vault.unlock` | `vault:unlock` | `electron/main.js:2812` |  | `src/pages/PasswordManager.tsx` |
+| `vault.unlockWithRecoveryWords` | `vault:unlockWithRecoveryWords` | `electron/main.js:2824` | `words.trim`<br>`derivePasswordFromRecoveryWords() (electron/vaultCrypto.js)` | `src/pages/PasswordManager.tsx` |
 | `vault.unregisterBrowserHost` | `vaultx:unregisterHost` | `electron/ipc/vaultBridgeIpc.js:195` | `registry.unregister`<br>`isBrowserId() (electron/services/vaultBridge/nativeHost.js)` | `src/components/vault/BrowserExtensionSection.tsx` |
-| `vault.update` | `vault:update` | `electron/main.js:2877` | `entries.findIndex`<br>`entries.slice` | _nao usado_ |
-| `window.close` | `window:close` | `electron/main.js:3809` | `HardwareService.init (electron/services/HardwareService.js)`<br>`UpdateService.init (electron/services/UpdateService.js)`<br>`argv.find` | `src/layouts/MainLayout.tsx` |
-| `window.isMaximized` | `window:isMaximized` | `electron/main.js:3805` |  | _nao usado_ |
-| `window.maximize` | `window:maximize` | `electron/main.js:3797` |  | `src/layouts/MainLayout.tsx` |
-| `window.minimize` | `window:minimize` | `electron/main.js:3793` |  | `src/layouts/MainLayout.tsx` |
-| `wintools.listFeatures` | `wintools:listFeatures` | `electron/ipc/winToolsIpc.js:11` | `engine.listFeatures` | `src/components/optimizer/WindowsToolsPanel.tsx` |
-| `wintools.openPanel` | `wintools:openPanel` | `electron/ipc/winToolsIpc.js:14` | `engine.openPanel` | _nao usado_ |
-| `wintools.run` | `wintools:run` | `electron/ipc/winToolsIpc.js:13` | `engine.run` | _nao usado_ |
-| `wintools.setFeature` | `wintools:setFeature` | `electron/ipc/winToolsIpc.js:12` | `engine.setFeature` | _nao usado_ |
-| `youtube.cancel` | `youtube:cancel` | `electron/main.js:2598` | `cancelActiveYtDlp() (electron/ytdlp.js)` | `src/pages/YoutubeDownloader.tsx` |
-| `youtube.download` | `youtube:download` | `electron/main.js:2467` | `cookiesPath.trim`<br>`cookiesFromBrowser.trim`<br>`userAgent.trim` | `src/i18n/messages.ts`<br>`src/pages/YoutubeDownloader.tsx` |
-| `youtube.getVideoInfo` | `youtube:getVideoInfo` | `electron/main.js:2362` | `cookiesPath.trim`<br>`cookiesFromBrowserRaw.trim`<br>`userAgentRaw.trim` | `src/pages/YoutubeDownloader.tsx` |
+| `vault.update` | `vault:update` | `electron/main.js:2880` | `entries.findIndex`<br>`entries.slice` | _nao usado_ |
+| `window.close` | `window:close` | `electron/main.js:3853` | `HardwareService.init (electron/services/HardwareService.js)`<br>`UpdateService.init (electron/services/UpdateService.js)`<br>`argv.find` | `src/layouts/MainLayout.tsx` |
+| `window.isMaximized` | `window:isMaximized` | `electron/main.js:3849` |  | _nao usado_ |
+| `window.maximize` | `window:maximize` | `electron/main.js:3841` |  | `src/layouts/MainLayout.tsx` |
+| `window.minimize` | `window:minimize` | `electron/main.js:3837` |  | `src/layouts/MainLayout.tsx` |
+| `wintools.diagnoseWu` | `wintools:diagnoseWu` | `electron/ipc/winToolsIpc.js:17` | `diagnoseWindowsUpdate() (electron/services/optimizer/wuDiagnose.js)` | `src/components/optimizer/WuDiagnosis.tsx` |
+| `wintools.listFeatures` | `wintools:listFeatures` | `electron/ipc/winToolsIpc.js:13` | `engine.listFeatures` | `src/components/optimizer/WindowsToolsPanel.tsx` |
+| `wintools.openPanel` | `wintools:openPanel` | `electron/ipc/winToolsIpc.js:16` | `engine.openPanel` | _nao usado_ |
+| `wintools.run` | `wintools:run` | `electron/ipc/winToolsIpc.js:15` | `engine.run` | `src/components/optimizer/WuDiagnosis.tsx` |
+| `wintools.setFeature` | `wintools:setFeature` | `electron/ipc/winToolsIpc.js:14` | `engine.setFeature` | _nao usado_ |
+| `youtube.cancel` | `youtube:cancel` | `electron/main.js:2601` | `cancelActiveYtDlp() (electron/ytdlp.js)` | `src/pages/YoutubeDownloader.tsx` |
+| `youtube.download` | `youtube:download` | `electron/main.js:2470` | `cookiesPath.trim`<br>`cookiesFromBrowser.trim`<br>`userAgent.trim` | `src/i18n/messages.ts`<br>`src/pages/YoutubeDownloader.tsx` |
+| `youtube.getVideoInfo` | `youtube:getVideoInfo` | `electron/main.js:2365` | `cookiesPath.trim`<br>`cookiesFromBrowserRaw.trim`<br>`userAgentRaw.trim` | `src/pages/YoutubeDownloader.tsx` |
 | `youtube.onProgress` | `youtube:downloadProgress` | _evento main->tela_ |  | `src/pages/YoutubeDownloader.tsx` |
 
 ## Handlers sem metodo no preload

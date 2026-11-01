@@ -190,12 +190,20 @@ const appCatalog: Record<string, { id: string, name: string, desc?: string }[]> 
     { id: 'Prusa3D.PrusaSlicer', name: 'PrusaSlicer', desc: 'Fatiador para impressoras 3D' },
     { id: 'GodotEngine.GodotEngine', name: 'Godot Engine', desc: 'Motor para criar jogos 2D e 3D' }
   ],
+  'Nuvem & Sincronização': [
+    { id: 'Google.GoogleDrive', name: 'Google Drive', desc: 'Arquivos do Google Drive direto no Explorer' },
+    { id: 'Dropbox.Dropbox', name: 'Dropbox', desc: 'Sincronização e compartilhamento de arquivos' },
+    { id: 'Microsoft.OneDrive', name: 'OneDrive', desc: 'Nuvem da Microsoft integrada ao Windows' },
+    { id: 'Mega.MEGASync', name: 'MEGA', desc: 'Nuvem com criptografia de ponta a ponta' }
+  ],
   Comunicação: [
     { id: 'Discord.Discord', name: 'Discord', desc: 'Chat de voz, texto e comunidades' },
     { id: 'Telegram.TelegramDesktop', name: 'Telegram', desc: 'Mensageiro rápido e seguro para desktop' },
     { id: '9NKSQGP7F2NH', name: 'WhatsApp', desc: 'Aplicativo oficial WhatsApp para Windows' },
     { id: 'Zoom.Zoom', name: 'Zoom', desc: 'Videoconferências e reuniões online' },
-    { id: 'SlackTechnologies.Slack', name: 'Slack', desc: 'Comunicação e colaboração em equipe' }
+    { id: 'SlackTechnologies.Slack', name: 'Slack', desc: 'Comunicação e colaboração em equipe' },
+    { id: 'Microsoft.Teams', name: 'Microsoft Teams', desc: 'Reuniões e chat do Microsoft 365' },
+    { id: 'OpenWhisperSystems.Signal', name: 'Signal', desc: 'Mensageiro com criptografia de ponta a ponta' }
   ],
   Desenvolvimento: [
     { id: 'Microsoft.VisualStudioCode', name: 'VS Code', desc: 'Editor de código mais popular do mundo' },

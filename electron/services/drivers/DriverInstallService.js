@@ -79,7 +79,8 @@ function Set-DhSvcStart([string]$n, [int]$v) {
   if ($LASTEXITCODE -ne 0) { Set-ItemProperty -LiteralPath ('HKLM:\\SYSTEM\\CurrentControlSet\\Services\\' + $n) -Name Start -Value $v -Type DWord -Force -ErrorAction SilentlyContinue }
 }
 function Unlock-DhWu {
-  foreach ($n in 'wuauserv','bits','dosvc') {
+  # cryptsvc checks the signature of every download, trustedinstaller installs: stripped systems disable them too
+  foreach ($n in 'wuauserv','bits','dosvc','cryptsvc','trustedinstaller') {
     $k = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\' + $n
     $v = (Get-ItemProperty -LiteralPath $k -ErrorAction SilentlyContinue).Start
     if ($v -eq 4) {
@@ -99,7 +100,28 @@ function Unlock-DhWu {
   }
   Start-Service -Name wuauserv -ErrorAction Stop
 }
+# Delivery Optimization in plain HTTP mode (99): the documented way out when its service or cache is broken
+$script:DhDoRestore = $null
+function Set-DhDoSimple {
+  $dk = 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\DeliveryOptimization'
+  if ($null -ne $script:DhDoRestore) { return }
+  $cur = (Get-ItemProperty -LiteralPath $dk -Name DODownloadMode -ErrorAction SilentlyContinue).DODownloadMode
+  $script:DhDoRestore = if ($null -eq $cur) { 'none' } else { [string]$cur }
+  if (-not (Test-Path -LiteralPath $dk)) { New-Item -Path $dk -Force | Out-Null }
+  Set-ItemProperty -LiteralPath $dk -Name DODownloadMode -Value 99 -Type DWord -Force
+  Restart-Service -Name wuauserv -Force -ErrorAction SilentlyContinue
+  DhP 'wuservice' 'info' 'delivery optimization: simple mode'
+}
+function Restore-DhDo {
+  if ($null -eq $script:DhDoRestore) { return }
+  $dk = 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\DeliveryOptimization'
+  if ($script:DhDoRestore -eq 'none') { Remove-ItemProperty -LiteralPath $dk -Name DODownloadMode -ErrorAction SilentlyContinue }
+  else { Set-ItemProperty -LiteralPath $dk -Name DODownloadMode -Value ([int]$script:DhDoRestore) -Type DWord -Force -ErrorAction SilentlyContinue }
+  $script:DhDoRestore = $null
+  DhP 'wuservice' 'info' 'delivery optimization restored'
+}
 function Restore-DhWu {
+  Restore-DhDo
   $pk = 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate'
   foreach ($name in $script:DhPolRestore) { Set-ItemProperty -LiteralPath $pk -Name $name -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue; DhP 'wuservice' 'info' ('policy restored ' + $name) }
   foreach ($r in $script:DhWuRestore) {
@@ -227,7 +249,20 @@ if (-not $abort -and $wuIds.Count -gt 0) {
         DhP ('wu:' + $id) 'downloading' ''
         $dl = $session.CreateUpdateDownloader(); $dl.Updates = $coll
         $dr = $dl.Download()
-        if ($dr.ResultCode -ne 2 -and $dr.ResultCode -ne 3) { DhP ('wu:' + $id) 'failed' ('download result ' + $dr.ResultCode + ' ' + ('{0:X8}' -f $dr.HResult)); continue }
+        if ($dr.ResultCode -ne 2 -and $dr.ResultCode -ne 3) {
+          # the overall code (80240022 "all failed") hides the cause: keep the update's own one
+          $why = '{0:X8}' -f $dr.GetUpdateResult(0).HResult
+          DhP ('wu:' + $id) 'info' ('download ' + $why + ', retrying with Delivery Optimization in simple mode')
+          Set-DhDoSimple
+          Start-Service -Name bits -ErrorAction SilentlyContinue
+          $dl = $session.CreateUpdateDownloader(); $dl.Updates = $coll
+          $dr = $dl.Download()
+        }
+        if ($dr.ResultCode -ne 2 -and $dr.ResultCode -ne 3) {
+          $why = '{0:X8}' -f $dr.GetUpdateResult(0).HResult
+          DhP ('wu:' + $id) 'failed' ('download ' + $why)
+          continue
+        }
         DhP ('wu:' + $id) 'installing' ''
         $in = $session.CreateUpdateInstaller(); $in.Updates = $coll
         $ir = $in.Install()

@@ -643,7 +643,8 @@ const darkhubApi = {
     listFeatures: () => ipcRenderer.invoke('wintools:listFeatures'),
     setFeature: (payload) => ipcRenderer.invoke('wintools:setFeature', payload),
     run: (payload) => ipcRenderer.invoke('wintools:run', payload),
-    openPanel: (payload) => ipcRenderer.invoke('wintools:openPanel', payload)
+    openPanel: (payload) => ipcRenderer.invoke('wintools:openPanel', payload),
+    diagnoseWu: () => ipcRenderer.invoke('wintools:diagnoseWu')
   },
   driver: {
     detect: () => ipcRenderer.invoke('driver:detect'),

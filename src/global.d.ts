@@ -962,6 +962,8 @@ export interface DarkHubAPI {
     setFeature: (payload: { id: string; enable: boolean }) => Promise<{ ok: boolean; error?: string; state?: string; requiresReboot?: boolean }>;
     run: (payload: { action: string }) => Promise<{ ok: boolean; error?: string; msg?: string }>;
     openPanel: (payload: { id: string }) => Promise<{ ok: boolean; error?: string }>;
+    /** Read-only Windows Update check: what stops it from downloading, most likely cause first. */
+    diagnoseWu: () => Promise<{ ok: boolean; error?: string; findings?: { id: string; level: 'bad' | 'warn'; data: Record<string, string> }[] }>;
   };
   driver: {
     detect: () => Promise<{

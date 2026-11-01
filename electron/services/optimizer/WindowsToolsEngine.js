@@ -165,6 +165,12 @@ foreach ($d in @("$env:SystemRoot\\SoftwareDistribution", "$env:SystemRoot\\Syst
   if (Test-Path -LiteralPath "$d.dh-old") { Remove-Item -LiteralPath "$d.dh-old" -Recurse -Force -ErrorAction SilentlyContinue }
   if (Test-Path -LiteralPath $d) { Rename-Item -LiteralPath $d -NewName ((Split-Path $d -Leaf) + '.dh-old') -ErrorAction Stop }
 }
+# services a tweak or a stripped system disabled go back to the Windows defaults (2 automatic, 3 manual)
+$defaults = @{ wuauserv = 3; bits = 3; cryptsvc = 2; dosvc = 2; usosvc = 2; trustedinstaller = 3 }
+foreach ($n in $defaults.Keys) {
+  $k = "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\$n"
+  if ((Get-ItemProperty -LiteralPath $k -ErrorAction SilentlyContinue).Start -eq 4) { Set-ItemProperty -LiteralPath $k -Name Start -Value $defaults[$n] -Type DWord -Force; Write-Output "DHINFO|enabled $n" }
+}
 foreach ($s in 'cryptsvc','bits','wuauserv') { Start-Service -Name $s -ErrorAction SilentlyContinue }
 Start-Sleep -Seconds 2
 $st = (Get-Service wuauserv).Status
