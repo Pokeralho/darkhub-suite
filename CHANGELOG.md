@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-11-01
+
 ### Fixed
 - Susuya area screenshots now let you select on any monitor: the frozen screen spans every monitor by default, like
   the Snipping Tool. Before, it opened only on the monitor under the mouse, so the "Select area" button (and the
