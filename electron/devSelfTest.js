@@ -148,6 +148,29 @@ export async function run(listeners) {
     if (!process.env.SELFTEST_SCENARIOS_ONLY) routes = [...new Set(['home', ...map.features.map((f) => f.id), 'settings'])]
   } catch {}
   if (process.env.SELFTEST_ROUTES) routes = process.env.SELFTEST_ROUTES.split(',').map((r) => r.trim()).filter(Boolean)
+
+  // SELFTEST_OVERLAY=<process name>: shows the in-game overlay on that running game, lets PresentMon measure for a
+  // while and saves a picture of the game's monitor with the overlay on it (overlay-ingame.png). Read-only for the
+  // system; the overlay is hidden again afterwards.
+  if (process.env.SELFTEST_OVERLAY) {
+    const want = process.env.SELFTEST_OVERLAY.toLowerCase().replace(/\.exe$/, '')
+    const procs = await call('overlay:processes').catch(() => null)
+    const target = (procs?.processes || []).find((p) => String(p.name || '').toLowerCase().replace(/\.exe$/, '') === want)
+    console.log(`[selftest] overlay target: ${target ? `${target.name} pid ${target.pid}` : 'not found'}`)
+    if (target) {
+      win.minimize() // keep DarkHub's own window out of the game's picture
+      const shown = await call('overlay:show', { pid: target.pid }).catch((e) => ({ ok: false, error: e.message }))
+      console.log(`[selftest] overlay:show ${shown?.ok === false ? `ERR ${shown.error}` : 'OK'}`)
+      await sleep(Number(process.env.SELFTEST_OVERLAY_WAIT || 15000))
+      const st = await call('overlay:status').catch(() => null)
+      console.log(`[selftest] overlay visible:${st?.visible} capturing:${st?.capturing} display:${st?.displayId} fps:${JSON.stringify(st?.stats?.fps ?? st?.stats ?? null).slice(0, 120)}`)
+      const { captureScreen } = await import('./services/susuya/Screenshot.js')
+      const shot = await captureScreen(path.join(outDir, 'overlay'), st?.displayId != null ? String(st.displayId) : 'cursor').catch((e) => { console.log(`[selftest] overlay capture failed: ${e.message}`); return null })
+      if (shot) { fs.copyFileSync(shot.file, path.join(outDir, 'overlay-ingame.png')); console.log(`[selftest] overlay shot ${shot.width}x${shot.height}`) }
+      await call('overlay:hide').catch(() => {})
+      win.restore()
+    }
+  }
   let consoleBuf = []
   win.webContents.on('console-message', (e) => {
     const level = e?.level ?? 'info'
