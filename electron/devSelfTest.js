@@ -41,6 +41,10 @@ export async function run(listeners) {
   fs.mkdirSync(outDir, { recursive: true })
   const win = await mainWindow()
   win.setSize(...(process.env.SELFTEST_SIZE || "1366x820").split("x").map(Number))
+  // SELFTEST_LANG=pt-BR: screenshots in another UI language (the selftest profile starts in en-US)
+  if (process.env.SELFTEST_LANG) {
+    await win.webContents.executeJavaScript(`localStorage.setItem('darkhub.lang', ${JSON.stringify(process.env.SELFTEST_LANG)}); location.reload()`).catch(() => {})
+  }
   await sleep(6000) // let startup background work settle
 
   // ---------------------------------------------------------------- 1. read-only IPC
@@ -171,6 +175,10 @@ export async function run(listeners) {
       // a window that is not on screen keeps its last painted frame: repaint before capturing
       win.webContents.invalidate()
       await sleep(400)
+      // the first capture after a route change can return the previous frame: take one, let it repaint, keep the second
+      await win.webContents.capturePage().catch(() => null)
+      win.webContents.invalidate()
+      await sleep(700)
       fs.writeFileSync(shot, (await win.webContents.capturePage()).toPNG())
     } catch { shot = null }
     const errorCard = await win.webContents.executeJavaScript(`!!document.querySelector('[role="alert"]')`).catch(() => false)
