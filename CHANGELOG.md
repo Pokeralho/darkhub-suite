@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-11-02
+
 ### Fixed
 - In-game overlay (overclocker layout): AMD Ryzen boards showed Vcore as a fixed 1.550 V. That is the SVI2 "no data"
   code LibreHardwareMonitor reports when the telemetry is not read, for Core and SoC alike; it is now ignored and the
