@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Updater: an update offer is checked again before downloading when it is more than a minute old. Before, a
+  release published between the check and the click was missed: the app installed the older one and asked to update
+  again right after restarting.
+
 ## [0.8.3] - 2026-11-02
 
 ### Fixed

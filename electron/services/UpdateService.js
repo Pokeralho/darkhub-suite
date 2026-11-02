@@ -6,6 +6,9 @@ import { spawn } from 'node:child_process';
 import Logger from './LoggerService.js';
 import { downloadToFile, assetSha256, GITHUB_HOSTS } from './SecureDownload.js';
 
+// An update offer older than this is checked again before downloading (a newer release may be out).
+const STALE_CHECK_MS = 60 * 1000;
+
 class UpdateService {
   constructor() {
     this._updater = null;
@@ -135,6 +138,7 @@ class UpdateService {
   }
 
   async checkForUpdates() {
+    this._checkedAt = Date.now();
     this._setState('checking');
     this._emit({ type: 'checking', stage: 'checking' });
 
@@ -200,6 +204,16 @@ class UpdateService {
     }
     if (this._state !== 'available' && !this._updateInfo) {
       return { ok: false, error: 'No update available for download.' };
+    }
+
+    // The offer may be stale: a newer release can appear between the check and the click (0.8.2 was installed
+    // minutes after 0.8.3 went out). Check again before downloading so the newest version is the one installed.
+    if (Date.now() - (this._checkedAt || 0) > STALE_CHECK_MS) {
+      const before = this._updateInfo?.version;
+      const fresh = await this.checkForUpdates();
+      if (fresh?.ok && fresh.updateAvailable === false) return { ok: false, error: 'App is already up to date.' };
+      if (fresh?.version && before && fresh.version !== before) Logger.info('UpdateService', `Newer release since the last check: v${before} -> v${fresh.version}`);
+      if (this._state !== 'available') return { ok: false, error: fresh?.error || 'No update available for download.' };
     }
 
     this._setState('downloading');
