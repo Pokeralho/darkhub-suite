@@ -24,7 +24,20 @@ describe('overlay: LibreHardwareMonitor reader', () => {
     expect(hw.gpu).toMatchObject({ load: 3, temp: 34.5, clock: 2610, memClock: 14001, power: 31.3, powerPct: 22, voltage: 0.985, memJunction: 40, vramUsedMb: 2231, vramTotalMb: 8151, fanRpm: 0 })
     expect(hw.ram).toMatchObject({ usedGb: 18.8, load: 59.1 })
     expect(hw.ram.totalGb).toBeCloseTo(31.8)
-    expect(hw.cpu).toMatchObject({ load: 20.1, loadMax: 64.7, vcore: 1.55, temp: null, clock: null, power: null, threads: [23.5, 64.7] })
+    // without admin/PawnIO: temps, clocks and power are 0 and SVI2 reports its 1.55 V "no data" code -> all null
+    expect(hw.cpu).toMatchObject({ load: 20.1, loadMax: 64.7, vcore: null, temp: null, clock: null, power: null, threads: [23.5, 64.7] })
+  })
+
+  it('reads a real Ryzen 7 5700 sample with admin: SVI2 stuck at 1.55 V falls back to the core VIDs', () => {
+    // values from the owner's PC (DarkHub.HwSensors.exe elevated, 2026-11-02)
+    const cpu = readLhm({ hw: [{ kind: 'Cpu', name: 'AMD Ryzen 7 5700', s: [
+      ['Load', 'CPU Total', 53.2], ['Power', 'Package', 51.678], ['Clock', 'Cores (Average)', 4240], ['Clock', 'Core #1', 4342], ['Clock', 'Core #4', 4367],
+      ['Voltage', 'Core #1 VID', 1.331], ['Voltage', 'Core #4 VID', 1.344], ['Voltage', 'Core #5 VID', 1.35],
+      ['Temperature', 'Core (Tctl/Tdie)', 68.125], ['Voltage', 'Core (SVI2 TFN)', 1.55], ['Voltage', 'SoC (SVI2 TFN)', 1.55]
+    ] }] }).cpu
+    expect(cpu).toMatchObject({ temp: 68.125, power: 51.678, clock: 4240, clockMax: 4367, vcore: 1.35 })
+    // a real SVI2 reading still wins over the VIDs
+    expect(readLhm({ hw: [{ kind: 'Cpu', name: 'x', s: [['Voltage', 'Core (SVI2 TFN)', 1.287], ['Voltage', 'Core #1 VID', 1.35]] }] }).cpu.vcore).toBe(1.287)
   })
 })
 

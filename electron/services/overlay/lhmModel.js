@@ -3,6 +3,9 @@
 // 0: those zeros mean "not read", never a real value, so they come out as null.
 
 const pos = (x) => (Number.isFinite(x) && x > 0 ? x : null)
+// AMD SVI2 voltage code 0 decodes to 1.55 V: LHM reports exactly that when the telemetry is not read (no admin or
+// PawnIO, or boards that do not expose SVI2 TFN), for Core and SoC alike. It is never a real reading.
+const volts = (x) => (pos(x) != null && Math.abs(x - 1.55) > 1e-4 ? x : null)
 
 function index(hw) {
   const map = new Map()
@@ -32,7 +35,9 @@ export function readLhm(payload) {
       clockMax: coreClocks.length ? Math.max(...coreClocks) : null,
       clockEffective: pos(get('Clock', 'Cores (Average Effective)')),
       power: pos(get('Power', 'Package', 'CPU Package')),
-      vcore: pos(get('Voltage', 'Core (SVI2 TFN)', 'CPU Core', 'Vcore', 'Core (SVI3 TFN)')),
+      // measured Vcore when available, otherwise the highest requested core VID (what the cores ask for under load)
+      vcore: volts(get('Voltage', 'Core (SVI2 TFN)')) ?? pos(get('Voltage', 'CPU Core', 'Vcore', 'Core (SVI3 TFN)'))
+        ?? (() => { const vids = all('Voltage', /^Core #\d+ VID$/).map(volts).filter((v) => v != null); return vids.length ? Math.max(...vids) : null })(),
       threads: threadLoads
     }
   }
