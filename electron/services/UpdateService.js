@@ -237,6 +237,9 @@ class UpdateService {
     // The fallback installer is executed silently, so it must come from GitHub over HTTPS and match
     // the SHA-256 digest GitHub publishes for the release asset. Without a digest we refuse.
     const info = this._updateInfo;
+    // An offer from electron-updater carries no SHA-256. It gets here when its download fails, as it always does in the
+    // portable build, which has no app-update.yml.
+    if (info?.downloadUrl && !info.sha256) info.sha256 = await this._publishedSha256(info);
     if (!info?.downloadUrl || !info?.sha256) {
       return fail('Integrity data (SHA-256) unavailable for this release. Download it manually from GitHub.');
     }
@@ -312,6 +315,18 @@ class UpdateService {
     } catch (err) {
       Logger.error('UpdateService', 'Error installing update:', err);
       return { ok: false, error: err.message };
+    }
+  }
+
+  /** The digest GitHub publishes for exactly this version and file. Anything else is null, and the download is refused. */
+  async _publishedSha256(info) {
+    try {
+      const release = await this._fetchLatestGitHubRelease();
+      if (release?.tag_name?.replace(/^v/, '') !== info.version) return null;
+      return assetSha256(release.assets?.find((a) => a.name === info.assetName));
+    } catch (e) {
+      Logger.warn('UpdateService', `Could not read the release digest: ${e?.message ?? e}`);
+      return null;
     }
   }
 

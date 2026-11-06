@@ -46,3 +46,52 @@ describe('updater: an offer that went stale', () => {
     expect(String((downloadToFile.mock.calls[0] as unknown[])[0])).toContain('0.8.3');
   });
 });
+
+describe('updater: an offer from electron-updater, whose download failed (portable build)', () => {
+  // what the update-available handler builds: no sha256
+  const offer = (v: string) => ({ version: v, assetName: `DarkHub-Setup-${v}.exe`, downloadUrl: `https://github.com/x/releases/download/v${v}/DarkHub-Setup-${v}.exe` });
+  const fresh = (v: string) => { svc._state = 'available'; svc._updateInfo = offer(v); svc._checkedAt = Date.now(); };
+  const events: { type: string; message?: string }[] = [];
+
+  beforeEach(() => { downloadToFile.mockClear(); events.length = 0; svc._emit = (e: { type: string }) => events.push(e); });
+
+  it('reads the published digest and downloads against it', async () => {
+    svc._fetchLatestGitHubRelease = vi.fn(async () => release('0.8.4'));
+    fresh('0.8.4');
+    await svc.downloadUpdate();
+    expect(downloadToFile).toHaveBeenCalledTimes(1);
+    expect((downloadToFile.mock.calls[0] as unknown[])[2]).toMatchObject({ expectedSha256: 'ab' });
+  });
+
+  const refused = async () => {
+    await svc.downloadUpdate();
+    expect(downloadToFile).not.toHaveBeenCalled();
+    expect(events.at(-1)?.message).toContain('SHA-256');
+  };
+
+  it('still refuses when the file has no digest', async () => {
+    const r = release('0.8.4');
+    delete (r.assets[0] as { digest?: string }).digest;
+    svc._fetchLatestGitHubRelease = vi.fn(async () => r);
+    fresh('0.8.4');
+    await refused();
+  });
+
+  it('never borrows the digest of another version or another file', async () => {
+    svc._fetchLatestGitHubRelease = vi.fn(async () => release('0.8.5'));
+    fresh('0.8.4');
+    await refused();
+    downloadToFile.mockClear();
+    const r = release('0.8.4');
+    r.assets[0].name = 'DarkHub.0.8.4-portable.exe';
+    svc._fetchLatestGitHubRelease = vi.fn(async () => r);
+    fresh('0.8.4');
+    await refused();
+  });
+
+  it('still refuses when GitHub cannot be reached', async () => {
+    svc._fetchLatestGitHubRelease = vi.fn(async () => { throw new Error('offline'); });
+    fresh('0.8.4');
+    await refused();
+  });
+});
