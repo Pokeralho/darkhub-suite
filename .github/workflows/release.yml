@@ -87,7 +87,7 @@ jobs:
           Copy-Item dist_release\latest.yml out\latest.yml
           Get-ChildItem out | Get-FileHash -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } | Set-Content out\SHA256SUMS.txt
 
-      - uses: actions/attest-build-provenance@v2
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             out/*.exe
