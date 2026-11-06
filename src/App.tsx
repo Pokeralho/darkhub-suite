@@ -46,6 +46,7 @@ const OverlayEditor = lazy(() => import('./pages/OverlayEditor'));
 const Presets = lazy(() => import('./pages/Presets'));
 const StartupManager = lazy(() => import('./pages/StartupManager'));
 const Benchmark = lazy(() => import('./pages/Benchmark'));
+const GpuBench = lazy(() => import('./pages/GpuBench'));
 const GameOverlay = lazy(() => import('./pages/GameOverlay'));
 const SaveBackup = lazy(() => import('./pages/SaveBackup'));
 // Dev-only IPC trace panel (tree-shaken out of production builds).
@@ -178,6 +179,8 @@ const App = () => {
         return <GameOverlay onNavigate={(p: string) => setCurrentPage(p)} />;
       case 'benchmark':
         return <Benchmark />;
+      case 'gpubench':
+        return <GpuBench />;
       case 'startup':
         return <StartupManager />;
       case 'usb':

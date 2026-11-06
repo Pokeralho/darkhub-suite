@@ -96,6 +96,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
         { id: 'ultra-latency', label: t('nav.ultralatency', 'Ultra Low Latency'), icon: Flame },
         { id: 'dll-injector', label: t('nav.dllinjector', 'DLL Injector'), icon: Crosshair },
         { id: 'benchmark', label: t('nav.benchmark', 'Before/after benchmark'), icon: Gauge },
+        { id: 'gpubench', label: t('nav.gpubench', 'GPU benchmark'), icon: Gauge },
         { id: 'overlay', label: t('nav.overlay', 'In-game overlay'), icon: Layers },
         { id: 'savebackup', label: t('nav.savebackup', 'Save backup'), icon: Archive }
       ]

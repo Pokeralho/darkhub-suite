@@ -66,6 +66,7 @@ import { registerRealtimeIPC } from './ipc/realtimeIpc.js'
 import { registerCodeRunnerIPC } from './ipc/codeRunnerIpc.js'
 import { registerStartupIPC } from './ipc/startupIpc.js'
 import { registerBenchmarkIPC } from './ipc/benchmarkIpc.js'
+import { registerGpuBenchIPC } from './ipc/gpuBenchIpc.js'
 import { registerMaintenanceIPC } from './ipc/maintenanceIpc.js'
 import { registerSaveBackupIPC } from './ipc/saveBackupIpc.js'
 import { registerOverlayIPC } from './ipc/overlayIpc.js'
@@ -238,6 +239,7 @@ safeRegister('realtime', () => registerRealtimeIPC({ app, ipcMain, dialog, Brows
 safeRegister('code', () => registerCodeRunnerIPC({ ipcMain, logger: Logger }))
 safeRegister('startup', () => registerStartupIPC({ app, ipcMain, logger: Logger }))
 safeRegister('benchmark', () => registerBenchmarkIPC({ app, ipcMain, BrowserWindow, logger: Logger }))
+safeRegister('gpubench', () => registerGpuBenchIPC({ app, ipcMain, BrowserWindow, shell, safeStorage, logger: Logger }))
 safeRegister('maintenance', () => registerMaintenanceIPC({ app, ipcMain, BrowserWindow, Notification, logger: Logger }))
 safeRegister('saves', () => registerSaveBackupIPC({ app, ipcMain, BrowserWindow, dialog, shell, logger: Logger }))
 // app hotkeys are watched without taking the key from games (see HotkeyService)

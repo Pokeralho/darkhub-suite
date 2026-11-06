@@ -7,7 +7,7 @@ import type { OvlItem, OvlLayout, OvlLayoutsState, OvlPreview, OvlStyle, OvlThem
 
 const api = () => window.darkhub?.overlay;
 const FONTS = ['"Cascadia Mono", Consolas, monospace', 'Consolas, monospace', '"Segoe UI", system-ui, sans-serif', '"Segoe UI Variable Display", "Segoe UI", sans-serif', 'Bahnschrift, "Segoe UI", sans-serif', 'Arial, sans-serif', 'Verdana, sans-serif', 'Tahoma, sans-serif', '"Trebuchet MS", sans-serif', 'Impact, sans-serif', '"Courier New", monospace', '"Lucida Console", monospace'];
-const GROUPS = ['fps', 'gpu', 'cpu', 'ram', 'session', 'other'];
+const GROUPS = ['fps', 'gpu', 'cpu', 'ram', 'power', 'cost', 'session', 'other'];
 const ANCHORS = ['tl', 'tc', 'tr', 'ml', '', 'mr', 'bl', 'bc', 'br'] as const;
 const CODE_PREFIX = 'dhovl1:';
 const encode = (l: OvlLayout) => CODE_PREFIX + btoa(unescape(encodeURIComponent(JSON.stringify(l))));

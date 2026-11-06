@@ -1,4 +1,5 @@
 // Overlay settings and the rows it shows. Pure.
+import { normalizePower, POWER_DEFAULTS } from './powerModel.js'
 
 export const METRICS = ['fps', 'low1', 'frametime', 'graph', 'cpu', 'cpuTemp', 'gpu', 'gpuTemp', 'vram', 'gpuClock', 'ram', 'cpuPower', 'latency']
 export const LAYOUTS = ['compact', 'advanced', 'oc', 'custom']
@@ -17,7 +18,9 @@ export const DEFAULTS = {
   // not Shift+F10: that is Windows' context-menu shortcut; this matches the screenshot ones (Ctrl+Shift+F11/F12)
   hotkey: 'Ctrl+Shift+F9',
   metrics: ['fps', 'low1', 'frametime', 'graph', 'cpu', 'cpuTemp', 'gpu', 'gpuTemp'],
-  logFolder: ''
+  logFolder: '',
+  // PSU, extra load and tariff for the estimates (powerModel.js)
+  ...POWER_DEFAULTS
 }
 
 export function normalizeSettings(s = {}) {
@@ -34,7 +37,8 @@ export function normalizeSettings(s = {}) {
     intervalMs: [250, 500, 1000].includes(Number(s.intervalMs)) ? Number(s.intervalMs) : DEFAULTS.intervalMs,
     hotkey: typeof s.hotkey === 'string' && s.hotkey.length <= 40 ? s.hotkey : DEFAULTS.hotkey,
     metrics: Array.isArray(s.metrics) ? s.metrics.filter((m) => METRICS.includes(m)) : DEFAULTS.metrics,
-    logFolder: typeof s.logFolder === 'string' ? s.logFolder : ''
+    logFolder: typeof s.logFolder === 'string' ? s.logFolder : '',
+    ...normalizePower(s)
   }
 }
 
@@ -107,7 +111,8 @@ export const COLORS = { gpu: '#4ade80', vram: '#a78bfa', cpu: '#60a5fa', ram: '#
  * null: then the basic sensors fill in), `session` from SessionStats.stats(), `history` holds the last samples
  * (one per refresh) of fps, cpu, gpu, cpuTemp and gpuTemp.
  */
-export function buildPanel(layout, frames, session, hw, sensors, history, labels = {}) {
+export function buildPanel(layout, frames, session, hw, sensors, history, labels = {}, extras = {}) {
+  const { derived = null, renderLatency = null } = extras || {}
   const oc = layout === 'oc'
   const L = (k, d) => labels[k] || d
   const cpu = hw?.cpu || {}
@@ -135,15 +140,56 @@ export function buildPanel(layout, frames, session, hw, sensors, history, labels
   }
   lines.push({ tag: 'VRAM', color: COLORS.vram, cells: [cell(f(vramMb != null ? vramMb / 1024 : null, 2), gpu.vramTotalMb ? `/ ${f(gpu.vramTotalMb / 1024, 0)} GB` : 'GB'), cell(f(gpu.memClock), 'MHz'), ...(oc ? [cell(f(gpu.memCtrlLoad), '% ctrl')] : [])] })
 
+  if (oc) {
+    const nv = hw?.nvml || {}
+    const e1 = []
+    if (gpu.vramPct != null) e1.push(cell(f(gpu.vramPct), '% VRAM'))
+    if (gpu.busLoad != null) e1.push(cell(f(gpu.busLoad), '% ' + L('bus', 'bus')))
+    if (nv.pcieGen != null && nv.pcieWidth != null) e1.push(cell(`${f(nv.pcieGen)}.0 x${f(nv.pcieWidth)}`, 'PCIe'))
+    if (gpu.videoEngineLoad != null) e1.push(cell(f(gpu.videoEngineLoad), '% ' + L('videoEngine', 'video')))
+    if (nv.encoderPct != null) e1.push(cell(f(nv.encoderPct), '% enc'))
+    if (nv.decoderPct != null) e1.push(cell(f(nv.decoderPct), '% dec'))
+    if (e1.length) lines.push({ tag: '', color: COLORS.vram, cells: e1 })
+  }
+
   const cpuCells = [cell(f(cpuLoad), '%'), cell(f(cpuTemp), '°C', tone(cpuTemp, 80, 90)), cell(f(cpu.clock), 'MHz'), cell(f(cpu.power ?? sensors?.cpuPower), 'W')]
   if (oc) cpuCells.push(cell(f(cpu.vcore, 3), 'V'), cell(f(cpu.clockMax), 'MHz max'))
   lines.push({ tag: 'CPU', color: COLORS.cpu, cells: cpuCells })
   if (oc && loadMax != null) lines.push({ tag: '', color: COLORS.cpu, cells: [cell(f(loadMax), '% ' + L('maxThread', 'max thread'), tone(loadMax, 90, 98))] })
-  lines.push({ tag: 'RAM', color: COLORS.ram, cells: [cell(f(ram.usedGb, 1), ram.totalGb ? `/ ${f(ram.totalGb, 0)} GB` : 'GB'), ...(ram.load != null || sensors?.ram != null ? [cell(f(ram.load ?? sensors?.ram), '%')] : [])] })
+  // clock, power, temperature and VID need an elevated helper: say so instead of showing blanks
+  if (oc && hw?.access?.cpuNeedsAdmin) lines.push({ tag: '', color: COLORS.cpu, cells: [cell(L('needsAdmin', 'needs admin'), '', 'warn')] })
+  else if (oc && hw?.access?.cpuNeedsPawnio) lines.push({ tag: '', color: COLORS.cpu, cells: [cell(L('needsPawnio', 'needs PawnIO'), '', 'warn')] })
+  lines.push({ tag: 'RAM', color: COLORS.ram, cells: [cell(f(ram.usedGb, 1), ram.totalGb ? `/ ${f(ram.totalGb, 0)} GB` : 'GB'), ...(ram.load != null || sensors?.ram != null ? [cell(f(ram.load ?? sensors?.ram), '%')] : []),
+    // SMBIOS values, not a live counter: derived, marked with *
+    ...(oc && ram.effectiveMts ? [cell(f(ram.effectiveMts), 'MT/s*'), cell(f(ram.baseClockMhz), 'MHz*')] : [])] })
 
   const fpsCells = [cell(frames ? f(frames.fps) : null, 'FPS', frames ? tone(frames.fps, 50, 30, false) : ''), cell(frames ? f(frames.frameTimeMs, 1) : null, 'ms'),
     cell(frames ? f(frames.low1) : null, '', '', '1%'), cell(frames ? f(frames.low01) : null, '', '', '0.1%')]
   lines.push({ tag: 'FPS', color: COLORS.fps, big: true, cells: fpsCells })
+
+  // power, efficiency, PSU and cost: every number below is an estimate or derived from one, marked with *
+  if (oc && derived) {
+    const d = derived
+    const nv = hw?.nvml || {}
+    const pw = [cell(f(d.gpuW), 'W'), cell(f(d.efficiency.fpsPerWatt, 2), 'FPS/W*'), cell(f(d.efficiency.joulesPerFrame, 2), 'J/' + L('frameShort', 'frame') + '*')]
+    if (d.energy.gpuKj != null) pw.push(cell(f(d.energy.gpuKj, 2), 'kJ'))
+    lines.push({ tag: 'PWR', color: COLORS.gpu, cells: pw })
+    if (d.system.dcW != null) {
+      lines.push({ tag: 'PSU*', color: COLORS.cpu, cells: [cell(f(d.system.loadPct), '%'), cell(f(d.system.efficiency), '% ' + L('eff', 'eff')), cell(f(d.system.dcW), 'W DC'), cell(f(d.system.acW), 'W AC')] })
+      if (d.system.partial) lines.push({ tag: '', color: COLORS.cpu, cells: [cell(L('partial', 'without') + ' ' + d.system.missing.map((m) => m.toUpperCase()).join('/'), '', 'warn')] })
+    }
+    const c = d.cost
+    const money = (x) => f(x, 2)
+    const costCells = []
+    if (c.gpu) costCells.push(cell(money(c.gpu.perHour), 'R$/h GPU*'))
+    if (c.cpuGpu) costCells.push(cell(money(c.cpuGpu.perHour), 'R$/h CPU+GPU*'))
+    if (c.withExtra) costCells.push(cell(money(c.withExtra.perHour), 'R$/h ' + L('withExtra', '+extra') + '*'))
+    if (costCells.length) lines.push({ tag: 'R$*', color: COLORS.fps, cells: costCells })
+    if (nv.throttle?.length) {
+      const limiting = nv.throttle.filter((r) => r !== 'idle' && r !== 'appClocks')
+      if (limiting.length) lines.push({ tag: '', color: COLORS.gpu, cells: [cell(limiting.map((r) => L('throttle.' + r, r)).join(' · '), '', 'warn')] })
+    }
+  }
 
   // what limits the frame rate: the GPU is busy almost the whole frame → GPU-bound, otherwise the CPU/engine
   let bound = null
@@ -176,6 +222,11 @@ export function buildPanel(layout, frames, session, hw, sensors, history, labels
     )
     if (bound) stats.push([L('bound', 'Limited by'), `${bound.kind === 'gpu' ? 'GPU' : 'CPU'} (GPU ${bound.pct}%)`])
     if (frames?.presentMode) stats.push([L('presentMode', 'Present'), frames.presentMode.replace(/_/g, ' ')])
+    if (renderLatency) stats.push([L('renderLatency', 'Render latency'), `${f(renderLatency.min, 1)} / ${f(renderLatency.avg, 1)} / ${f(renderLatency.max, 1)} ms`])
+    if (derived?.efficiency.fpsPerWattAvg != null) stats.push([L('avgFpsPerWatt', 'Avg FPS/W') + '*', f(derived.efficiency.fpsPerWattAvg, 2)])
+    if (derived?.efficiency.joulesPerFrameAvg != null) stats.push([L('avgJoulesPerFrame', 'Avg J/frame') + '*', f(derived.efficiency.joulesPerFrameAvg, 2)])
+    if (derived?.energy.gpuKj != null) stats.push([L('energyGpu', 'GPU energy'), `${f(derived.energy.gpuKj, 2)} kJ`])
+    if (derived) stats.push(['*', L('estimate', 'estimate')])
   }
 
   return { lines, graphs, stats, threads: oc && threads?.length ? threads.map((x) => Math.round(x)) : null, threadsLabel: L('threads', 'CPU threads') }

@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-01T18:28:34. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-05T21:25:12. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -30,7 +30,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/devSelfTest.js`
 
-`short`:19, `withTimeout`:25, `sleep`:26, `mainWindow`:28, `run`:40, `call`:69, `callLong`:134
+`short`:19, `withTimeout`:25, `sleep`:26, `mainWindow`:28, `run`:40, `call`:73, `callLong`:138
 
 ## `electron/devSelfTestMutate.js`
 
@@ -136,6 +136,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `registerDriverIPC`:9, `handle`:12
 
+## `electron/ipc/gpuBenchIpc.js`
+
+`toJpeg`:5, `registerGpuBenchIPC`:12, `broadcast`:13, `handle`:15
+
 ## `electron/ipc/hubIpc.js`
 
 `registerHubIPC`:23, `send`:26, `focus`:27, `approve`:31, `readDev`:53, `writeDev`:54, `loadDevFolder`:55, `watchDev`:62, `addDev`:76, `openLink`:92, `handle`:101, `text`:107, `init`:156
@@ -214,7 +218,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/main.js`
 
-`getSystemInformation`:129, `get`:135, `getSharp`:144, `getOcrWorker`:153, `getExiftool`:173, `getFfmpegPath`:181, `getLibraryStore`:213, `safeRegister`:220, `getYtDlpTools`:258, `isDev`:263, `normalizeAccessPath`:287, `isPathInside`:297, `grantFilePath`:303, `grantDirectoryPath`:308, `hasFileAccessGrant`:313, `assertOutputDirGranted`:325, `assertFileAccessGranted`:331, `assertFileAccessGrantedMany`:340, `psSingleQuote`:346, `loadRuntimeConfig`:350, `isAllowedExternalProtocol`:360, `getAllowedExternalUrl`:364, `openAllowedExternalUrlDetached`:374, `isEmbeddedExternalProtocol`:385, `handleEmbeddedExternalNavigation`:389, `isTrustedAppNavigation`:401, `getAppIconPath`:411, `showMainWindow`:426, `ensureTray`:439, `hideWindowToBackground`:466, `estimateDirectoryBytes`:471, `computeJunkEstimate`:515, `work`:529, `createMainWindow`:596, `kickWindowsPaint`:661, `showWhenReady`:733, `eventSender`:818, `measureLatency`:845, `getActiveAdapterName`:875, `getMainCpuLoad`:1111, `broadcastLibraryEvent`:1255, `scoreExecutable`:1331, `key`:1336, `scanDirectoryForBestExe`:1357, `walk`:1360, `findPgeBat`:1501, `launchPgeBat`:1521, `isStartupTaskEnabled`:1597, `setStartupTask`:1607, `refreshLiveCounts`:1718, `sendEvent`:1974, `findLibreOfficeSoffice`:2206, `toXml`:2298, `buildArgs`:2391, `vaultFilePath`:2665, `setVaultAutoLockMinutes`:2673, `clearVaultAutoLock`:2680, `scheduleVaultAutoLock`:2687, `touchVault`:2696, `vaultFileExists`:2700, `readVaultFile`:2709, `writeVaultFile`:2714, `lockVault`:2722, `ensureUnlocked`:2729, `loadVaultUsingWrapper`:2734, `persistVaultData`:2755, `getSecurityScoreV2`:3127, `add`:3132, `isValidHostname`:3309, `getClickEnginePath`:3443, `autoClickerCall`:3469, `isValidWingetId`:3549, `installGithubReleaseMsi`:3561, `installFromOfficialUrl`:3589, `progress`:3625, `runWinget`:3650, `runDeferredStartup`:3732
+`getSystemInformation`:130, `get`:136, `getSharp`:145, `getOcrWorker`:154, `getExiftool`:174, `getFfmpegPath`:182, `getLibraryStore`:214, `safeRegister`:221, `getYtDlpTools`:260, `isDev`:265, `normalizeAccessPath`:289, `isPathInside`:299, `grantFilePath`:305, `grantDirectoryPath`:310, `hasFileAccessGrant`:315, `assertOutputDirGranted`:327, `assertFileAccessGranted`:333, `assertFileAccessGrantedMany`:342, `psSingleQuote`:348, `loadRuntimeConfig`:352, `isAllowedExternalProtocol`:362, `getAllowedExternalUrl`:366, `openAllowedExternalUrlDetached`:376, `isEmbeddedExternalProtocol`:387, `handleEmbeddedExternalNavigation`:391, `isTrustedAppNavigation`:403, `getAppIconPath`:413, `showMainWindow`:428, `ensureTray`:441, `hideWindowToBackground`:468, `estimateDirectoryBytes`:473, `computeJunkEstimate`:517, `work`:531, `createMainWindow`:598, `kickWindowsPaint`:663, `showWhenReady`:735, `eventSender`:820, `measureLatency`:847, `getActiveAdapterName`:877, `getMainCpuLoad`:1113, `broadcastLibraryEvent`:1257, `scoreExecutable`:1333, `key`:1338, `scanDirectoryForBestExe`:1359, `walk`:1362, `findPgeBat`:1503, `launchPgeBat`:1523, `isStartupTaskEnabled`:1599, `setStartupTask`:1609, `refreshLiveCounts`:1720, `sendEvent`:1976, `findLibreOfficeSoffice`:2208, `toXml`:2300, `buildArgs`:2393, `vaultFilePath`:2667, `setVaultAutoLockMinutes`:2675, `clearVaultAutoLock`:2682, `scheduleVaultAutoLock`:2689, `touchVault`:2698, `vaultFileExists`:2702, `readVaultFile`:2711, `writeVaultFile`:2716, `lockVault`:2724, `ensureUnlocked`:2731, `loadVaultUsingWrapper`:2736, `persistVaultData`:2757, `getSecurityScoreV2`:3129, `add`:3134, `isValidHostname`:3311, `getClickEnginePath`:3445, `autoClickerCall`:3471, `isValidWingetId`:3551, `installGithubReleaseMsi`:3563, `installFromOfficialUrl`:3591, `progress`:3627, `runWinget`:3652, `runDeferredStartup`:3734
 
 ## `electron/networkIPC.js`
 
@@ -226,7 +230,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:284, `handler`:303, `handler`:313, `handler`:325, `listener`:368, `handler`:420, `handler`:446, `handler`:452, `handler`:458, `handler`:464, `listener`:473, `listener`:484, `handler`:509, `listener`:522, `listener`:539, `handler`:577, `handler`:592, `listener`:615, `listener`:640, `listener`:675, `listener`:702, `handler`:743
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:286, `handler`:305, `handler`:315, `handler`:331, `handler`:343, `listener`:386, `handler`:438, `handler`:464, `handler`:470, `handler`:476, `handler`:482, `listener`:491, `listener`:502, `handler`:527, `listener`:540, `listener`:557, `handler`:595, `handler`:610, `listener`:633, `listener`:658, `listener`:693, `listener`:720, `handler`:761
 
 ## `electron/services/CodeRunner.js`
 
@@ -330,7 +334,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/UpdateService.js`
 
-`UpdateService`:9 _class_, `init`:23, `_setupUpdater`:44, `_scheduleAutoCheck`:126, `_setState`:133, `checkForUpdates`:137, `downloadUpdate`:197, `fail`:217, `installUpdate`:271, `_fetchLatestGitHubRelease`:304, `_isNewerVersion`:338, `_registerIPC`:350, `_emit`:362, `destroy`:368
+`UpdateService`:12 _class_, `init`:26, `_setupUpdater`:47, `_scheduleAutoCheck`:129, `_setState`:136, `checkForUpdates`:140, `downloadUpdate`:201, `fail`:231, `installUpdate`:285, `_fetchLatestGitHubRelease`:318, `_isNewerVersion`:352, `_registerIPC`:364, `_emit`:376, `destroy`:382
 
 ## `electron/services/autoclicker/AutoClickerService.js`
 
@@ -416,6 +420,22 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `quoteArg`:9, `buildRelaunchCommand`:15, `relaunchAsAdmin`:20, `ensureElevated`:32
 
+## `electron/services/gpubench/GpuBenchService.js`
+
+`enginePath`:17, `Engine`:23 _class_, `next`:30, `ask`:39, `stop`:44, `kill`:49, `GpuBenchService`:52 _class_, `hubUrl`:66, `history`:71, `_save`:72, `remove`:73, `stressHistory`:75, `removeStress`:76, `_token`:78, `status`:82, `rankingUrl`:86, `openRanking`:88, `link`:106, `unlink`:125, `cancel`:132, `_sensorSample`:134, `run`:136, `warm`:152, `record`:158, `stress`:196, `_preview`:256, `_rankedRun`:267
+
+## `electron/services/gpubench/gpuBenchModel.js`
+
+`decodeFrameUs`:12, `frameStats`:20, `scoreOf`:35, `sensorSummary`:42, `pick`:43, `mean`:44, `max`:45, `sampleGpu`:55, `val`:57, `localPlan`:65
+
+## `electron/services/gpubench/sceneModel.js`
+
+`pcg`:22, `hash2`:29, `tri`:31, `box`:34, `camera`:47, `sub`:58, `cross`:59, `norm`:60, `primaryRay`:63, `hitBox`:73, `castRay`:88, `pixelId`:115, `tileHasEdges`:118, `pickTiles`:127, `tileHash`:137, `sha`:143, `frameRoot`:146, `merkleLevels`:152, `merkleRoot`:163, `merklePath`:166, `verifyPath`:177
+
+## `electron/services/gpubench/stressModel.js`
+
+`normalizeStress`:15, `stressPlan`:25, `isDeviceLost`:32, `finite`:34, `round1`:35, `stability`:38, `clockDrop`:48, `avg`:54, `summarizeStress`:68
+
 ## `electron/services/hotkeys/HotkeyService.js`
 
 `HotkeyService`:12 _class_, `_watcher`:20, `_send`:49, `register`:57, `unregister`:71, `dispose`:79
@@ -462,7 +482,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/hwsensors/DarkHub.HwSensors.cs`
 
-`HwSensors`:18 _class_, `Esc`:20, `PawnIoInstalled`:32, `Dump`:38, `IsAdmin`:67, `Main`:73
+`Nvml`:25 _class_, `ProcInfo`:40 _class_, `Device`:46 _class_, `Num`:106, `U32`:113, `ProcMem`:120, `Dump`:138, `HwSensors`:173 _class_, `Esc`:175, `PawnIoInstalled`:187, `Dump`:193, `IsAdmin`:222, `ReadSmbios`:231, `Main`:259
 
 ## `electron/services/hwsensors/pawnio.js`
 
@@ -570,7 +590,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/overlay/OverlayService.js`
 
-`OverlayService`:18 _class_, `_saveLayouts`:62, `layoutsState`:64, `saveLayout`:73, `newLayout`:82, `deleteLayout`:88, `activateLayout`:96, `preview`:105, `_save`:110, `_emit`:111, `status`:113, `setSettings`:122, `_bindHotkey`:133, `_displays`:141, `_displayIdFromPhysical`:152, `_place`:159, `_ensureWindow`:171, `show`:187, `hide`:205, `toggle`:218, `_closeSession`:220, `p`:223, `_attach`:229, `_track`:245, `_follow`:258, `_restartLoop`:268, `_stopLoop`:275, `_stream`:277, `_render`:284, `add`:300, `_log`:319, `f`:328, `dispose`:333
+`OverlayService`:19 _class_, `_saveLayouts`:71, `layoutsState`:73, `saveLayout`:82, `newLayout`:91, `deleteLayout`:97, `activateLayout`:105, `preview`:114, `power`:120, `resetEnergy`:128, `_save`:130, `_emit`:131, `status`:133, `setSettings`:142, `_bindHotkey`:153, `_displays`:161, `_displayIdFromPhysical`:172, `_place`:179, `_ensureWindow`:191, `show`:207, `hide`:225, `toggle`:238, `_closeSession`:240, `p`:243, `_attach`:249, `_track`:267, `_follow`:280, `_restartLoop`:290, `_stopLoop`:297, `_stream`:299, `_render`:306, `add`:323, `_log`:342, `f`:351, `dispose`:356
 
 ## `electron/services/overlay/PresentMonService.js`
 
@@ -578,19 +598,23 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/overlay/customModel.js`
 
-`isNum`:7, `num`:8, `str`:9, `esc`:10, `cssValue`:12, `color`:13, `hw`:18, `gpu`:19, `cpu`:20, `ram`:21, `fr`:22, `ss`:23, `normStyle`:97, `newId`:105, `idOk`:106, `normItem`:108, `normWidget`:122, `normalizeLayout`:148, `hexToRgba`:185, `px`:191, `value`:193, `hash`:213, `renderLayout`:224, `add`:231, `M`:320, `fromPreset`:390, `sampleContext`:396, `hist`:398
+`isNum`:9, `num`:10, `str`:11, `esc`:12, `cssValue`:14, `color`:15, `hw`:20, `gpu`:21, `cpu`:22, `ram`:23, `fr`:24, `ss`:25, `nv`:26, `dv`:27, `rl`:28, `normStyle`:140, `newId`:148, `idOk`:149, `normItem`:151, `normWidget`:165, `normalizeLayout`:191, `hexToRgba`:228, `px`:234, `value`:236, `hash`:257, `renderLayout`:268, `add`:275, `M`:364, `fromPreset`:437, `sampleContext`:443, `hist`:445
 
 ## `electron/services/overlay/frameStats.js`
 
-`splitCsv`:4, `createCsvParser`:19, `num`:29, `pct`:43, `FrameWindow`:46 _class_, `push`:55, `stats`:65, `avg`:72, `reset`:89, `SessionStats`:100 _class_, `reset`:103, `push`:117, `percentile`:138, `stats`:149
+`splitCsv`:4, `createCsvParser`:19, `num`:29, `RangeStat`:46 _class_, `reset`:48, `push`:49, `stats`:56, `pct`:59, `FrameWindow`:62 _class_, `push`:72, `stats`:83, `avg`:90, `reset`:108, `SessionStats`:119 _class_, `reset`:122, `push`:136, `percentile`:157, `stats`:168
 
 ## `electron/services/overlay/lhmModel.js`
 
-`pos`:5, `index`:7, `get`:10, `all`:11, `avg`:15, `readLhm`:17
+`pos`:5, `volts`:8, `hwEntries`:10, `index`:12, `get`:15, `all`:16, `decodeThrottle`:25, `avg`:31, `readLhm`:33, `n`:115
 
 ## `electron/services/overlay/overlayModel.js`
 
-`normalizeSettings`:23, `clamp`:24, `pickDisplay`:43, `byId`:44, `v`:52, `n`:53, `readSensors`:56, `tone`:71, `buildRows`:77, `f`:101, `cell`:102, `buildPanel`:110, `L`:112, `mm`:170
+`normalizeSettings`:26, `clamp`:27, `pickDisplay`:47, `byId`:48, `v`:56, `n`:57, `readSensors`:60, `tone`:75, `buildRows`:81, `f`:105, `cell`:106, `buildPanel`:114, `L`:117, `money`:182, `mm`:216
+
+## `electron/services/overlay/powerModel.js`
+
+`psuCurve`:23, `psuEfficiency`:33, `num`:46, `posNum`:47, `fpsPerWatt`:50, `joulesPerFrame`:52, `EnergyMeter`:59 _class_, `reset`:62, `push`:72, `mid`:84, `hasCounter`:94, `gpuJoules`:95, `cpuJoules`:96, `systemPower`:100, `costOf`:115, `normalizePower`:128, `clamp`:129, `buildDerived`:146, `scenario`:159
 
 ## `electron/services/psTools/PsToolkitService.js`
 
@@ -832,6 +856,22 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `ioctl`:30, `u32le`:51, `u64le`:54, `disk_path`:58, `open_query`:63, `geometry`:74, `bus_name`:105, `descriptor_string`:129, `device_info`:138, `wide`:163, `from_wide`:166, `volume_extents`:171, `volumes`:186, `system_disks`:219, `list_drives`:239, `disk_of_path`:270, `lock_volumes`:286, `open`:325, `size`:347, `sector_size`:350, `read_at`:353, `write_at`:371, `flush`:384
 
+## `native_gpubench/src/gpu.rs`
+
+`wndproc`:123, `heap_props`:130, `buffer_desc`:134, `tex_desc`:141, `create`:148, `barrier`:154, `uav_barrier`:169, `bytecode`:177, `compute_pso`:181, `graphics_pso`:186, `root_signature`:207, `loaded_modules`:229, `dot`:245, `sun_dir`:247, `frame_cb`:253, `cpu_handle`:377, `gpu_handle`:380, `write_descriptors`:385, `init_rt`:428, `wait_value`:508, `wait_idle`:516, `pump`:523, `ids_to`:535, `record`:542, `submit`:654, `collect`:666, `segment`:684, `capture`:715, `read_ldr`:734, `read_texture`:742, `drop`:773
+
+## `native_gpubench/src/main.rs`
+
+`say`:16, `u32s_b64`:22, `vectors`:29, `run`:45, `main`:131
+
+## `native_gpubench/src/proof.rs`
+
+`frame_root`:6, `pair`:10, `levels`:17, `merkle_root`:27, `merkle_path`:33, `hex`:45
+
+## `native_gpubench/src/scene.rs`
+
+`pcg`:14, `hash2`:20, `tri`:24, `box_at`:34, `camera`:50, `basis`:61
+
 ## `native_pacer/src/lib.rs`
 
 `CreateWindowExA`:66, `DestroyWindow`:80, `timeBeginPeriod`:85, `timeEndPeriod`:86, `QueryPerformanceCounter`:90, `QueryPerformanceFrequency`:91, `VirtualProtect`:92, `CreateFileMappingW`:93, `OpenFileMappingW`:94, `MapViewOfFile`:95, `CloseHandle`:96, `GetCurrentProcessId`:97, `Sleep`:98, `LoadLibraryA`:99, `GetProcAddress`:100, `CreateThread`:101, `CreateWaitableTimerExW`:102, `SetWaitableTimer`:103, `WaitForSingleObject`:104, `get_qpc_ms`:218, `precision_wait`:228, `hist_recent`:254, `push_sample`:258, `compute_stats`:267, `publish`:317, `is_main_swapchain`:356, `perform_pacing`:407, `hooked_present`:478, `hooked_present1`:488, `map_named`:502, `setup_shared_memory`:519, `patch_slot`:547, `com_release`:560, `install_vtable_hooks`:571, `remove_vtable_hooks`:659, `init_thread`:671, `DllMain`:687, `reset`:729, `stats_come_only_from_real_samples`:735, `low01_unavailable_with_few_samples`:754, `telemetry_layout_matches_reader`:766
@@ -844,13 +884,17 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `$`:46, `show`:59
 
+## `scripts/gpubench-check.mjs`
+
+`u32s`:12, `next`:26, `send`:27
+
 ## `scripts/hub-docs.mjs`
 
 `cell`:17, `value`:18, `builtinMarkdown`:20, `builtinJsonText`:85
 
 ## `src/App.tsx`
 
-`pageFromHash`:56, `PageLoading`:61 _component_, `App`:76 _component_, `onHash`:91, `reportRenderError`:97, `renderPage`:101
+`pageFromHash`:57, `PageLoading`:62 _component_, `App`:77 _component_, `onHash`:92, `reportRenderError`:98, `renderPage`:102
 
 ## `src/components/DetailedHardwareInfo.tsx`
 
@@ -928,6 +972,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `api`:9, `fill`:10, `mb`:12, `ItemState`:14 _type_, `MissingDrivers`:18 _component_, `itemTitle`:75, `toggle`:77, `runInstall`:83, `reasonText`:110, `sourceText`:116, `statusLine`:118, `itemRow`:139, `wuHintKey`:350
 
+## `src/components/gpubench/StressPanel.tsx`
+
+`num`:8, `StabilityChart`:11 _component_, `y`:13, `best`:15, `StressPanel`:32 _component_, `api`:41, `start`:50, `remove`:63, `loadName`:65, `verdictName`:66, `verdictClass`:67, `reasonText`:68
+
 ## `src/components/hub/HubApproval.tsx`
 
 `Approval`:7 _type_, `HubApproval`:10 _component_, `answer`:19
@@ -975,6 +1023,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `src/components/monitor/LhmSensorTree.tsx`
 
 `LhmSensor`:5 _type_, `LhmHardware`:6 _type_, `LhmData`:7 _type_, `kindIcon`:37, `fmt`:39, `LhmSensorTree`:51 _component_, `match`:59
+
+## `src/components/monitor/PowerPanel.tsx`
+
+`api`:6, `f`:7, `Row`:10 _component_, `Block`:19 _component_, `PowerSettingsForm`:31 _component_, `num`:33, `PowerPanel`:78 _component_, `set`:93, `cpuVal`:109, `money`:111, `kwh`:112
 
 ## `src/components/network/LatencyLab.tsx`
 
@@ -1138,15 +1190,19 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/i18n/messages.ts`
 
-`SupportedLang`:29 _type_, `LanguageOption`:31 _type_, `getTranslationTemplate`:3434
+`SupportedLang`:31 _type_, `LanguageOption`:33 _type_, `getTranslationTemplate`:3436
 
 ## `src/i18n/overlayEditorMessages.ts`
 
 `prefixed`:17
 
+## `src/i18n/powerMessages.ts`
+
+`prefixed`:20
+
 ## `src/layouts/MainLayout.tsx`
 
-`MainLayoutProps`:17 _type_, `NavSection`:23 _type_, `MainLayout`:33 _component_, `handleMenuClick`:149, `handleNavKeyDown`:172, `navButton`:187, `rail`:193
+`MainLayoutProps`:17 _type_, `NavSection`:23 _type_, `MainLayout`:33 _component_, `handleMenuClick`:150, `handleNavKeyDown`:173, `navButton`:188, `rail`:194
 
 ## `src/lib/cipherTools.ts`
 
@@ -1230,7 +1286,11 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/GameOverlay.tsx`
 
-`n`:9, `GameOverlay`:11 _component_, `api`:19, `metricLabel`:21, `set`:45, `toggle`:52, `toggleMetric`:61, `PlacementPicker`:188 _component_, `ratio`:191, `spotLabel`:192, `nudge`:197
+`n`:10, `GameOverlay`:12 _component_, `api`:20, `metricLabel`:22, `set`:52, `toggle`:59, `toggleMetric`:68, `PlacementPicker`:203 _component_, `ratio`:206, `spotLabel`:207, `nudge`:212
+
+## `src/pages/GpuBench.tsx`
+
+`num`:8, `GpuBench`:10 _component_, `api`:23, `load`:24, `errorText`:41, `run`:49, `link`:60, `unlink`:69, `remove`:70, `testName`:76, `statusName`:77, `statusClass`:83, `phaseText`:84
 
 ## `src/pages/Home.tsx`
 
@@ -1334,7 +1394,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/SystemMonitor.tsx`
 
-`formatBytes`:18, `PropertyRow`:27 _component_, `Skel`:38 _component_, `toneFor`:43, `loadBar`:52, `SectionBlock`:100 _component_, `TabType`:112 _type_, `toFixedSafe`:114, `formatSource`:119, `isVirtualNet`:133, `SystemMonitor`:139 _component_, `fetchUsage`:202, `handleBenchmark`:232, `generateReport`:253, `handleTabRefresh`:269, `renderTabs`:276, `renderTabLoadingState`:345, `renderTabErrorState`:361, `renderContent`:375, `norm`:559, `getTempStyle`:617
+`formatBytes`:19, `PropertyRow`:28 _component_, `Skel`:39 _component_, `toneFor`:44, `loadBar`:53, `SectionBlock`:101 _component_, `TabType`:113 _type_, `toFixedSafe`:115, `formatSource`:120, `isVirtualNet`:134, `SystemMonitor`:140 _component_, `fetchUsage`:203, `handleBenchmark`:233, `generateReport`:254, `handleTabRefresh`:270, `renderTabs`:277, `renderTabLoadingState`:346, `renderTabErrorState`:362, `renderContent`:376, `norm`:560, `getTempStyle`:618
 
 ## `src/pages/TextEditor.tsx`
 
@@ -1424,6 +1484,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `ext`:16
 
+## `tests/gpuStress.test.ts`
+
+`loop`:11, `fakeEngine`:88, `say`:91, `service`:107
+
 ## `tests/hub.test.ts`
 
 `base`:19, `reg`:20, `v`:21, `refused`:62, `official`:87, `fakeTweaks`:176, `fakeOptimizer`:191, `op`:193, `dir`:210, `pkg`:214, `run`:292
@@ -1503,6 +1567,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/templateBackslash.test.ts`
 
 `lostEscapes`:10, `visit`:13, `walk`:36
+
+## `tests/updateService.test.ts`
+
+`release`:20
 
 ## `tests/vaultBridge.test.ts`
 

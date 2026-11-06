@@ -126,3 +126,6 @@ desktop.ini
 graphify-out/
 # Real-ESRGAN, fetched at build time (npm run build:upscaler)
 vendor/realesrgan/
+
+# compiled shaders are committed: building the engine does not need the Windows SDK
+!native_gpubench/shaders/out/

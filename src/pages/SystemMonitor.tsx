@@ -12,6 +12,7 @@ import { HelpTip } from '../components/HelpTip';
 import PageHeader from '../components/ui/PageHeader';
 import AdvancedSensorsPanel from '../components/monitor/AdvancedSensorsPanel';
 import LhmSensorTree from '../components/monitor/LhmSensorTree';
+import PowerPanel from '../components/monitor/PowerPanel';
 import { Sparkline } from '../components/library/Sparkline';
 import { useSensorHistory } from '../hooks/useSensorHistory';
 
@@ -982,6 +983,7 @@ const SystemMonitor = () => {
         const lhm = metrics?.temps?.values?.lhm;
         return (
           <div className="space-y-6 animate-in">
+            <PowerPanel cpuLoad={metrics?.cpu?.values?.currentLoad?.value} />
             {lhm ? <LhmSensorTree lhm={lhm} /> : (
               <>
                 <p className="dh-help max-w-[75ch]">{t('monitor.lhm.off', 'A lista completa (tensões, temperaturas, potência, clocks, uso, ventoinhas e SMART de cada componente) vem dos sensores avançados. Ative-os abaixo.')}</p>

@@ -73,8 +73,29 @@ export interface OvlLayoutsState { ok: boolean; error?: string; active: string; 
 export interface OvlCanvas { id: string; kind: 'graph' | 'bars'; series?: { color: string; values: number[] }[]; values?: number[]; floor?: number; ceil?: number; height: number; width?: number; fill?: boolean; lineWidth?: number; grid?: boolean; colors?: string[] }
 export interface OvlPreview { ok: boolean; error?: string; live: boolean; html: string; css: string; canvases: OvlCanvas[]; box: { anchor: string; offsetX: number; offsetY: number; scale: number; opacity: number } }
 export interface OverlayDisplay { id: string; name: string; primary: boolean; width: number; height: number; hz: number | null }
-export interface OverlaySettings { layout: 'compact' | 'advanced' | 'oc' | 'custom'; position: 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br'; offsetX: number; offsetY: number; monitor: string; scale: number; opacity: number; background: number; intervalMs: number; hotkey: string; metrics: string[]; logFolder: string }
-export interface OverlayFrameStats { fps: number | null; frameTimeMs: number | null; low1: number | null; low01: number | null; maxFrameTimeMs: number; gpuBusyMs: number | null; latencyMs: number | null; presentMode: string; graph: number[] }
+export interface OverlaySettings { layout: 'compact' | 'advanced' | 'oc' | 'custom'; position: 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br'; offsetX: number; offsetY: number; monitor: string; scale: number; opacity: number; background: number; intervalMs: number; hotkey: string; metrics: string[]; logFolder: string;
+  /** PSU, extra load and tariff for the power estimates */
+  psuWatts: number; psuRating: 'white' | 'bronze' | 'silver' | 'gold' | 'platinum' | 'titanium' | 'custom'; psuCustom: number[]; extraWatts: number; tariff: number; hoursPerDay: number }
+export interface OverlayFrameStats { fps: number | null; frameTimeMs: number | null; low1: number | null; low01: number | null; maxFrameTimeMs: number; gpuBusyMs: number | null; latencyMs: number | null; renderLatencyMs?: number | null; presentMode: string; graph: number[] }
+/** One cost scenario: kWh and R$ per period (R$ is null when no tariff is set). */
+export interface OverlayCost { kwhHour: number; kwhDay: number; kwhMonth: number; kwhYear: number; perHour: number | null; perDay: number | null; perMonth: number | null; perYear: number | null }
+export interface OverlayDerived {
+  settings: Pick<OverlaySettings, 'psuWatts' | 'psuRating' | 'psuCustom' | 'extraWatts' | 'tariff' | 'hoursPerDay'>;
+  gpuW: number | null; cpuW: number | null;
+  efficiency: { fpsPerWatt: number | null; fpsPerWattAvg: number | null; joulesPerFrame: number | null; joulesPerFrameAvg: number | null; fpsPerWattSystem: number | null };
+  energy: { gpuKj: number | null; cpuKj: number | null; source: 'nvml' | 'integrated' | null; seconds: number };
+  system: { dcW: number | null; loadPct: number | null; efficiency: number | null; acW: number | null; lossW: number | null; missing: string[]; partial: boolean; est: true };
+  cost: { est: true; gpu: OverlayCost | null; cpuGpu: OverlayCost | null; withExtra: OverlayCost | null; wall: OverlayCost | null };
+}
+/** LibreHardwareMonitor + direct NVML + SMBIOS readings (electron/services/overlay/lhmModel.js). Null = not read / not exposed. */
+export interface OverlayHw {
+  gpu: { name: string; load: number | null; temp: number | null; hotspot: number | null; memJunction: number | null; clock: number | null; memClock: number | null; power: number | null; powerPct: number | null; voltage: number | null; fanRpm: number | null; fanPct: number | null; vramUsedMb: number | null; vramTotalMb: number | null; memCtrlLoad: number | null; videoEngineLoad: number | null; busLoad: number | null; vramPct: number | null; vramFreeMb: number | null; d3dDedicatedMb: number | null; d3dSharedMb: number | null; pcieRxBps: number | null; pcieTxBps: number | null; engines: Record<string, number> } | null;
+  cpu: { name: string; load: number | null; temp: number | null; clock: number | null; power: number | null; vcore: number | null } | null;
+  ram: { usedGb: number | null; totalGb: number | null; load: number | null; effectiveMts?: number; ratedMts?: number | null; baseClockMhz?: number; type?: string | null; derived?: boolean } | null;
+  nvml?: { energyJ: number | null; powerW: number | null; powerLimitW: number | null; enforcedLimitW: number | null; pcieGen: number | null; pcieWidth: number | null; pcieMaxGen: number | null; pcieMaxWidth: number | null; encoderPct: number | null; decoderPct: number | null; throttle: string[] | null; computeMemMb: number | null; computeProcs: number | null; graphicsMemMb: number | null };
+  access: { admin: boolean; pawnio: boolean; cpuNeedsAdmin: boolean; cpuNeedsPawnio: boolean };
+}
+export interface OverlayPower { ok: boolean; at: number; gaming: boolean; hw: OverlayHw | null; derived: OverlayDerived | null }
 export interface OverlayStatus {
   ok: boolean; error?: string | null; visible?: boolean; settings?: OverlaySettings; target?: { pid: number; name: string } | null; mode?: 'foreground' | 'fixed';
   capturing?: boolean; presentMonInstalled?: boolean; stats?: OverlayFrameStats | null; displays?: OverlayDisplay[]; displayId?: string | null;
@@ -125,6 +146,41 @@ export interface BenchRun {
   context: { powerPlan: string | null; onBattery: boolean; cpu: string | null; threads: number; ramGb: number; osBuild: string; backgroundCpu: number };
   metrics: Record<string, { median: number; noise: number; samples: number[] }>;
 }
+
+export interface GpuBenchRun {
+  id: string;
+  at: number;
+  label: string;
+  quick: boolean;
+  sceneVersion: number;
+  status: 'local' | 'verified' | 'review' | 'rejected';
+  flags: string[];
+  score: { raster: number; rt: number | null; total: number | null };
+  stats: { raster: GpuBenchStats; rt?: GpuBenchStats };
+  gpu: { name: string; vendorId: number; deviceId: number; vramMb: number; driver: string; dxr: boolean };
+  sensors: { samples: number; gpuClockAvg: number | null; gpuClockMax: number | null; gpuTempAvg: number | null; gpuTempMax: number | null; gpuPowerAvg: number | null; gpuLoadAvg: number | null };
+}
+
+export interface GpuStressLoop { index: number; test: string; fps: number; low1: number; clock: number | null; tempMax: number | null; power: number | null; error: 'ids' | 'image' | null }
+
+export interface GpuStressRun {
+  id: string;
+  at: number;
+  minutes: number;
+  load: string;
+  gpu: { name: string; driver: string; dxr: boolean };
+  loops: GpuStressLoop[];
+  summary: {
+    verdict: 'pass' | 'fail' | 'inconclusive' | 'stopped' | 'cancelled'; reasons: string[]; stop: string | null; errors: number; tempLimit: number; planned: number; completed: number;
+    stability: number | null; clockDrop: number | null; throttled: boolean; tempStart: number | null; tempMax: number | null; powerAvg: number | null; noTempSensor: boolean;
+  };
+}
+
+export interface GpuStressEvent { type: 'stress'; phase: 'warm' | 'run'; test: string; loop: number; total: number; data?: GpuStressLoop }
+
+export interface GpuBenchStats { frames: number; fps: number; avgMs: number; low1: number }
+
+export interface GpuBenchProgress { type: 'progress'; phase: 'warm' | 'run' | 'proof' | 'finish'; test: string; index: number; total: number }
 
 export interface StartupItem {
   id: string;
@@ -587,6 +643,8 @@ export interface DarkHubAPI {
     show: (payload?: { pid?: number }) => Promise<OverlayStatus>;
     hide: () => Promise<OverlayStatus>;
     setSettings: (payload: Partial<OverlaySettings> & { labels?: Record<string, string> }) => Promise<OverlayStatus & { hotkeyError?: string | null }>;
+    power: () => Promise<OverlayPower>;
+    resetEnergy: () => Promise<OverlayPower>;
     processes: () => Promise<{ ok: boolean; processes: { pid: number; name: string; wsMb: number }[] }>;
     pickLogFolder: () => Promise<OverlayStatus & { canceled?: boolean }>;
     onEvent: (callback: (s: OverlayStatus) => void) => () => void;
@@ -613,6 +671,19 @@ export interface DarkHubAPI {
     setTask: (payload: { id: string; patch: Partial<Pick<MaintTask, 'enabled' | 'freq' | 'time' | 'weekday' | 'day'>> & { options?: Record<string, unknown> } }) => Promise<MaintState>;
     runNow: (payload: { id: string }) => Promise<{ ok: boolean; error?: string; entry?: MaintHistoryEntry }>;
     onEvent: (callback: (e: { type: 'started' | 'finished'; id: string } & Partial<MaintHistoryEntry>) => void) => () => void;
+  };
+  /** GPU benchmark and the Hub ranking. */
+  gpubench: {
+    status: () => Promise<{ ok: boolean; engine: boolean; running: boolean; linked: boolean; canStoreToken: boolean; hub: string; runs: GpuBenchRun[]; stress: GpuStressRun[] }>;
+    stress: (payload: { minutes: number; load: string; tempLimit: number }) => Promise<{ ok: boolean; error?: string; run?: GpuStressRun }>;
+    removeStress: (payload: { id: string }) => Promise<{ ok: boolean }>;
+    run: (payload: { ranked?: boolean; quick?: boolean; label?: string }) => Promise<{ ok: boolean; error?: string; run?: GpuBenchRun }>;
+    cancel: () => Promise<{ ok: boolean }>;
+    remove: (payload: { id: string }) => Promise<{ ok: boolean }>;
+    link: () => Promise<{ ok: boolean; error?: string }>;
+    unlink: () => Promise<{ ok: boolean }>;
+    openRanking: (payload: { id?: string }) => Promise<{ ok: boolean }>;
+    onEvent: (callback: (e: GpuBenchProgress | GpuStressEvent | { type: 'link'; code: string }) => void) => () => void;
   };
   /** Before/after benchmark. */
   bench: {

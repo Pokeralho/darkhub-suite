@@ -4,7 +4,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { FrameWindow, SessionStats } from './frameStats.js'
+import { FrameWindow, SessionStats, RangeStat } from './frameStats.js'
+import { EnergyMeter, buildDerived } from './powerModel.js'
 import { normalizeSettings, readSensors, buildRows, buildPanel, pickDisplay } from './overlayModel.js'
 import { readLhm } from './lhmModel.js'
 import { normalizeLayout, renderLayout, fromPreset, sampleContext, PRESETS, METRICS, SERIES } from './customModel.js'
@@ -21,9 +22,16 @@ export class OverlayService {
     this.lhm = null
     this.pendingFt = []
     this.sessionStats = new SessionStats()
+    this.renderLat = new RangeStat() // render latency min / max / avg over the session
+    this.energy = new EnergyMeter() // GPU / CPU energy since the game was attached (or the last reset)
     this.history = { fps: [], cpu: [], gpu: [], cpuTemp: [], gpuTemp: [] }
     // full LibreHardwareMonitor tree (clocks, power, voltages, fans) for the advanced layouts
-    lhmSource?.on?.('data', (p) => { if (p?.type === 'lhm') this.lhm = readLhm(p) })
+    lhmSource?.on?.('data', (p) => {
+      if (p?.type !== 'lhm') return
+      this.lhm = readLhm(p)
+      const hw = this.lhm
+      this.energy.push(p.t, { gpuW: hw.nvml?.powerW ?? hw.gpu?.power ?? null, cpuW: hw.cpu?.power ?? null, counterJ: hw.nvml?.energyJ ?? null })
+    })
     this.file = path.join(app.getPath('userData'), 'overlay.json')
     this.win = null
     this.visible = false
@@ -52,6 +60,7 @@ export class OverlayService {
       if (this.target && f.pid !== this.target.pid) return
       this.window.push(f)
       this.sessionStats.push(f.msBetweenPresents)
+      this.renderLat.push(f.msRenderLatency)
       if (this.visible && f.msBetweenPresents > 0 && this.pendingFt.length < 4000) this.pendingFt.push(Math.round(f.msBetweenPresents * 100) / 100)
       if (f.msBetweenPresents > 0 && this.session.length < 500000) this.session.push(f.msBetweenPresents)
     })
@@ -106,6 +115,17 @@ export class OverlayService {
     const live = this.visible && this._ctx ? this._ctx : null
     return { ok: true, live: Boolean(live), ...renderLayout(model, { ...(live || sampleContext()), labels: this.labels }) }
   }
+
+  /** Power / efficiency / PSU / cost numbers for the System Monitor (no game needed): sensors + the user's PSU and tariff. */
+  power() {
+    const hw = this.lhm && Date.now() - (this.lhm.at || 0) < 10000 ? this.lhm : null
+    const sensors = readSensors(this.hardware.snapshot())
+    const frames = this.visible ? this.window.stats() : null
+    const derived = buildDerived({ frames, session: this.visible ? this.sessionStats.stats() : null, hw, sensors, settings: this.settings, energy: this.energy })
+    return { ok: true, at: Date.now(), hw, derived, gaming: Boolean(frames) }
+  }
+
+  resetEnergy() { this.energy.reset(); return this.power() }
 
   _save() { fs.writeFileSync(this.file, JSON.stringify({ ...this.settings, labels: this.labels }, null, 1)) }
   _emit() { this.onEvent?.(this.status()) }
@@ -231,6 +251,8 @@ export class OverlayService {
     this._closeSession()
     this.window.reset()
     this.sessionStats.reset()
+    this.renderLat.reset()
+    this.energy.reset()
     for (const k of Object.keys(this.history)) this.history[k] = []
     this.target = { pid, name }
     try {
@@ -291,6 +313,7 @@ export class OverlayService {
       fps: frames?.fps ?? null, 'gpu.load': hw?.gpu?.load ?? sensors.gpu ?? null, 'cpu.load': sensors.cpu ?? null,
       'gpu.temp': hw?.gpu?.temp ?? sensors.gpuTemp ?? null, 'cpu.temp': hw?.cpu?.temp ?? sensors.cpuTemp ?? null
     }
+    const derived = buildDerived({ frames, session: this.sessionStats.stats(), hw, sensors, settings: this.settings, energy: this.energy })
     let data
     if (this.settings.layout === 'compact') {
       const rows = buildRows(this.settings, frames, sensors, this.labels)
@@ -301,12 +324,12 @@ export class OverlayService {
       add('fps', frames?.fps); add('cpu', sensors.cpu); add('gpu', hw?.gpu?.load ?? sensors.gpu)
       add('cpuTemp', hw?.cpu?.temp ?? sensors.cpuTemp); add('gpuTemp', hw?.gpu?.temp ?? sensors.gpuTemp)
       const session = this.sessionStats.stats()
-      this._ctx = { frames, session, hw, sensors, history: h }
+      this._ctx = { frames, session, hw, sensors, history: h, derived, renderLatency: this.renderLat.stats() }
       if (this.settings.layout === 'custom') {
         const layout = this.layouts.find((l) => l.id === this.activeLayout) || this.layouts[0]
         data = { settings: this.settings, live, custom: renderLayout(layout, { ...this._ctx, labels: this.labels }, { values: false }) }
       } else {
-        const panel = buildPanel(this.settings.layout, frames, session, hw, sensors, h, this.labels)
+        const panel = buildPanel(this.settings.layout, frames, session, hw, sensors, h, this.labels, { derived, renderLatency: this.renderLat.stats() })
         // the page plots the streams itself: the points are not sent
         panel.graphs = panel.graphs.map(({ values, series, ...g }) => g)
         data = { settings: this.settings, live, panel }

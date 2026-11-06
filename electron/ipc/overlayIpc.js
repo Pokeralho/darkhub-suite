@@ -30,6 +30,8 @@ export function registerOverlayIPC({ app, ipcMain, BrowserWindow, screen, hotkey
   handle('overlay:show', ({ pid }) => get().show({ pid: pid ? Number(pid) : null }))
   handle('overlay:hide', () => get().hide())
   handle('overlay:setSettings', (patch) => get().setSettings(patch))
+  handle('overlay:power', () => get().power())
+  handle('overlay:resetEnergy', () => get().resetEnergy())
   // layout editor
   handle('overlay:layouts', () => get().layoutsState())
   handle('overlay:saveLayout', ({ layout }) => get().saveLayout(layout))

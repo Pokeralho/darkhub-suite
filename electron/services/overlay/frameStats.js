@@ -35,9 +35,25 @@ export function createCsvParser() {
       msBetweenDisplayChange: num('MsBetweenDisplayChange'),
       msGpuBusy: num('MsGPUBusy'),
       msCpuBusy: num('MsCPUBusy'),
-      msLatency: num('MsAllInputToPhotonLatency') ?? num('MsUntilDisplayed')
+      msLatency: num('MsAllInputToPhotonLatency') ?? num('MsUntilDisplayed'),
+      // time from the end of rendering until the present call finished (PresentMon 2.x); null on versions without it
+      msRenderLatency: num('MsRenderPresentLatency')
     }
   }
+}
+
+/** Running min / max / average of a stream of numbers, in constant memory. */
+export class RangeStat {
+  constructor() { this.reset() }
+  reset() { this.n = 0; this.sum = 0; this.min = null; this.max = null }
+  push(x) {
+    if (!Number.isFinite(x) || x < 0 || x > 10000) return
+    this.n++
+    this.sum += x
+    this.min = this.min == null ? x : Math.min(this.min, x)
+    this.max = this.max == null ? x : Math.max(this.max, x)
+  }
+  stats() { return this.n ? { min: this.min, max: this.max, avg: this.sum / this.n, samples: this.n } : null }
 }
 
 const pct = (sorted, p) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1))] : null)
@@ -49,6 +65,7 @@ export class FrameWindow {
     this.frames = []
     this.gpuBusy = []
     this.latency = []
+    this.renderLatency = []
     this.presentMode = ''
   }
 
@@ -58,8 +75,9 @@ export class FrameWindow {
     this.frames.push(ft)
     if (f.msGpuBusy != null) this.gpuBusy.push(f.msGpuBusy)
     if (f.msLatency != null && f.msLatency > 0) this.latency.push(f.msLatency)
+    if (f.msRenderLatency != null && f.msRenderLatency >= 0) this.renderLatency.push(f.msRenderLatency)
     if (f.presentMode) this.presentMode = f.presentMode
-    for (const a of [this.frames, this.gpuBusy, this.latency]) if (a.length > this.maxFrames) a.splice(0, a.length - this.maxFrames)
+    for (const a of [this.frames, this.gpuBusy, this.latency, this.renderLatency]) if (a.length > this.maxFrames) a.splice(0, a.length - this.maxFrames)
   }
 
   stats() {
@@ -81,12 +99,13 @@ export class FrameWindow {
       maxFrameTimeMs: sorted[sorted.length - 1],
       gpuBusyMs: avg(this.gpuBusy.slice(-n)),
       latencyMs: avg(this.latency.slice(-n)),
+      renderLatencyMs: avg(this.renderLatency.slice(-n)),
       presentMode: this.presentMode,
       graph: this.frames.slice(-120)
     }
   }
 
-  reset() { this.frames = []; this.gpuBusy = []; this.latency = []; this.presentMode = '' }
+  reset() { this.frames = []; this.gpuBusy = []; this.latency = []; this.renderLatency = []; this.presentMode = '' }
 }
 
 const BUCKET_MS = 0.1

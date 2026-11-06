@@ -16,6 +16,7 @@ const files = [
   ['electron/services/hub/hubModel.js', 'hubModel.js'],
   ['electron/services/hub/builtins.js', 'builtins.js'],
   ['electron/services/hub/extensionModel.js', 'extensionModel.js'],
+  ['electron/services/gpubench/sceneModel.js', 'sceneModel.js'],
   ['electron/services/hub/schema/v1.json', 'schema/v1.json'],
   ['docs/hub/builtins.json', 'builtins.json']
 ]

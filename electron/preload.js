@@ -278,6 +278,8 @@ const darkhubApi = {
     show: (payload) => ipcRenderer.invoke('overlay:show', payload),
     hide: () => ipcRenderer.invoke('overlay:hide'),
     setSettings: (payload) => ipcRenderer.invoke('overlay:setSettings', payload),
+    power: () => ipcRenderer.invoke('overlay:power'),
+    resetEnergy: () => ipcRenderer.invoke('overlay:resetEnergy'),
     processes: () => ipcRenderer.invoke('overlay:processes'),
     pickLogFolder: () => ipcRenderer.invoke('overlay:pickLogFolder'),
     onEvent: (callback) => {
@@ -313,6 +315,22 @@ const darkhubApi = {
       const handler = (_e, data) => callback(data)
       ipcRenderer.on('maint:event', handler)
       return () => ipcRenderer.removeListener('maint:event', handler)
+    }
+  },
+  gpubench: {
+    status: () => ipcRenderer.invoke('gpubench:status'),
+    run: (payload) => ipcRenderer.invoke('gpubench:run', payload),
+    stress: (payload) => ipcRenderer.invoke('gpubench:stress', payload),
+    removeStress: (payload) => ipcRenderer.invoke('gpubench:removeStress', payload),
+    cancel: () => ipcRenderer.invoke('gpubench:cancel'),
+    remove: (payload) => ipcRenderer.invoke('gpubench:remove', payload),
+    link: () => ipcRenderer.invoke('gpubench:link'),
+    unlink: () => ipcRenderer.invoke('gpubench:unlink'),
+    openRanking: (payload) => ipcRenderer.invoke('gpubench:openRanking', payload),
+    onEvent: (callback) => {
+      const handler = (_e, msg) => callback(msg)
+      ipcRenderer.on('gpubench:event', handler)
+      return () => ipcRenderer.removeListener('gpubench:event', handler)
     }
   },
   bench: {

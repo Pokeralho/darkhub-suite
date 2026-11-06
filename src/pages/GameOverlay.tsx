@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Eye, EyeOff, Loader2, Info, AlertTriangle, FolderOpen, RefreshCw } from '../components/icons';
 import PageHeader from '../components/ui/PageHeader';
 import HotkeyCapture from '../components/HotkeyCapture';
+import { PowerSettingsForm } from '../components/monitor/PowerPanel';
 import { useI18n } from '../i18n/I18nProvider';
 import type { OverlayStatus, OverlaySettings } from '../global';
 
@@ -32,7 +33,13 @@ export default function GameOverlay({ onNavigate }: { onNavigate?: (page: string
       avg: t('ovl.l.avg', 'média'), max: t('ovl.l.max', 'máx'), load: t('ovl.l.load', 'Uso %'), temps: t('ovl.l.temps', 'Temp °C'), threads: t('ovl.l.threads', 'Threads da CPU'),
       hotspot: 'hotspot', memJunction: t('ovl.l.memJunction', 'mem'), maxThread: t('ovl.l.maxThread', 'thread mais usada'), session: t('ovl.l.session', 'Sessão'),
       avgFps: t('ovl.l.avgFps', 'FPS médio'), worstFrame: t('ovl.l.worstFrame', 'Pior quadro'), stdDev: t('ovl.l.stdDev', 'Variação (σ)'), stutters: t('ovl.l.stutters', 'Engasgos'),
-      frames: t('ovl.l.frames', 'Quadros'), bound: t('ovl.l.bound', 'Limitado por'), presentMode: t('ovl.l.present', 'Apresentação')
+      frames: t('ovl.l.frames', 'Quadros'), bound: t('ovl.l.bound', 'Limitado por'), presentMode: t('ovl.l.present', 'Apresentação'),
+      needsAdmin: t('pwr.needsAdmin', 'precisa de admin'), needsPawnio: t('pwr.needsPawnio', 'precisa do driver PawnIO'), renderLatency: t('pwr.renderLatency', 'Latência de render'),
+      avgFpsPerWatt: t('pwr.fpsPerWattAvg', 'FPS/W médio'), avgJoulesPerFrame: t('pwr.jpfAvg', 'J/quadro médio'), energyGpu: t('pwr.energyGpu', 'Energia da GPU'), estimate: t('pwr.estimate', 'estimativa'),
+      frameShort: t('pwr.frameShort', 'quadro'), eff: t('pwr.effShort', 'efic.'), withExtra: t('pwr.withExtraShort', '+adic.'), partial: t('pwr.partialShort', 'sem'), bus: t('pwr.busShort', 'barramento'), videoEngine: t('pwr.videoShort', 'vídeo'),
+      'throttle.swPowerCap': t('pwr.throttle.swPowerCap', 'limite de potência'), 'throttle.hwSlowdown': t('pwr.throttle.hwSlowdown', 'redução por hardware'), 'throttle.swThermal': t('pwr.throttle.swThermal', 'limite térmico'),
+      'throttle.hwThermal': t('pwr.throttle.hwThermal', 'redução térmica (HW)'), 'throttle.hwPowerBrake': t('pwr.throttle.hwPowerBrake', 'freio de energia'), 'throttle.boardLimit': t('pwr.throttle.boardLimit', 'limite da placa'),
+      'throttle.reliability': t('pwr.throttle.reliability', 'confiabilidade'), 'throttle.syncBoost': t('pwr.throttle.syncBoost', 'sync boost'), 'throttle.displayClock': t('pwr.throttle.displayClock', 'clock do display')
     } })
       .then((s) => { if (s?.ok) { setSt(s); setHotkey(s.settings?.hotkey ?? ''); } });
     void api()?.layouts().then((l) => { if (l?.ok) void api()?.setSettings({ labels: Object.fromEntries(l.metrics.map((m) => [`m.${m.key}`, t(`ovle.m.${m.key}`, m.label)])) }); });
@@ -160,6 +167,14 @@ export default function GameOverlay({ onNavigate }: { onNavigate?: (page: string
             <button type="button" onClick={() => void api()?.pickLogFolder().then((r) => r?.ok && setSt(r))} className="dh-btn dh-btn-ghost dh-btn-sm"><FolderOpen size={13} />{t('ovl.chooseFolder', 'Escolher pasta')}</button>
             {s.logFolder && <button type="button" onClick={() => void set({ logFolder: '' })} className="dh-btn dh-btn-ghost dh-btn-sm">{t('ovl.logDisable', 'Desligar')}</button>}
           </div>
+        </section>
+      )}
+
+      {s && s.layout !== 'compact' && (
+        <section className="rounded-xl border border-zinc-800/80 p-4 space-y-3">
+          <h2 className="dh-section-title">{t('pwr.overlayTitle', 'Fonte, consumo e custo (estimativas*)')}</h2>
+          <p className="dh-help max-w-[80ch]">{t('pwr.overlayHelp', 'O layout Overclocker mostra FPS/W, J/quadro, carga e eficiência da fonte, total no PC e custo de energia. Informe a sua fonte e a tarifa para os números fazerem sentido. Os mesmos valores aparecem em Monitor do Sistema, na aba Sensores.')}</p>
+          <PowerSettingsForm s={s} set={(p) => void set(p)} />
         </section>
       )}
 

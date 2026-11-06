@@ -17,6 +17,7 @@
     "build:renderer": "vite build",
     "build:pacer": "cargo build --release --manifest-path native_pacer/Cargo.toml && powershell -NoProfile -Command \"Copy-Item native_pacer/target/release/DarkHub_PacerHook.dll electron/services/DarkHub.PacerHook.dll -Force\"",
     "test:pacer": "cargo test --manifest-path native_pacer/Cargo.toml -- --test-threads=1",
+    "build:gpubench": "bash native_gpubench/build-shaders.sh && cargo build --release --manifest-path native_gpubench/Cargo.toml && powershell -NoProfile -Command \"Copy-Item native_gpubench/target/release/DarkHub_GpuBench.exe electron/services/DarkHub.GpuBench.exe -Force\"",
     "build:disk": "cargo build --release --manifest-path native_disk/Cargo.toml && powershell -NoProfile -Command \"Copy-Item native_disk/target/release/DarkHub_DiskRescue.exe electron/services/DarkHub.DiskRescue.exe -Force\"",
     "test:disk": "cargo test --manifest-path native_disk/Cargo.toml",
     "test:cleaner": "cargo test --manifest-path native_cleaner/Cargo.toml",

@@ -4,6 +4,8 @@
 // Imported layouts come from other people: every text is escaped into HTML, style values are filtered, and the
 // overlay page has `default-src 'none'`, so CSS can restyle the overlay but cannot load anything or run code.
 
+import { buildDerived } from './powerModel.js'
+
 const isNum = (x) => x != null && x !== '' && Number.isFinite(Number(x))
 const num = (x, lo, hi, d) => (isNum(x) ? Math.min(hi, Math.max(lo, Number(x))) : d)
 const str = (x, max = 60, d = '') => (typeof x === 'string' ? x.slice(0, max) : d)
@@ -21,6 +23,20 @@ const cpu = (ctx) => hw(ctx).cpu || {}
 const ram = (ctx) => hw(ctx).ram || {}
 const fr = (ctx) => ctx.frames || null
 const ss = (ctx) => ctx.session || null
+const nv = (ctx) => hw(ctx).nvml || {}
+const dv = (ctx) => ctx.derived || null
+const rl = (ctx) => ctx.renderLatency || null
+
+// cost of the GPU alone, CPU + GPU, and CPU + GPU + additional components, from the user's tariff (estimates)
+const COST_METRICS = {}
+for (const [scen, name] of [['gpu', 'GPU'], ['cpuGpu', 'CPU+GPU'], ['withExtra', 'CPU+GPU+extra']]) {
+  for (const [per, key, label] of [['perHour', 'hour', 'per hour'], ['perDay', 'day', 'per day'], ['perMonth', 'month', 'per month'], ['perYear', 'year', 'per year']]) {
+    COST_METRICS[`cost.${scen}.${key}`] = { group: 'cost', label: `${name} cost ${label}`, unit: '', pre: 'R$ ', d: 2, est: true, get: (c) => dv(c)?.cost?.[scen]?.[per] }
+  }
+  for (const [per, label] of [['kwhDay', 'kWh per day'], ['kwhMonth', 'kWh per month']]) {
+    COST_METRICS[`cost.${scen}.${per}`] = { group: 'cost', label: `${name} ${label}`, unit: 'kWh', d: 1, est: true, get: (c) => dv(c)?.cost?.[scen]?.[per] }
+  }
+}
 
 export const METRICS = {
   fps: { group: 'fps', label: 'FPS', unit: 'FPS', d: 0, get: (c) => fr(c)?.fps, tone: [50, 30, true] },
@@ -31,6 +47,7 @@ export const METRICS = {
   latency: { group: 'fps', label: 'Latency', unit: 'ms', d: 1, get: (c) => fr(c)?.latencyMs || null },
   gpuBusy: { group: 'fps', label: 'GPU busy', unit: 'ms', d: 1, get: (c) => fr(c)?.gpuBusyMs },
   bound: { group: 'fps', label: 'Limited by', unit: '', d: 0, get: (c) => { const f = fr(c); return f?.gpuBusyMs > 0 && f?.frameTimeMs > 0 ? (f.gpuBusyMs / f.frameTimeMs >= 0.9 ? 'GPU' : 'CPU') : null } },
+  renderLatency: { group: 'fps', label: 'Render latency', unit: 'ms', d: 1, get: (c) => fr(c)?.renderLatencyMs },
   presentMode: { group: 'fps', label: 'Present mode', unit: '', d: 0, get: (c) => fr(c)?.presentMode?.replace(/_/g, ' ') || null },
 
   'gpu.load': { group: 'gpu', label: 'GPU load', unit: '%', d: 0, get: (c) => gpu(c).load ?? c.sensors?.gpu },
@@ -48,6 +65,18 @@ export const METRICS = {
   'gpu.vramTotal': { group: 'gpu', label: 'VRAM total', unit: 'GB', d: 0, get: (c) => (gpu(c).vramTotalMb != null ? gpu(c).vramTotalMb / 1024 : null) },
   'gpu.memCtrl': { group: 'gpu', label: 'Memory controller', unit: '%', d: 0, get: (c) => gpu(c).memCtrlLoad },
   'gpu.name': { group: 'gpu', label: 'GPU name', unit: '', d: 0, get: (c) => gpu(c).name || null },
+  'gpu.vramPct': { group: 'gpu', label: 'VRAM %', unit: '%', d: 0, get: (c) => gpu(c).vramPct, tone: [85, 95] },
+  'gpu.bus': { group: 'gpu', label: 'GPU bus load', unit: '%', d: 0, get: (c) => gpu(c).busLoad },
+  'gpu.videoEngine': { group: 'gpu', label: 'Video engine', unit: '%', d: 0, get: (c) => gpu(c).videoEngineLoad },
+  'gpu.encoder': { group: 'gpu', label: 'Encoder (NVENC)', unit: '%', d: 0, get: (c) => nv(c).encoderPct },
+  'gpu.decoder': { group: 'gpu', label: 'Decoder (NVDEC)', unit: '%', d: 0, get: (c) => nv(c).decoderPct },
+  'gpu.pcie': { group: 'gpu', label: 'PCIe link', unit: '', d: 0, get: (c) => (nv(c).pcieGen != null && nv(c).pcieWidth != null ? `${nv(c).pcieGen}.0 x${nv(c).pcieWidth}` : null) },
+  'gpu.pcieRx': { group: 'gpu', label: 'PCIe receive', unit: 'MB/s', d: 0, get: (c) => (gpu(c).pcieRxBps != null ? gpu(c).pcieRxBps / 1048576 : null) },
+  'gpu.pcieTx': { group: 'gpu', label: 'PCIe send', unit: 'MB/s', d: 0, get: (c) => (gpu(c).pcieTxBps != null ? gpu(c).pcieTxBps / 1048576 : null) },
+  'gpu.d3dShared': { group: 'gpu', label: 'Shared GPU memory', unit: 'MB', d: 0, get: (c) => gpu(c).d3dSharedMb },
+  'gpu.powerLimit': { group: 'gpu', label: 'Power limit', unit: 'W', d: 0, get: (c) => nv(c).enforcedLimitW ?? nv(c).powerLimitW },
+  'gpu.energy': { group: 'gpu', label: 'GPU energy (session)', unit: 'kJ', d: 2, get: (c) => dv(c)?.energy?.gpuKj },
+  'gpu.throttle': { group: 'gpu', label: 'Clock limiters', unit: '', d: 0, get: (c) => { const r = nv(c).throttle; if (!r) return null; const x = r.filter((k) => k !== 'idle' && k !== 'appClocks'); return x.length ? x.join(' · ') : 'none' } },
 
   'cpu.load': { group: 'cpu', label: 'CPU load', unit: '%', d: 0, get: (c) => c.sensors?.cpu ?? null },
   'cpu.temp': { group: 'cpu', label: 'CPU temp', unit: '°C', d: 0, get: (c) => cpu(c).temp ?? c.sensors?.cpuTemp, tone: [80, 90] },
@@ -60,6 +89,8 @@ export const METRICS = {
 
   'ram.used': { group: 'ram', label: 'RAM used', unit: 'GB', d: 1, get: (c) => ram(c).usedGb },
   'ram.total': { group: 'ram', label: 'RAM total', unit: 'GB', d: 0, get: (c) => ram(c).totalGb },
+  'ram.rate': { group: 'ram', label: 'RAM rate (SMBIOS)', unit: 'MT/s', d: 0, est: true, get: (c) => ram(c).effectiveMts },
+  'ram.base': { group: 'ram', label: 'RAM base clock (SMBIOS)', unit: 'MHz', d: 0, est: true, get: (c) => ram(c).baseClockMhz },
   'ram.load': { group: 'ram', label: 'RAM %', unit: '%', d: 0, get: (c) => ram(c).load ?? c.sensors?.ram, tone: [85, 95] },
 
   'session.time': { group: 'session', label: 'Session', unit: '', d: 0, get: (c) => { const s = ss(c)?.seconds; return s == null ? null : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` } },
@@ -72,7 +103,19 @@ export const METRICS = {
   'session.stdDev': { group: 'session', label: 'Frametime σ', unit: 'ms', d: 2, get: (c) => ss(c)?.stdDevMs },
   'session.stutters': { group: 'session', label: 'Stutters', unit: '', d: 0, get: (c) => ss(c)?.stutters },
   'session.frames': { group: 'session', label: 'Frames', unit: '', d: 0, get: (c) => ss(c)?.frames },
+  'session.renderMin': { group: 'session', label: 'Render latency min', unit: 'ms', d: 1, get: (c) => rl(c)?.min },
+  'session.renderAvg': { group: 'session', label: 'Render latency avg', unit: 'ms', d: 1, get: (c) => rl(c)?.avg },
+  'session.renderMax': { group: 'session', label: 'Render latency max', unit: 'ms', d: 1, get: (c) => rl(c)?.max },
+  'pwr.fpsPerWatt': { group: 'power', label: 'FPS per watt', unit: 'FPS/W', d: 2, est: true, get: (c) => dv(c)?.efficiency?.fpsPerWatt },
+  'pwr.fpsPerWattAvg': { group: 'power', label: 'FPS per watt (avg)', unit: 'FPS/W', d: 2, est: true, get: (c) => dv(c)?.efficiency?.fpsPerWattAvg },
+  'pwr.jpf': { group: 'power', label: 'Energy per frame', unit: 'J', d: 2, est: true, get: (c) => dv(c)?.efficiency?.joulesPerFrame },
+  'pwr.jpfAvg': { group: 'power', label: 'Energy per frame (avg)', unit: 'J', d: 2, est: true, get: (c) => dv(c)?.efficiency?.joulesPerFrameAvg },
+  'psu.load': { group: 'power', label: 'PSU load', unit: '%', d: 0, est: true, get: (c) => dv(c)?.system?.loadPct, tone: [80, 95] },
+  'psu.eff': { group: 'power', label: 'PSU efficiency', unit: '%', d: 0, est: true, get: (c) => dv(c)?.system?.efficiency },
+  'psu.dc': { group: 'power', label: 'PC total (DC)', unit: 'W', d: 0, est: true, get: (c) => dv(c)?.system?.dcW },
+  'psu.ac': { group: 'power', label: 'PC at the wall (AC)', unit: 'W', d: 0, est: true, get: (c) => dv(c)?.system?.acW },
 
+  ...COST_METRICS,
   clock: { group: 'other', label: 'Clock', unit: '', d: 0, get: (c) => { const n = new Date(c.now || Date.now()); return `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}` } }
 }
 
@@ -204,9 +247,10 @@ function value(item, ctx, theme) {
     const v = Number(raw)
     tone = lowBad ? (v <= bad ? 'bad' : v <= warn ? 'warn' : '') : (v >= bad ? 'bad' : v >= warn ? 'warn' : '')
   }
-  const unit = raw == null ? '' : (item.unit ?? m.unit)
+  const unit = raw == null ? '' : `${item.unit ?? m.unit}${m.est ? '*' : ''}`
+  const prefix = raw == null ? item.prefix : (item.prefix ?? m.pre)
   const style = [item.color && !tone ? `color:${item.color}` : '', item.size ? `font-size:${item.size}px` : ''].filter(Boolean).join(';')
-  return `<span class="val ${tone}"${style ? ` style="${esc(style)}"` : ''}>${item.prefix ? `<span class="pre">${esc(item.prefix)}</span>` : ''}${esc(text)}${unit ? `<span class="unit">${esc(unit)}</span>` : ''}</span>`
+  return `<span class="val ${tone}"${style ? ` style="${esc(style)}"` : ''}>${prefix ? `<span class="pre">${esc(prefix)}</span>` : ''}${esc(text)}${unit ? `<span class="unit">${esc(unit)}</span>` : ''}</span>`
 }
 
 /** Stable short hash of a layout's structure: the overlay page rebuilds only when it changes. */
@@ -262,7 +306,7 @@ export function renderLayout(layout, ctx, opts = {}) {
         break
       }
       case 'stats':
-        add(w, 'w-stats', w.keys.map((k) => `<span class="lbl">${esc(ctx.labels?.[`m.${k}`] || METRICS[k].label)}</span>${value({ metric: k }, ctx, t)}`).join(''))
+        add(w, 'w-stats', w.keys.map((k) => `<span class="lbl">${esc(ctx.labels?.[`m.${k}`] || METRICS[k].label)}${METRICS[k].est ? '*' : ''}</span>${value({ metric: k }, ctx, t)}`).join(''))
         break
       case 'text':
         add(w, 'w-text', esc(w.text))
@@ -339,8 +383,11 @@ export const PRESETS = {
       M('VRAM', '#a78bfa', 'gpu.vram', 'gpu.memClock', 'gpu.memCtrl'),
       M('CPU', '#60a5fa', 'cpu.load', 'cpu.temp', 'cpu.clock', 'cpu.power', 'cpu.vcore'),
       M('', '', { metric: 'cpu.loadMax', unit: '% max' }, { metric: 'cpu.clockMax', unit: 'MHz max' }),
-      M('RAM', '#f472b6', 'ram.used', 'ram.load'),
+      M('RAM', '#f472b6', 'ram.used', 'ram.load', 'ram.rate'),
       M('FPS', '#fbbf24', { metric: 'fps', size: 18, unit: '' }, 'frametime', { metric: 'low1', prefix: '1%' }, { metric: 'low01', prefix: '0.1%' }),
+      M('PWR', '#4ade80', 'gpu.power', 'pwr.fpsPerWatt', 'pwr.jpf', 'gpu.energy'),
+      M('PSU', '#60a5fa', 'psu.load', 'psu.eff', 'psu.dc', 'psu.ac'),
+      M('R$', '#fbbf24', 'cost.gpu.hour', 'cost.cpuGpu.hour', 'cost.withExtra.hour'),
       { type: 'graph', title: 'Frametime', series: [{ source: 'frametime', color: '#fbbf24' }], height: 40 },
       { type: 'graph', title: 'GPU · CPU %', series: [{ source: 'gpu.load', color: '#4ade80' }, { source: 'cpu.load', color: '#60a5fa' }], height: 34, info: false },
       { type: 'bars', title: 'Threads', height: 24 },
@@ -396,17 +443,24 @@ export function fromPreset(key) {
 export function sampleContext(now = Date.now()) {
   const graph = Array.from({ length: 120 }, (_, i) => 6.9 + Math.sin(i / 6) * 0.5 + (i % 47 === 0 ? 9 : 0))
   const hist = (base, amp) => Array.from({ length: 120 }, (_, i) => base + Math.sin(i / 9) * amp)
+  const frames = { fps: 144, frameTimeMs: 6.9, low1: 118, low01: 96, maxFrameTimeMs: 15.9, latencyMs: 18.4, renderLatencyMs: 2.1, gpuBusyMs: 6.6, presentMode: 'Hardware: Independent Flip', graph }
+  const hwSample = {
+      gpu: { name: 'GeForce RTX', load: 97, temp: 67, hotspot: 79, memJunction: 72, clock: 2805, memClock: 14001, power: 138, powerPct: 95, voltage: 1.0, fanRpm: 1640, fanPct: 52, vramUsedMb: 6420, vramTotalMb: 8151, memCtrlLoad: 41, vramPct: 79, busLoad: 12, videoEngineLoad: 0, pcieRxBps: 41943040, pcieTxBps: 18874368, d3dSharedMb: 210 },
+      cpu: { name: 'Ryzen', temp: 71, clock: 4512, clockMax: 4650, power: 62, vcore: 1.25 },
+      ram: { usedGb: 18.4, totalGb: 32, load: 57, effectiveMts: 3200, baseClockMhz: 1600 },
+      nvml: { powerW: 138, enforcedLimitW: 145, pcieGen: 4, pcieWidth: 16, encoderPct: 0, decoderPct: 0, throttle: ['swPowerCap'] }
+  }
+  const sensorsSample = { cpu: 41, cores: [88, 34, 72, 21, 65, 40, 58, 12, 47, 30, 81, 25, 36, 18, 52, 29] }
+  const session = { seconds: 1534, frames: 220000, avgFps: 143.2, minFps: 121, maxFps: 165, low1: 117, low01: 92, maxFrameMs: 24.1, stdDevMs: 1.42, stutters: 7 }
   return {
     now,
-    frames: { fps: 144, frameTimeMs: 6.9, low1: 118, low01: 96, maxFrameTimeMs: 15.9, latencyMs: 18.4, gpuBusyMs: 6.6, presentMode: 'Hardware: Independent Flip', graph },
-    session: { seconds: 1534, frames: 220000, avgFps: 143.2, minFps: 121, maxFps: 165, low1: 117, low01: 92, maxFrameMs: 24.1, stdDevMs: 1.42, stutters: 7 },
-    hw: {
-      gpu: { name: 'GeForce RTX', load: 97, temp: 67, hotspot: 79, memJunction: 72, clock: 2805, memClock: 14001, power: 138, powerPct: 95, voltage: 1.0, fanRpm: 1640, fanPct: 52, vramUsedMb: 6420, vramTotalMb: 8151, memCtrlLoad: 41 },
-      cpu: { name: 'Ryzen', temp: 71, clock: 4512, clockMax: 4650, power: 62, vcore: 1.25 },
-      ram: { usedGb: 18.4, totalGb: 32, load: 57 }
-    },
+    frames,
+    renderLatency: { min: 0.6, avg: 2.1, max: 9.8 },
+    derived: buildDerived({ frames, session, hw: hwSample, sensors: sensorsSample, settings: {}, energy: null }),
+    session,
+    hw: hwSample,
     // CPU load comes from Windows' counters (LHM's is wrong on recent Windows 11)
-    sensors: { cpu: 41, cores: [88, 34, 72, 21, 65, 40, 58, 12, 47, 30, 81, 25, 36, 18, 52, 29] },
+    sensors: sensorsSample,
     history: { fps: hist(142, 8), gpu: hist(95, 3), cpu: hist(40, 9), gpuTemp: hist(66, 2), cpuTemp: hist(70, 3) }
   }
 }
