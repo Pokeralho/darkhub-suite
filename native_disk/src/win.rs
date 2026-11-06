@@ -21,6 +21,7 @@ const IOCTL_STORAGE_GET_DEVICE_NUMBER: u32 = 0x002D_1080;
 const IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS: u32 = 0x0056_0000;
 const FSCTL_LOCK_VOLUME: u32 = 0x0009_0018;
 const FSCTL_DISMOUNT_VOLUME: u32 = 0x0009_0020;
+const FSCTL_UNLOCK_VOLUME: u32 = 0x0009_001C;
 
 const FILE_SHARE_READ_WRITE: u32 = 0x1 | 0x2;
 const FILE_FLAG_NO_BUFFERING: u32 = 0x2000_0000;
@@ -275,6 +276,30 @@ pub fn disk_of_path(path: &str) -> Option<u32> {
     } else {
         None
     }
+}
+
+/// Which volumes of disk `n` have nothing open: tries the lock and releases it, never dismounts.
+pub fn probe_locks(n: u32) -> Value {
+    let mut out = Vec::new();
+    for v in volumes().into_iter().filter(|v| v.extents.iter().any(|e| e.0 == n)) {
+        let lockable = match OpenOptions::new().read(true).write(true).share_mode(FILE_SHARE_READ_WRITE).open(&v.guid_path) {
+            Ok(f) => {
+                let ok = (0..3).any(|i| {
+                    if i > 0 {
+                        std::thread::sleep(std::time::Duration::from_millis(200));
+                    }
+                    ioctl(&f, FSCTL_LOCK_VOLUME, &[], &mut []).is_ok()
+                });
+                if ok {
+                    let _ = ioctl(&f, FSCTL_UNLOCK_VOLUME, &[], &mut []);
+                }
+                ok
+            }
+            Err(_) => false,
+        };
+        out.push(json!({ "volume": v.guid_path, "mount_points": v.mount_points, "lockable": lockable }));
+    }
+    json!({ "volumes": out })
 }
 
 /// Locks and dismounts every volume on disk `n`. Handles stay open (lock held) until dropped.

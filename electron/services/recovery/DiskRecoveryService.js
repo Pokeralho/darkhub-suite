@@ -115,6 +115,17 @@ export class DiskRecoveryService {
     });
   }
 
+  /** Holds the job slot for work that runs elsewhere (partitioning), so no clone or carve starts meanwhile. */
+  reserve(kind) {
+    if (this.job) return false;
+    this.job = { kind, proc: null, startedAt: Date.now(), cancelTimer: null };
+    return true;
+  }
+
+  release(kind) {
+    if (this.job?.kind === kind && !this.job.proc) this.job = null;
+  }
+
   status() {
     return { ok: true, running: !!this.job, kind: this.job?.kind ?? null, startedAt: this.job?.startedAt ?? null };
   }
@@ -123,6 +134,7 @@ export class DiskRecoveryService {
   cancel() {
     const job = this.job;
     if (!job) return { ok: true, running: false };
+    if (!job.proc) return { ok: true, running: true };
     try { job.proc.stdin.write('cancel\n'); } catch { /* stdin closed */ }
     if (!job.cancelTimer) job.cancelTimer = setTimeout(() => { try { job.proc.kill(); } catch { /* gone */ } }, 15000);
     return { ok: true, running: true };

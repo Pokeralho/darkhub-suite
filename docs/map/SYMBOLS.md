@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-05T21:25:12. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-05T23:53:44. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -138,7 +138,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ipc/gpuBenchIpc.js`
 
-`toJpeg`:5, `registerGpuBenchIPC`:12, `broadcast`:13, `handle`:15
+`toJpeg`:5, `registerGpuBenchIPC`:12, `broadcast`:13, `parentOf`:16, `handle`:20, `n`:31
 
 ## `electron/ipc/hubIpc.js`
 
@@ -174,7 +174,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ipc/recoveryIpc.js`
 
-`registerRecoveryIPC`:4, `handle`:6, `winOf`:12, `sender`:13
+`registerRecoveryIPC`:5, `handle`:8, `winOf`:14, `sender`:15, `onClose`:41
 
 ## `electron/ipc/restoreIpc.js`
 
@@ -230,7 +230,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:286, `handler`:305, `handler`:315, `handler`:331, `handler`:343, `listener`:386, `handler`:438, `handler`:464, `handler`:470, `handler`:476, `handler`:482, `listener`:491, `listener`:502, `handler`:527, `listener`:540, `listener`:557, `handler`:595, `handler`:610, `listener`:633, `listener`:658, `listener`:693, `listener`:720, `handler`:761
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:286, `handler`:305, `handler`:315, `handler`:333, `handler`:345, `listener`:388, `handler`:440, `handler`:466, `handler`:472, `handler`:478, `handler`:484, `listener`:493, `listener`:504, `handler`:529, `listener`:542, `listener`:559, `handler`:597, `handler`:612, `listener`:635, `listener`:664, `listener`:699, `listener`:726, `handler`:767
 
 ## `electron/services/CodeRunner.js`
 
@@ -342,7 +342,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/benchmark/BenchmarkService.js`
 
-`exec`:13, `backgroundCpu`:18, `snap`:19, `context`:26, `ps`:28, `BenchmarkService`:43 _class_, `history`:50, `_save`:51, `run`:53, `cancel`:87, `compare`:92, `remove`:100
+`exec`:15, `backgroundCpu`:20, `snap`:21, `context`:28, `ps`:30, `BenchmarkService`:45 _class_, `history`:52, `_save`:53, `run`:55, `cancel`:93, `compare`:98, `remove`:106
 
 ## `electron/services/benchmark/benchStats.js`
 
@@ -350,7 +350,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/benchmark/benchWorker.js`
 
-`emit`:12, `now`:13, `kernel`:17, `cpuSingle`:28, `cpuMulti`:35, `memBandwidth`:53, `memLatency`:63, `timerJitter`:81, `tick`:85, `diskSeqWrite`:101, `disk4kSyncWrite`:113
+`emit`:12, `now`:13, `kernel`:17, `work`:28, `cpuSingle`:37, `cpuMulti`:44, `memBandwidth`:78, `memLatency`:89, `timerJitter`:107, `tick`:111, `diskSeqWrite`:127, `disk4kSyncWrite`:139
 
 ## `electron/services/cleaner/CleanerService.js`
 
@@ -422,7 +422,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/gpubench/GpuBenchService.js`
 
-`enginePath`:17, `Engine`:23 _class_, `next`:30, `ask`:39, `stop`:44, `kill`:49, `GpuBenchService`:52 _class_, `hubUrl`:66, `history`:71, `_save`:72, `remove`:73, `stressHistory`:75, `removeStress`:76, `_token`:78, `status`:82, `rankingUrl`:86, `openRanking`:88, `link`:106, `unlink`:125, `cancel`:132, `_sensorSample`:134, `run`:136, `warm`:152, `record`:158, `stress`:196, `_preview`:256, `_rankedRun`:267
+`enginePath`:17, `Engine`:23 _class_, `next`:31, `send`:44, `ask`:46, `stop`:51, `kill`:56, `GpuBenchService`:59 _class_, `hubUrl`:73, `history`:78, `_save`:79, `remove`:80, `stressHistory`:82, `removeStress`:83, `_token`:85, `status`:89, `viewport`:94, `_startEngine`:100, `ranking`:107, `rankingUrl`:117, `openRanking`:119, `link`:137, `unlink`:156, `cancel`:163, `_sensorSample`:165, `run`:167, `warm`:183, `record`:189, `stress`:228, `_preview`:289, `_rankedRun`:300
 
 ## `electron/services/gpubench/gpuBenchModel.js`
 
@@ -650,7 +650,19 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/recovery/DiskRecoveryService.js`
 
-`defaultExe`:10, `normalizeTarget`:16, `diskNumberOf`:24, `int`:29, `createLineParser`:36, `parseLine`:46, `DiskRecoveryService`:55 _class_, `available`:65, `_missing`:69, `run`:74, `finish`:104, `status`:118, `cancel`:123, `_backupPath`:131, `_writeFlags`:141, `listDrives`:152, `inspectDisk`:154, `readSector`:156, `writeSector`:160, `repairHeader`:168, `setActive`:179, `backupTable`:184, `restoreBackup`:190, `clone`:199, `verify`:217, `surfaceTest`:224, `startCarving`:230, `smart`:243
+`defaultExe`:10, `normalizeTarget`:16, `diskNumberOf`:24, `int`:29, `createLineParser`:36, `parseLine`:46, `DiskRecoveryService`:55 _class_, `available`:65, `_missing`:69, `run`:74, `finish`:104, `reserve`:119, `release`:125, `status`:129, `cancel`:134, `_backupPath`:143, `_writeFlags`:153, `listDrives`:164, `inspectDisk`:166, `readSector`:168, `writeSector`:172, `repairHeader`:180, `setActive`:191, `backupTable`:196, `restoreBackup`:202, `clone`:211, `verify`:229, `surfaceTest`:236, `startCarving`:242, `smart`:255
+
+## `electron/services/recovery/PartitionService.js`
+
+`defaultScript`:16, `partitionRole`:39, `bitlockerState`:46, `withRawBitlocker`:55, `fingerprint`:67, `freeGaps`:73, `asList`:86, `letterOf`:87, `shapeListing`:93, `PartitionService`:195 _class_, `list`:208, `_exec`:218, `_payload`:237, `_probeLocks`:245, `_settleBitlocker`:253, `_context`:264, `limits`:297, `plan`:303, `apply`:319
+
+## `electron/services/recovery/partition-ops.ps1`
+
+`Send-Result`:13, `Stop-Refused`:17, `Get-DiskPartitions`:19, `Assert-Target`:23, `Invoke-Format`:45
+
+## `electron/services/recovery/partitionPolicy.js`
+
+`whole`:19, `alignedMib`:24, `fileSystem`:29, `label`:33, `driveLetter`:39, `normalizeRequest`:46, `diskBlockers`:66, `partitionBlockers`:85, `volumeInUse`:95, `createChecks`:97, `resizeChecks`:109, `evaluate`:123, `predict`:174, `verify`:197, `at`:200
 
 ## `electron/services/restore/RestoreService.js`
 
@@ -834,7 +846,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `native_disk/src/main.rs`
 
-`parse`:30, `get`:53, `flag`:56, `need`:59, `num`:62, `target`:65, `sector`:69, `system_disks`:74, `guard_write`:83, `region_of`:95, `plan_result`:110, `hex_rows`:123, `read_sector_cmd`:136, `write_sector_cmd`:171, `clone_cmd`:189, `finish_copy`:238, `run`:272, `main`:396
+`parse`:30, `get`:53, `flag`:56, `need`:59, `num`:62, `target`:65, `sector`:69, `system_disks`:74, `guard_write`:83, `region_of`:95, `plan_result`:110, `hex_rows`:123, `read_sector_cmd`:136, `write_sector_cmd`:171, `clone_cmd`:189, `finish_copy`:238, `run`:272, `main`:403
 
 ## `native_disk/src/parts.rs`
 
@@ -854,15 +866,15 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `native_disk/src/win.rs`
 
-`ioctl`:30, `u32le`:51, `u64le`:54, `disk_path`:58, `open_query`:63, `geometry`:74, `bus_name`:105, `descriptor_string`:129, `device_info`:138, `wide`:163, `from_wide`:166, `volume_extents`:171, `volumes`:186, `system_disks`:219, `list_drives`:239, `disk_of_path`:270, `lock_volumes`:286, `open`:325, `size`:347, `sector_size`:350, `read_at`:353, `write_at`:371, `flush`:384
+`ioctl`:31, `u32le`:52, `u64le`:55, `disk_path`:59, `open_query`:64, `geometry`:75, `bus_name`:106, `descriptor_string`:130, `device_info`:139, `wide`:164, `from_wide`:167, `volume_extents`:172, `volumes`:187, `system_disks`:220, `list_drives`:240, `disk_of_path`:271, `probe_locks`:282, `lock_volumes`:311, `open`:350, `size`:372, `sector_size`:375, `read_at`:378, `write_at`:396, `flush`:409
 
 ## `native_gpubench/src/gpu.rs`
 
-`wndproc`:123, `heap_props`:130, `buffer_desc`:134, `tex_desc`:141, `create`:148, `barrier`:154, `uav_barrier`:169, `bytecode`:177, `compute_pso`:181, `graphics_pso`:186, `root_signature`:207, `loaded_modules`:229, `dot`:245, `sun_dir`:247, `frame_cb`:253, `cpu_handle`:377, `gpu_handle`:380, `write_descriptors`:385, `init_rt`:428, `wait_value`:508, `wait_idle`:516, `pump`:523, `ids_to`:535, `record`:542, `submit`:654, `collect`:666, `segment`:684, `capture`:715, `read_ldr`:734, `read_texture`:742, `drop`:773
+`wndproc`:123, `heap_props`:130, `buffer_desc`:134, `tex_desc`:141, `create`:148, `barrier`:154, `uav_barrier`:169, `bytecode`:177, `compute_pso`:181, `graphics_pso`:186, `root_signature`:207, `place`:229, `loaded_modules`:237, `dot`:253, `sun_dir`:255, `frame_cb`:261, `cpu_handle`:391, `gpu_handle`:394, `write_descriptors`:399, `init_rt`:442, `wait_value`:522, `wait_idle`:530, `hwnd_raw`:537, `pump`:539, `ids_to`:551, `record`:558, `submit`:670, `collect`:682, `segment`:700, `capture`:737, `read_ldr`:756, `read_texture`:764, `drop`:795
 
 ## `native_gpubench/src/main.rs`
 
-`say`:16, `u32s_b64`:22, `vectors`:29, `run`:45, `main`:131
+`say`:16, `u32s_b64`:22, `vectors`:29, `run`:45, `main`:141
 
 ## `native_gpubench/src/proof.rs`
 
@@ -972,9 +984,17 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `api`:9, `fill`:10, `mb`:12, `ItemState`:14 _type_, `MissingDrivers`:18 _component_, `itemTitle`:75, `toggle`:77, `runInstall`:83, `reasonText`:110, `sourceText`:116, `statusLine`:118, `itemRow`:139, `wuHintKey`:350
 
+## `src/components/gpubench/RankingTop.tsx`
+
+`RankingTop`:8 _component_, `label`:26
+
+## `src/components/gpubench/RunOverlay.tsx`
+
+`RunOverlay`:13 _component_, `send`:25
+
 ## `src/components/gpubench/StressPanel.tsx`
 
-`num`:8, `StabilityChart`:11 _component_, `y`:13, `best`:15, `StressPanel`:32 _component_, `api`:41, `start`:50, `remove`:63, `loadName`:65, `verdictName`:66, `verdictClass`:67, `reasonText`:68
+`num`:9, `StabilityChart`:12 _component_, `y`:14, `best`:16, `StressPanel`:33 _component_, `api`:42, `start`:51, `remove`:64, `loadName`:66, `verdictName`:67, `verdictClass`:68, `reasonText`:69
 
 ## `src/components/hub/HubApproval.tsx`
 
@@ -1080,13 +1100,25 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `ApplyResult`:5 _type_, `HeaderGuardModal`:12 _component_, `onKey`:27, `apply`:35, `WriteDiff`:108 _component_, `grid`:122
 
+## `src/components/recovery/PartitionManager.tsx`
+
+`Selection`:10 _type_, `Action`:11 _type_, `PartitionManager`:14 _component_, `roleName`:38, `review`:50, `Review`:151 _type_, `FsFields`:153 _component_, `CreateForm`:167 _component_, `FormatForm`:197 _component_, `ResizeForm`:211 _component_, `LetterForm`:240 _component_
+
 ## `src/components/recovery/PartitionMapBar.tsx`
 
 `PartitionMapBar`:10 _component_
 
+## `src/components/recovery/PartitionPlanModal.tsx`
+
+`PartitionPlanModal`:10 _component_, `onKey`:18, `apply`:27, `bar`:37
+
 ## `src/components/recovery/SectorHexViewer.tsx`
 
 `SectorHexViewer`:8 _component_, `go`:26, `ascii`:30, `Field`:138 _component_
+
+## `src/components/recovery/partitionLayout.ts`
+
+`kindOf`:5, `layoutOf`:13, `alignGap`:23, `freeLetters`:28
 
 ## `src/components/recovery/rescueUtils.tsx`
 
@@ -1254,7 +1286,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/DiskRescue.tsx`
 
-`Tab`:13 _type_, `Guard`:14 _type_, `diskOf`:16, `DiskRescue`:18 _component_, `openImage`:56, `HealthTab`:123 _component_, `runSurface`:139, `Stat`:241 _component_, `GuardTab`:252 _component_, `wrap`:265, `planGpt`:271, `scan`:278, `planMbr`:283, `backup`:291, `restore`:296, `copyState`:307, `BootTab`:362 _component_, `planActive`:369
+`Tab`:14 _type_, `Guard`:15 _type_, `diskOf`:17, `DiskRescue`:19 _component_, `openImage`:57, `HealthTab`:126 _component_, `runSurface`:142, `Stat`:244 _component_, `GuardTab`:255 _component_, `wrap`:268, `planGpt`:274, `scan`:281, `planMbr`:286, `backup`:294, `restore`:299, `copyState`:310, `BootTab`:365 _component_, `planActive`:372
 
 ## `src/pages/DllInjector.tsx`
 
@@ -1290,7 +1322,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/GpuBench.tsx`
 
-`num`:8, `GpuBench`:10 _component_, `api`:23, `load`:24, `errorText`:41, `run`:49, `link`:60, `unlink`:69, `remove`:70, `testName`:76, `statusName`:77, `statusClass`:83, `phaseText`:84
+`num`:10, `GpuBench`:12 _component_, `api`:25, `load`:26, `errorText`:43, `run`:51, `link`:62, `unlink`:71, `remove`:72, `testName`:78, `statusName`:79, `statusClass`:85, `phaseText`:86
 
 ## `src/pages/Home.tsx`
 
@@ -1448,6 +1480,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `svc`:45
 
+## `tests/benchWorkerReal.test.ts`
+
+`run`:11, `best`:19
+
 ## `tests/cleaner.test.ts`
 
 `tmpDir`:13, `fakeIni`:16, `fakeFetch`:21, `put`:81, `execFileImpl`:154
@@ -1486,7 +1522,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `tests/gpuStress.test.ts`
 
-`loop`:11, `fakeEngine`:88, `say`:91, `service`:107
+`loop`:11, `fakeEngine`:88, `say`:91, `service`:107, `fetchImpl`:136
 
 ## `tests/hub.test.ts`
 
@@ -1531,6 +1567,18 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/optiscaler.test.ts`
 
 `isRdna2`:16, `mockGetLibraryStore`:37, `sectionKeys`:67
+
+## `tests/partitionManager.test.tsx`
+
+`part`:10, `disk`:14, `mount`:18, `plan`:54, `run`:68
+
+## `tests/partitionPolicy.test.ts`
+
+`part`:13, `disk`:17, `ctx`:21, `create`:115, `r`:132, `l`:147, `harness`:191, `listed`:195, `writes`:223
+
+## `tests/partitionService.test.ts`
+
+`raw`:10
 
 ## `tests/powershellTools.test.ts`
 

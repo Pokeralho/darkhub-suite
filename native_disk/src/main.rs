@@ -284,6 +284,13 @@ fn run(a: &Args, prog: &mut Progress) -> R<Value> {
             v["target"] = json!(t.display());
             Ok(v)
         }
+        "probe-lock" => {
+            #[cfg(windows)]
+            if let Target::Disk(n) = a.target("target")? {
+                return Ok(win::probe_locks(n));
+            }
+            Err(Fail::new("bad_args", "probe-lock precisa de um disco físico"))
+        }
         "read-sector" => read_sector_cmd(a),
         "write-sector" => write_sector_cmd(a),
         "restore-gpt" => {
@@ -386,7 +393,7 @@ fn run(a: &Args, prog: &mut Progress) -> R<Value> {
             };
             carve::carve(&t, &out, &opts, prog)
         }
-        "" | "help" => Ok(json!({ "commands": ["list-drives", "inspect", "read-sector", "write-sector", "restore-gpt", "scan-vbr", "rebuild-mbr", "set-active", "backup-table", "restore-backup", "clone", "verify", "hash", "surface-test", "carve"] })),
+        "" | "help" => Ok(json!({ "commands": ["list-drives", "inspect", "probe-lock", "read-sector", "write-sector", "restore-gpt", "scan-vbr", "rebuild-mbr", "set-active", "backup-table", "restore-backup", "clone", "verify", "hash", "surface-test", "carve"] })),
         other => Err(Fail::new("bad_args", format!("comando desconhecido: {other}"))),
     }
 }

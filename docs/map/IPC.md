@@ -1,6 +1,6 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-05T21:25:12. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-05T23:53:44. NAO edite a mao: rode `npm run map`. -->
 
-# Canais IPC (527)
+# Canais IPC (533)
 
 | API (`window.darkhub.`) | canal | handler | chama | usado em |
 |---|---|---|---|---|
@@ -145,16 +145,18 @@
 | `fs.readFile` | `fs:readFile` | `electron/main.js:3420` |  | `src/pages/TextEditor.tsx`<br>`src/pages/TextSummarizer.tsx` |
 | `fs.writeFile` | `fs:writeFile` | `electron/main.js:3432` | `devPath.includes` | `src/pages/TextEditor.tsx` |
 | `getTrace` | `dev:getTrace` | **sem handler** |  | _nao usado_ |
-| `gpubench.cancel` | `gpubench:cancel` | `electron/ipc/gpuBenchIpc.js:25` | `svc.cancel` | `src/components/gpubench/StressPanel.tsx`<br>`src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
-| `gpubench.link` | `gpubench:link` | `electron/ipc/gpuBenchIpc.js:27` | `svc.link` | `src/pages/GpuBench.tsx` |
-| `gpubench.onEvent` | `gpubench:event` | _evento main->tela_ |  | `src/components/gpubench/StressPanel.tsx`<br>`src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
-| `gpubench.openRanking` | `gpubench:openRanking` | `electron/ipc/gpuBenchIpc.js:29` | `svc.openRanking`<br>`svc.cancel` | `src/pages/GpuBench.tsx` |
-| `gpubench.remove` | `gpubench:remove` | `electron/ipc/gpuBenchIpc.js:26` | `svc.remove` | `src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
-| `gpubench.removeStress` | `gpubench:removeStress` | `electron/ipc/gpuBenchIpc.js:24` | `svc.removeStress` | `src/components/gpubench/StressPanel.tsx` |
-| `gpubench.run` | `gpubench:run` | `electron/ipc/gpuBenchIpc.js:22` | `svc.run` | `src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
-| `gpubench.status` | `gpubench:status` | `electron/ipc/gpuBenchIpc.js:21` | `svc.status` | `src/pages/GpuBench.tsx` |
-| `gpubench.stress` | `gpubench:stress` | `electron/ipc/gpuBenchIpc.js:23` | `svc.stress` | `src/components/gpubench/StressPanel.tsx` |
-| `gpubench.unlink` | `gpubench:unlink` | `electron/ipc/gpuBenchIpc.js:28` | `svc.unlink` | `src/pages/GpuBench.tsx` |
+| `gpubench.cancel` | `gpubench:cancel` | `electron/ipc/gpuBenchIpc.js:35` | `svc.cancel` | `src/components/gpubench/StressPanel.tsx`<br>`src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
+| `gpubench.link` | `gpubench:link` | `electron/ipc/gpuBenchIpc.js:37` | `svc.link` | `src/pages/GpuBench.tsx` |
+| `gpubench.onEvent` | `gpubench:event` | _evento main->tela_ |  | `src/components/gpubench/RunOverlay.tsx`<br>`src/components/gpubench/StressPanel.tsx`<br>`src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
+| `gpubench.openRanking` | `gpubench:openRanking` | `electron/ipc/gpuBenchIpc.js:39` | `svc.openRanking`<br>`svc.cancel` | `src/pages/GpuBench.tsx` |
+| `gpubench.ranking` | `gpubench:ranking` | `electron/ipc/gpuBenchIpc.js:29` | `svc.ranking` | `src/components/gpubench/RankingTop.tsx` |
+| `gpubench.remove` | `gpubench:remove` | `electron/ipc/gpuBenchIpc.js:36` | `svc.remove` | `src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
+| `gpubench.removeStress` | `gpubench:removeStress` | `electron/ipc/gpuBenchIpc.js:34` | `svc.removeStress` | `src/components/gpubench/StressPanel.tsx` |
+| `gpubench.run` | `gpubench:run` | `electron/ipc/gpuBenchIpc.js:27` | `svc.run` | `src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
+| `gpubench.status` | `gpubench:status` | `electron/ipc/gpuBenchIpc.js:26` | `svc.status` | `src/pages/GpuBench.tsx` |
+| `gpubench.stress` | `gpubench:stress` | `electron/ipc/gpuBenchIpc.js:28` | `svc.stress` | `src/components/gpubench/StressPanel.tsx` |
+| `gpubench.unlink` | `gpubench:unlink` | `electron/ipc/gpuBenchIpc.js:38` | `svc.unlink` | `src/pages/GpuBench.tsx` |
+| `gpubench.viewport` | `gpubench:viewport` | `electron/ipc/gpuBenchIpc.js:30` | `svc.viewport` | `src/components/gpubench/RunOverlay.tsx` |
 | `hardware.onUpdate` | `hardware:update` | _evento main->tela_ |  | `src/hooks/useSystemMetrics.ts` |
 | `hardware.startPolling` | `hardware:startPolling` | `electron/services/HardwareService.js:51` | `hookedSenders.has`<br>`hookedSenders.add`<br>`sender.once` | `src/hooks/useSystemMetrics.ts` |
 | `hardware.stopPolling` | `hardware:stopPolling` | `electron/services/HardwareService.js:69` | `perSender.get`<br>`perSender.set`<br>`perSender.delete` | `src/hooks/useSystemMetrics.ts` |
@@ -359,25 +361,29 @@
 | `realtime.scanFiles` | `realtime:scanFiles` | `electron/ipc/realtimeIpc.js:141` | `protection.scanNow`<br>`clamav.status`<br>`clamav.update` | _nao usado_ |
 | `realtime.setConfig` | `realtime:setConfig` | `electron/ipc/realtimeIpc.js:119` | `store.update` | `src/pages/Realtime.tsx` |
 | `realtime.status` | `realtime:status` | `electron/ipc/realtimeIpc.js:104` | `clamav.status`<br>`clamav.install`<br>`clamav.update` | `src/pages/Realtime.tsx` |
-| `recovery.backupTable` | `recovery:backup-table` | `electron/ipc/recoveryIpc.js:23` | `svc.backupTable` | _nao usado_ |
-| `recovery.cancel` | `recovery:cancel` | `electron/ipc/recoveryIpc.js:31` | `svc.cancel` | _nao usado_ |
-| `recovery.cancelCarve` | `recovery:cancel-carve` | `electron/ipc/recoveryIpc.js:30` | `svc.cancel` | _nao usado_ |
-| `recovery.clone` | `recovery:clone` | `electron/ipc/recoveryIpc.js:25` | `svc.clone` | _nao usado_ |
-| `recovery.inspectDisk` | `recovery:inspect-disk` | `electron/ipc/recoveryIpc.js:18` | `svc.inspectDisk` | _nao usado_ |
-| `recovery.listDrives` | `recovery:list-drives` | `electron/ipc/recoveryIpc.js:17` | `svc.listDrives` | _nao usado_ |
+| `recovery.backupTable` | `recovery:backup-table` | `electron/ipc/recoveryIpc.js:25` | `svc.backupTable` | _nao usado_ |
+| `recovery.cancel` | `recovery:cancel` | `electron/ipc/recoveryIpc.js:33` | `svc.cancel` | _nao usado_ |
+| `recovery.cancelCarve` | `recovery:cancel-carve` | `electron/ipc/recoveryIpc.js:32` | `svc.cancel` | _nao usado_ |
+| `recovery.clone` | `recovery:clone` | `electron/ipc/recoveryIpc.js:27` | `svc.clone` | _nao usado_ |
+| `recovery.inspectDisk` | `recovery:inspect-disk` | `electron/ipc/recoveryIpc.js:20` | `svc.inspectDisk` | _nao usado_ |
+| `recovery.listDrives` | `recovery:list-drives` | `electron/ipc/recoveryIpc.js:19` | `svc.listDrives` | _nao usado_ |
 | `recovery.onProgress` | `recovery:progress` | _evento main->tela_ |  | _nao usado_ |
-| `recovery.pickFolder` | `recovery:pick-folder` | `electron/ipc/recoveryIpc.js:35` |  | _nao usado_ |
-| `recovery.pickImage` | `recovery:pick-image` | `electron/ipc/recoveryIpc.js:39` |  | _nao usado_ |
-| `recovery.readSector` | `recovery:read-sector` | `electron/ipc/recoveryIpc.js:19` | `svc.readSector` | _nao usado_ |
-| `recovery.repairHeader` | `recovery:repair-header` | `electron/ipc/recoveryIpc.js:21` | `svc.repairHeader` | _nao usado_ |
-| `recovery.restoreBackup` | `recovery:restore-backup` | `electron/ipc/recoveryIpc.js:24` | `svc.restoreBackup` | _nao usado_ |
-| `recovery.setActive` | `recovery:set-active` | `electron/ipc/recoveryIpc.js:22` | `svc.setActive` | _nao usado_ |
-| `recovery.smart` | `recovery:smart` | `electron/ipc/recoveryIpc.js:28` | `svc.smart` | _nao usado_ |
-| `recovery.startCarve` | `recovery:start-carve` | `electron/ipc/recoveryIpc.js:29` | `svc.startCarving` | _nao usado_ |
-| `recovery.status` | `recovery:status` | `electron/ipc/recoveryIpc.js:32` | `svc.status` | _nao usado_ |
-| `recovery.surfaceTest` | `recovery:surface-test` | `electron/ipc/recoveryIpc.js:27` | `svc.surfaceTest` | _nao usado_ |
-| `recovery.verify` | `recovery:verify` | `electron/ipc/recoveryIpc.js:26` | `svc.verify` | _nao usado_ |
-| `recovery.writeSector` | `recovery:write-sector` | `electron/ipc/recoveryIpc.js:20` | `svc.writeSector` | _nao usado_ |
+| `recovery.partitionApply` | `recovery:partition-apply` | `electron/ipc/recoveryIpc.js:39` | `parts.apply` | _nao usado_ |
+| `recovery.partitionLimits` | `recovery:partition-limits` | `electron/ipc/recoveryIpc.js:36` | `parts.limits` | _nao usado_ |
+| `recovery.partitionList` | `recovery:list-partitions` | `electron/ipc/recoveryIpc.js:35` | `parts.list` | _nao usado_ |
+| `recovery.partitionPlan` | `recovery:partition-plan` | `electron/ipc/recoveryIpc.js:37` | `parts.plan` | _nao usado_ |
+| `recovery.pickFolder` | `recovery:pick-folder` | `electron/ipc/recoveryIpc.js:54` |  | _nao usado_ |
+| `recovery.pickImage` | `recovery:pick-image` | `electron/ipc/recoveryIpc.js:58` |  | _nao usado_ |
+| `recovery.readSector` | `recovery:read-sector` | `electron/ipc/recoveryIpc.js:21` | `svc.readSector` | _nao usado_ |
+| `recovery.repairHeader` | `recovery:repair-header` | `electron/ipc/recoveryIpc.js:23` | `svc.repairHeader` | _nao usado_ |
+| `recovery.restoreBackup` | `recovery:restore-backup` | `electron/ipc/recoveryIpc.js:26` | `svc.restoreBackup` | _nao usado_ |
+| `recovery.setActive` | `recovery:set-active` | `electron/ipc/recoveryIpc.js:24` | `svc.setActive` | _nao usado_ |
+| `recovery.smart` | `recovery:smart` | `electron/ipc/recoveryIpc.js:30` | `svc.smart` | _nao usado_ |
+| `recovery.startCarve` | `recovery:start-carve` | `electron/ipc/recoveryIpc.js:31` | `svc.startCarving` | _nao usado_ |
+| `recovery.status` | `recovery:status` | `electron/ipc/recoveryIpc.js:34` | `svc.status` | _nao usado_ |
+| `recovery.surfaceTest` | `recovery:surface-test` | `electron/ipc/recoveryIpc.js:29` | `svc.surfaceTest` | _nao usado_ |
+| `recovery.verify` | `recovery:verify` | `electron/ipc/recoveryIpc.js:28` | `svc.verify` | _nao usado_ |
+| `recovery.writeSector` | `recovery:write-sector` | `electron/ipc/recoveryIpc.js:22` | `svc.writeSector` | _nao usado_ |
 | `restore.install` | `restore:install` | `electron/ipc/restoreIpc.js:13` | `svc.install` | `src/components/setup/RestoreComponentsPanel.tsx` |
 | `restore.status` | `restore:status` | `electron/ipc/restoreIpc.js:12` | `svc.status` | `src/components/drivers/MissingDrivers.tsx`<br>`src/components/setup/RestoreComponentsPanel.tsx` |
 | `saves.addCustom` | `saves:addCustom` | `electron/ipc/saveBackupIpc.js:49` | `svc.settings`<br>`svc.setSettings`<br>`custom.filter` | _nao usado_ |

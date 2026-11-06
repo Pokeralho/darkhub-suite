@@ -376,6 +376,33 @@ export interface RescueLayoutItem {
   kind: 'ntfs' | 'fat' | 'ext' | 'raw' | 'unallocated'; index?: number; start_lba: number; sectors: number; size: number;
   fs?: string; label?: string; type_name?: string; type_id?: string; name?: string; boot?: boolean; beyond_disk?: boolean;
 }
+export interface PartitionEntry {
+  number: number | null; offset: number; size: number; guid?: string; isLogical?: boolean; role: 'esp' | 'msr' | 'recovery' | 'basic' | 'dynamic' | 'spaces' | 'linux' | 'extended' | 'unknown';
+  letter: string | null; mountPaths: string[]; isBoot: boolean; isSystem: boolean; isActive: boolean; isHidden: boolean;
+  fileSystem: string | null; label: string; free: number | null; volumePath: string | null;
+  bitlocker: 'on' | 'off' | 'unknown' | 'none'; hasPagefile: boolean; isWindows: boolean;
+}
+export interface PartitionDisk {
+  number: number; name: string; serial: string; uniqueId: string; guid?: string; bus: string; style: string; size: number; sectorSize: number;
+  isBoot: boolean; isSystem: boolean; isOffline: boolean; isReadOnly: boolean; isClustered: boolean;
+  partitions: PartitionEntry[]; free: { offset: number; size: number }[];
+}
+export type PartitionFs = 'NTFS' | 'exFAT' | 'FAT32';
+export type PartitionRequest =
+  | { op: 'init'; disk: number }
+  | { op: 'create'; disk: number; offset: number; size: number; fs: PartitionFs; label?: string; letter?: string | null }
+  | { op: 'delete'; disk: number; partition: number }
+  | { op: 'resize'; disk: number; partition: number; newSize: number }
+  | { op: 'format'; disk: number; partition: number; fs: PartitionFs; label?: string; full?: boolean }
+  | { op: 'letter'; disk: number; partition: number; letter: string };
+export interface PartitionPlan {
+  planId: string | null; op: PartitionRequest['op']; diskName: string; before: PartitionDisk; after: PartitionDisk;
+  blockers: string[]; warnings: string[]; dataLoss: boolean; limits: { min: number; max: number } | null;
+}
+export interface PartitionApplyResult {
+  ok: boolean; code?: string; error?: string; blockers?: string[]; written?: boolean | null;
+  backupFile?: string | null; partition?: number | null; disk?: PartitionDisk | null; mismatches?: string[];
+}
 export interface RescueGptCopy { present: boolean; lba: number; valid?: boolean; header_crc_ok?: boolean; entries_crc_ok?: boolean; alternate_lba?: number; last_usable?: number; num_entries?: number; disk_guid?: string }
 export interface RescueInspect {
   target: string; size: number; sector_size: number; total_sectors: number; scheme: 'gpt' | 'mbr' | 'none';
@@ -1061,6 +1088,10 @@ export interface DarkHubAPI {
     cancelCarve: () => Promise<{ ok: boolean; running?: boolean }>;
     cancel: () => Promise<{ ok: boolean; running?: boolean }>;
     status: () => Promise<{ ok: boolean; running: boolean; kind: string | null; startedAt: number | null }>;
+    partitionList: () => Promise<RescueResult<{ elevated: boolean; usedLetters: string[]; disks: PartitionDisk[] }>>;
+    partitionLimits: (payload: { disk: number; partition: number }) => Promise<RescueResult<{ min: number; max: number }>>;
+    partitionPlan: (payload: PartitionRequest) => Promise<RescueResult<PartitionPlan>>;
+    partitionApply: (payload: { planId: string; confirmName: string; ack?: boolean }) => Promise<PartitionApplyResult>;
     pickFolder: () => Promise<{ ok: boolean; canceled?: boolean; path?: string }>;
     pickImage: (payload?: { save?: boolean; defaultName?: string }) => Promise<{ ok: boolean; canceled?: boolean; path?: string }>;
     onProgress: (callback: (ev: RescueEvent) => void) => () => void;

@@ -6,11 +6,12 @@ import SectorHexViewer from '../components/recovery/SectorHexViewer';
 import HeaderGuardModal from '../components/recovery/HeaderGuardModal';
 import CarvingManager from '../components/recovery/CarvingManager';
 import CloneWizard from '../components/recovery/CloneWizard';
+import PartitionManager from '../components/recovery/PartitionManager';
 import { api, ErrorLine, fmtBytes, JobProgress, type ProgressEv } from '../components/recovery/rescueUtils';
 import { AlertTriangle, CheckCircle, FolderOpen, Gauge, HardDrive, Loader2, RefreshCw, Save, Search, ShieldCheck, Upload, Wrench } from '../components/icons';
 import { useI18n } from '../i18n/I18nProvider';
 
-type Tab = 'health' | 'guard' | 'editor' | 'carve' | 'clone' | 'boot';
+type Tab = 'health' | 'partitions' | 'guard' | 'editor' | 'carve' | 'clone' | 'boot';
 type Guard = { title: string; plan: RescuePlanResult['plan']; apply: (confirmDisk?: number) => Promise<{ ok: boolean; error?: string; result?: RescuePlanResult['result'] }> };
 
 const diskOf = (target: string) => { const m = /^disk:(\d+)$/.exec(target); return m ? Number(m[1]) : null; };
@@ -60,6 +61,7 @@ export default function DiskRescue() {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'health', label: t('rescue.tab.health', 'Saúde e partições') },
+    { id: 'partitions', label: t('rescue.tab.partitions', 'Particionamento') },
     { id: 'guard', label: t('rescue.tab.guard', 'HeaderGuard') },
     { id: 'editor', label: t('rescue.tab.editor', 'DiskEditor') },
     { id: 'carve', label: t('rescue.tab.carve', 'Deep Carving') },
@@ -107,6 +109,7 @@ export default function DiskRescue() {
       {!target ? <p className="dh-help">{t('rescue.noTarget', 'Escolha um disco ou abra uma imagem.')}</p> : (
         <>
           {tab === 'health' ? <HealthTab target={target} drive={drive} info={info} loading={loadingInfo} error={infoError} /> : null}
+          {tab === 'partitions' ? <PartitionManager diskNumber={diskOf(target)} /> : null}
           {tab === 'guard' ? <GuardTab target={target} info={info} readOnly={!!drive?.is_system} onChanged={loadInfo} /> : null}
           {tab === 'editor' ? <SectorHexViewer key={target} target={target} /> : null}
           {tab === 'carve' ? <CarvingManager key={target} target={target} diskNumber={diskOf(target)} /> : null}

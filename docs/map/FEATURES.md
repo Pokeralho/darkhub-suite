@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-05T21:25:12. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-05T23:53:44. NAO edite a mao: rode `npm run map`. -->
 
 # Mapa de funcionalidades (tela -> IPC -> backend)
 Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/preload.js` -> canal IPC -> handler -> servico.
@@ -165,10 +165,10 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 |---|---|---|---|
 | `bench.compare` | `bench:compare` | `electron/ipc/benchmarkIpc.js:16` | `svc.compare` |
 | `bench.history` | `bench:history` | `electron/ipc/benchmarkIpc.js:15` | `svc.history` |
-| `gpubench.cancel` | `gpubench:cancel` | `electron/ipc/gpuBenchIpc.js:25` | `svc.cancel` |
+| `gpubench.cancel` | `gpubench:cancel` | `electron/ipc/gpuBenchIpc.js:35` | `svc.cancel` |
 | `gpubench.onEvent` | `gpubench:event` | `nao encontrado` |  |
-| `gpubench.remove` | `gpubench:remove` | `electron/ipc/gpuBenchIpc.js:26` | `svc.remove` |
-| `gpubench.run` | `gpubench:run` | `electron/ipc/gpuBenchIpc.js:22` | `svc.run` |
+| `gpubench.remove` | `gpubench:remove` | `electron/ipc/gpuBenchIpc.js:36` | `svc.remove` |
+| `gpubench.run` | `gpubench:run` | `electron/ipc/gpuBenchIpc.js:27` | `svc.run` |
 
 ### DarkPacer (FPS Lock)  (rota `darkpacer`)
 - Tela: `src/pages/FramePacer.tsx`
@@ -212,21 +212,23 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 ### GPU benchmark  (rota `gpubench`)
 - Tela: `src/pages/GpuBench.tsx`
-- Componentes/hooks usados: `src/components/gpubench/StressPanel.tsx`, `src/components/icons/index.tsx`, `src/components/ui/PageHeader.tsx`
+- Componentes/hooks usados: `src/components/gpubench/RankingTop.tsx`, `src/components/gpubench/RunOverlay.tsx`, `src/components/gpubench/StressPanel.tsx`, `src/components/icons/index.tsx`, `src/components/ui/PageHeader.tsx`
 - Arquivos de backend: `electron/ipc/gpuBenchIpc.js`
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `gpubench.cancel` | `gpubench:cancel` | `electron/ipc/gpuBenchIpc.js:25` | `svc.cancel` |
-| `gpubench.link` | `gpubench:link` | `electron/ipc/gpuBenchIpc.js:27` | `svc.link` |
+| `gpubench.cancel` | `gpubench:cancel` | `electron/ipc/gpuBenchIpc.js:35` | `svc.cancel` |
+| `gpubench.link` | `gpubench:link` | `electron/ipc/gpuBenchIpc.js:37` | `svc.link` |
 | `gpubench.onEvent` | `gpubench:event` | `nao encontrado` |  |
-| `gpubench.openRanking` | `gpubench:openRanking` | `electron/ipc/gpuBenchIpc.js:29` | `svc.openRanking`<br>`svc.cancel` |
-| `gpubench.remove` | `gpubench:remove` | `electron/ipc/gpuBenchIpc.js:26` | `svc.remove` |
-| `gpubench.removeStress` | `gpubench:removeStress` | `electron/ipc/gpuBenchIpc.js:24` | `svc.removeStress` |
-| `gpubench.run` | `gpubench:run` | `electron/ipc/gpuBenchIpc.js:22` | `svc.run` |
-| `gpubench.status` | `gpubench:status` | `electron/ipc/gpuBenchIpc.js:21` | `svc.status` |
-| `gpubench.stress` | `gpubench:stress` | `electron/ipc/gpuBenchIpc.js:23` | `svc.stress` |
-| `gpubench.unlink` | `gpubench:unlink` | `electron/ipc/gpuBenchIpc.js:28` | `svc.unlink` |
+| `gpubench.openRanking` | `gpubench:openRanking` | `electron/ipc/gpuBenchIpc.js:39` | `svc.openRanking`<br>`svc.cancel` |
+| `gpubench.ranking` | `gpubench:ranking` | `electron/ipc/gpuBenchIpc.js:29` | `svc.ranking` |
+| `gpubench.remove` | `gpubench:remove` | `electron/ipc/gpuBenchIpc.js:36` | `svc.remove` |
+| `gpubench.removeStress` | `gpubench:removeStress` | `electron/ipc/gpuBenchIpc.js:34` | `svc.removeStress` |
+| `gpubench.run` | `gpubench:run` | `electron/ipc/gpuBenchIpc.js:27` | `svc.run` |
+| `gpubench.status` | `gpubench:status` | `electron/ipc/gpuBenchIpc.js:26` | `svc.status` |
+| `gpubench.stress` | `gpubench:stress` | `electron/ipc/gpuBenchIpc.js:28` | `svc.stress` |
+| `gpubench.unlink` | `gpubench:unlink` | `electron/ipc/gpuBenchIpc.js:38` | `svc.unlink` |
+| `gpubench.viewport` | `gpubench:viewport` | `electron/ipc/gpuBenchIpc.js:30` | `svc.viewport` |
 
 ### System Optimizer  (rota `optimizer`)
 - Tela: `src/pages/Optimizer.tsx`
@@ -489,7 +491,7 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 ### Disk Studio & Rescue  (rota `disk-rescue`)
 - Tela: `src/pages/DiskRescue.tsx`
-- Componentes/hooks usados: `src/components/icons/index.tsx`, `src/components/recovery/CarvingManager.tsx`, `src/components/recovery/CloneWizard.tsx`, `src/components/recovery/HeaderGuardModal.tsx`, `src/components/recovery/PartitionMapBar.tsx`, `src/components/recovery/SectorHexViewer.tsx`, `src/components/recovery/rescueUtils.tsx`, `src/components/ui/PageHeader.tsx`
+- Componentes/hooks usados: `src/components/icons/index.tsx`, `src/components/recovery/CarvingManager.tsx`, `src/components/recovery/CloneWizard.tsx`, `src/components/recovery/HeaderGuardModal.tsx`, `src/components/recovery/PartitionManager.tsx`, `src/components/recovery/PartitionMapBar.tsx`, `src/components/recovery/PartitionPlanModal.tsx`, `src/components/recovery/SectorHexViewer.tsx`, `src/components/recovery/partitionLayout.ts`, `src/components/recovery/rescueUtils.tsx`, `src/components/ui/PageHeader.tsx`
 - Sem chamadas IPC (tela apenas de interface).
 
 ### Download Manager  (rota `downloads`)

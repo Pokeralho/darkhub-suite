@@ -1,6 +1,6 @@
 // Must stay the first import: dev profile + IPC trace (no-op when packaged).
 import { devStartPage } from './devBootstrap.js'
-import { app, BrowserWindow, dialog, ipcMain, shell, protocol, clipboard, globalShortcut, Menu, Tray, screen, session, Notification, safeStorage } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell, protocol, clipboard, globalShortcut, Menu, Tray, screen, session, Notification, safeStorage, powerSaveBlocker } from 'electron'
 import log from 'electron-log'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -232,7 +232,7 @@ safeRegister('driver', () => registerDriverIPC({
 safeRegister('powershell', () => registerPowerShellIPC({ ipcMain, logger: Logger }))
 safeRegister('wintools', () => registerWinToolsIPC({ ipcMain, logger: Logger }))
 safeRegister('diskscan', () => registerDiskScanIPC({ ipcMain, dialog, shell, BrowserWindow, logger: Logger }))
-safeRegister('recovery', () => registerRecoveryIPC({ ipcMain, dialog, BrowserWindow, logger: Logger }))
+safeRegister('recovery', () => registerRecoveryIPC({ ipcMain, dialog, BrowserWindow, powerSaveBlocker, app, logger: Logger }))
 safeRegister('cleaner', () => registerCleanerIPC({ app, ipcMain, shell, logger: Logger }))
 safeRegister('hwsensors', () => registerHwSensorsIPC({ app, ipcMain, logger: Logger }))
 safeRegister('realtime', () => registerRealtimeIPC({ app, ipcMain, dialog, BrowserWindow, Notification, logger: Logger }))

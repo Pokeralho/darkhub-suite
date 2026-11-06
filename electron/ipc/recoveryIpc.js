@@ -1,8 +1,10 @@
 import { DiskRecoveryService } from '../services/recovery/DiskRecoveryService.js'
+import { PartitionService } from '../services/recovery/PartitionService.js'
 
 /** `recovery:*` (Disk Studio & Rescue). Long jobs push events on 'recovery:progress' to the window that started them. */
-export function registerRecoveryIPC({ ipcMain, dialog, BrowserWindow, logger, service } = {}) {
+export function registerRecoveryIPC({ ipcMain, dialog, BrowserWindow, powerSaveBlocker, app, logger, service, partitions } = {}) {
   const svc = service || new DiskRecoveryService()
+  const parts = partitions || new PartitionService({ recovery: svc, appPaths: app ? [app.getAppPath(), app.getPath('userData'), process.execPath] : [] })
   const handle = (channel, fn) => ipcMain.handle(channel, async (event, payload) => {
     try { return await fn(payload ?? {}, event) } catch (err) {
       try { logger?.error?.('DiskRescue', `${channel}: ${err?.message ?? err}`) } catch { /* ignore */ }
@@ -30,6 +32,23 @@ export function registerRecoveryIPC({ ipcMain, dialog, BrowserWindow, logger, se
   handle('recovery:cancel-carve', () => svc.cancel())
   handle('recovery:cancel', () => svc.cancel())
   handle('recovery:status', () => svc.status())
+  handle('recovery:list-partitions', () => parts.list())
+  handle('recovery:partition-limits', (p) => parts.limits(p))
+  handle('recovery:partition-plan', (p) => parts.plan(p))
+  // Resizing cannot be stopped safely: while it runs the PC stays awake and the window refuses to close.
+  handle('recovery:partition-apply', async (p, event) => {
+    const win = winOf(event)
+    const onClose = (e) => {
+      e.preventDefault()
+      dialog?.showMessageBox?.(win, { type: 'warning', message: 'Uma operação de partição está em andamento. Aguarde terminar.' })
+    }
+    win?.on?.('close', onClose)
+    const blocker = powerSaveBlocker?.start?.('prevent-app-suspension')
+    try { return await parts.apply(p) } finally {
+      win?.removeListener?.('close', onClose)
+      if (blocker !== undefined) powerSaveBlocker?.stop?.(blocker)
+    }
+  })
 
   // Paths always come from native dialogs.
   handle('recovery:pick-folder', async (_p, event) => {
