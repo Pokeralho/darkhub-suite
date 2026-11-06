@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Play, Square, Loader2, Trash2, AlertTriangle, Info } from '../components/icons';
 import PageHeader from '../components/ui/PageHeader';
+import RankingTop from '../components/gpubench/RankingTop';
+import RunOverlay from '../components/gpubench/RunOverlay';
 import StressPanel from '../components/gpubench/StressPanel';
 import { useI18n } from '../i18n/I18nProvider';
 import type { GpuBenchRun, GpuBenchProgress, GpuStressRun } from '../global';
@@ -123,10 +125,12 @@ export default function GpuBench() {
             {progress ? phaseText(progress) : t('gpubench.preparing', 'Abrindo o motor...')}
           </p>
         )}
-        <p className="flex items-start gap-2 dh-help"><Info size={13} className="mt-0.5 shrink-0" />{t('gpubench.tip', 'Uma janela abre durante o teste. Feche jogos e navegadores antes: tudo que usa a GPU reduz a pontuação. O teste completo leva cerca de 2 minutos.')}</p>
+        <p className="flex items-start gap-2 dh-help"><Info size={13} className="mt-0.5 shrink-0" />{t('gpubench.tip', 'O teste roda aqui mesmo, ocupando a tela do DarkHub. Feche jogos e navegadores antes: tudo que usa a GPU reduz a pontuação. O teste completo leva cerca de 2 minutos.')}</p>
         {!engine && <p role="alert" className="flex items-center gap-2 text-[12.5px] text-red-400"><AlertTriangle size={14} />{errorText('engine_missing')}</p>}
         {error && <p role="alert" className="flex items-center gap-2 text-[12.5px] text-red-400"><AlertTriangle size={14} />{errorText(error)}</p>}
       </section>
+
+      {running && <RunOverlay title={t('nav.gpubench', 'Benchmark de GPU')} status={progress ? phaseText(progress) : t('gpubench.preparing', 'Abrindo o motor...')} percent={progress?.total ? (progress.index / progress.total) * 100 : 0} onCancel={() => void api()?.cancel()} />}
 
       {latest && (
         <section className="space-y-3">
@@ -164,6 +168,7 @@ export default function GpuBench() {
               : <button type="button" disabled={linking != null} onClick={() => void link()} className="dh-btn dh-btn-primary dh-btn-sm">{t('gpubench.link', 'Conectar conta do Hub')}</button>}
           </div>
         </div>
+        <RankingTop onOpen={(id) => void api()?.openRanking({ id })} />
         {linking != null && <p className="text-[12.5px] text-zinc-300">{t('gpubench.linkHelp', 'Confirme no navegador com o GitHub.')}{linking ? ` ${t('gpubench.linkCode', 'Código')}: ${linking}` : ''}</p>}
         <p className="dh-help">{t('gpubench.fair', 'Resultados enviados são conferidos pelo servidor: ele escolhe trechos do teste e recalcula o que deveria aparecer na tela. Resultados fora do padrão da GPU e o topo do ranking passam por revisão antes de aparecer.')}</p>
       </section>

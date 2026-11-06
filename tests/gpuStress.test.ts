@@ -112,6 +112,43 @@ function service(script: Parameters<typeof fakeEngine>[0], hardware: unknown = n
 }
 const fast = { loopMs: 15000, warmMs: 1 };
 
+describe('embedding and ranking', () => {
+  it('starts the engine inside the app window, sends where to draw and turns ticks into events', async () => {
+    const seen: { args: string[]; sent: Record<string, unknown>[]; events: unknown[] } = { args: [], sent: [], events: [] };
+    const spawnImpl = fakeEngine((c) => { seen.sent.push(c); return c.cmd === 'segment' ? segment : { type: 'fingerprint', ids: 'a', image: 'b' }; });
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'embed-'));
+    const exe = path.join(dir, 'engine.exe');
+    fs.writeFileSync(exe, '');
+    const svc = new GpuBenchService({ app: { getPath: () => dir }, safeStorage: null, shell: null, hardware: null, exe, onEvent: (e: unknown) => seen.events.push(e),
+      spawnImpl: (_x: string, args: string[]) => { seen.args = args; const c = spawnImpl(); setTimeout(() => c.stdout.write('{"type":"tick","fps":120.5}\n'), 0); return c; } } as never);
+    svc.viewport({ x: 10, y: 20, w: 640, h: 360, visible: true });
+    const r = await svc.stress({ minutes: 5 }, { loopMs: 60000, warmMs: 1, parent: '12345' });
+    expect(r.ok).toBe(true);
+    expect(seen.args).toEqual(['--parent', '12345']);
+    expect(seen.sent[0]).toMatchObject({ cmd: 'rect', x: 10, w: 640 }); // reported before the engine was up
+    expect(seen.events).toContainEqual({ type: 'tick', fps: 120.5 });
+  });
+
+  it('reads the top of the ranking without an account', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rank-'));
+    const calls: { url: string; headers: Record<string, string> }[] = [];
+    const items = Array.from({ length: 8 }, (_, i) => ({ rank: i + 1, runId: `r${i}`, login: `u${i}`, gpu: 'RTX', score: 900 - i, cpu: 'x', status: 'verified' }));
+    const fetchImpl = async (url: string, o: { headers: Record<string, string> }) => { calls.push({ url, headers: o.headers }); return { ok: true, json: async () => ({ items }) }; };
+    const svc = new GpuBenchService({ app: { getPath: () => dir }, safeStorage: null, shell: null, hardware: null, fetchImpl } as never);
+    const r = await svc.ranking({ test: 'rt' });
+    expect(r.items).toHaveLength(5);
+    expect(r.items[0]).toEqual({ rank: 1, runId: 'r0', login: 'u0', gpu: 'RTX', score: 900 });
+    expect(calls[0].url).toContain('/api/bench/ranking?test=rt');
+    expect(calls[0].headers.authorization).toBeUndefined();
+  });
+
+  it('treats a Hub without the ranking as a normal state', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rank-'));
+    const svc = new GpuBenchService({ app: { getPath: () => dir }, safeStorage: null, shell: null, hardware: null, fetchImpl: async () => ({ ok: false, status: 404, json: async () => ({}) }) } as never);
+    expect(await svc.ranking({ test: 'nope' })).toMatchObject({ ok: false, error: 'unavailable' });
+  });
+});
+
 describe('stress service', () => {
   it('passes when every frame matches the reference', async () => {
     const svc = service((c) => (c.cmd === 'segment' ? segment : { type: 'fingerprint', ids: 'a', image: 'b' }));

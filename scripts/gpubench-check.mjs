@@ -23,7 +23,7 @@ console.log(`vectors: ${bad ? bad + ' DIFFER' : 'all match'}`)
 // 2. the real thing
 const child = spawn(path.resolve(exe), [], { stdio: ['pipe', 'pipe', 'inherit'] })
 const lines = readline.createInterface({ input: child.stdout })[Symbol.asyncIterator]()
-const next = async () => JSON.parse((await lines.next()).value)
+const next = async () => { for (;;) { const m = JSON.parse((await lines.next()).value); if (m.type !== 'tick') return m } }
 const send = (o) => child.stdin.write(JSON.stringify(o) + '\n')
 const ready = await next()
 console.log(ready)

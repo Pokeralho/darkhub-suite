@@ -79,7 +79,7 @@ export default function Benchmark() {
   const busyWarning = latest && latest.context.backgroundCpu > 20;
   const verdictClass = { better: 'text-emerald-400', worse: 'text-red-400', same: 'text-zinc-500' } as const;
   const rows = useMemo(() => [...(cmp?.rows ?? [])].sort((a, b) => METRIC_ORDER.indexOf(a.metric) - METRIC_ORDER.indexOf(b.metric)), [cmp]);
-  const warningName = (w: string) => ({ powerPlan: t('bench.ctx.powerPlan', 'plano de energia'), onBattery: t('bench.ctx.battery', 'bateria/tomada'), cpu: 'CPU', ramGb: 'RAM', osBuild: t('bench.ctx.os', 'versão do Windows'), backgroundCpu: t('bench.ctx.load', 'uso de CPU em segundo plano') } as Record<string, string>)[w] ?? w;
+  const warningName = (w: string) => ({ suite: t('bench.ctx.suite', 'versão do teste (uma das medições é anterior à correção do teste)'), powerPlan: t('bench.ctx.powerPlan', 'plano de energia'), onBattery: t('bench.ctx.battery', 'bateria/tomada'), cpu: 'CPU', ramGb: 'RAM', osBuild: t('bench.ctx.os', 'versão do Windows'), backgroundCpu: t('bench.ctx.load', 'uso de CPU em segundo plano') } as Record<string, string>)[w] ?? w;
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6">
@@ -165,7 +165,7 @@ export default function Benchmark() {
               </table>
             </div>
           )}
-          <p className="dh-help">{t('bench.timerHelp', 'Timer de 1 ms: quanto um "espere 1 ms" atrasa de fato. No Windows padrão fica perto de 15 ms; ajustes de resolução de timer reduzem esse número.')}</p>
+          <p className="dh-help">{t('bench.timerHelp', 'Timer de 1 ms: quanto um "espere 1 ms" atrasa de fato. No Windows padrão fica perto de 15 ms. Só ajustes globais de resolução de timer mudam este número; os feitos por um programa valem apenas para ele.')}</p>
         </section>
       )}
 

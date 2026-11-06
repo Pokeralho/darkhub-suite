@@ -2,6 +2,7 @@
 export const benchmarkMessages: Record<'pt-BR' | 'en-US', Record<string, string>> = {
   'pt-BR': {
     'nav.benchmark': 'Benchmark antes/depois',
+    'bench.ctx.suite': 'versão do teste (uma das medições é anterior à correção do teste)',
     'bench.m.cpuSingle': 'CPU, 1 núcleo',
     'bench.m.cpuMulti': 'CPU, todos os núcleos',
     'bench.m.memBandwidth': 'Memória, banda',
@@ -37,7 +38,7 @@ export const benchmarkMessages: Record<'pt-BR' | 'en-US', Record<string, string>
     'bench.better': 'melhorou',
     'bench.worse': 'piorou',
     'bench.same': 'dentro da variação',
-    'bench.timerHelp': 'Timer de 1 ms: quanto um "espere 1 ms" atrasa de fato. No Windows padrão fica perto de 15 ms; ajustes de resolução de timer reduzem esse número.',
+    'bench.timerHelp': 'Timer de 1 ms: quanto um "espere 1 ms" atrasa de fato. No Windows padrão fica perto de 15 ms. Só ajustes globais de resolução de timer mudam este número; os feitos por um programa valem apenas para ele.',
     'bench.history': 'Execuções',
     'bench.empty': 'Nenhuma execução ainda. Rode a primeira para ter a referência de "antes".',
     'bench.delete': 'Apagar',
@@ -79,7 +80,8 @@ export const benchmarkMessages: Record<'pt-BR' | 'en-US', Record<string, string>
     'bench.better': 'improved',
     'bench.worse': 'got worse',
     'bench.same': 'within variation',
-    'bench.timerHelp': '1 ms timer: how late a "wait 1 ms" really is. On stock Windows it is close to 15 ms; timer resolution tweaks lower this number.',
+    'bench.ctx.suite': 'test version (one of the runs predates the test fix)',
+    'bench.timerHelp': '1 ms timer: how late a "wait 1 ms" really is. On stock Windows it is close to 15 ms. Only global timer resolution tweaks change this number; those made by one program apply to that program alone.',
     'bench.history': 'Runs',
     'bench.empty': 'No runs yet. Run the first one to get the "before" reference.',
     'bench.delete': 'Delete',

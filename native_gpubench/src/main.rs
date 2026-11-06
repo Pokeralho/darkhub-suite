@@ -13,7 +13,7 @@ use std::io::{BufRead, Write};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-fn say(v: Value) {
+pub(crate) fn say(v: Value) {
     let mut out = std::io::stdout().lock();
     let _ = writeln!(out, "{v}");
     let _ = out.flush();
@@ -48,14 +48,24 @@ fn run() -> Result<(), String> {
         say(vectors());
         return Ok(());
     }
-    let mut g = gpu::Gpu::new().map_err(|e| format!("d3d12: {e}"))?;
+    let parent = args.iter().position(|a| a == "--parent").and_then(|i| args.get(i + 1)).and_then(|v| v.parse::<isize>().ok());
+    let mut g = gpu::Gpu::new(parent).map_err(|e| format!("d3d12: {e}"))?;
     say(json!({"type": "ready", "adapter": g.info.name, "vendorId": g.info.vendor, "deviceId": g.info.device,
         "vramMb": g.info.vram_mb, "driver": g.info.driver, "dxr": g.info.dxr,
         "width": scene::WIDTH, "height": scene::HEIGHT, "tiles": scene::TILE_COUNT}));
 
     let (tx, rx) = mpsc::channel::<String>();
+    let hwnd = g.hwnd_raw();
     std::thread::spawn(move || {
         for line in std::io::stdin().lock().lines().map_while(Result::ok) {
+            // handled here, not in the main loop: the window must follow the app even in the middle of a segment
+            if let Ok(m) = serde_json::from_str::<Value>(&line) {
+                if m["cmd"] == "rect" {
+                    let n = |k: &str| m[k].as_i64().unwrap_or(0) as i32;
+                    gpu::place(hwnd, n("x"), n("y"), n("w"), n("h"), m["visible"].as_bool().unwrap_or(true));
+                    continue;
+                }
+            }
             if tx.send(line).is_err() { break; }
         }
         let _ = tx.send("{\"cmd\":\"quit\"}".into()); // stdin closed: the parent is gone

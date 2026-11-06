@@ -178,6 +178,8 @@ export interface GpuStressRun {
 
 export interface GpuStressEvent { type: 'stress'; phase: 'warm' | 'run'; test: string; loop: number; total: number; data?: GpuStressLoop }
 
+export interface GpuRankRow { rank: number; runId: string; login: string; gpu: string; score: number }
+
 export interface GpuBenchStats { frames: number; fps: number; avgMs: number; low1: number }
 
 export interface GpuBenchProgress { type: 'progress'; phase: 'warm' | 'run' | 'proof' | 'finish'; test: string; index: number; total: number }
@@ -677,13 +679,15 @@ export interface DarkHubAPI {
     status: () => Promise<{ ok: boolean; engine: boolean; running: boolean; linked: boolean; canStoreToken: boolean; hub: string; runs: GpuBenchRun[]; stress: GpuStressRun[] }>;
     stress: (payload: { minutes: number; load: string; tempLimit: number }) => Promise<{ ok: boolean; error?: string; run?: GpuStressRun }>;
     removeStress: (payload: { id: string }) => Promise<{ ok: boolean }>;
+    ranking: (payload: { test: string }) => Promise<{ ok: boolean; test?: string; items?: GpuRankRow[]; error?: string }>;
+    viewport: (payload: { x: number; y: number; w: number; h: number; visible?: boolean }) => Promise<{ ok: boolean }>;
     run: (payload: { ranked?: boolean; quick?: boolean; label?: string }) => Promise<{ ok: boolean; error?: string; run?: GpuBenchRun }>;
     cancel: () => Promise<{ ok: boolean }>;
     remove: (payload: { id: string }) => Promise<{ ok: boolean }>;
     link: () => Promise<{ ok: boolean; error?: string }>;
     unlink: () => Promise<{ ok: boolean }>;
     openRanking: (payload: { id?: string }) => Promise<{ ok: boolean }>;
-    onEvent: (callback: (e: GpuBenchProgress | GpuStressEvent | { type: 'link'; code: string }) => void) => () => void;
+    onEvent: (callback: (e: GpuBenchProgress | GpuStressEvent | { type: 'tick'; fps: number } | { type: 'link'; code: string }) => void) => () => void;
   };
   /** Before/after benchmark. */
   bench: {

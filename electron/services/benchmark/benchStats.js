@@ -37,7 +37,7 @@ export function summarize(samples) {
 }
 
 /**
- * Compares two summarized runs. A difference counts only when it is beyond twice the larger noise (at least 2%):
+ * Compares two summarized runs. A difference counts only when it is beyond twice the larger noise (at least 3%):
  * verdict 'better' | 'worse' | 'same'.
  */
 export function compare(before, after) {

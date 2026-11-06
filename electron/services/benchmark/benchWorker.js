@@ -22,26 +22,51 @@ function kernel(iters) {
     acc = (acc + (x >>> 0) % 977) | 0
   }
   return acc + f
+}
+// Many short calls, not one long one: a single long loop lives on on-stack replacement, and V8 then drops that code
+// between samples, so some samples ran 6x slower. Repeated calls get the function optimized once and kept.
+function work(iters) {
+  let sink = 0
+  for (let done = 0; done < iters; done += 250000) sink += kernel(250000)
+  return sink
 }`
-const CPU_ITERS = quick ? 20e6 : 60e6
+const CPU_ITERS = quick ? 100e6 : 300e6
+// one instance for every sample: a new function per sample would throw the warm-up's JIT work away
+const work = new Function(`${CPU_KERNEL}; return work`)()
 
 function cpuSingle() {
-  const kernel = new Function(`${CPU_KERNEL}; return kernel`)()
   const t = now()
-  kernel(CPU_ITERS)
+  work(CPU_ITERS)
   return (CPU_ITERS * 4) / ((now() - t) / 1000) / 1e6
 }
 
+/** All threads at once. Workers start and warm up first, then wait at a barrier: only the kernel is timed, not thread startup. */
 function cpuMulti() {
   const n = os.cpus().length
-  const code = `const { parentPort, workerData } = require('node:worker_threads'); ${CPU_KERNEL}; parentPort.postMessage(kernel(workerData))`
+  const code = `const { parentPort, workerData } = require('node:worker_threads'); ${CPU_KERNEL}
+    work(40e6)
+    parentPort.postMessage('ready')
+    parentPort.once('message', () => { work(workerData); parentPort.postMessage('done') })`
   const per = Math.round(CPU_ITERS / 2)
   return new Promise((resolve, reject) => {
-    const t = now()
+    const workers = []
+    let ready = 0
     let left = n
+    let t = 0
     for (let i = 0; i < n; i++) {
       const w = new Worker(code, { eval: true, workerData: per })
-      w.once('message', () => { w.terminate(); if (--left === 0) resolve((per * 4 * n) / ((now() - t) / 1000) / 1e6) })
+      workers.push(w)
+      w.on('message', (m) => {
+        if (m === 'ready') {
+          if (++ready === n) { t = now(); for (const x of workers) x.postMessage('go') }
+          return
+        }
+        if (--left === 0) {
+          const ms = now() - t
+          for (const x of workers) x.terminate()
+          resolve((per * 4 * n) / (ms / 1000) / 1e6)
+        }
+      })
       w.once('error', reject)
     }
   })
@@ -58,10 +83,11 @@ function memBandwidth() {
   return (MEM_BYTES * 2 * 4) / ((now() - t) / 1000) / 1e9 // read + write
 }
 
-// Random cyclic permutation over a buffer far larger than the CPU caches: each step is a dependent cache miss.
+// Random cyclic permutation over a buffer far larger than the CPU caches (X3D parts carry 96 MB and more of L3): each
+// step is a dependent cache miss, so this measures RAM.
 let chain = null
 function memLatency() {
-  const n = (quick ? 32 : 64) * 1024 * 1024 / 4
+  const n = (quick ? 128 : 256) * 1024 * 1024 / 4
   if (!chain) {
     chain = new Uint32Array(n)
     const order = new Uint32Array(n)
@@ -130,7 +156,7 @@ function disk4kSyncWrite(file) {
 
 const samples = { cpuSingle: [], cpuMulti: [], memBandwidth: [], memLatency: [], timerJitterP99: [], timerJitterAvg: [], diskSeqWrite: [], disk4kSyncWrite: [] }
 const dir = opts.diskDir && fs.existsSync(opts.diskDir) ? opts.diskDir : os.tmpdir()
-const file = path.join(dir, `darkhub-bench-${process.pid}.tmp`)
+const file = opts.tempFile || path.join(dir, `darkhub-bench-${process.pid}.tmp`)
 
 const tests = [
   ['cpuSingle', async () => samples.cpuSingle.push(cpuSingle())],
@@ -145,9 +171,11 @@ const tests = [
 try {
   // warm-up: JIT and CPU clocks settle before anything is measured
   cpuSingle()
+  cpuSingle()
   memBandwidth() // also allocates the buffers, so the first measured pass is not an allocation
   for (const [name, fn] of tests) {
     if (opts.skipDisk && name.startsWith('disk')) continue
+    if (Array.isArray(opts.only) && !opts.only.includes(name)) continue
     for (let r = 0; r < runs; r++) {
       emit({ type: 'progress', test: name, run: r + 1, runs })
       await fn()

@@ -21,23 +21,30 @@ export function enginePath() {
 
 /** One running engine process: send a command, await the next line it answers. */
 class Engine {
-  constructor(exe, spawnImpl) {
-    this.child = spawnImpl(exe, [], { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: false })
+  constructor(exe, spawnImpl, { parent = null, onTick = null } = {}) {
+    this.onTick = onTick
+    this.child = spawnImpl(exe, parent ? ['--parent', String(parent)] : [], { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: false })
     this.lines = readline.createInterface({ input: this.child.stdout })[Symbol.asyncIterator]()
     this.closed = new Promise((resolve) => { this.child.once('close', () => resolve(null)); this.child.once('error', () => resolve(null)) })
   }
 
   async next() {
-    const line = await Promise.race([this.lines.next().then((r) => (r.done ? null : r.value)), this.closed])
-    if (line == null) throw new Error('cancelled')
-    const msg = JSON.parse(line)
+    let msg
+    do {
+      const line = await Promise.race([this.lines.next().then((r) => (r.done ? null : r.value)), this.closed])
+      if (line == null) throw new Error('cancelled')
+      msg = JSON.parse(line)
+      if (msg.type === 'tick') this.onTick?.(msg)
+    } while (msg.type === 'tick')
     if (msg.type === 'aborted') throw new Error('cancelled')
     if (msg.type === 'error') throw new Error(msg.error)
     return msg
   }
 
+  send(cmd) { this.child.stdin.write(`${JSON.stringify(cmd)}\n`) }
+
   ask(cmd) {
-    this.child.stdin.write(`${JSON.stringify(cmd)}\n`)
+    this.send(cmd)
     return this.next()
   }
 
@@ -81,6 +88,30 @@ export class GpuBenchService {
 
   status() {
     return { ok: true, engine: fs.existsSync(this.exe), running: Boolean(this.engine), linked: Boolean(this._token()), canStoreToken: Boolean(this.safeStorage?.isEncryptionAvailable?.()), hub: this.hubUrl(), runs: this.history(), stress: this.stressHistory() }
+  }
+
+  /** Where the engine draws, in physical pixels of the app window. Remembered: the screen may report it before the engine is up. */
+  viewport(rect) {
+    this.rect = rect
+    try { this.engine?.send({ cmd: 'rect', ...rect }) } catch { /* closing */ }
+    return { ok: true }
+  }
+
+  _startEngine(parent) {
+    const engine = new Engine(this.exe, this.spawnImpl, { parent, onTick: (t) => this.onEvent?.({ type: 'tick', fps: t.fps }) })
+    this.engine = engine
+    return engine
+  }
+
+  /** The best of the public ranking. It needs no account; an unreachable Hub is a normal state for the screen. */
+  async ranking({ test = 'total', limit = 5 } = {}) {
+    const kind = ['total', 'raster', 'rt'].includes(test) ? test : 'total'
+    try {
+      const data = await this._api('GET', `/ranking?test=${kind}`, undefined, null)
+      return { ok: true, test: kind, items: (data.items || []).slice(0, limit).map((r) => ({ rank: r.rank, runId: r.runId, login: r.login, gpu: r.gpu, score: r.score })) }
+    } catch (e) {
+      return { ok: false, error: 'unavailable', detail: e.message }
+    }
   }
 
   rankingUrl() { return `${this.hubUrl()}/ranking` }
@@ -133,19 +164,19 @@ export class GpuBenchService {
 
   _sensorSample() { return sampleGpu(this.hardware?.snapshot?.()) }
 
-  async run({ ranked = false, quick = false, label = '' } = {}) {
+  async run({ ranked = false, quick = false, label = '', parent = null } = {}) {
     if (this.engine) return { ok: false, error: 'already_running' }
     if (!fs.existsSync(this.exe)) return { ok: false, error: 'engine_missing' }
     if (ranked && !this._token()) return { ok: false, error: 'not_linked' }
     this.stopReason = null
 
-    const engine = new Engine(this.exe, this.spawnImpl)
-    this.engine = engine
+    const engine = this._startEngine(parent)
     const samples = []
     const sampler = setInterval(() => samples.push(this._sensorSample()), 1000)
     this.hardware?.holdSensors?.('gpubench')
     try {
       const ready = await engine.next()
+      if (this.rect) engine.send({ cmd: 'rect', ...this.rect })
       const stats = {}
       const us = { raster: [], rt: [] }
       const tests = ready.dxr ? ['raster', 'rt'] : ['raster']
@@ -186,6 +217,7 @@ export class GpuBenchService {
       this.hardware?.releaseSensors?.('gpubench')
       engine.stop()
       this.engine = null
+      this.rect = null
     }
   }
 
@@ -193,12 +225,11 @@ export class GpuBenchService {
    * Stress test, local only. Loops the load, watches the temperature every second and re-renders one fixed frame after
    * each loop: it must match the reference taken at the start. `loopMs` exists for tests; the screen never sets it.
    */
-  async stress(options = {}, { loopMs = LOOP_MS, warmMs = WARM_MS } = {}) {
+  async stress(options = {}, { loopMs = LOOP_MS, warmMs = WARM_MS, parent = null } = {}) {
     if (this.engine) return { ok: false, error: 'already_running' }
     if (!fs.existsSync(this.exe)) return { ok: false, error: 'engine_missing' }
     const opts = normalizeStress(options)
-    const engine = new Engine(this.exe, this.spawnImpl)
-    this.engine = engine
+    const engine = this._startEngine(parent)
     this.stopReason = null
     const samples = []
     const sampler = setInterval(() => {
@@ -213,6 +244,7 @@ export class GpuBenchService {
     let gpu = null
     try {
       const ready = await engine.next()
+      if (this.rect) engine.send({ cmd: 'rect', ...this.rect })
       gpu = { name: ready.adapter, driver: ready.driver, dxr: ready.dxr }
       plan = stressPlan({ minutes: opts.minutes, load: opts.load, dxr: ready.dxr, loopMs })
       const seed = crypto.randomInt(2 ** 32)
@@ -244,6 +276,7 @@ export class GpuBenchService {
       this.hardware?.releaseSensors?.('gpustress')
       engine.stop()
       this.engine = null
+      this.rect = null
     }
     if (!gpu) return { ok: false, error: this.stopReason === 'cancelled' ? 'cancelled' : 'engine_failed' }
     if (!loops.length && this.stopReason === 'cancelled') return { ok: false, error: 'cancelled' } // nothing measured: nothing to keep

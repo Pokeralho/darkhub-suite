@@ -225,6 +225,14 @@ unsafe fn root_signature(d: &ID3D12Device5) -> Result<ID3D12RootSignature> {
     d.CreateRootSignature(0, std::slice::from_raw_parts(blob.GetBufferPointer() as *const u8, blob.GetBufferSize()))
 }
 
+/// Moves the embedded window. Called from the stdin thread: async, so a busy render loop never blocks it.
+pub fn place(hwnd: isize, x: i32, y: i32, w: i32, h: i32, visible: bool) {
+    unsafe {
+        let show = if visible { SWP_SHOWWINDOW } else { SWP_HIDEWINDOW };
+        let _ = SetWindowPos(HWND(hwnd as *mut c_void), HWND_TOP, x, y, w.max(1), h.max(1), SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS | show);
+    }
+}
+
 /// File names (no paths) of everything loaded in this process: shows overlays and injected hooks to a reviewer.
 pub fn loaded_modules() -> Vec<String> {
     unsafe {
@@ -276,7 +284,8 @@ fn frame_cb(seed: u32, frame: u32) -> FrameCb {
 }
 
 impl Gpu {
-    pub fn new() -> Result<Self> {
+    /// `parent`: the app window to render inside. None opens a window of its own (scripts and tests).
+    pub fn new(parent: Option<isize>) -> Result<Self> {
         unsafe {
             let factory: IDXGIFactory6 = CreateDXGIFactory2(DXGI_CREATE_FACTORY_FLAGS(0))?;
             let adapter: IDXGIAdapter1 = factory.EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE)?;
@@ -299,7 +308,12 @@ impl Gpu {
             let hinst = GetModuleHandleW(None)?;
             let class = w!("DarkHubGpuBench");
             RegisterClassW(&WNDCLASSW { lpfnWndProc: Some(wndproc), hInstance: hinst.into(), lpszClassName: class, hCursor: LoadCursorW(None, IDC_ARROW)?, ..Default::default() });
-            let hwnd = CreateWindowExW(WINDOW_EX_STYLE(0), class, w!("DarkHub GPU Benchmark"), WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 1296, 759, None, None, hinst, None)?;
+            let title = w!("DarkHub GPU Benchmark");
+            let hwnd = match parent {
+                // hidden until the app says where it goes
+                Some(p) => CreateWindowExW(WINDOW_EX_STYLE(0), class, title, WS_CHILD | WS_CLIPSIBLINGS, 0, 0, 16, 9, HWND(p as *mut c_void), None, hinst, None)?,
+                None => CreateWindowExW(WINDOW_EX_STYLE(0), class, title, WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 1296, 759, None, None, hinst, None)?,
+            };
 
             let sd = DXGI_SWAP_CHAIN_DESC1 {
                 Width: WIDTH, Height: HEIGHT, Format: DXGI_FORMAT_R8G8B8A8_UNORM, SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
@@ -520,6 +534,8 @@ impl Gpu {
         self.wait_value(v)
     }
 
+    pub fn hwnd_raw(&self) -> isize { self.hwnd.0 as isize }
+
     pub fn pump(&mut self) -> bool {
         unsafe {
             let mut m = MSG::default();
@@ -686,7 +702,13 @@ impl Gpu {
             let (mut roots, mut frame_us) = (vec![], vec![]);
             let started = Instant::now();
             let mut frame = 0u32;
+            let (mut tick_at, mut tick_frame) = (Instant::now(), 0u32);
             while started.elapsed() < dur {
+                if tick_at.elapsed() >= Duration::from_millis(500) {
+                    let fps = (frame - tick_frame) as f64 / tick_at.elapsed().as_secs_f64();
+                    crate::say(serde_json::json!({"type": "tick", "fps": (fps * 10.0).round() / 10.0, "frame": frame}));
+                    (tick_at, tick_frame) = (Instant::now(), frame);
+                }
                 if !self.pump() { self.wait_idle()?; return Ok(None); }
                 let slot = frame as usize % SLOTS;
                 if self.slots[slot].pending {

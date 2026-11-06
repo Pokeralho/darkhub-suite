@@ -44,6 +44,13 @@ a seeded path. See `sceneModel.js` for the exact definition: that file is normat
 Visibility ID per pixel: box index, `ID_GROUND`, or `ID_SKY`. Both tests render at a fixed `WIDTH` x `HEIGHT` regardless
 of the window, and both produce this ID image: rasterization through a visibility buffer, ray tracing from primary hits.
 
+## Embedding
+
+The app passes its window handle (`--parent <hwnd>`) and the engine draws in a native child window. The screen sends the
+position with `{"cmd":"rect"}`; the engine's stdin thread applies it, so the window follows even mid segment. A child
+window cannot be clipped by the page, so the screen uses a fixed overlay while a test runs. Without `--parent` the engine
+opens its own window, which scripts use. During a segment it reports `{"type":"tick","fps":...}` every 500 ms.
+
 ## Commitment
 
 Per frame, a compute pass hashes each `TILE` x `TILE` tile of the ID image into one `u32` (`tileHash`). The engine reads

@@ -9,6 +9,8 @@ import { summarize, compare, contextWarnings } from './benchStats.js'
 
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'benchWorker.js')
 const MAX_RUNS = 100
+// Bumped when a measurement changes: runs from different suites are not comparable. 2: real multi-core timing, RAM latency.
+export const SUITE = 2
 
 const exec = (cmd, args) => new Promise((resolve) => {
   execFile(cmd, args, { windowsHide: true, timeout: 10000 }, (err, stdout) => resolve(err ? '' : String(stdout)))
@@ -53,7 +55,10 @@ export class BenchmarkService {
   async run({ label = '', quick = false, skipDisk = false, diskDir = '' } = {}) {
     if (this.child) return { ok: false, error: 'Um benchmark já está rodando' }
     const ctx = await context()
-    const args = JSON.stringify({ runs: quick ? 3 : 5, quick, skipDisk, diskDir })
+    // the service owns the temp file: a killed worker cannot clean up after itself
+    const tempFile = path.join(diskDir && fs.existsSync(diskDir) ? diskDir : os.tmpdir(), `darkhub-bench-${process.pid}-${Date.now()}.tmp`)
+    const args = JSON.stringify({ runs: quick ? 3 : 5, quick, skipDisk, diskDir, tempFile })
+    this.cancelled = false
     const started = Date.now()
     const result = await new Promise((resolve) => {
       // Electron as plain Node: same binary, no window, reads this file from the app (asar included)
@@ -75,17 +80,18 @@ export class BenchmarkService {
       })
       child.on('close', (code) => {
         this.child = null
-        resolve(out ?? { type: 'error', error: code === null ? 'cancelled' : `exit ${code}` })
+        try { fs.rmSync(tempFile, { force: true }) } catch { /* in use */ }
+        resolve(this.cancelled ? { type: 'error', error: 'cancelled' } : out ?? { type: 'error', error: `exit ${code}` })
       })
     })
     if (result.type !== 'result') return { ok: false, error: result.error }
-    const entry = { id: `b${started}`, at: started, ms: Date.now() - started, label: String(label).slice(0, 80), quick, context: ctx, metrics: summarize(result.samples) }
+    const entry = { id: `b${started}`, suite: SUITE, at: started, ms: Date.now() - started, label: String(label).slice(0, 80), quick, context: ctx, metrics: summarize(result.samples) }
     this._save([entry, ...this.history()])
     return { ok: true, run: entry }
   }
 
   cancel() {
-    if (this.child) { try { this.child.kill() } catch { /* gone */ } }
+    if (this.child) { this.cancelled = true; try { this.child.kill() } catch { /* gone */ } }
     return { ok: true }
   }
 
@@ -94,7 +100,7 @@ export class BenchmarkService {
     const a = list.find((x) => x.id === aId)
     const b = list.find((x) => x.id === bId)
     if (!a || !b) return { ok: false, error: 'Execução não encontrada' }
-    return { ok: true, rows: compare(a.metrics, b.metrics), warnings: contextWarnings(a.context, b.context) }
+    return { ok: true, rows: compare(a.metrics, b.metrics), warnings: [...((a.suite ?? 1) !== (b.suite ?? 1) ? ['suite'] : []), ...contextWarnings(a.context, b.context)] }
   }
 
   remove(id) {

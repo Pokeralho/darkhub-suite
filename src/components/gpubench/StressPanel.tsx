@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Play, Square, Loader2, Trash2, AlertTriangle, Info } from '../icons';
+import { Play, Square, Trash2, AlertTriangle, Info } from '../icons';
+import RunOverlay from './RunOverlay';
 import { useI18n } from '../../i18n/I18nProvider';
 import type { GpuStressEvent, GpuStressLoop, GpuStressRun } from '../../global';
 
@@ -112,14 +113,9 @@ export default function StressPanel({ runs, engine, blocked, onBusy, onDone }: {
       {error && <p role="alert" className="flex items-center gap-2 text-[12.5px] text-red-400"><AlertTriangle size={14} />{error}</p>}
 
       {active && (
-        <div className="space-y-2">
-          <p className="flex items-center gap-2 text-[12.5px] text-zinc-300">
-            <Loader2 size={14} className="animate-spin" />
-            {live?.phase === 'run' ? t('stress.loop', 'Ciclo {a} de {b}').replace('{a}', String(live.loop)).replace('{b}', String(live.total)) : t('stress.warming', 'Aquecendo e gravando a referência...')}
-            {live?.data && <span className="font-mono tabular-nums text-zinc-500">{live.data.fps.toFixed(1)} FPS · {num(live.data.tempMax)} °C</span>}
-          </p>
-          {liveLoops.length > 1 && <StabilityChart loops={liveLoops} label={chartLabel} />}
-        </div>
+        <RunOverlay title={t('stress.title', 'Teste de estresse')} onCancel={() => void api()?.cancel()} cancelLabel={t('stress.stop', 'Parar')} percent={live?.total ? (live.loop / live.total) * 100 : 0}
+          status={live?.phase === 'run' ? t('stress.loop', 'Ciclo {a} de {b}').replace('{a}', String(live.loop)).replace('{b}', String(live.total)) : t('stress.warming', 'Aquecendo e gravando a referência...')}
+          detail={live?.data ? `${num(live.data.tempMax)} °C${live.data.clock != null ? ` · ${num(live.data.clock)} MHz` : ''}${liveLoops.some((l) => l.error) ? ` · ${t('stress.errors', 'Erros')}: ${liveLoops.filter((l) => l.error).length}` : ''}` : undefined} />
       )}
 
       {!active && last && s && (
