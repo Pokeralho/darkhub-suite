@@ -76,6 +76,8 @@ sensors need it. It updates itself from GitHub releases (the download is checked
   archives against a hash database and, optionally, ClamAV; quarantine with restore.
 
 ### Sharing
+- **GPU benchmark and stress test**: rasterization and ray tracing score with a public ranking, and a stress test that
+  catches calculation errors, not just crashes.
 - **Susuya**: upload files up to 600 MB to [Susuya](https://susuya.darkhub.ink) and get a direct download link.
 - **Screenshots**: native-resolution lossless PNG with a global shortcut, also in exclusive-fullscreen games, with
   optional upload to Susuya.

@@ -136,7 +136,8 @@ export class GpuBenchService {
   /** Device pairing: the user approves in the browser, the app receives a Hub token. It is stored encrypted, never shown. */
   async link() {
     if (!this.safeStorage?.isEncryptionAvailable?.()) return { ok: false, error: 'no_secure_storage' }
-    const p = await this._api('POST', '/pair', {}, null)
+    const p = await this._api('POST', '/pair', {}, null).catch(() => null)
+    if (!p) return { ok: false, error: 'hub_unavailable' }
     await this.shell.openExternal(p.url)
     this.onEvent?.({ type: 'link', code: p.code })
     const token = { cancelled: false }

@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-05T21:25:12. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-05T23:44:55. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -138,7 +138,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ipc/gpuBenchIpc.js`
 
-`toJpeg`:5, `registerGpuBenchIPC`:12, `broadcast`:13, `handle`:15
+`toJpeg`:5, `registerGpuBenchIPC`:12, `broadcast`:13, `parentOf`:16, `handle`:20, `n`:31
 
 ## `electron/ipc/hubIpc.js`
 
@@ -230,7 +230,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:286, `handler`:305, `handler`:315, `handler`:331, `handler`:343, `listener`:386, `handler`:438, `handler`:464, `handler`:470, `handler`:476, `handler`:482, `listener`:491, `listener`:502, `handler`:527, `listener`:540, `listener`:557, `handler`:595, `handler`:610, `listener`:633, `listener`:658, `listener`:693, `listener`:720, `handler`:761
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:286, `handler`:305, `handler`:315, `handler`:333, `handler`:345, `listener`:388, `handler`:440, `handler`:466, `handler`:472, `handler`:478, `handler`:484, `listener`:493, `listener`:504, `handler`:529, `listener`:542, `listener`:559, `handler`:597, `handler`:612, `listener`:635, `listener`:660, `listener`:695, `listener`:722, `handler`:763
 
 ## `electron/services/CodeRunner.js`
 
@@ -342,7 +342,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/benchmark/BenchmarkService.js`
 
-`exec`:13, `backgroundCpu`:18, `snap`:19, `context`:26, `ps`:28, `BenchmarkService`:43 _class_, `history`:50, `_save`:51, `run`:53, `cancel`:87, `compare`:92, `remove`:100
+`exec`:15, `backgroundCpu`:20, `snap`:21, `context`:28, `ps`:30, `BenchmarkService`:45 _class_, `history`:52, `_save`:53, `run`:55, `cancel`:93, `compare`:98, `remove`:106
 
 ## `electron/services/benchmark/benchStats.js`
 
@@ -350,7 +350,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/benchmark/benchWorker.js`
 
-`emit`:12, `now`:13, `kernel`:17, `cpuSingle`:28, `cpuMulti`:35, `memBandwidth`:53, `memLatency`:63, `timerJitter`:81, `tick`:85, `diskSeqWrite`:101, `disk4kSyncWrite`:113
+`emit`:12, `now`:13, `kernel`:17, `work`:28, `cpuSingle`:37, `cpuMulti`:44, `memBandwidth`:78, `memLatency`:89, `timerJitter`:107, `tick`:111, `diskSeqWrite`:127, `disk4kSyncWrite`:139
 
 ## `electron/services/cleaner/CleanerService.js`
 
@@ -422,7 +422,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/gpubench/GpuBenchService.js`
 
-`enginePath`:17, `Engine`:23 _class_, `next`:30, `ask`:39, `stop`:44, `kill`:49, `GpuBenchService`:52 _class_, `hubUrl`:66, `history`:71, `_save`:72, `remove`:73, `stressHistory`:75, `removeStress`:76, `_token`:78, `status`:82, `rankingUrl`:86, `openRanking`:88, `link`:106, `unlink`:125, `cancel`:132, `_sensorSample`:134, `run`:136, `warm`:152, `record`:158, `stress`:196, `_preview`:256, `_rankedRun`:267
+`enginePath`:17, `Engine`:23 _class_, `next`:31, `send`:44, `ask`:46, `stop`:51, `kill`:56, `GpuBenchService`:59 _class_, `hubUrl`:73, `history`:78, `_save`:79, `remove`:80, `stressHistory`:82, `removeStress`:83, `_token`:85, `status`:89, `viewport`:94, `_startEngine`:100, `ranking`:107, `rankingUrl`:117, `openRanking`:119, `link`:137, `unlink`:157, `cancel`:164, `_sensorSample`:166, `run`:168, `warm`:184, `record`:190, `stress`:229, `_preview`:290, `_rankedRun`:301
 
 ## `electron/services/gpubench/gpuBenchModel.js`
 
@@ -518,7 +518,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/metadata/ooxmlZip.js`
 
-`CRC_TABLE`:7, `crc32`:17, `readZipEntries`:23, `entryData`:60, `rewriteZip`:67, `emit`:73, `xmlEscape`:146, `xmlUnescape`:147, `reEsc`:170, `elementRe`:171, `getXmlElement`:175, `setXmlElement`:180, `toW3cdtf`:192, `readOoxmlProps`:201, `find`:203, `writeOoxmlProps`:223, `find`:225, `writeOoxmlFile`:250
+`CRC_TABLE`:6, `crc32`:16, `readZipEntries`:22, `entryData`:59, `rewriteZip`:66, `emit`:72, `xmlEscape`:145, `xmlUnescape`:146, `reEsc`:169, `elementRe`:170, `getXmlElement`:174, `setXmlElement`:179, `toW3cdtf`:191, `readOoxmlProps`:200, `find`:202, `writeOoxmlProps`:222, `find`:224
 
 ## `electron/services/optimizer/AppManagerEngine.js`
 
@@ -858,11 +858,11 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `native_gpubench/src/gpu.rs`
 
-`wndproc`:123, `heap_props`:130, `buffer_desc`:134, `tex_desc`:141, `create`:148, `barrier`:154, `uav_barrier`:169, `bytecode`:177, `compute_pso`:181, `graphics_pso`:186, `root_signature`:207, `loaded_modules`:229, `dot`:245, `sun_dir`:247, `frame_cb`:253, `cpu_handle`:377, `gpu_handle`:380, `write_descriptors`:385, `init_rt`:428, `wait_value`:508, `wait_idle`:516, `pump`:523, `ids_to`:535, `record`:542, `submit`:654, `collect`:666, `segment`:684, `capture`:715, `read_ldr`:734, `read_texture`:742, `drop`:773
+`wndproc`:123, `heap_props`:130, `buffer_desc`:134, `tex_desc`:141, `create`:148, `barrier`:154, `uav_barrier`:169, `bytecode`:177, `compute_pso`:181, `graphics_pso`:186, `root_signature`:207, `place`:229, `loaded_modules`:237, `dot`:253, `sun_dir`:255, `frame_cb`:261, `cpu_handle`:391, `gpu_handle`:394, `write_descriptors`:399, `init_rt`:442, `wait_value`:522, `wait_idle`:530, `hwnd_raw`:537, `pump`:539, `ids_to`:551, `record`:558, `submit`:670, `collect`:682, `segment`:700, `capture`:737, `read_ldr`:756, `read_texture`:764, `drop`:795
 
 ## `native_gpubench/src/main.rs`
 
-`say`:16, `u32s_b64`:22, `vectors`:29, `run`:45, `main`:131
+`say`:16, `u32s_b64`:22, `vectors`:29, `run`:45, `main`:141
 
 ## `native_gpubench/src/proof.rs`
 
@@ -972,9 +972,17 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `api`:9, `fill`:10, `mb`:12, `ItemState`:14 _type_, `MissingDrivers`:18 _component_, `itemTitle`:75, `toggle`:77, `runInstall`:83, `reasonText`:110, `sourceText`:116, `statusLine`:118, `itemRow`:139, `wuHintKey`:350
 
+## `src/components/gpubench/RankingTop.tsx`
+
+`RankingTop`:8 _component_, `label`:26
+
+## `src/components/gpubench/RunOverlay.tsx`
+
+`RunOverlay`:13 _component_, `send`:25
+
 ## `src/components/gpubench/StressPanel.tsx`
 
-`num`:8, `StabilityChart`:11 _component_, `y`:13, `best`:15, `StressPanel`:32 _component_, `api`:41, `start`:50, `remove`:63, `loadName`:65, `verdictName`:66, `verdictClass`:67, `reasonText`:68
+`num`:9, `StabilityChart`:12 _component_, `y`:14, `best`:16, `StressPanel`:33 _component_, `api`:42, `start`:51, `remove`:64, `loadName`:66, `verdictName`:67, `verdictClass`:68, `reasonText`:69
 
 ## `src/components/hub/HubApproval.tsx`
 
@@ -1146,7 +1154,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/devtools/textTools.ts`
 
-`base64Encode`:4, `base64Decode`:11, `htmlEncode`:19, `htmlDecode`:23, `EncodeKind`:34 _type_, `encodeText`:36, `decodeText`:43, `jsonFormat`:50, `jsonMinify`:51, `ShaAlg`:54 _type_, `shaHex`:56, `uuidV4`:62, `ulid`:73, `ulidTime`:84, `JwtParts`:92 _type_, `decodeJwt`:94, `charsetSize`:109, `entropyBits`:119, `strengthLabel`:124, `PwOptions`:132 _type_, `generatePassword`:134, `lorem`:153, `rnd`:155, `RegexSegment`:172 _type_, `regexSegments`:174, `expandCronField`:200, `num`:203, `p2`:222, `join`:223, `explainCron`:226, `full`:233, `nextCronRuns`:249
+`base64Encode`:4, `base64Decode`:11, `htmlEncode`:19, `htmlDecode`:23, `EncodeKind`:34 _type_, `encodeText`:36, `decodeText`:43, `jsonMinify`:50, `ShaAlg`:53 _type_, `shaHex`:55, `uuidV4`:61, `ulid`:72, `ulidTime`:83, `JwtParts`:91 _type_, `decodeJwt`:93, `charsetSize`:108, `entropyBits`:118, `strengthLabel`:123, `PwOptions`:131 _type_, `generatePassword`:133, `lorem`:152, `rnd`:154, `RegexSegment`:171 _type_, `regexSegments`:173, `expandCronField`:199, `num`:202, `p2`:221, `join`:222, `explainCron`:225, `full`:232, `nextCronRuns`:248
 
 ## `src/devtools/ui.tsx`
 
@@ -1290,7 +1298,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/GpuBench.tsx`
 
-`num`:8, `GpuBench`:10 _component_, `api`:23, `load`:24, `errorText`:41, `run`:49, `link`:60, `unlink`:69, `remove`:70, `testName`:76, `statusName`:77, `statusClass`:83, `phaseText`:84
+`num`:10, `GpuBench`:12 _component_, `api`:25, `load`:26, `errorText`:43, `run`:52, `link`:63, `unlink`:72, `remove`:73, `testName`:79, `statusName`:80, `statusClass`:86, `phaseText`:87
 
 ## `src/pages/Home.tsx`
 
@@ -1448,6 +1456,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `svc`:45
 
+## `tests/benchWorkerReal.test.ts`
+
+`run`:11, `best`:19
+
 ## `tests/cleaner.test.ts`
 
 `tmpDir`:13, `fakeIni`:16, `fakeFetch`:21, `put`:81, `execFileImpl`:154
@@ -1486,7 +1498,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `tests/gpuStress.test.ts`
 
-`loop`:11, `fakeEngine`:88, `say`:91, `service`:107
+`loop`:11, `fakeEngine`:88, `say`:91, `service`:107, `fetchImpl`:136
 
 ## `tests/hub.test.ts`
 

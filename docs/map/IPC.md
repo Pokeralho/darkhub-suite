@@ -1,6 +1,6 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-05T21:25:12. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-05T23:44:55. NAO edite a mao: rode `npm run map`. -->
 
-# Canais IPC (527)
+# Canais IPC (529)
 
 | API (`window.darkhub.`) | canal | handler | chama | usado em |
 |---|---|---|---|---|
@@ -145,16 +145,18 @@
 | `fs.readFile` | `fs:readFile` | `electron/main.js:3420` |  | `src/pages/TextEditor.tsx`<br>`src/pages/TextSummarizer.tsx` |
 | `fs.writeFile` | `fs:writeFile` | `electron/main.js:3432` | `devPath.includes` | `src/pages/TextEditor.tsx` |
 | `getTrace` | `dev:getTrace` | **sem handler** |  | _nao usado_ |
-| `gpubench.cancel` | `gpubench:cancel` | `electron/ipc/gpuBenchIpc.js:25` | `svc.cancel` | `src/components/gpubench/StressPanel.tsx`<br>`src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
-| `gpubench.link` | `gpubench:link` | `electron/ipc/gpuBenchIpc.js:27` | `svc.link` | `src/pages/GpuBench.tsx` |
-| `gpubench.onEvent` | `gpubench:event` | _evento main->tela_ |  | `src/components/gpubench/StressPanel.tsx`<br>`src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
-| `gpubench.openRanking` | `gpubench:openRanking` | `electron/ipc/gpuBenchIpc.js:29` | `svc.openRanking`<br>`svc.cancel` | `src/pages/GpuBench.tsx` |
-| `gpubench.remove` | `gpubench:remove` | `electron/ipc/gpuBenchIpc.js:26` | `svc.remove` | `src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
-| `gpubench.removeStress` | `gpubench:removeStress` | `electron/ipc/gpuBenchIpc.js:24` | `svc.removeStress` | `src/components/gpubench/StressPanel.tsx` |
-| `gpubench.run` | `gpubench:run` | `electron/ipc/gpuBenchIpc.js:22` | `svc.run` | `src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
-| `gpubench.status` | `gpubench:status` | `electron/ipc/gpuBenchIpc.js:21` | `svc.status` | `src/pages/GpuBench.tsx` |
-| `gpubench.stress` | `gpubench:stress` | `electron/ipc/gpuBenchIpc.js:23` | `svc.stress` | `src/components/gpubench/StressPanel.tsx` |
-| `gpubench.unlink` | `gpubench:unlink` | `electron/ipc/gpuBenchIpc.js:28` | `svc.unlink` | `src/pages/GpuBench.tsx` |
+| `gpubench.cancel` | `gpubench:cancel` | `electron/ipc/gpuBenchIpc.js:35` | `svc.cancel` | `src/components/gpubench/StressPanel.tsx`<br>`src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
+| `gpubench.link` | `gpubench:link` | `electron/ipc/gpuBenchIpc.js:37` | `svc.link` | `src/pages/GpuBench.tsx` |
+| `gpubench.onEvent` | `gpubench:event` | _evento main->tela_ |  | `src/components/gpubench/RunOverlay.tsx`<br>`src/components/gpubench/StressPanel.tsx`<br>`src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
+| `gpubench.openRanking` | `gpubench:openRanking` | `electron/ipc/gpuBenchIpc.js:39` | `svc.openRanking`<br>`svc.cancel` | `src/pages/GpuBench.tsx` |
+| `gpubench.ranking` | `gpubench:ranking` | `electron/ipc/gpuBenchIpc.js:29` | `svc.ranking` | `src/components/gpubench/RankingTop.tsx` |
+| `gpubench.remove` | `gpubench:remove` | `electron/ipc/gpuBenchIpc.js:36` | `svc.remove` | `src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
+| `gpubench.removeStress` | `gpubench:removeStress` | `electron/ipc/gpuBenchIpc.js:34` | `svc.removeStress` | `src/components/gpubench/StressPanel.tsx` |
+| `gpubench.run` | `gpubench:run` | `electron/ipc/gpuBenchIpc.js:27` | `svc.run` | `src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
+| `gpubench.status` | `gpubench:status` | `electron/ipc/gpuBenchIpc.js:26` | `svc.status` | `src/pages/GpuBench.tsx` |
+| `gpubench.stress` | `gpubench:stress` | `electron/ipc/gpuBenchIpc.js:28` | `svc.stress` | `src/components/gpubench/StressPanel.tsx` |
+| `gpubench.unlink` | `gpubench:unlink` | `electron/ipc/gpuBenchIpc.js:38` | `svc.unlink` | `src/pages/GpuBench.tsx` |
+| `gpubench.viewport` | `gpubench:viewport` | `electron/ipc/gpuBenchIpc.js:30` | `svc.viewport` | `src/components/gpubench/RunOverlay.tsx` |
 | `hardware.onUpdate` | `hardware:update` | _evento main->tela_ |  | `src/hooks/useSystemMetrics.ts` |
 | `hardware.startPolling` | `hardware:startPolling` | `electron/services/HardwareService.js:51` | `hookedSenders.has`<br>`hookedSenders.add`<br>`sender.once` | `src/hooks/useSystemMetrics.ts` |
 | `hardware.stopPolling` | `hardware:stopPolling` | `electron/services/HardwareService.js:69` | `perSender.get`<br>`perSender.set`<br>`perSender.delete` | `src/hooks/useSystemMetrics.ts` |
