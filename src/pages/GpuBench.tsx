@@ -45,7 +45,8 @@ export default function GpuBench() {
     not_linked: t('gpubench.err.notLinked', 'Conecte sua conta do Hub para enviar ao ranking.'),
     already_running: t('gpubench.err.running', 'Um benchmark já está rodando.'),
     no_secure_storage: t('gpubench.err.storage', 'O Windows não ofereceu armazenamento seguro para guardar a conexão.'),
-    expired: t('gpubench.err.expired', 'O código expirou. Tente conectar de novo.')
+    expired: t('gpubench.err.expired', 'O código expirou. Tente conectar de novo.'),
+    hub_unavailable: t('gpubench.err.hub', 'O Hub não respondeu agora. Tente de novo mais tarde; o teste local funciona normalmente.')
   } as Record<string, string>)[code] ?? code;
 
   const run = async (ranked: boolean) => {

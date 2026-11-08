@@ -67,6 +67,9 @@ jobs:
       - run: npm run build:pacer
       - run: npm run build:disk
       - run: npm run build:cleaner
+      - run: cargo build --release --manifest-path native_gpubench/Cargo.toml
+      - run: Copy-Item native_gpubench/target/release/DarkHub_GpuBench.exe electron/services/DarkHub.GpuBench.exe -Force
+        shell: pwsh
       # Real-ESRGAN AI upscaler shipped in resources/realesrgan (pinned release, SHA-256 checked)
       - run: npm run build:upscaler
       - run: npm run build:renderer

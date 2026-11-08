@@ -6,7 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-11-06
+
+### Added
+- GPU benchmark: synthetic rasterization and ray tracing test (D3D12 and DXR 1.1) at 2560x1440, rendered inside the
+  DarkHub window, with a score and a local history.
+- Public ranking on hub.darkhub.ink: submitted runs are checked by the server (clock, frame commitments, recomputed spot
+  checks), the screen shows the top of the ranking, and connecting the app issues a token limited to the benchmark.
+- GPU stress test: 5 to 60 minutes, frame rate stability, calculation errors found by redoing a fixed frame, a
+  temperature limit on NVIDIA, and an inconclusive verdict when another program is the likely cause.
+- Sensors: energy, power limits, PCIe link, encoder and decoder load, throttle reasons, RAM rate, render latency, FPS per
+  watt, joules per frame, and power supply and electricity cost estimates in the Monitor and the overlay.
+
 ### Fixed
+- Before/after benchmark: all-cores CPU timed thread startup instead of the CPU, single-core samples varied, RAM latency
+  fit in the cache of X3D processors, and cancelling could report an error. Runs from older versions are flagged when
+  compared, since the numbers changed.
 - Updater: an update offer is checked again before downloading when it is more than a minute old. Before, a
   release published between the check and the click was missed: the app installed the older one and asked to update
   again right after restarting.

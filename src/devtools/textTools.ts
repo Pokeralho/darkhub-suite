@@ -47,7 +47,6 @@ export function decodeText(kind: EncodeKind, text: string): string {
 }
 
 // ---------- JSON ----------
-export function jsonFormat(text: string, indent = 2): string { return JSON.stringify(JSON.parse(text), null, indent); }
 export function jsonMinify(text: string): string { return JSON.stringify(JSON.parse(text)); }
 
 // ---------- hashes ----------

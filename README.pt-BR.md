@@ -80,6 +80,8 @@ publicado).
   restauração.
 
 ### Compartilhamento
+- **Benchmark e estresse de GPU**: pontuação de rasterização e ray tracing com ranking público, e um teste de estresse
+  que pega erros de cálculo, não só travamentos.
 - **Susuya**: envie arquivos de até 600 MB para o [Susuya](https://susuya.darkhub.ink) e receba um link direto.
 - **Capturas de tela**: PNG sem perda na resolução nativa, com atalho global, inclusive em jogos em tela cheia
   exclusiva, com envio opcional para o Susuya.

@@ -1,7 +1,6 @@
 // Minimal ZIP rewriter for OOXML (docx/xlsx/pptx) document properties.
 // Every entry other than the ones we replace is copied byte-for-byte (still compressed); local headers are rebuilt from
 // the central directory so data descriptors are not needed. ZIP64 and encrypted archives are refused.
-import fs from 'node:fs/promises'
 import zlib from 'node:zlib'
 
 const CRC_TABLE = (() => {
@@ -245,10 +244,5 @@ export function writeOoxmlProps(buf, fields = {}, { strip = false } = {}) {
   if (core != null) repl.set(CORE_PATH, Buffer.from(core, 'utf8'))
   if (app != null) repl.set(APP_PATH, Buffer.from(app, 'utf8'))
   return rewriteZip(buf, repl)
-}
-
-export async function writeOoxmlFile(inPath, outPath, fields, opts) {
-  const buf = await fs.readFile(inPath)
-  await fs.writeFile(outPath, writeOoxmlProps(buf, fields, opts))
 }
 
