@@ -95,6 +95,8 @@ publicado).
 - **Central de Drivers**: detecção de GPU (inclusive placas no driver genérico da Microsoft), links de drivers
   oficiais, reparo de câmera e de captura.
 - **Mapa de disco**: scanner nativo multithread (o C: inteiro em segundos), treemap ao vivo, filtros, relatórios.
+- **Particionamento**: crie, exclua, redimensione, formate e troque a letra de partições, com prévia do antes e depois;
+  discos com o Windows ou com partição de boot ficam só para leitura.
 
 ### Manutenção do Windows
 - **Recursos e reparos do Windows**: WSL, Hyper-V, Sandbox, .NET 3.5, OpenSSH; reset do Windows Update, reparo do

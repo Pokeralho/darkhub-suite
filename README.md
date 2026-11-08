@@ -90,6 +90,8 @@ sensors need it. It updates itself from GitHub releases (the download is checked
 - **Driver Center**: GPU detection (including cards on Microsoft's generic driver), official driver links, camera
   and capture repair.
 - **Disk map**: native multi-threaded scanner (a full C: drive in seconds), live treemap, filters, reports.
+- **Partitioning**: create, delete, resize, format and re-letter partitions with a before/after preview; disks with
+  Windows or a boot partition stay read-only.
 
 ### Windows maintenance
 - **Windows features and repairs**: WSL, Hyper-V, Sandbox, .NET 3.5, OpenSSH; Windows Update reset, winget repair,

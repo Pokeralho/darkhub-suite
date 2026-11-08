@@ -6,6 +6,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-11-08
+
+### Added
+- Disk Studio partitioning: create, delete, shrink, extend, format, change the drive letter and initialize blank disks
+  as GPT, through the Windows Storage module. Each operation shows the disk before and after and runs only after the
+  disk's name is typed; the partition table is backed up first. Disks with Windows or an EFI partition, volumes in use,
+  with BitLocker or the page file, dynamic disks and Storage Spaces are refused, and the disk is checked again before
+  writing.
+
+### Fixed
+- Dashboard temp cleanup: the "Estimated junk" card read other folders than the cleanup and kept its value for a
+  minute, so the number never dropped after cleaning. It now measures the same folders and is refreshed right after.
+  Files with "amd64" in the name were skipped as vendor caches and are now removed. The result shows files removed,
+  space freed and what stayed in use; the button no longer mentions the Recycle Bin.
+- Broken accents in power plan error messages and in the GPU name shown by DLSS Manager (console code page).
+- "Keep all cores active" could not be undone when the plan used the hidden Windows default.
+- Dashboard recent activity showed "NaN" as the time; the Windows repair button ignored a failed start.
+- The disk engine links the C runtime statically, so Disk Studio works without the Visual C++ runtime installed.
+- Updater: an offer without a checksum (always in the portable build) now uses the digest GitHub publishes for that
+  version instead of being refused.
+
 ## [0.8.4] - 2026-11-06
 
 ### Added
