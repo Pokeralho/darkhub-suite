@@ -53,9 +53,11 @@ function makeId() {
 export function useRecentActivity() {
   const [activities, setActivities] = useState<ActivityEntry[]>(loadPersisted)
 
-  const push = useCallback((entry: Omit<ActivityEntry, 'id'>) => {
+  // the dashboard's quick actions push without a timestamp: stamp it here (they showed "há NaN d")
+  const push = useCallback((entry: Omit<ActivityEntry, 'id' | 'timestamp'> & { timestamp?: number }) => {
     setActivities(prev => {
-      const next = [{ ...entry, id: makeId() }, ...prev].slice(0, MAX_ENTRIES)
+      const timestamp = Number.isFinite(entry.timestamp) ? Number(entry.timestamp) : Date.now()
+      const next = [{ ...entry, timestamp, id: makeId() }, ...prev].slice(0, MAX_ENTRIES)
       persist(next)
       return next
     })

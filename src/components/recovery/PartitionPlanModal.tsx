@@ -47,7 +47,7 @@ export default function PartitionPlanModal({ title, plan, onClose, onDone }: { t
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-[16px] font-semibold text-zinc-50">{title}</h2>
-            <p className="dh-help mt-0.5">{t('rescue.part.modal.sub', 'Nada foi alterado ainda.')} <span className="text-zinc-300">{plan.diskName}</span></p>
+            <p className="dh-help mt-0.5">{done?.written === false || !done ? `${t('rescue.part.modal.sub', 'Nada foi alterado ainda.')} ` : null}<span className="text-zinc-300">{plan.diskName}</span></p>
           </div>
           <button type="button" className="dh-btn dh-btn-sm dh-btn-ghost" disabled={busy} onClick={onClose}>{t('rescue.close', 'Fechar')}</button>
         </div>

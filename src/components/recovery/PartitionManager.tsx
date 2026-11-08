@@ -11,7 +11,7 @@ type Selection = { partition: number } | { gap: number } | null;
 type Action = 'format' | 'resize' | 'letter' | null;
 const FILE_SYSTEMS: PartitionFs[] = ['NTFS', 'exFAT', 'FAT32'];
 
-export default function PartitionManager({ diskNumber }: { diskNumber: number | null }) {
+export default function PartitionManager({ diskNumber, reloadKey = 0 }: { diskNumber: number | null; reloadKey?: number }) {
   const { t } = useI18n();
   const [disks, setDisks] = useState<PartitionDisk[] | null>(null);
   const [elevated, setElevated] = useState(true);
@@ -27,7 +27,7 @@ export default function PartitionManager({ diskNumber }: { diskNumber: number | 
     if (r?.ok) { setDisks(r.disks); setElevated(r.elevated); setUsed(r.usedLetters ?? []); setError(null); }
     else { setDisks([]); setError(r?.error || t('rescue.part.fail', 'Não foi possível ler os discos.')); }
   }, [t]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); }, [load, reloadKey]);
   useEffect(() => { setSel(null); setAction(null); }, [diskNumber]);
 
   const disk = useMemo(() => disks?.find((d) => d.number === diskNumber) ?? null, [disks, diskNumber]);

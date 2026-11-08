@@ -38,7 +38,8 @@ class UpdateService {
 
     try {
       await this._setupUpdater();
-      this._scheduleAutoCheck();
+      // the self-test screenshots every screen: an "update available" prompt on top of each one hides the page
+      if (!(process.env.DARKHUB_SELFTEST && !app.isPackaged)) this._scheduleAutoCheck();
     } catch (err) {
       Logger.warn('UpdateService', `electron-updater setup notice, fallback engine is active: ${err?.message || err}`);
     }

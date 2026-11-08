@@ -34,6 +34,8 @@ describe('DarkHub Suite Core Verification', () => {
     expect(storageEngine._isProtectedPath('Overwatch')).toBe(true);
     expect(storageEngine._isProtectedPath('AMD_DxCache')).toBe(true);
     expect(storageEngine._isProtectedPath('random_temp_junk_123.tmp')).toBe(false);
+    expect(storageEngine._isProtectedPath('dd_vcredist_amd64_20261017154553.log')).toBe(false);
+    expect(storageEngine._isProtectedPath('AMDAutodetect')).toBe(true);
   });
 
   it('should include HAGS and DLSS Manager translations and navigation keys', () => {

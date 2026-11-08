@@ -25,6 +25,7 @@ const formatBytes = (bytes: number | null | undefined) => {
 };
 
 function timeAgo(ts: number): string {
+  if (!Number.isFinite(ts)) return '';
   const diff = Math.floor((Date.now() - ts) / 1000);
   if (diff < 60) return 'agora mesmo';
   if (diff < 3600) return `há ${Math.floor(diff / 60)} min`;
@@ -279,11 +280,18 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       if (window.darkhub?.optimizer?.applyTweak) {
         const res = await window.darkhub.optimizer.applyTweak('clean-temp');
         if (res?.ok) {
-          setCleanFeedback('Limpeza concluída com sucesso!');
+          const removed = Number(res.processedItems ?? 0);
+          const freed = formatBytes(Number(res.freedBytes ?? 0));
+          const skipped = Number(res.lockedFiles ?? 0);
+          let text = removed > 0
+            ? t('dashboard.cleanDone', '{n} arquivo(s) removido(s), {size} liberados.').replace('{n}', String(removed)).replace('{size}', freed)
+            : t('dashboard.cleanNothing', 'Nada para remover: as pastas temporárias já estavam limpas.');
+          if (skipped > 0) text += ' ' + t('dashboard.cleanSkipped', '{n} em uso ou protegido(s) pelo Windows ficaram.').replace('{n}', String(skipped));
+          setCleanFeedback(text);
           addActivity?.({
             type: 'junkClean',
-            label: 'Limpeza de Lixo e Cache',
-            sublabel: 'Arquivos temporários e MRU excluídos'
+            label: t('dashboard.cleanActivity', 'Limpeza de arquivos temporários'),
+            sublabel: `${removed} · ${freed}`
           });
           refreshJunk?.(true);
         } else {
@@ -324,7 +332,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     setQuickActionBusy('repair');
     try {
       if (window.darkhub?.optimizer?.applyTweak) {
-        await window.darkhub.optimizer.applyTweak('repair-windows');
+        const res = await window.darkhub.optimizer.applyTweak('repair-windows');
+        if (!res?.ok) { setCleanFeedback(res?.error ?? t('dashboard.repairFail', 'O reparo não foi iniciado.')); return; }
         setCleanFeedback('Processo de reparo SFC/DISM iniciado em nova janela.');
         addActivity?.({
           type: 'optimization',
@@ -567,7 +576,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={handleCleanJunk} disabled={isCleaningJunk} className="dh-btn dh-btn-primary dh-btn-sm">
             {isCleaningJunk ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-            <span>{t('dashboard.cleanTempRecycle', 'Clean Temp & Recycle Bin')}</span>
+            <span>{t('dashboard.cleanTempRecycle', 'Limpar arquivos temporários')}</span>
           </button>
           <button onClick={handleOptimizeRam} disabled={isOptimizingRam} className="dh-btn dh-btn-sm">
             {isOptimizingRam ? <Loader2 size={13} className="animate-spin" /> : <Layers size={13} />}

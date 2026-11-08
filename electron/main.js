@@ -470,58 +470,13 @@ function hideWindowToBackground(win) {
   win.hide()
 }
 
-async function estimateDirectoryBytes(root, opts, state, depth) {
-  if (!root) return
-  if (state.truncated) return
-  if (Date.now() > state.deadline) {
-    state.truncated = true
-    return
-  }
-  if (depth > state.maxDepth) return
-  let entries
-  try {
-    entries = await fs.readdir(root, { withFileTypes: true })
-  } catch (err) {
-    state.errors++
-    return
-  }
-
-  for (const ent of entries) {
-    if (state.truncated) return
-    if (Date.now() > state.deadline) {
-      state.truncated = true
-      return
-    }
-    if (state.entries >= state.maxEntries) {
-      state.truncated = true
-      return
-    }
-    state.entries++
-    const full = path.join(root, ent.name)
-    try {
-      if (ent.isSymbolicLink?.()) continue
-      if (ent.isDirectory?.()) {
-        state.dirs++
-        await estimateDirectoryBytes(full, opts, state, depth + 1)
-      } else if (ent.isFile?.()) {
-        state.files++
-        const st = await fs.stat(full)
-        if (typeof st?.size === 'number' && Number.isFinite(st.size)) state.bytes += st.size
-      }
-    } catch (err) {
-      state.errors++
-    }
-  }
-}
-
+// "Lixo (estimado)" on the dashboard: what the temp cleaner would remove (StorageEngine walks the same folders with
+// the same protected names). It used to read other folders, including the app's own cache, and its 60 s cache
+// survived a clean, so the number never dropped after cleaning.
 async function computeJunkEstimate(payload) {
   const timeoutMsRaw = Number(payload?.timeoutMs)
-  const maxEntriesRaw = Number(payload?.maxEntries)
-  const maxDepthRaw = Number(payload?.maxDepth)
   const cacheTtlMsRaw = Number(payload?.cacheTtlMs)
-  const timeoutMs = Number.isFinite(timeoutMsRaw) ? Math.max(200, Math.min(5000, Math.trunc(timeoutMsRaw))) : 900
-  const maxEntries = Number.isFinite(maxEntriesRaw) ? Math.max(200, Math.min(20000, Math.trunc(maxEntriesRaw))) : 8000
-  const maxDepth = Number.isFinite(maxDepthRaw) ? Math.max(1, Math.min(12, Math.trunc(maxDepthRaw))) : 6
+  const timeoutMs = Number.isFinite(timeoutMsRaw) ? Math.max(200, Math.min(15000, Math.trunc(timeoutMsRaw))) : 5000
   const cacheTtlMs = Number.isFinite(cacheTtlMsRaw) ? Math.max(5000, Math.min(10 * 60_000, Math.trunc(cacheTtlMsRaw))) : 60_000
 
   const now = Date.now()
@@ -530,57 +485,15 @@ async function computeJunkEstimate(payload) {
 
   const work = (async () => {
     const start = Date.now()
-    const roots = []
-    try {
-      roots.push(os.tmpdir())
-    } catch {}
-    try {
-      roots.push(app.getPath('temp'))
-    } catch {}
-    try {
-      roots.push(app.getPath('cache'))
-    } catch {}
-    try {
-      roots.push(path.join(process.env.windir || 'C:\\Windows', 'Temp'))
-    } catch {}
-
-    const normalizedRoots = roots.filter(Boolean).map((p) => path.normalize(String(p)))
-    const seen = new Set()
-    const uniqueRoots = []
-    for (const p of normalizedRoots) {
-      const key = process.platform === 'win32' ? p.toLowerCase() : p
-      if (seen.has(key)) continue
-      seen.add(key)
-      uniqueRoots.push(p)
-    }
-
-    const state = {
-      bytes: 0,
-      files: 0,
-      dirs: 0,
-      errors: 0,
-      entries: 0,
-      truncated: false,
-      deadline: Date.now() + timeoutMs,
-      maxEntries,
-      maxDepth
-    }
-
-    for (const r of uniqueRoots) {
-      if (state.truncated) break
-      await estimateDirectoryBytes(r, payload, state, 0)
-    }
-
+    const r = await StorageEngine.analyzeTempFiles({ deadlineMs: timeoutMs })
     const result = {
       ok: true,
       ts: Date.now(),
       durationMs: Date.now() - start,
-      bytes: state.bytes,
-      files: state.files,
-      dirs: state.dirs,
-      errors: state.errors,
-      truncated: state.truncated,
-      roots: uniqueRoots
+      bytes: r.summary.bytes,
+      files: r.summary.files,
+      truncated: r.summary.truncated,
+      roots: StorageEngine.tempDirs
     }
     junkEstimateCache = { ts: Date.now(), result, inFlight: null }
     return result
@@ -588,8 +501,7 @@ async function computeJunkEstimate(payload) {
 
   junkEstimateCache = { ts: junkEstimateCache.ts, result: junkEstimateCache.result, inFlight: work }
   try {
-    const r = await work
-    return r
+    return await work
   } finally {
     if (junkEstimateCache?.inFlight === work) junkEstimateCache.inFlight = null
   }
@@ -1915,7 +1827,11 @@ ipcMain.handle('optimizer:applyTweak', async (_event, id) => {
   try {
     switch (id) {
       case 'optimize-ram': return await MemoryEngine.optimizeRAM()
-      case 'clean-temp': return await StorageEngine.cleanTempFiles()
+      case 'clean-temp': {
+        const r = await StorageEngine.cleanTempFiles()
+        junkEstimateCache = { ts: 0, result: null, inFlight: null } // the next estimate must read the folders again
+        return r
+      }
       case 'repair-windows': return await SystemEngine.repairWindows()
       default: return { ok: false, error: `Unknown tweak: ${String(id)}` }
     }
@@ -1996,7 +1912,7 @@ ipcMain.handle('optimizer:runRoutine', async (_event, routineId) => {
       res = await SystemEngine.toggleFeature(feat, false);
     } else {
       switch (routineId) {
-        case 'clean-temp': res = await SystemEngine.cleanRegistryAndTemp(); break;
+        case 'clean-temp': res = await SystemEngine.cleanRegistryAndTemp(); junkEstimateCache = { ts: 0, result: null, inFlight: null }; break;
         case 'clean-registry': res = await SystemEngine.cleanRegistryAndTemp(); break;
         case 'create-restore-point': res = await SystemEngine.createRestorePoint(); break;
         case 'repair-windows': res = await SystemEngine.repairWindows(); break;

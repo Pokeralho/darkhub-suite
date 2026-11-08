@@ -25,6 +25,7 @@ export default function DiskRescue() {
   const [info, setInfo] = useState<RescueInspect | null>(null);
   const [infoError, setInfoError] = useState<string | null>(null);
   const [loadingInfo, setLoadingInfo] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const loadDrives = useCallback(async () => {
     setDrivesError(null);
@@ -74,7 +75,7 @@ export default function DiskRescue() {
       <PageHeader
         title={t('rescue.title', 'Disk Studio & Rescue')}
         subtitle={t('rescue.subtitle', 'Mapa de partições, reparo de MBR/GPT apagados, editor de setores, recuperação de arquivos apagados e clonagem, direto no disco.')}
-        actions={<button type="button" className="dh-btn dh-btn-sm" onClick={() => { void loadDrives(); void loadInfo(); }}><RefreshCw size={14} />{t('rescue.reload', 'Recarregar')}</button>}
+        actions={<button type="button" className="dh-btn dh-btn-sm" onClick={() => { void loadDrives(); void loadInfo(); setReloadKey((k) => k + 1); }}><RefreshCw size={14} />{t('rescue.reload', 'Recarregar')}</button>}
       >
         <div className="flex flex-wrap items-center gap-2">
           <HardDrive size={16} className="text-zinc-400" />
@@ -109,7 +110,7 @@ export default function DiskRescue() {
       {!target ? <p className="dh-help">{t('rescue.noTarget', 'Escolha um disco ou abra uma imagem.')}</p> : (
         <>
           {tab === 'health' ? <HealthTab target={target} drive={drive} info={info} loading={loadingInfo} error={infoError} /> : null}
-          {tab === 'partitions' ? <PartitionManager diskNumber={diskOf(target)} /> : null}
+          {tab === 'partitions' ? <PartitionManager diskNumber={diskOf(target)} reloadKey={reloadKey} /> : null}
           {tab === 'guard' ? <GuardTab target={target} info={info} readOnly={!!drive?.is_system} onChanged={loadInfo} /> : null}
           {tab === 'editor' ? <SectorHexViewer key={target} target={target} /> : null}
           {tab === 'carve' ? <CarvingManager key={target} target={target} diskNumber={diskOf(target)} /> : null}

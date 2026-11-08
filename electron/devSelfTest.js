@@ -51,7 +51,8 @@ export async function run(listeners) {
   const ipc = []
   const channels = (process.env.SELFTEST_SCREENS_ONLY || process.env.SELFTEST_SCENARIOS_ONLY) ? [] : [...listeners.keys()].filter((ch) => {
     const action = ch.split(':').slice(1).join(':')
-    return READ.test(action) && !UNSAFE.test(action) && !ch.startsWith('dev:')
+    // updater:check reads, but a newer release then opens a prompt over every screenshot that follows
+    return READ.test(action) && !UNSAFE.test(action) && !ch.startsWith('dev:') && ch !== 'updater:check'
   }).sort()
   for (const ch of channels) {
     const t0 = performance.now()
@@ -142,7 +143,7 @@ export async function run(listeners) {
 
   // ---------------------------------------------------------------- 2. every screen with the real backend
   // Without docs/map (e.g. a copied app folder) fall back to the known routes.
-  let routes = process.env.SELFTEST_SCENARIOS_ONLY ? [] : ['home', 'dashboard', 'darkos', 'optimizer', 'ultra-latency', 'darkpacer', 'optiscaler', 'dlss5', 'dll-injector', 'monitor', 'driver', 'networktools', 'setuphub', 'library', 'security', 'passwords', 'decryption', 'converter', 'downloads', 'youtube', 'ocr', 'metadata', 'texteditor', 'summarizer', 'autoclicker', 'devtools', 'powershell', 'luluflix', 'juuzou', 'savebackup', 'overlay', 'benchmark', 'gpubench', 'startup', 'usb', 'maintenance', 'kakugan', 'overlay-editor', 'presets', 'settings']
+  let routes = process.env.SELFTEST_SCENARIOS_ONLY ? [] : ['home', 'dashboard', 'darkos', 'optimizer', 'ultra-latency', 'darkpacer', 'optiscaler', 'dlss5', 'dll-injector', 'monitor', 'driver', 'networktools', 'setuphub', 'library', 'security', 'passwords', 'decryption', 'converter', 'downloads', 'youtube', 'ocr', 'metadata', 'texteditor', 'summarizer', 'autoclicker', 'devtools', 'powershell', 'luluflix', 'juuzou', 'savebackup', 'overlay', 'benchmark', 'gpubench', 'startup', 'usb', 'maintenance', 'kakugan', 'overlay-editor', 'presets', 'realtime', 'cleaner', 'disk-rescue', 'spacesniffer', 'share', 'settings']
   try {
     const map = JSON.parse(fs.readFileSync(path.join(root, 'docs', 'map', 'map.json'), 'utf8'))
     if (!process.env.SELFTEST_SCENARIOS_ONLY) routes = [...new Set(['home', ...map.features.map((f) => f.id), 'settings'])]

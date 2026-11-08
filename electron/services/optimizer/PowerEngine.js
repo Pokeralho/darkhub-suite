@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { decodeConsoleText } from '../consoleText.js';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { runCommand } from '../PowerShellRunner.js';
@@ -22,8 +23,9 @@ class PowerEngine {
 
   async _powercfg(args) {
     try {
-      const r = await runCommand('powercfg.exe', args, { timeoutMs: 15000 });
-      return { code: r.code ?? 1, stdout: r.stdout || '', stderr: r.stderr || '' };
+      // latin1 + decodeConsoleText: powercfg writes in the OEM code page ("configura��o" in error messages)
+      const r = await runCommand('powercfg.exe', args, { timeoutMs: 15000, encoding: 'latin1' });
+      return { code: r.code ?? 1, stdout: decodeConsoleText(r.stdout || ''), stderr: decodeConsoleText(r.stderr || '') };
     } catch (e) {
       return { code: 1, stdout: '', stderr: e?.message ?? String(e) };
     }

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { execFile, exec, execSync } from 'node:child_process';
 import Logger from '../LoggerService.js';
 import ElevationHelper from '../optimizer/ElevationHelper.js';
+import { runPowerShell } from '../PowerShellRunner.js';
 
 const fs = fsRaw.promises;
 const execAsync = promisify(exec);
@@ -266,7 +267,9 @@ class Dlss5Service {
       const script = `
         Get-CimInstance Win32_VideoController | Select-Object -Property Name, DriverVersion, AdapterRAM | ConvertTo-Json -Compress
       `;
-      const { stdout } = await execAsync(`powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "${script.trim()}"`);
+      // runPowerShell forces UTF-8 output: through exec the name came in the console code page
+      // ("Adaptador de V�deo B�sico da Microsoft")
+      const { stdout } = await runPowerShell(script.trim(), { timeoutMs: 20000 });
       if (!stdout || !stdout.trim()) {
         return { vendor: 'other', model: 'Genérico', isRtx: false, isAmd: false, defaultProfile: 'nvidia' };
       }

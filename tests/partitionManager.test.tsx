@@ -88,6 +88,25 @@ describe('Partition actions', () => {
     expect(await screen.findByText(/\.dhbk/)).toBeTruthy()
   })
 
+  it('stops saying nothing changed once the operation ran', async () => {
+    await open(plan())
+    expect(screen.getByText(/Nothing has changed yet|Nada foi alterado ainda/)).toBeTruthy()
+    fireEvent.change(screen.getByRole('textbox', { name: /(nome do disco|disk name)/ }), { target: { value: 'USB Disk' } })
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(run()!)
+    await screen.findByText(/\.dhbk/)
+    expect(screen.queryByText(/Nothing has changed yet|Nada foi alterado ainda/)).toBeNull()
+  })
+
+  it('reads the disks again when the page asks for a reload', async () => {
+    const view = mount([disk()])
+    await screen.findAllByText('NTFS')
+    const list = (window as any).darkhub.recovery.partitionList
+    const calls = list.mock.calls.length
+    view.rerender(<I18nProvider><PartitionManager diskNumber={2} reloadKey={1} /></I18nProvider>)
+    await waitFor(() => expect(list.mock.calls.length).toBe(calls + 1))
+  })
+
   it('a refused plan shows why and has no way to run', async () => {
     await open(plan({ planId: null, blockers: ['volume_in_use'] }))
     expect(screen.getByRole('alert').textContent).toMatch(/in use|em uso/)

@@ -414,9 +414,13 @@ foreach ($a in 'CPMINCORES','CPMAXCORES') { Write-Output ('DHAFT|' + $a + '|' + 
       return { ok: false, error: 'Não há valores salvos para restaurar o estacionamento de núcleos. Use "Equilibrado" no plano de energia para voltar ao padrão.' };
     }
     const lines = [];
+    // '-' = the plan had no value of its own (hidden setting, Windows default): drop the value we wrote so the
+    // default applies again. Before, such a snapshot could never be reverted.
+    const ids = { CPMINCORES: '0cc5b647-c1df-4637-891a-dec35c318583', CPMAXCORES: 'ea062031-0e34-4ff1-9b6d-eb1059334028' };
     for (const a of ['CPMINCORES', 'CPMAXCORES']) {
       const val = Number.parseInt(snap[a], 10);
       if (Number.isInteger(val) && val >= 0 && val <= 100) lines.push(`& powercfg.exe /setacvalueindex ${snap.scheme} SUB_PROCESSOR ${a} ${val} | Out-Null\r\nDhCheck 'powercfg ${a}'`);
+      else if (snap[a] === '-') lines.push(`Remove-ItemProperty -LiteralPath 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Power\\User\\PowerSchemes\\${snap.scheme}\\54533251-82be-4824-96c1-47b60b740d00\\${ids[a]}' -Name ACSettingIndex -ErrorAction SilentlyContinue`);
     }
     if (!lines.length) return { ok: false, error: 'Snapshot sem valores utilizáveis.' };
     lines.push(`& powercfg.exe /setactive ${snap.scheme} | Out-Null\r\nDhCheck 'powercfg /setactive'`);

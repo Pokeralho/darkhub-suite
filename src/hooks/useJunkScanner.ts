@@ -60,7 +60,7 @@ export const useJunkScanner = () => {
     inFlightRef.current = true
     setLoading(true)
     try {
-      const res = await window.darkhub.system.getJunkEstimate({ timeoutMs: 900, cacheTtlMs: 60_000 })
+      const res = await window.darkhub.system.getJunkEstimate({ timeoutMs: 5000, cacheTtlMs: 60_000 })
       if (res?.ok && typeof res?.bytes === 'number') {
         saveCache({ bytes: res.bytes, ok: true, truncated: res.truncated })
       }

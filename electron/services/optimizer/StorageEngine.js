@@ -42,12 +42,13 @@ class StorageEngine {
       'dxcache',
       'glcache',
       'vkcache',
-      'nvidia',
-      'amd',
       'overwatch',
       'blizzard',
       'battle.net'
     ];
+    // vendor names only at the start: "amd" anywhere also matched every "..._amd64_..." installer log, which then
+    // stayed in TEMP forever
+    if (/^(amd|nvidia)/.test(lower)) return true;
     return protectedPatterns.some((pattern) => lower.includes(pattern));
   }
 
@@ -63,6 +64,7 @@ class StorageEngine {
       return;
     }
     for (const entry of entries) {
+      if (state.deadline && Date.now() > state.deadline) { state.truncated = true; return; }
       if (this._isProtectedPath(entry.name)) { state.protectedSkipped += 1; continue; }
       const full = path.join(dir, entry.name);
       try {
@@ -96,13 +98,7 @@ class StorageEngine {
   }
 
   _newState() {
-    return { files: 0, bytes: 0, locked: 0, denied: 0, protectedSkipped: 0, skippedDeep: 0 };
-  }
-
-  async _scanDir(dirPath) {
-    const state = this._newState();
-    await this._walk(dirPath, { dryRun: true, state });
-    return { files: state.files, bytes: state.bytes };
+    return { files: 0, bytes: 0, locked: 0, denied: 0, protectedSkipped: 0, skippedDeep: 0, truncated: false, deadline: 0 };
   }
 
   async _deleteDirContents(dirPath) {
@@ -111,15 +107,18 @@ class StorageEngine {
     return { deletedFiles: state.files, freedBytes: state.bytes, lockedFiles: state.locked + state.denied, deniedFiles: state.denied };
   }
 
-  async analyzeTempFiles() {
-    let totalFiles = 0;
-    let totalBytes = 0;
+  /**
+   * What cleanTempFiles would remove: same folders, same protected names, so the dashboard estimate and the
+   * cleaner can never disagree. `deadlineMs` stops early and marks the result as truncated (a lower bound).
+   */
+  async analyzeTempFiles({ deadlineMs = 0 } = {}) {
+    const state = this._newState();
+    if (deadlineMs > 0) state.deadline = Date.now() + deadlineMs;
     for (const dir of this.tempDirs) {
-      const stats = await this._scanDir(dir);
-      totalFiles += stats.files;
-      totalBytes += stats.bytes;
+      await this._walk(dir, { dryRun: true, state });
+      if (state.truncated) break;
     }
-    return { ok: true, summary: { files: totalFiles, bytes: totalBytes, dirs: this.tempDirs.length } };
+    return { ok: true, summary: { files: state.files, bytes: state.bytes, dirs: this.tempDirs.length, truncated: state.truncated } };
   }
 
   async cleanTempFiles() {
@@ -146,6 +145,7 @@ class StorageEngine {
     return {
       ok: true,
       status,
+      deniedFiles: totalDenied,
       durationMs: Date.now() - started,
       affectedResources: this.tempDirs,
       processedItems: totalDeleted,

@@ -243,6 +243,8 @@ if ($u) { $cmd = if ($u.QuietUninstallString) { $u.QuietUninstallString } else {
     return { ok: okOf(c) && st?.isOpen === true && okOf(x), detail: `open:${st?.isOpen}` }
   })
   await step('latency ultra enable+disable', async () => {
+    // the mode needs a game: point it at notepad (it refused with "Selecione o executável do jogo" before)
+    await call('latency:setConfig', { gameExePath: `${process.env.SystemRoot || 'C:\\Windows'}\\System32\\notepad.exe` })
     const e = await call('latency:enableUltra'); await sleep(1500); const q = await call('latency:queryTimer'); const d = await call('latency:disableUltra')
     return { ok: okOf(e) && okOf(d), detail: `enable:${JSON.stringify(e).slice(0, 220)} disable:${JSON.stringify(d).slice(0, 120)} timer:${JSON.stringify(q).slice(0, 80)}` }
   })
