@@ -51,3 +51,6 @@ package-lock.json linguist-generated=true
 # Third-party binaries and libraries shipped as-is
 electron/services/hwsensors/*.dll linguist-vendored=true
 electron/services/fsr4_rdna2/** linguist-vendored=true
+
+# hashed in electron/services/integrity.json: must be byte-identical on every checkout
+electron/services/hwsensors/*.config -text
