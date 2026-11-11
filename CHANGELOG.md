@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.6] - 2026-11-11
+
+### Fixed
+- DarkPacer: the frame cap did not apply, because the hook lost its shared memory right after creating it.
+
+### Added
+- DarkPacer: 32-bit games (through an x86 helper), OpenGL games, a heartbeat that lifts the cap if the controller
+  stops, identity checks before injecting, and an optional adapter filter. Games with anti-cheat loaded are refused.
+- Sensors: NVIDIA power per connector (PCIe slot, 16-pin, 8/6-pin) with volts and amps, in the Monitor, the power panel
+  and the overlay. Every metric now says whether it is measured, derived, estimated or unavailable, and why.
+- GPU benchmark: driver control panel audit (NVIDIA), a three-clock check on every segment, and a SHA-256 check of the
+  engine and the sensor helper before they start.
+- Power panel: two-point wall calibration with a watt-meter, and PSU lookup in the 80 PLUS catalog.
+
 ## [0.8.5] - 2026-11-08
 
 ### Added
