@@ -1,5 +1,6 @@
 // Overlay settings and the rows it shows. Pure.
 import { normalizePower, POWER_DEFAULTS } from './powerModel.js'
+import { metric, provTag, railTone, RAIL_IDS } from './lhmModel.js'
 
 export const METRICS = ['fps', 'low1', 'frametime', 'graph', 'cpu', 'cpuTemp', 'gpu', 'gpuTemp', 'vram', 'gpuClock', 'ram', 'cpuPower', 'latency']
 export const LAYOUTS = ['compact', 'advanced', 'oc', 'custom']
@@ -72,28 +73,35 @@ export function readSensors(snap) {
   }
 }
 
+// temperatures, clocks and power are never physically 0 on a running PC: a 0 there means "not read"
+const reading = (x) => (Number.isFinite(Number(x)) && Number(x) > 0 ? Number(x) : null)
+const pct = (x) => (x != null && Number.isFinite(Number(x)) ? `${n(x)}%` : '—')
+
 const tone = (val, warn, bad, higherIsBad = true) => {
   if (!Number.isFinite(Number(val))) return ''
   return higherIsBad ? (val >= bad ? 'bad' : val >= warn ? 'warn' : '') : (val <= bad ? 'bad' : val <= warn ? 'warn' : 'good')
 }
 
-/** Rows for the overlay page, in the user's order of metrics. */
-export function buildRows(settings, frames, sensors, labels) {
+/** Rows for the overlay page, in the user's order of metrics. A metric that was not read shows — (never 0); `title`
+ *  carries why when the advanced sensors know it (hw: readLhm(), optional). */
+export function buildRows(settings, frames, sensors, labels, hw = null) {
   const rows = []
+  const why = (path) => { const m = hw ? metric(hw, path) : null; return m && m.prov === 'unavailable' ? m.reason : 'not_exposed' }
+  const cpuTemp = reading(sensors.cpuTemp), gpuTemp = reading(sensors.gpuTemp), cpuPower = reading(sensors.cpuPower), gpuClock = reading(sensors.gpuClock)
   for (const m of settings.metrics) {
     switch (m) {
       case 'fps': rows.push({ big: true, label: labels.fps, value: frames ? n(frames.fps) : '—', tone: frames ? tone(frames.fps, 50, 30, false) : '' }); break
       case 'low1': rows.push({ label: labels.low1, value: frames ? n(frames.low1) : '—' }); break
       case 'frametime': rows.push({ label: labels.frametime, value: frames ? `${n(frames.frameTimeMs, 1)} ms` : '—' }); break
       case 'latency': rows.push({ label: labels.latency, value: frames?.latencyMs ? `${n(frames.latencyMs, 1)} ms` : '—' }); break
-      case 'cpu': rows.push({ label: 'CPU', value: `${n(sensors.cpu)}%` }); break
-      case 'cpuTemp': rows.push({ label: labels.cpuTemp, value: sensors.cpuTemp != null ? `${n(sensors.cpuTemp)}°C` : '—', tone: tone(sensors.cpuTemp, 80, 90) }); break
-      case 'cpuPower': rows.push({ label: labels.cpuPower, value: sensors.cpuPower != null ? `${n(sensors.cpuPower)} W` : '—' }); break
-      case 'gpu': rows.push({ label: 'GPU', value: `${n(sensors.gpu)}%` }); break
-      case 'gpuTemp': rows.push({ label: labels.gpuTemp, value: sensors.gpuTemp != null ? `${n(sensors.gpuTemp)}°C` : '—', tone: tone(sensors.gpuTemp, 80, 88) }); break
+      case 'cpu': rows.push({ label: 'CPU', value: pct(sensors.cpu) }); break
+      case 'cpuTemp': rows.push({ label: labels.cpuTemp, value: cpuTemp != null ? `${n(cpuTemp)}°C` : '—', tone: tone(cpuTemp, 80, 90), ...(cpuTemp == null ? { title: why('cpu.temp') } : {}) }); break
+      case 'cpuPower': rows.push({ label: labels.cpuPower, value: cpuPower != null ? `${n(cpuPower)} W` : '—', ...(cpuPower == null ? { title: why('cpu.power') } : {}) }); break
+      case 'gpu': rows.push({ label: 'GPU', value: pct(sensors.gpu) }); break
+      case 'gpuTemp': rows.push({ label: labels.gpuTemp, value: gpuTemp != null ? `${n(gpuTemp)}°C` : '—', tone: tone(gpuTemp, 80, 88), ...(gpuTemp == null ? { title: why('gpu.temp') } : {}) }); break
       case 'vram': rows.push({ label: 'VRAM', value: sensors.vramMb != null ? `${n(sensors.vramMb / 1024, 1)} GB` : '—' }); break
-      case 'gpuClock': rows.push({ label: labels.gpuClock, value: sensors.gpuClock != null ? `${n(sensors.gpuClock)} MHz` : '—' }); break
-      case 'ram': rows.push({ label: 'RAM', value: `${n(sensors.ram)}%` }); break
+      case 'gpuClock': rows.push({ label: labels.gpuClock, value: gpuClock != null ? `${n(gpuClock)} MHz` : '—', ...(gpuClock == null ? { title: why('gpu.clock') } : {}) }); break
+      case 'ram': rows.push({ label: 'RAM', value: pct(sensors.ram) }); break
       default: break
     }
   }
@@ -103,7 +111,14 @@ export function buildRows(settings, frames, sensors, labels) {
 // ------------------------------------------------------------------ advanced / overclocker layouts (RTSS style)
 
 const f = (x, d = 0) => (x != null && Number.isFinite(Number(x)) ? Number(x).toFixed(d) : null)
-const cell = (v, u = '', t = '', p = '') => ({ v: v ?? '—', u: v == null ? '' : u, t, p })
+const cell = (v, u = '', t = '', p = '', r) => ({ v: v ?? '—', u: v == null ? '' : u, t, p, ...(v == null && r ? { r } : {}) })
+/** A cell for a readLhm() metric path: '*' after the unit when derived, the reason (r) when unavailable. */
+const mcell = (hw, path, x, d, u, t = '') => {
+  const m = hw ? metric(hw, path) : null
+  if (m && m.prov !== 'unavailable') return cell(f(x, d), m.prov === 'derived' ? `${u}*` : u, t)
+  return cell(f(x, d), u, t, '', m?.reason || (x == null ? 'not_exposed' : undefined))
+}
+const RAIL_SHORT = { PCIE: 'slot', '16PIN0': '16p', '8PIN0': '8p#1', '8PIN1': '8p#2', '6PIN0': '6p#1', '6PIN1': '6p#2' }
 export const COLORS = { gpu: '#4ade80', vram: '#a78bfa', cpu: '#60a5fa', ram: '#f472b6', fps: '#fbbf24', frame: '#fbbf24' }
 
 /**
@@ -119,17 +134,18 @@ export function buildPanel(layout, frames, session, hw, sensors, history, labels
   const gpu = hw?.gpu || {}
   const ram = hw?.ram || {}
   const gpuLoad = gpu.load ?? sensors?.gpu
-  const gpuTemp = gpu.temp ?? sensors?.gpuTemp
+  const gpuTemp = gpu.temp ?? reading(sensors?.gpuTemp)
   // CPU load from Windows' own counters first: LHM reports 100% on every thread on recent Windows 11 builds
   const cpuLoad = sensors?.cpu ?? null
   const threads = sensors?.cores?.length ? sensors.cores : null
   const loadMax = threads?.length ? Math.max(...threads) : null
-  const cpuTemp = cpu.temp ?? sensors?.cpuTemp
+  const cpuTemp = cpu.temp ?? reading(sensors?.cpuTemp)
   const vramMb = gpu.vramUsedMb ?? sensors?.vramMb
   const lines = []
 
-  const gpuCells = [cell(f(gpuLoad), '%'), cell(f(gpuTemp), '°C', tone(gpuTemp, 80, 88)), cell(f(gpu.clock ?? sensors?.gpuClock), 'MHz'), cell(f(gpu.power), 'W')]
-  if (oc) gpuCells.push(cell(f(gpu.voltage, 3), 'V'), cell(f(gpu.powerPct), '% TDP'))
+  const gpuCells = [cell(f(gpuLoad), '%'), cell(f(gpuTemp), '°C', tone(gpuTemp, 80, 88), '', gpuTemp == null ? metric(hw, 'gpu.temp').reason : undefined),
+    cell(f(gpu.clock ?? reading(sensors?.gpuClock)), 'MHz'), mcell(hw, 'gpu.power', gpu.power, 0, 'W')]
+  if (oc) gpuCells.push(mcell(hw, 'gpu.voltage', gpu.voltage, 3, 'V'), mcell(hw, 'gpu.powerPct', gpu.powerPct, 0, '% TDP'))
   lines.push({ tag: 'GPU', color: COLORS.gpu, cells: gpuCells })
   if (oc && (gpu.hotspot || gpu.memJunction || gpu.fanRpm != null)) {
     lines.push({ tag: '', color: COLORS.gpu, cells: [
@@ -150,10 +166,17 @@ export function buildPanel(layout, frames, session, hw, sensors, history, labels
     if (nv.encoderPct != null) e1.push(cell(f(nv.encoderPct), '% enc'))
     if (nv.decoderPct != null) e1.push(cell(f(nv.decoderPct), '% dec'))
     if (e1.length) lines.push({ tag: '', color: COLORS.vram, cells: e1 })
+    // per-connector input power (NVIDIA cards that sense it): W and V per rail; a sagging 12 V rail turns warn/bad
+    const rails = (gpu.rails || []).filter((r) => r.w != null || r.v != null)
+    if (rails.length) {
+      lines.push({ tag: 'IN', color: COLORS.gpu, cells: rails.flatMap((r) => [cell(f(r.w, 0), `W ${RAIL_SHORT[r.id] || r.id}`), cell(f(r.v, 2), 'V', railTone(r.v))]) })
+    }
   }
 
-  const cpuCells = [cell(f(cpuLoad), '%'), cell(f(cpuTemp), '°C', tone(cpuTemp, 80, 90)), cell(f(cpu.clock), 'MHz'), cell(f(cpu.power ?? sensors?.cpuPower), 'W')]
-  if (oc) cpuCells.push(cell(f(cpu.vcore, 3), 'V'), cell(f(cpu.clockMax), 'MHz max'))
+  const cpuCells = [cell(f(cpuLoad), '%'), cell(f(cpuTemp), '°C', tone(cpuTemp, 80, 90), '', cpuTemp == null ? metric(hw, 'cpu.temp').reason : undefined),
+    mcell(hw, 'cpu.clock', cpu.clock, 0, 'MHz'), cpu.power == null && reading(sensors?.cpuPower) != null ? cell(f(reading(sensors.cpuPower)), 'W') : mcell(hw, 'cpu.power', cpu.power, 0, 'W')]
+  // VID instead of a measured Vcore is derived: V*
+  if (oc) cpuCells.push(mcell(hw, 'cpu.vcore', cpu.vcore, 3, 'V'), cell(f(cpu.clockMax), 'MHz max'))
   lines.push({ tag: 'CPU', color: COLORS.cpu, cells: cpuCells })
   if (oc && loadMax != null) lines.push({ tag: '', color: COLORS.cpu, cells: [cell(f(loadMax), '% ' + L('maxThread', 'max thread'), tone(loadMax, 90, 98))] })
   // clock, power, temperature and VID need an elevated helper: say so instead of showing blanks
@@ -230,4 +253,35 @@ export function buildPanel(layout, frames, session, hw, sensors, history, labels
   }
 
   return { lines, graphs, stats, threads: oc && threads?.length ? threads.map((x) => Math.round(x)) : null, threadsLabel: L('threads', 'CPU threads') }
+}
+
+// ------------------------------------------------------------------ session log (CSV) with provenance
+
+/** Columns of the overlay CSV log. Each sensor value has a *_src column: measured:lhm, measured:nvml, measured:nvapi,
+ *  measured:system (Windows counters), derived:lhm (VID), unavailable:needs_admin, ... Unavailable values are empty, never 0. */
+export const LOG_HEADER = ['time', 'fps', 'frametime_ms', 'low1_fps', 'cpu_pct', 'cpu_c', 'cpu_c_src', 'gpu_pct', 'gpu_c', 'gpu_c_src', 'vram_mb',
+  'gpu_w', 'gpu_w_src', 'cpu_w', 'cpu_w_src', 'vcore_v', 'vcore_src',
+  ...RAIL_IDS.flatMap((id) => ['w', 'v', 'a'].map((u) => `rail_${id.toLowerCase()}_${u}`)), 'rails_src'].join(',')
+
+/** One CSV line (no newline) for the log. sensors: readSensors(); hw: readLhm() or null. */
+export function logRow(now, frames, sensors, hw) {
+  const c = (x, d = 1) => (x != null && Number.isFinite(Number(x)) ? Number(x).toFixed(d) : '')
+  // advanced sensor first, Windows counter as fallback (then it is "measured:system"); zeros are "not read"
+  const pick = (path, fallback) => {
+    const m = hw ? metric(hw, path) : null
+    if (m && m.value != null) return [m.value, provTag(hw, path)]
+    const fb = reading(fallback)
+    if (fb != null) return [fb, 'measured:system']
+    return [null, `unavailable:${m?.reason || 'not_exposed'}`]
+  }
+  const [cpuC, cpuCSrc] = pick('cpu.temp', sensors?.cpuTemp)
+  const [gpuC, gpuCSrc] = pick('gpu.temp', sensors?.gpuTemp)
+  const nvW = hw ? metric(hw, 'nvml.powerW') : null
+  const [gpuW, gpuWSrc] = nvW && nvW.value != null ? [nvW.value, 'measured:nvml'] : pick('gpu.power', null)
+  const [cpuW, cpuWSrc] = pick('cpu.power', sensors?.cpuPower)
+  const [vcore, vcoreSrc] = pick('cpu.vcore', null)
+  const rails = RAIL_IDS.flatMap((id) => ['w', 'v', 'a'].map((u) => { const m = hw ? metric(hw, `gpu.rails.${id}.${u}`) : null; return m && m.value != null ? c(m.value, u === 'w' ? 1 : 3) : '' }))
+  const railsSrc = hw?.gpu?.rails?.length ? 'measured:nvapi' : `unavailable:${hw?.gpu?.railsState === 'non_nvidia' ? 'non_nvidia' : 'not_exposed'}`
+  return [new Date(now).toISOString(), c(frames?.fps), c(frames?.frameTimeMs, 2), c(frames?.low1), c(sensors?.cpu), c(cpuC), cpuCSrc, c(sensors?.gpu), c(gpuC), gpuCSrc, c(sensors?.vramMb, 0),
+    c(gpuW), gpuWSrc, c(cpuW), cpuWSrc, c(vcore, 3), vcoreSrc, ...rails, railsSrc].join(',')
 }

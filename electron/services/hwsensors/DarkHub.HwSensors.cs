@@ -5,8 +5,12 @@
 // Output: one JSON line per sample on stdout:
 //   {"type":"lhm","t":<ms>,"pawnio":<bool>,"admin":<bool>,"hw":[{"kind":"Cpu","name":"...","s":[["Temperature","Core (Tctl/Tdie)",45.25],...]}],
 //    "nvml":[{"name":"...","energyMj":..,"powerMw":..,...}],"smbios":{"ramMts":..,"ramRatedMts":..,...}}
-// "nvml" (NVIDIA only: direct NVML reads that LHM does not expose) and "smbios" (memory modules, read once) are omitted
-// when absent; inside them a field the card/driver does not report is omitted too, never written as zero.
+//    "nvrails":[{"name":"...","state":"ok|no_rails|unsupported|disabled","boardW":..,"rails":[{"id":"16PIN0","w":..,"v":..,"a":..},{"id":"PCIE",..}]}]
+// "nvml" (NVIDIA only: direct NVML reads that LHM does not expose), "nvrails" (NVIDIA only: per-connector input power
+// through NVAPI; ids PCIE, 16PIN0, 8PIN0/1, 6PIN0/1; "bad" marks a sample that failed the V x A check) and "smbios"
+// (memory modules, read once) are omitted when absent; inside them a field the card/driver does not report is omitted
+// too, never written as zero, and a rail the card does not sense has no entry.
+// Usage: DarkHub.HwSensors.exe --probe-rails   prints the raw NVAPI power-channel table once (read-only diagnostic)
 // Usage: DarkHub.HwSensors.exe [intervalMs]   (stdin closing ends the process)
 using System;
 using System.Collections.Generic;
@@ -170,6 +174,279 @@ namespace DarkHub.Native
         }
     }
 
+    // Per-connector input power on NVIDIA (PCIe slot 12 V, 12VHPWR/12V-2x6, 8-pin, 6-pin), read-only, through the
+    // undocumented NVAPI power-monitor pair (GetInfo: channel table; GetStatus: per-channel samples). Interface facts
+    // (query IDs, struct versions, offsets, rail codes, units) are corroborated by open-source NVAPI wrappers and were
+    // verified against a shipping tool. Defensive by design: nvapi64.dll from System32 only, explicit size+version in
+    // every struct, guard bytes after each buffer (an overrun disables the feature for good), 3 consecutive failures
+    // disable it for the session, and every value is range- and consistency-checked. A rail the card does not sense
+    // is simply absent: never a zero.
+    internal sealed class NvRails
+    {
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern IntPtr LoadLibraryExW(string path, IntPtr reserved, uint flags);
+        [DllImport("kernel32.dll", CharSet = CharSet.Ansi, SetLastError = true)] private static extern IntPtr GetProcAddress(IntPtr module, string name);
+        private const uint LoadLibrarySearchSystem32 = 0x800;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate IntPtr FQuery(uint id);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int FInit();
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int FEnum([Out] IntPtr[] handles, out int count);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Ansi)] private delegate int FName(IntPtr gpu, StringBuilder name);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int FBuf(IntPtr gpu, IntPtr buffer);
+
+        // NVAPI query-interface IDs (public ones from NVIDIA's nvapi_interface.h; the power-monitor pair is undocumented)
+        private const uint IdInitialize = 0x0150E828, IdEnumPhysical = 0xE5AC921F, IdFullName = 0xCEEE8E9F;
+        private const uint IdMonitorInfo = 0xC12EB19E, IdMonitorStatus = 0xF40238EF;
+
+        // Channel table: two known versions share the same header and channel layout (v3 adds larger relation entries)
+        private static readonly uint[] InfoVersions = { (3u << 16) | 0xCA8, (1u << 16) | 0xAA8 };
+        private const uint StatusVersion = (1u << 16) | 0x59C;
+        private const int InfoMask = 16, InfoChannels = 40, InfoStride = 60, InfoType = 12, InfoRail = 16;
+        private const int StatusMask = 4, StatusBoard = 8, StatusChannels = 28, StatusStride = 44;
+        private const int MaxChannels = 32, GuardLen = 64;
+        private const byte GuardByte = 0x5C;
+
+        // input rail codes → connector ids; anything else (outputs, internal, totals) is never shown as a connector
+        private static string RailId(uint rail)
+        {
+            switch (rail)
+            {
+                case 255: return "PCIE";   // PCIe slot 12 V
+                case 218: return "16PIN0"; // 12VHPWR / 12V-2x6
+                case 250: return "8PIN0";
+                case 251: return "8PIN1";
+                case 252: return "6PIN0";
+                case 253: return "6PIN1";
+                default: return null;
+            }
+        }
+        // channel kinds that carry a sensed value (summation of sensed inputs, sensor, client-aligned sensor). Estimated
+        // and lookup-table channels are model outputs, not measurements.
+        private static int TypeRank(uint type) { return type == 8 ? 3 : type == 6 ? 2 : type == 1 ? 1 : 0; }
+
+        private sealed class Gpu
+        {
+            public IntPtr Handle; public string Name; public uint InfoVersion;
+            public uint Mask; public readonly Dictionary<string, int> Channels = new Dictionary<string, int>(); public string State = "pending";
+        }
+
+        private readonly List<Gpu> _gpus = new List<Gpu>();
+        private FBuf _info, _status;
+        private int _failures;
+        private bool _disabled;
+        private string _why;
+        public bool Present { get { return _gpus.Count > 0; } }
+
+        public NvRails()
+        {
+            try
+            {
+                string path = Path.Combine(Environment.SystemDirectory, "nvapi64.dll");
+                if (!File.Exists(path)) return;
+                IntPtr lib = LoadLibraryExW(path, IntPtr.Zero, LoadLibrarySearchSystem32);
+                if (lib == IntPtr.Zero) return;
+                IntPtr qi = GetProcAddress(lib, "nvapi_QueryInterface");
+                if (qi == IntPtr.Zero) return;
+                var query = (FQuery)Marshal.GetDelegateForFunctionPointer(qi, typeof(FQuery));
+                var init = Fn<FInit>(query, IdInitialize);
+                var enumerate = Fn<FEnum>(query, IdEnumPhysical);
+                var name = Fn<FName>(query, IdFullName);
+                _info = Fn<FBuf>(query, IdMonitorInfo);
+                _status = Fn<FBuf>(query, IdMonitorStatus);
+                if (init == null || enumerate == null || init() != 0) return;
+                var handles = new IntPtr[64];
+                int count;
+                if (enumerate(handles, out count) != 0) return;
+                for (int i = 0; i < Math.Min(count, 64); i++)
+                {
+                    var g = new Gpu { Handle = handles[i] };
+                    var sb = new StringBuilder(64);
+                    if (name != null && name(handles[i], sb) == 0) g.Name = sb.ToString();
+                    _gpus.Add(g);
+                }
+                if (_info == null || _status == null) { _disabled = true; _why = "not_exposed"; }
+            }
+            catch { _gpus.Clear(); }
+        }
+
+        private static T Fn<T>(FQuery query, uint id) where T : class
+        {
+            IntPtr p = query(id);
+            return p == IntPtr.Zero ? null : Marshal.GetDelegateForFunctionPointer(p, typeof(T)) as T;
+        }
+
+        // One call into the driver with a version-stamped buffer and guard bytes after it. Returns the payload or null.
+        private byte[] Call(FBuf fn, IntPtr gpu, uint version, uint mask, out int status)
+        {
+            int size = (int)(version & 0xFFFF);
+            IntPtr mem = Marshal.AllocHGlobal(size + GuardLen);
+            try
+            {
+                var init = new byte[size + GuardLen];
+                for (int i = size; i < init.Length; i++) init[i] = GuardByte;
+                BitConverter.GetBytes(version).CopyTo(init, 0);
+                if (mask != 0) BitConverter.GetBytes(mask).CopyTo(init, StatusMask);
+                Marshal.Copy(init, 0, mem, init.Length);
+                status = fn(gpu, mem);
+                var back = new byte[size + GuardLen];
+                Marshal.Copy(mem, back, 0, back.Length);
+                for (int i = size; i < back.Length; i++)
+                    if (back[i] != GuardByte) { _disabled = true; _why = "overrun"; status = -1; return null; }
+                if (status != 0) return null;
+                var payload = new byte[size];
+                Array.Copy(back, payload, size);
+                return payload;
+            }
+            finally { Marshal.FreeHGlobal(mem); }
+        }
+
+        private static uint U32(byte[] b, int off) { return BitConverter.ToUInt32(b, off); }
+
+        private void Fail(string why)
+        {
+            _why = why;
+            if (++_failures >= 3) _disabled = true;
+        }
+
+        // Reads the channel table once per GPU: which channels are inputs we can name, and which version the driver takes.
+        private bool Describe(Gpu g)
+        {
+            foreach (uint v in InfoVersions)
+            {
+                int st;
+                byte[] info = Call(_info, g.Handle, v, 0, out st);
+                if (_disabled) return false;
+                if (info == null) continue;
+                if (U32(info, 0) != v) continue;
+                g.InfoVersion = v;
+                g.Mask = U32(info, InfoMask);
+                var best = new Dictionary<string, int>();
+                var rank = new Dictionary<string, int>();
+                var ambiguous = new HashSet<string>();
+                for (int c = 0; c < MaxChannels; c++)
+                {
+                    if ((g.Mask & (1u << c)) == 0) continue;
+                    int o = InfoChannels + c * InfoStride;
+                    uint type = U32(info, o + InfoType), rail = U32(info, o + InfoRail);
+                    string id = RailId(rail);
+                    int r = TypeRank(type);
+                    if (id == null || r == 0) continue;
+                    int prev;
+                    if (!rank.TryGetValue(id, out prev) || r > prev) { rank[id] = r; best[id] = c; ambiguous.Remove(id); }
+                    else if (r == prev) ambiguous.Add(id); // two channels of the same kind claim one connector: unreadable
+                }
+                foreach (var kv in best) if (!ambiguous.Contains(kv.Key)) g.Channels[kv.Key] = kv.Value;
+                g.State = g.Channels.Count > 0 ? "ok" : "no_rails";
+                return true;
+            }
+            g.State = "unsupported";
+            return false;
+        }
+
+        private static string F(double v) { return v.ToString("0.###", CultureInfo.InvariantCulture); }
+
+        // {"name":..,"state":"ok|no_rails|unsupported|disabled","boardW":..,"rails":[{"id","w","v","a"}]}
+        public void Dump(StringBuilder sb)
+        {
+            sb.Append('[');
+            for (int i = 0; i < _gpus.Count; i++)
+            {
+                Gpu g = _gpus[i];
+                if (i > 0) sb.Append(',');
+                sb.Append("{\"name\":"); HwSensors.Esc(sb, g.Name ?? "");
+                var rails = new StringBuilder();
+                double? board = null;
+                try
+                {
+                    if (!_disabled && g.State == "pending" && !Describe(g) && !_disabled) Fail("info");
+                    if (!_disabled && g.State == "ok")
+                    {
+                        int st;
+                        byte[] s = Call(_status, g.Handle, StatusVersion, g.Mask, out st);
+                        if (s == null || U32(s, 0) != StatusVersion) { if (!_disabled) Fail("status " + st); }
+                        else
+                        {
+                            _failures = 0;
+                            uint returned = U32(s, StatusMask);
+                            uint boardMw = U32(s, StatusBoard);
+                            if (boardMw > 0 && boardMw <= 3000000) board = boardMw / 1000.0;
+                            bool firstRail = true;
+                            foreach (var kv in g.Channels)
+                            {
+                                if ((returned & (1u << kv.Value)) == 0) continue;
+                                int o = StatusChannels + kv.Value * StatusStride;
+                                uint mw = U32(s, o), ma = U32(s, o + 12), uv = U32(s, o + 16);
+                                double? w = mw != uint.MaxValue && mw <= 900000 ? mw / 1000.0 : (double?)null;
+                                double? a = ma != uint.MaxValue && ma <= 80000 ? ma / 1000.0 : (double?)null;
+                                double? v = uv != uint.MaxValue && uv > 0 && uv <= 30000000 ? uv / 1e6 : (double?)null;
+                                string flag = null;
+                                // a sensed 12 V input reads well above 0 V; W must agree with V x A (shunt + ADC rounding)
+                                if (v.HasValue && v.Value < 1.0) { v = null; flag = "v_range"; }
+                                if (w.HasValue && v.HasValue && a.HasValue)
+                                {
+                                    double va = v.Value * a.Value;
+                                    if (Math.Abs(w.Value - va) > Math.Max(3.0, 0.15 * Math.Max(w.Value, va))) { w = null; a = null; flag = "w_va"; }
+                                }
+                                if (!w.HasValue && !v.HasValue && !a.HasValue && flag == null) continue;
+                                rails.Append(firstRail ? "" : ",").Append("{\"id\":\"").Append(kv.Key).Append('"');
+                                firstRail = false;
+                                if (w.HasValue) rails.Append(",\"w\":").Append(F(w.Value));
+                                if (v.HasValue) rails.Append(",\"v\":").Append(F(v.Value));
+                                if (a.HasValue) rails.Append(",\"a\":").Append(F(a.Value));
+                                if (flag != null) rails.Append(",\"bad\":\"").Append(flag).Append('"');
+                                rails.Append('}');
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex) { Fail(ex.GetType().Name); }
+                sb.Append(",\"state\":\"").Append(_disabled ? "disabled" : g.State).Append('"');
+                if (_disabled && _why != null) { sb.Append(",\"why\":"); HwSensors.Esc(sb, _why); }
+                if (board.HasValue) sb.Append(",\"boardW\":").Append(F(board.Value));
+                sb.Append(",\"rails\":[").Append(rails).Append("]}");
+            }
+            sb.Append(']');
+        }
+
+        // Diagnostic: the raw channel table and one status sample, for verifying a new card. Read-only.
+        public void Probe(TextWriter o)
+        {
+            if (_info == null || _status == null) { o.WriteLine("power-monitor query not exposed by this driver"); return; }
+            foreach (Gpu g in _gpus)
+            {
+                o.WriteLine("gpu: " + g.Name + "  disabled=" + _disabled + " why=" + _why);
+                foreach (uint v in InfoVersions)
+                {
+                    int st;
+                    byte[] info = Call(_info, g.Handle, v, 0, out st);
+                    o.WriteLine(string.Format("  info v=0x{0:X} status={1} {2}", v, st, info == null ? "(none)" : ""));
+                    if (info == null) continue;
+                    uint mask = U32(info, InfoMask);
+                    o.WriteLine(string.Format("  supported={0} mask=0x{1:X8}", info[4], mask));
+                    for (int c = 0; c < MaxChannels; c++)
+                        if ((mask & (1u << c)) != 0)
+                        {
+                            int off = InfoChannels + c * InfoStride;
+                            o.WriteLine(string.Format("    ch{0,2} type={1} rail={2} -> {3}", c, U32(info, off + InfoType), U32(info, off + InfoRail), RailId(U32(info, off + InfoRail)) ?? "-"));
+                        }
+                    byte[] s = Call(_status, g.Handle, StatusVersion, mask, out st);
+                    o.WriteLine(string.Format("  status call={0} {1}", st, s == null ? "(none)" : ""));
+                    if (s != null)
+                    {
+                        uint rm = U32(s, StatusMask);
+                        o.WriteLine(string.Format("  returned=0x{0:X8} board_mW={1}", rm, U32(s, StatusBoard)));
+                        for (int c = 0; c < MaxChannels; c++)
+                            if ((rm & (1u << c)) != 0)
+                            {
+                                int off = StatusChannels + c * StatusStride;
+                                o.WriteLine(string.Format("    ch{0,2} mW={1} min={2} max={3} mA={4} uV={5}", c, U32(s, off), U32(s, off + 4), U32(s, off + 8), U32(s, off + 12), U32(s, off + 16)));
+                            }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
     public static class HwSensors
     {
         internal static void Esc(StringBuilder sb, string s)
@@ -258,6 +535,14 @@ namespace DarkHub.Native
 
         public static int Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "--probe-rails")
+            {
+                // read-only diagnostic of the NVIDIA per-connector power query; no LHM, no loop
+                var probe = new NvRails();
+                if (!probe.Present) Console.WriteLine("no NVIDIA GPU through NVAPI");
+                else probe.Probe(Console.Out);
+                return 0;
+            }
             int interval = 1000;
             if (args.Length > 0) int.TryParse(args[0], out interval);
             interval = Math.Max(250, Math.Min(10000, interval));
@@ -282,6 +567,11 @@ namespace DarkHub.Native
             bool pawnio = PawnIoInstalled();
             bool admin = IsAdmin();
             var nvml = new Nvml();
+            // the NVAPI rail query only ever runs when LHM found an NVIDIA GPU
+            bool hasNvidia = false;
+            foreach (IHardware h in computer.Hardware) if (h.HardwareType == HardwareType.GpuNvidia) hasNvidia = true;
+            NvRails rails = null;
+            if (hasNvidia) { try { rails = new NvRails(); } catch { rails = null; } }
             string smbios = ReadSmbios();
             var sb = new StringBuilder(32 * 1024);
             var stdout = Console.Out;
@@ -299,6 +589,11 @@ namespace DarkHub.Native
                 }
                 sb.Append(']');
                 if (nvml.Ok) { sb.Append(",\"nvml\":"); try { nvml.Dump(sb); } catch { sb.Append("[]"); } }
+                if (rails != null && rails.Present)
+                {
+                    var rb = new StringBuilder();
+                    try { rails.Dump(rb); sb.Append(",\"nvrails\":").Append(rb); } catch { }
+                }
                 if (smbios != null) sb.Append(",\"smbios\":").Append(smbios);
                 sb.Append('}');
                 try { stdout.WriteLine(sb.ToString()); stdout.Flush(); }

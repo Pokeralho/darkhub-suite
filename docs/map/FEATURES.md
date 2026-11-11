@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-08T00:26:00. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-11T18:57:04. NAO edite a mao: rode `npm run map`. -->
 
 # Mapa de funcionalidades (tela -> IPC -> backend)
 Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/preload.js` -> canal IPC -> handler -> servico.
@@ -84,21 +84,27 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 ### System Monitor  (rota `monitor`)
 - Tela: `src/pages/SystemMonitor.tsx`
-- Componentes/hooks usados: `src/components/HelpTip.tsx`, `src/components/icons/index.tsx`, `src/components/library/Sparkline.tsx`, `src/components/monitor/AdvancedSensorsPanel.tsx`, `src/components/monitor/LhmSensorTree.tsx`, `src/components/monitor/PowerPanel.tsx`, `src/components/ui/PageHeader.tsx`, `src/hooks/useDeepHardware.ts`, `src/hooks/useSensorHistory.ts`, `src/hooks/useSystemMetrics.ts`
-- Arquivos de backend: `electron/hal/HardwareHAL.js`, `electron/hal/collectors/HwSensorsDaemon.js`, `electron/ipc/hwSensorsIpc.js`, `electron/ipc/overlayIpc.js`, `electron/main.js`, `electron/services/HardwareService.js`
+- Componentes/hooks usados: `src/components/HelpTip.tsx`, `src/components/gpubench/RunOverlay.tsx`, `src/components/icons/index.tsx`, `src/components/library/Sparkline.tsx`, `src/components/monitor/AdvancedSensorsPanel.tsx`, `src/components/monitor/LhmSensorTree.tsx`, `src/components/monitor/PowerPanel.tsx`, `src/components/monitor/PsuCatalogPicker.tsx`, `src/components/monitor/WallCalibration.tsx`, `src/components/ui/PageHeader.tsx`, `src/hooks/useDeepHardware.ts`, `src/hooks/useSensorHistory.ts`, `src/hooks/useSystemMetrics.ts`
+- Arquivos de backend: `electron/hal/HardwareHAL.js`, `electron/hal/collectors/HwSensorsDaemon.js`, `electron/ipc/gpuBenchIpc.js`, `electron/ipc/hwSensorsIpc.js`, `electron/ipc/overlayIpc.js`, `electron/main.js`, `electron/services/HardwareService.js`, `electron/services/overlay/powerModel.js`, `electron/services/overlay/wallCalibration.js`
 
 | API | canal | handler | chama |
 |---|---|---|---|
 | `app.getResourceUsage` | `app:getResourceUsage` | `electron/main.js:1470` | `metrics.map`<br>`processes.reduce` |
+| `gpubench.cancel` | `gpubench:cancel` | `electron/ipc/gpuBenchIpc.js:35` | `svc.cancel` |
+| `gpubench.onEvent` | `gpubench:event` | `nao encontrado` |  |
+| `gpubench.viewport` | `gpubench:viewport` | `electron/ipc/gpuBenchIpc.js:30` | `svc.viewport` |
 | `hardware.onUpdate` | `hardware:update` | `nao encontrado` |  |
 | `hardware.startPolling` | `hardware:startPolling` | `electron/services/HardwareService.js:51` | `hookedSenders.has`<br>`hookedSenders.add`<br>`sender.once`<br>`hookedSenders.delete` |
 | `hardware.stopPolling` | `hardware:stopPolling` | `electron/services/HardwareService.js:69` | `perSender.get`<br>`perSender.set`<br>`perSender.delete`<br>`HAL.getSnapshot (electron/hal/HardwareHAL.js)` |
 | `hwsensors.status` | `hwsensors:status` | `electron/ipc/hwSensorsIpc.js:46` | `HwSensorsDaemon.status (electron/hal/collectors/HwSensorsDaemon.js)` |
-| `overlay.power` | `overlay:power` | `electron/ipc/overlayIpc.js:33` |  |
-| `overlay.resetEnergy` | `overlay:resetEnergy` | `electron/ipc/overlayIpc.js:34` |  |
-| `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:32` |  |
-| `overlay.show` | `overlay:show` | `electron/ipc/overlayIpc.js:30` |  |
-| `overlay.status` | `overlay:status` | `electron/ipc/overlayIpc.js:29` |  |
+| `overlay.calibrate` | `overlay:calibrate` | `electron/ipc/overlayIpc.js:45` | `svc.power`<br>`points.slice`<br>`pts.some`<br>`svc.setSettings` |
+| `overlay.clearCalibration` | `overlay:clearCalibration` | `electron/ipc/overlayIpc.js:61` |  |
+| `overlay.power` | `overlay:power` | `electron/ipc/overlayIpc.js:37` |  |
+| `overlay.psuSearch` | `overlay:psuSearch` | `electron/ipc/overlayIpc.js:43` |  |
+| `overlay.resetEnergy` | `overlay:resetEnergy` | `electron/ipc/overlayIpc.js:38` |  |
+| `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:36` |  |
+| `overlay.show` | `overlay:show` | `electron/ipc/overlayIpc.js:34` |  |
+| `overlay.status` | `overlay:status` | `electron/ipc/overlayIpc.js:33` |  |
 | `system.enableProcessTracking` | `system:enableProcessTracking` | `electron/main.js:871` |  |
 | `system.runBenchmark` | `system:runBenchmark` | `electron/main.js:978` | `hrtime.bigint`<br>`parentPort.postMessage`<br>`mops.toFixed`<br>`ms.toFixed` |
 
@@ -304,21 +310,27 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 ### In-game overlay  (rota `overlay`)
 - Tela: `src/pages/GameOverlay.tsx`
-- Componentes/hooks usados: `src/components/HotkeyCapture.tsx`, `src/components/icons/index.tsx`, `src/components/monitor/PowerPanel.tsx`, `src/components/ui/PageHeader.tsx`, `src/utils/hotkey.ts`
-- Arquivos de backend: `electron/ipc/overlayIpc.js`, `electron/services/NativeLatencyClient.js`
+- Componentes/hooks usados: `src/components/HotkeyCapture.tsx`, `src/components/gpubench/RunOverlay.tsx`, `src/components/icons/index.tsx`, `src/components/monitor/PowerPanel.tsx`, `src/components/monitor/PsuCatalogPicker.tsx`, `src/components/monitor/WallCalibration.tsx`, `src/components/ui/PageHeader.tsx`, `src/utils/hotkey.ts`
+- Arquivos de backend: `electron/ipc/gpuBenchIpc.js`, `electron/ipc/overlayIpc.js`, `electron/services/NativeLatencyClient.js`, `electron/services/overlay/powerModel.js`, `electron/services/overlay/wallCalibration.js`
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `overlay.hide` | `overlay:hide` | `electron/ipc/overlayIpc.js:31` |  |
-| `overlay.layouts` | `overlay:layouts` | `electron/ipc/overlayIpc.js:36` |  |
+| `gpubench.cancel` | `gpubench:cancel` | `electron/ipc/gpuBenchIpc.js:35` | `svc.cancel` |
+| `gpubench.onEvent` | `gpubench:event` | `nao encontrado` |  |
+| `gpubench.viewport` | `gpubench:viewport` | `electron/ipc/gpuBenchIpc.js:30` | `svc.viewport` |
+| `overlay.calibrate` | `overlay:calibrate` | `electron/ipc/overlayIpc.js:45` | `svc.power`<br>`points.slice`<br>`pts.some`<br>`svc.setSettings` |
+| `overlay.clearCalibration` | `overlay:clearCalibration` | `electron/ipc/overlayIpc.js:61` |  |
+| `overlay.hide` | `overlay:hide` | `electron/ipc/overlayIpc.js:35` |  |
+| `overlay.layouts` | `overlay:layouts` | `electron/ipc/overlayIpc.js:63` |  |
 | `overlay.onEvent` | `overlay:event` | `nao encontrado` |  |
-| `overlay.pickLogFolder` | `overlay:pickLogFolder` | `electron/ipc/overlayIpc.js:46` |  |
-| `overlay.power` | `overlay:power` | `electron/ipc/overlayIpc.js:33` |  |
-| `overlay.processes` | `overlay:processes` | `electron/ipc/overlayIpc.js:42` | `nativeLatencyClient.listProcesses (electron/services/NativeLatencyClient.js)` |
-| `overlay.resetEnergy` | `overlay:resetEnergy` | `electron/ipc/overlayIpc.js:34` |  |
-| `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:32` |  |
-| `overlay.show` | `overlay:show` | `electron/ipc/overlayIpc.js:30` |  |
-| `overlay.status` | `overlay:status` | `electron/ipc/overlayIpc.js:29` |  |
+| `overlay.pickLogFolder` | `overlay:pickLogFolder` | `electron/ipc/overlayIpc.js:73` |  |
+| `overlay.power` | `overlay:power` | `electron/ipc/overlayIpc.js:37` |  |
+| `overlay.processes` | `overlay:processes` | `electron/ipc/overlayIpc.js:69` | `nativeLatencyClient.listProcesses (electron/services/NativeLatencyClient.js)` |
+| `overlay.psuSearch` | `overlay:psuSearch` | `electron/ipc/overlayIpc.js:43` |  |
+| `overlay.resetEnergy` | `overlay:resetEnergy` | `electron/ipc/overlayIpc.js:38` |  |
+| `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:36` |  |
+| `overlay.show` | `overlay:show` | `electron/ipc/overlayIpc.js:34` |  |
+| `overlay.status` | `overlay:status` | `electron/ipc/overlayIpc.js:33` |  |
 
 ### Save backup  (rota `savebackup`)
 - Tela: `src/pages/SaveBackup.tsx`
@@ -778,13 +790,13 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `overlay.activateLayout` | `overlay:activateLayout` | `electron/ipc/overlayIpc.js:40` |  |
-| `overlay.deleteLayout` | `overlay:deleteLayout` | `electron/ipc/overlayIpc.js:39` |  |
-| `overlay.layouts` | `overlay:layouts` | `electron/ipc/overlayIpc.js:36` |  |
-| `overlay.newLayout` | `overlay:newLayout` | `electron/ipc/overlayIpc.js:38` |  |
-| `overlay.preview` | `overlay:preview` | `electron/ipc/overlayIpc.js:41` |  |
-| `overlay.saveLayout` | `overlay:saveLayout` | `electron/ipc/overlayIpc.js:37` |  |
-| `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:32` |  |
+| `overlay.activateLayout` | `overlay:activateLayout` | `electron/ipc/overlayIpc.js:67` |  |
+| `overlay.deleteLayout` | `overlay:deleteLayout` | `electron/ipc/overlayIpc.js:66` |  |
+| `overlay.layouts` | `overlay:layouts` | `electron/ipc/overlayIpc.js:63` |  |
+| `overlay.newLayout` | `overlay:newLayout` | `electron/ipc/overlayIpc.js:65` |  |
+| `overlay.preview` | `overlay:preview` | `electron/ipc/overlayIpc.js:68` |  |
+| `overlay.saveLayout` | `overlay:saveLayout` | `electron/ipc/overlayIpc.js:64` |  |
+| `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:36` |  |
 
 ### settings  (rota `settings`)
 - Tela: `src/pages/Settings.tsx`

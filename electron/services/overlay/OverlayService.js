@@ -6,9 +6,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { FrameWindow, SessionStats, RangeStat } from './frameStats.js'
 import { EnergyMeter, buildDerived } from './powerModel.js'
-import { normalizeSettings, readSensors, buildRows, buildPanel, pickDisplay } from './overlayModel.js'
+import { normalizeSettings, readSensors, buildRows, buildPanel, pickDisplay, LOG_HEADER, logRow } from './overlayModel.js'
 import { readLhm } from './lhmModel.js'
-import { normalizeLayout, renderLayout, fromPreset, sampleContext, PRESETS, METRICS, SERIES } from './customModel.js'
+import { normalizeLayout, renderLayout, fromPreset, sampleContext, PRESETS, METRICS, SERIES, metricKind } from './customModel.js'
 
 const PAGE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets', 'overlay', 'overlay.html')
 const FOLLOW_MS = 2000
@@ -74,7 +74,7 @@ export class OverlayService {
     return {
       ok: true, active: this.activeLayout, layouts: this.layouts,
       presets: Object.fromEntries(Object.entries(PRESETS).map(([k, p]) => [k, p.name])),
-      metrics: Object.entries(METRICS).map(([key, m]) => ({ key, group: m.group, label: m.label, unit: m.unit, decimals: m.d })),
+      metrics: Object.entries(METRICS).map(([key, m]) => ({ key, group: m.group, label: m.label, unit: m.unit, decimals: m.d, kind: metricKind(m) })),
       series: Object.entries(SERIES).map(([key, x]) => ({ key, label: x.label }))
     }
   }
@@ -316,7 +316,7 @@ export class OverlayService {
     const derived = buildDerived({ frames, session: this.sessionStats.stats(), hw, sensors, settings: this.settings, energy: this.energy })
     let data
     if (this.settings.layout === 'compact') {
-      const rows = buildRows(this.settings, frames, sensors, this.labels)
+      const rows = buildRows(this.settings, frames, sensors, this.labels, hw)
       data = { settings: this.settings, live, rows, graph: this.settings.metrics.includes('graph') && frames ? 1 : 0 }
     } else {
       const h = this.history
@@ -336,20 +336,33 @@ export class OverlayService {
       }
     }
     this.win.webContents.executeJavaScript(`window.__overlay && window.__overlay(${JSON.stringify(data)})`).catch(() => {})
-    this._log(frames, sensors)
+    this._log(frames, sensors, hw)
   }
 
-  _log(frames, sensors) {
+  _log(frames, sensors, hw = null) {
     const dir = this.settings.logFolder
     if (!dir || !frames || !this.target) return
     const now = Date.now()
     if (this._lastLog && now - this._lastLog < 1000) return
     this._lastLog = now
     try {
-      const file = path.join(dir, `darkhub-${String(this.target.name || this.target.pid).replace(/[^\w.-]/g, '_')}-${new Date().toISOString().slice(0, 10)}.csv`)
-      if (!fs.existsSync(file)) fs.writeFileSync(file, 'time,fps,frametime_ms,low1_fps,cpu_pct,cpu_c,gpu_pct,gpu_c,vram_mb\n')
-      const f = (x, d = 1) => (Number.isFinite(Number(x)) ? Number(x).toFixed(d) : '')
-      fs.appendFileSync(file, `${new Date(now).toISOString()},${f(frames.fps)},${f(frames.frameTimeMs, 2)},${f(frames.low1)},${f(sensors.cpu)},${f(sensors.cpuTemp)},${f(sensors.gpu)},${f(sensors.gpuTemp)},${f(sensors.vramMb, 0)}\n`)
+      // every sensor column has a *_src column (measured / derived / unavailable + source or reason). A file started
+      // with the older header gets a sibling instead of mixed columns.
+      let file = path.join(dir, `darkhub-${String(this.target.name || this.target.pid).replace(/[^\w.-]/g, '_')}-${new Date().toISOString().slice(0, 10)}.csv`)
+      if (this._logBase === file) file = this._logFile
+      else {
+        this._logBase = file
+        if (fs.existsSync(file)) {
+          const fd = fs.openSync(file, 'r')
+          const head = Buffer.alloc(LOG_HEADER.length + 2)
+          const got = fs.readSync(fd, head, 0, head.length, 0)
+          fs.closeSync(fd)
+          if (head.toString('utf8', 0, got).split('\n', 1)[0].trim() !== LOG_HEADER) file = file.replace(/\.csv$/, '-prov.csv')
+        }
+        this._logFile = file
+      }
+      if (!fs.existsSync(file)) fs.writeFileSync(file, LOG_HEADER + '\n')
+      fs.appendFileSync(file, logRow(now, frames, sensors, hw) + '\n')
     } catch { /* folder gone */ }
   }
 

@@ -37,9 +37,9 @@ class FramePacerEngine extends EventEmitter {
     }
   }
 
-  start({ targetFps = 144, pacingMode = 'flatline' } = {}) {
+  start({ targetFps = 144, pacingMode = 'flatline', adapterLuid } = {}) {
     if (this.isRunning) {
-      this.updateConfig({ targetFps, pacingMode })
+      this.updateConfig({ targetFps, pacingMode, adapterLuid })
       return { ok: true, isRunning: true, targetFps: this.targetFps, pacingMode: this.pacingMode }
     }
 
@@ -47,6 +47,8 @@ class FramePacerEngine extends EventEmitter {
     this.targetFps = Number(targetFps) || 144
     this.pacingMode = pacingMode || 'flatline'
     this._crashTimes = []
+    const luid = normalizeAdapterLuid(adapterLuid)
+    if (luid !== null) this.adapterLuid = luid
 
     Logger.info('FramePacerEngine', `Iniciando motor nativo C# - Alvo: ${this.targetFps} FPS, Modo: ${this.pacingMode}`)
 
@@ -73,19 +75,24 @@ class FramePacerEngine extends EventEmitter {
     return { ok: true, isRunning: false }
   }
 
-  updateConfig({ targetFps, pacingMode } = {}) {
+  updateConfig({ targetFps, pacingMode, adapterLuid } = {}) {
     if (typeof targetFps === 'number' && targetFps >= 0) {
       this.targetFps = targetFps
     }
     if (pacingMode && ['flatline', 'reflex', 'uncapped'].includes(pacingMode)) {
       this.pacingMode = pacingMode
     }
+    // Optional: pace only swap chains rendered by this adapter (DXGI LUID as up to 16 hex digits,
+    // HighPart then LowPart; '' or '0' = any adapter). OpenGL cannot be attributed to an adapter,
+    // so with a LUID selected OpenGL games are not limited.
+    const luid = normalizeAdapterLuid(adapterLuid)
+    if (luid !== null) this.adapterLuid = luid
 
     Logger.info('FramePacerEngine', `Atualizando: ${this.targetFps} FPS (${this.pacingMode})`)
 
     if (this._nativeProcess && this._nativeProcess.stdin && !this._nativeProcess.stdin.destroyed) {
       try {
-        const config = JSON.stringify({ targetFps: this.targetFps, pacingMode: this.pacingMode })
+        const config = JSON.stringify({ targetFps: this.targetFps, pacingMode: this.pacingMode, adapterLuid: this.adapterLuid || '0' })
         this._nativeProcess.stdin.write(config + '\n')
       } catch (err) {
         Logger.warn('FramePacerEngine', `Falha ao enviar config para processo nativo: ${err.message}`)
@@ -138,7 +145,9 @@ class FramePacerEngine extends EventEmitter {
 
       const proc = spawn(exePath, [
         String(this.targetFps),
-        String(this.pacingMode)
+        String(this.pacingMode),
+        '--adapter-luid',
+        this.adapterLuid || '0'
       ], {
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe']
@@ -230,6 +239,14 @@ class FramePacerEngine extends EventEmitter {
       try { proc.kill() } catch {}
     }
   }
+}
+
+/** '' / '0' / undefined-free normaliser for the adapter filter. Returns null for invalid input. */
+export function normalizeAdapterLuid(v) {
+  if (v === undefined || v === null) return null
+  const s = String(v).trim().replace(/^0x/i, '').toLowerCase()
+  if (s === '') return '0'
+  return /^[0-9a-f]{1,16}$/.test(s) ? s : null
 }
 
 let exitKillRegistered = false

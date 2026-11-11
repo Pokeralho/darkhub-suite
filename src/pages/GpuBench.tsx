@@ -46,6 +46,7 @@ export default function GpuBench() {
     already_running: t('gpubench.err.running', 'Um benchmark já está rodando.'),
     no_secure_storage: t('gpubench.err.storage', 'O Windows não ofereceu armazenamento seguro para guardar a conexão.'),
     expired: t('gpubench.err.expired', 'O código expirou. Tente conectar de novo.'),
+    integrity_failed: t('gpubench.err.integrity', 'O motor do benchmark foi alterado ou está corrompido. Reinstale o DarkHub.'),
     hub_unavailable: t('gpubench.err.hub', 'O Hub não respondeu agora. Tente de novo mais tarde; o teste local funciona normalmente.')
   } as Record<string, string>)[code] ?? code;
 
@@ -153,6 +154,13 @@ export default function GpuBench() {
           {latest.sensors.samples > 0 && (
             <p className="text-[12.5px] text-zinc-400 font-mono tabular-nums">
               {num(latest.sensors.gpuClockAvg)} MHz · {num(latest.sensors.gpuTempMax)} °C {t('gpubench.max', 'máx')}{latest.sensors.gpuPowerAvg != null ? ` · ${num(latest.sensors.gpuPowerAvg)} W` : ''}
+            </p>
+          )}
+          {latest.driver && latest.driver.length > 0 && (
+            <p className="text-[12.5px] text-zinc-400">
+              {latest.driver[0] === 'driver_unaudited'
+                ? t('gpubench.driver.unaudited', 'Configurações do driver não conferidas nesta GPU.')
+                : `${t('gpubench.driver.changed', 'Painel do driver fora do padrão')}: ${latest.driver.map((f) => f.replace('driver_', '').replace(/_/g, ' ')).join(', ')}`}
             </p>
           )}
           {latest.flags.length > 0 && <p className="text-[12.5px] text-amber-300">{t('gpubench.flags', 'Avisos do servidor')}: {latest.flags.join(', ')}</p>}

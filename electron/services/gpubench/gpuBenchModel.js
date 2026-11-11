@@ -61,6 +61,17 @@ export function sampleGpu(snapshot, t = Date.now()) {
   return { t, clock: val(gpu?.clockCore), temp: val(gpu?.temperature), load: val(gpu?.utilization), power: val(gpu?.powerDraw) }
 }
 
+/**
+ * Driver control-panel settings that differ from the driver's default, as flags ('driver_texture_quality', ...). The
+ * same rule runs on the server. 'driver_unaudited' when there was nothing to read (not NVIDIA, or the read failed).
+ */
+export function driverFlags(audit) {
+  if (!audit?.ok || !audit.settings || typeof audit.settings !== 'object') return ['driver_unaudited']
+  return Object.entries(audit.settings)
+    .filter(([, s]) => s?.state === 'set' && (s.default == null || s.value !== s.default))
+    .map(([key]) => `driver_${key}`).sort()
+}
+
 /** Flat list of what a run does, in order. */
 export function localPlan({ dxr, quick }) {
   const n = quick ? QUICK_SEGMENTS : LOCAL_SEGMENTS

@@ -1,6 +1,6 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-08T00:26:00. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-11T18:57:04. NAO edite a mao: rode `npm run map`. -->
 
-# Canais IPC (533)
+# Canais IPC (537)
 
 | API (`window.darkhub.`) | canal | handler | chama | usado em |
 |---|---|---|---|---|
@@ -145,7 +145,7 @@
 | `fs.readFile` | `fs:readFile` | `electron/main.js:3336` |  | `src/pages/TextEditor.tsx`<br>`src/pages/TextSummarizer.tsx` |
 | `fs.writeFile` | `fs:writeFile` | `electron/main.js:3348` | `devPath.includes` | `src/pages/TextEditor.tsx` |
 | `getTrace` | `dev:getTrace` | **sem handler** |  | _nao usado_ |
-| `gpubench.cancel` | `gpubench:cancel` | `electron/ipc/gpuBenchIpc.js:35` | `svc.cancel` | `src/components/gpubench/StressPanel.tsx`<br>`src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
+| `gpubench.cancel` | `gpubench:cancel` | `electron/ipc/gpuBenchIpc.js:35` | `svc.cancel` | `src/components/gpubench/StressPanel.tsx`<br>`src/components/monitor/WallCalibration.tsx`<br>`src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
 | `gpubench.link` | `gpubench:link` | `electron/ipc/gpuBenchIpc.js:37` | `svc.link` | `src/pages/GpuBench.tsx` |
 | `gpubench.onEvent` | `gpubench:event` | _evento main->tela_ |  | `src/components/gpubench/RunOverlay.tsx`<br>`src/components/gpubench/StressPanel.tsx`<br>`src/pages/Benchmark.tsx`<br>`src/pages/GpuBench.tsx` |
 | `gpubench.openRanking` | `gpubench:openRanking` | `electron/ipc/gpuBenchIpc.js:39` | `svc.openRanking`<br>`svc.cancel` | `src/pages/GpuBench.tsx` |
@@ -312,21 +312,25 @@
 | `optiscaler.downloadUpdate` | `optiscaler:downloadUpdate` | `electron/optiscalerManager.js:1287` |  | `src/pages/OptiScalerManager.tsx` |
 | `optiscaler.listBackups` | `optiscaler:listBackups` | `electron/optiscalerManager.js:1242` |  | `src/pages/OptiScalerManager.tsx` |
 | `optiscaler.restoreBackup` | `optiscaler:restoreBackup` | `electron/optiscalerManager.js:1250` |  | `src/pages/OptiScalerManager.tsx` |
-| `overlay.activateLayout` | `overlay:activateLayout` | `electron/ipc/overlayIpc.js:40` |  | `src/pages/OverlayEditor.tsx` |
-| `overlay.deleteLayout` | `overlay:deleteLayout` | `electron/ipc/overlayIpc.js:39` |  | `src/pages/OverlayEditor.tsx` |
-| `overlay.hide` | `overlay:hide` | `electron/ipc/overlayIpc.js:31` |  | `src/pages/GameOverlay.tsx` |
-| `overlay.layouts` | `overlay:layouts` | `electron/ipc/overlayIpc.js:36` |  | `src/pages/GameOverlay.tsx`<br>`src/pages/OverlayEditor.tsx` |
-| `overlay.newLayout` | `overlay:newLayout` | `electron/ipc/overlayIpc.js:38` |  | `src/pages/OverlayEditor.tsx` |
+| `overlay.activateLayout` | `overlay:activateLayout` | `electron/ipc/overlayIpc.js:67` |  | `src/pages/OverlayEditor.tsx` |
+| `overlay.calibrate` | `overlay:calibrate` | `electron/ipc/overlayIpc.js:45` | `svc.power`<br>`points.slice`<br>`pts.some` | `src/components/monitor/WallCalibration.tsx` |
+| `overlay.clearCalibration` | `overlay:clearCalibration` | `electron/ipc/overlayIpc.js:61` |  | `src/components/monitor/WallCalibration.tsx` |
+| `overlay.deleteLayout` | `overlay:deleteLayout` | `electron/ipc/overlayIpc.js:66` |  | `src/pages/OverlayEditor.tsx` |
+| `overlay.hide` | `overlay:hide` | `electron/ipc/overlayIpc.js:35` |  | `src/pages/GameOverlay.tsx` |
+| `overlay.layouts` | `overlay:layouts` | `electron/ipc/overlayIpc.js:63` |  | `src/pages/GameOverlay.tsx`<br>`src/pages/OverlayEditor.tsx` |
+| `overlay.newLayout` | `overlay:newLayout` | `electron/ipc/overlayIpc.js:65` |  | `src/pages/OverlayEditor.tsx` |
 | `overlay.onEvent` | `overlay:event` | _evento main->tela_ |  | `src/pages/GameOverlay.tsx` |
-| `overlay.pickLogFolder` | `overlay:pickLogFolder` | `electron/ipc/overlayIpc.js:46` |  | `src/pages/GameOverlay.tsx` |
-| `overlay.power` | `overlay:power` | `electron/ipc/overlayIpc.js:33` |  | `src/components/monitor/PowerPanel.tsx` |
-| `overlay.preview` | `overlay:preview` | `electron/ipc/overlayIpc.js:41` |  | `src/pages/OverlayEditor.tsx` |
-| `overlay.processes` | `overlay:processes` | `electron/ipc/overlayIpc.js:42` | `nativeLatencyClient.listProcesses (electron/services/NativeLatencyClient.js)` | `src/pages/GameOverlay.tsx` |
-| `overlay.resetEnergy` | `overlay:resetEnergy` | `electron/ipc/overlayIpc.js:34` |  | `src/components/monitor/PowerPanel.tsx` |
-| `overlay.saveLayout` | `overlay:saveLayout` | `electron/ipc/overlayIpc.js:37` |  | `src/pages/OverlayEditor.tsx` |
-| `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:32` |  | `src/components/monitor/PowerPanel.tsx`<br>`src/pages/GameOverlay.tsx`<br>`src/pages/OverlayEditor.tsx` |
-| `overlay.show` | `overlay:show` | `electron/ipc/overlayIpc.js:30` |  | `src/pages/GameOverlay.tsx`<br>`src/pages/SystemMonitor.tsx` |
-| `overlay.status` | `overlay:status` | `electron/ipc/overlayIpc.js:29` |  | `src/components/monitor/PowerPanel.tsx`<br>`src/pages/GameOverlay.tsx` |
+| `overlay.pickLogFolder` | `overlay:pickLogFolder` | `electron/ipc/overlayIpc.js:73` |  | `src/pages/GameOverlay.tsx` |
+| `overlay.power` | `overlay:power` | `electron/ipc/overlayIpc.js:37` |  | `src/components/monitor/AdvancedSensorsPanel.tsx`<br>`src/components/monitor/PowerPanel.tsx`<br>`src/components/monitor/WallCalibration.tsx` |
+| `overlay.preview` | `overlay:preview` | `electron/ipc/overlayIpc.js:68` |  | `src/pages/OverlayEditor.tsx` |
+| `overlay.processes` | `overlay:processes` | `electron/ipc/overlayIpc.js:69` | `nativeLatencyClient.listProcesses (electron/services/NativeLatencyClient.js)` | `src/pages/GameOverlay.tsx` |
+| `overlay.psuCatalogStatus` | `overlay:psuCatalogStatus` | `electron/ipc/overlayIpc.js:42` |  | _nao usado_ |
+| `overlay.psuSearch` | `overlay:psuSearch` | `electron/ipc/overlayIpc.js:43` |  | `src/components/monitor/PsuCatalogPicker.tsx` |
+| `overlay.resetEnergy` | `overlay:resetEnergy` | `electron/ipc/overlayIpc.js:38` |  | `src/components/monitor/PowerPanel.tsx` |
+| `overlay.saveLayout` | `overlay:saveLayout` | `electron/ipc/overlayIpc.js:64` |  | `src/pages/OverlayEditor.tsx` |
+| `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:36` |  | `src/components/monitor/PowerPanel.tsx`<br>`src/pages/GameOverlay.tsx`<br>`src/pages/OverlayEditor.tsx` |
+| `overlay.show` | `overlay:show` | `electron/ipc/overlayIpc.js:34` |  | `src/pages/GameOverlay.tsx`<br>`src/pages/SystemMonitor.tsx` |
+| `overlay.status` | `overlay:status` | `electron/ipc/overlayIpc.js:33` |  | `src/components/monitor/PowerPanel.tsx`<br>`src/pages/GameOverlay.tsx` |
 | `pge.openPortable` | `pge:openPortable` | `electron/main.js:1461` |  | `src/layouts/MainLayout.tsx`<br>`src/pages/Home.tsx` |
 | `powershell.customStart` | `powershell:customStart` | `electron/ipc/powershellIpc.js:95` | `kit.startCustom`<br>`sender.isDestroyed`<br>`sender.send` | `src/components/pstools/CustomScriptRunner.tsx` |
 | `powershell.customStatus` | `powershell:customStatus` | `electron/ipc/powershellIpc.js:100` | `kit.isCustomRunning` | `src/components/pstools/CustomScriptRunner.tsx` |

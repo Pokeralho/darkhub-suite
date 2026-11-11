@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-08T00:26:00. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-11T18:57:04. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -66,7 +66,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/hal/collectors/HwSensorsDaemon.js`
 
-`isPawnIoInstalled`:17, `forgetPawnIoCheck`:29, `HwSensorsDaemon`:36 _class_, `enabled`:53, `enabled`:63, `status`:68, `start`:81, `stop`:118, `restart`:129
+`isPawnIoInstalled`:18, `forgetPawnIoCheck`:30, `HwSensorsDaemon`:37 _class_, `enabled`:54, `enabled`:64, `status`:69, `start`:82, `stop`:122, `restart`:133
 
 ## `electron/hal/collectors/LatencyCollector.js`
 
@@ -162,7 +162,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ipc/overlayIpc.js`
 
-`registerOverlayIPC`:9, `broadcast`:11, `get`:18, `handle`:23
+`registerOverlayIPC`:13, `broadcast`:15, `get`:22, `handle`:27, `psuCatalog`:41
 
 ## `electron/ipc/powershellIpc.js`
 
@@ -230,7 +230,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:286, `handler`:305, `handler`:315, `handler`:333, `handler`:345, `listener`:388, `handler`:440, `handler`:466, `handler`:472, `handler`:478, `handler`:484, `listener`:493, `listener`:504, `handler`:529, `listener`:542, `listener`:559, `handler`:597, `handler`:612, `listener`:635, `listener`:664, `listener`:699, `listener`:726, `handler`:767
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:290, `handler`:309, `handler`:319, `handler`:337, `handler`:349, `listener`:392, `handler`:444, `handler`:470, `handler`:476, `handler`:482, `handler`:488, `listener`:497, `listener`:508, `handler`:533, `listener`:546, `listener`:563, `handler`:601, `handler`:616, `listener`:639, `listener`:668, `listener`:703, `listener`:730, `handler`:771
 
 ## `electron/services/CodeRunner.js`
 
@@ -254,7 +254,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/DarkHub.FrameLimiter.cs`
 
-`PacerConfig`:14 _class_, `TelemetrySnapshot`:23 _class_, `DarkHubFrameLimiter`:41 _class_, `OpenProcess`:46, `VirtualAllocEx`:48, `WriteProcessMemory`:50, `CreateRemoteThread`:52, `GetModuleHandle`:54, `GetProcAddress`:56, `CloseHandle`:58, `QueryFullProcessImageName`:60, `GetForegroundWindow`:62, `GetWindowThreadProcessId`:64, `IsWindowVisible`:66, `VirtualFreeEx`:69, `WaitForSingleObject`:71, `GetProcessPath`:108, `DetectActiveGame`:119, `InjectHookDll`:220, `ResetCap`:271, `ClampFps`:277, `UpdateSharedConfig`:284, `UpdateSharedConfig`:289, `OpenTelemetry`:327, `CloseTelemetry`:344, `ReadSharedTelemetry`:356, `Fd`:409, `EscJ`:414, `EmitTelemetry`:416, `ReadStdin`:453, `Main`:508
+`PacerConfigV2`:19 _class_, `TelemetrySnapshot`:36 _class_, `GameTarget`:56 _class_, `InjectResult`:65 _class_, `Success`:72, `Refuse`:73, `Fail`:74, `DarkHubFrameLimiter`:77 _class_, `OpenProcess`:82, `VirtualAllocEx`:84, `WriteProcessMemory`:86, `CreateRemoteThread`:88, `GetModuleHandle`:90, `GetProcAddress`:92, `CloseHandle`:94, `QueryFullProcessImageName`:96, `GetProcessTimes`:98, `GetExitCodeProcess`:100, `GetExitCodeThread`:102, `IsWow64Process`:104, `IsWow64Process2`:106, `ProcessIdToSessionId`:108, `GetProcessInformation`:110, `EnumProcessModulesEx`:112, `GetModuleBaseName`:114, `OpenProcessToken`:116, `GetForegroundWindow`:118, `GetWindowThreadProcessId`:120, `IsWindowVisible`:122, `VirtualFreeEx`:125, `WaitForSingleObject`:127, `IsBlacklisted`:187, `GetProcessPath`:194, `GetHandlePath`:201, `CaptureIdentity`:209, `DetectActiveGame`:224, `PeMachine`:318, `TargetArch`:338, `ModuleNames`:360, `AntiCheatFound`:380, `FindBinary`:402, `ModuleLoaded`:411, `InjectHookDll`:423, `SameUser`:504, `InjectX64`:520, `InjectViaX86Helper`:557, `JsonStr`:585, `ConfigLayoutOk`:614, `EnsureConfigView`:627, `PublishConfig`:652, `HeartbeatLoop`:682, `ResetCap`:695, `ClampFps`:713, `TryParseLuid`:722, `OpenTelemetry`:744, `CloseTelemetry`:761, `ReadSharedTelemetry`:773, `Fd`:826, `EscJ`:831, `EmitTelemetry`:833, `ReadStdin`:872, `ArgValue`:927, `ResultJson`:933, `Main`:939
 
 ## `electron/services/DarkHub.FramePacer.ps1`
 
@@ -290,7 +290,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/FramePacerEngine.js`
 
-`FramePacerEngine`:13 _class_, `start`:40, `stop`:64, `updateConfig`:76, `getMetrics`:101, `_getExePath`:110, `_spawnNativeProcess`:134, `_killNativeProcess`:207, `_killSync`:224, `registerExitKill`:236
+`FramePacerEngine`:13 _class_, `start`:40, `stop`:66, `updateConfig`:78, `getMetrics`:108, `_getExePath`:117, `_spawnNativeProcess`:141, `_killNativeProcess`:216, `_killSync`:233, `normalizeAdapterLuid`:245, `registerExitKill`:253
 
 ## `electron/services/FramePacerOverlay.js`
 
@@ -351,6 +351,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `electron/services/benchmark/benchWorker.js`
 
 `emit`:12, `now`:13, `kernel`:17, `work`:28, `cpuSingle`:37, `cpuMulti`:44, `memBandwidth`:78, `memLatency`:89, `timerJitter`:107, `tick`:111, `diskSeqWrite`:127, `disk4kSyncWrite`:139
+
+## `electron/services/binaryIntegrity.js`
+
+`unpacked`:13, `sha256File`:18, `readManifest`:20, `verifyBinaries`:31, `integrityError`:48
 
 ## `electron/services/cleaner/CleanerService.js`
 
@@ -426,11 +430,11 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/gpubench/GpuBenchService.js`
 
-`enginePath`:17, `Engine`:23 _class_, `next`:31, `send`:44, `ask`:46, `stop`:51, `kill`:56, `GpuBenchService`:59 _class_, `hubUrl`:73, `history`:78, `_save`:79, `remove`:80, `stressHistory`:82, `removeStress`:83, `_token`:85, `status`:89, `viewport`:94, `_startEngine`:100, `ranking`:107, `rankingUrl`:117, `openRanking`:119, `link`:137, `unlink`:156, `cancel`:163, `_sensorSample`:165, `run`:167, `warm`:183, `record`:189, `stress`:228, `_preview`:289, `_rankedRun`:300
+`enginePath`:18, `Engine`:24 _class_, `next`:32, `send`:45, `ask`:47, `stop`:52, `kill`:57, `GpuBenchService`:60 _class_, `hubUrl`:74, `history`:79, `_save`:80, `remove`:81, `stressHistory`:83, `removeStress`:84, `_token`:86, `status`:90, `viewport`:95, `_engineIntegrity`:102, `_startEngine`:106, `ranking`:113, `rankingUrl`:123, `openRanking`:125, `link`:143, `unlink`:163, `cancel`:170, `_sensorSample`:172, `run`:174, `warm`:191, `record`:197, `stress`:239, `_preview`:301, `_rankedRun`:312
 
 ## `electron/services/gpubench/gpuBenchModel.js`
 
-`decodeFrameUs`:12, `frameStats`:20, `scoreOf`:35, `sensorSummary`:42, `pick`:43, `mean`:44, `max`:45, `sampleGpu`:55, `val`:57, `localPlan`:65
+`decodeFrameUs`:12, `frameStats`:20, `scoreOf`:35, `sensorSummary`:42, `pick`:43, `mean`:44, `max`:45, `sampleGpu`:55, `val`:57, `driverFlags`:68, `localPlan`:76
 
 ## `electron/services/gpubench/sceneModel.js`
 
@@ -486,7 +490,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/hwsensors/DarkHub.HwSensors.cs`
 
-`Nvml`:25 _class_, `ProcInfo`:40 _class_, `Device`:46 _class_, `Num`:106, `U32`:113, `ProcMem`:120, `Dump`:138, `HwSensors`:173 _class_, `Esc`:175, `PawnIoInstalled`:187, `Dump`:193, `IsAdmin`:222, `ReadSmbios`:231, `Main`:259
+`Nvml`:29 _class_, `ProcInfo`:44 _class_, `Device`:50 _class_, `Num`:110, `U32`:117, `ProcMem`:124, `Dump`:142, `NvRails`:184 _class_, `RailId`:209, `TypeRank`:224, `Gpu`:226 _class_, `Call`:278, `U32`:302, `Fail`:304, `Describe`:311, `F`:345, `Dump`:348, `Probe`:411, `HwSensors`:450 _class_, `Esc`:452, `PawnIoInstalled`:464, `Dump`:470, `IsAdmin`:499, `ReadSmbios`:508, `Main`:536
 
 ## `electron/services/hwsensors/pawnio.js`
 
@@ -522,7 +526,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/metadata/ooxmlZip.js`
 
-`CRC_TABLE`:7, `crc32`:17, `readZipEntries`:23, `entryData`:60, `rewriteZip`:67, `emit`:73, `xmlEscape`:146, `xmlUnescape`:147, `reEsc`:170, `elementRe`:171, `getXmlElement`:175, `setXmlElement`:180, `toW3cdtf`:192, `readOoxmlProps`:201, `find`:203, `writeOoxmlProps`:223, `find`:225, `writeOoxmlFile`:250
+`CRC_TABLE`:6, `crc32`:16, `readZipEntries`:22, `entryData`:59, `rewriteZip`:66, `emit`:72, `xmlEscape`:145, `xmlUnescape`:146, `reEsc`:169, `elementRe`:170, `getXmlElement`:174, `setXmlElement`:179, `toW3cdtf`:191, `readOoxmlProps`:200, `find`:202, `writeOoxmlProps`:222, `find`:224
 
 ## `electron/services/optimizer/AppManagerEngine.js`
 
@@ -594,7 +598,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/overlay/OverlayService.js`
 
-`OverlayService`:19 _class_, `_saveLayouts`:71, `layoutsState`:73, `saveLayout`:82, `newLayout`:91, `deleteLayout`:97, `activateLayout`:105, `preview`:114, `power`:120, `resetEnergy`:128, `_save`:130, `_emit`:131, `status`:133, `setSettings`:142, `_bindHotkey`:153, `_displays`:161, `_displayIdFromPhysical`:172, `_place`:179, `_ensureWindow`:191, `show`:207, `hide`:225, `toggle`:238, `_closeSession`:240, `p`:243, `_attach`:249, `_track`:267, `_follow`:280, `_restartLoop`:290, `_stopLoop`:297, `_stream`:299, `_render`:306, `add`:323, `_log`:342, `f`:351, `dispose`:356
+`OverlayService`:19 _class_, `_saveLayouts`:71, `layoutsState`:73, `saveLayout`:82, `newLayout`:91, `deleteLayout`:97, `activateLayout`:105, `preview`:114, `power`:120, `resetEnergy`:128, `_save`:130, `_emit`:131, `status`:133, `setSettings`:142, `_bindHotkey`:153, `_displays`:161, `_displayIdFromPhysical`:172, `_place`:179, `_ensureWindow`:191, `show`:207, `hide`:225, `toggle`:238, `_closeSession`:240, `p`:243, `_attach`:249, `_track`:267, `_follow`:280, `_restartLoop`:290, `_stopLoop`:297, `_stream`:299, `_render`:306, `add`:323, `_log`:342, `dispose`:369
 
 ## `electron/services/overlay/PresentMonService.js`
 
@@ -602,7 +606,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/overlay/customModel.js`
 
-`isNum`:9, `num`:10, `str`:11, `esc`:12, `cssValue`:14, `color`:15, `hw`:20, `gpu`:21, `cpu`:22, `ram`:23, `fr`:24, `ss`:25, `nv`:26, `dv`:27, `rl`:28, `normStyle`:140, `newId`:148, `idOk`:149, `normItem`:151, `normWidget`:165, `normalizeLayout`:191, `hexToRgba`:228, `px`:234, `value`:236, `hash`:257, `renderLayout`:268, `add`:275, `M`:364, `fromPreset`:437, `sampleContext`:443, `hist`:445
+`isNum`:10, `num`:11, `str`:12, `esc`:13, `cssValue`:15, `color`:16, `hw`:25, `gpu`:26, `cpu`:27, `ram`:28, `fr`:29, `ss`:30, `nv`:31, `dv`:32, `rl`:33, `at`:51, `normStyle`:158, `newId`:166, `idOk`:167, `normItem`:169, `normWidget`:183, `normalizeLayout`:209, `hexToRgba`:246, `px`:252, `metricKind`:255, `metricValue`:266, `value`:284, `hash`:308, `renderLayout`:319, `add`:326, `M`:415, `fromPreset`:488, `sampleContext`:494, `hist`:496
 
 ## `electron/services/overlay/frameStats.js`
 
@@ -610,15 +614,23 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/overlay/lhmModel.js`
 
-`pos`:5, `volts`:8, `hwEntries`:10, `index`:12, `get`:15, `all`:16, `decodeThrottle`:25, `avg`:31, `readLhm`:33, `n`:115
+`finite`:16, `pos`:17, `isSvi2Sentinel`:20, `volts`:21, `hwEntries`:23, `index`:25, `find`:29, `get`:30, `all`:31, `decodeThrottle`:40, `railTone`:51, `avg`:56, `measured`:58, `derivedP`:59, `unavailable`:60, `readLhm`:62, `why`:70, `take`:78, `T`:123, `valueAt`:247, `metric`:257, `provTag`:266
 
 ## `electron/services/overlay/overlayModel.js`
 
-`normalizeSettings`:26, `clamp`:27, `pickDisplay`:47, `byId`:48, `v`:56, `n`:57, `readSensors`:60, `tone`:75, `buildRows`:81, `f`:105, `cell`:106, `buildPanel`:114, `L`:117, `money`:182, `mm`:216
+`normalizeSettings`:27, `clamp`:28, `pickDisplay`:48, `byId`:49, `v`:57, `n`:58, `readSensors`:61, `reading`:77, `pct`:78, `tone`:80, `buildRows`:87, `why`:89, `f`:113, `cell`:114, `mcell`:116, `buildPanel`:129, `L`:132, `money`:205, `mm`:239, `logRow`:267, `c`:268, `pick`:270
 
 ## `electron/services/overlay/powerModel.js`
 
-`psuCurve`:23, `psuEfficiency`:33, `num`:46, `posNum`:47, `fpsPerWatt`:50, `joulesPerFrame`:52, `EnergyMeter`:59 _class_, `reset`:62, `push`:72, `mid`:84, `hasCounter`:94, `gpuJoules`:95, `cpuJoules`:96, `systemPower`:100, `costOf`:115, `normalizePower`:128, `clamp`:129, `buildDerived`:146, `scenario`:159
+`psuCurve`:30, `psuEfficiency`:40, `num`:53, `posNum`:54, `fpsPerWatt`:57, `joulesPerFrame`:59, `EnergyMeter`:66 _class_, `reset`:69, `push`:79, `mid`:91, `hasCounter`:101, `gpuJoules`:102, `cpuJoules`:103, `systemPower`:108, `costOf`:125, `str`:139, `normalizeModel`:141, `normalizePower`:154, `clamp`:155, `calibrationFor`:173, `buildDerived`:189, `scenario`:203
+
+## `electron/services/overlay/psuCatalog.js`
+
+`pct`:34, `text`:41, `parseRecord`:49, `parseCatalog`:74, `norm`:85, `searchCatalog`:91, `dateKey`:110, `pickVariant`:116, `by`:118, `PsuCatalog`:132 _class_, `_readCache`:143, `status`:155, `_fetch`:160, `search`:177, `validEntry`:201
+
+## `electron/services/overlay/wallCalibration.js`
+
+`num`:54, `readingSigma`:57, `readingWatts`:63, `windowStats`:80, `checkPoint`:96, `fitXk`:108, `k`:109, `f`:113, `solveCalibration`:141, `calHardwareId`:180, `normalizeCalibration`:192, `calibrationState`:207
 
 ## `electron/services/psTools/PsToolkitService.js`
 
@@ -872,13 +884,17 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `ioctl`:31, `u32le`:52, `u64le`:55, `disk_path`:59, `open_query`:64, `geometry`:75, `bus_name`:106, `descriptor_string`:130, `device_info`:139, `wide`:164, `from_wide`:167, `volume_extents`:172, `volumes`:187, `system_disks`:220, `list_drives`:240, `disk_of_path`:271, `probe_locks`:282, `lock_volumes`:311, `open`:350, `size`:372, `sector_size`:375, `read_at`:378, `write_at`:396, `flush`:409
 
+## `native_gpubench/src/audit.rs`
+
+`intact`:61, `u32_at`:62, `ptr`:63, `func`:66, `driver`:72, `read_drs`:80, `QueryPerformanceCounter`:152, `QueryPerformanceFrequency`:153, `clocks`:165, `clock_report`:181
+
 ## `native_gpubench/src/gpu.rs`
 
-`wndproc`:123, `heap_props`:130, `buffer_desc`:134, `tex_desc`:141, `create`:148, `barrier`:154, `uav_barrier`:169, `bytecode`:177, `compute_pso`:181, `graphics_pso`:186, `root_signature`:207, `place`:229, `loaded_modules`:237, `dot`:253, `sun_dir`:255, `frame_cb`:261, `cpu_handle`:391, `gpu_handle`:394, `write_descriptors`:399, `init_rt`:442, `wait_value`:522, `wait_idle`:530, `hwnd_raw`:537, `pump`:539, `ids_to`:551, `record`:558, `submit`:670, `collect`:682, `segment`:700, `capture`:737, `read_ldr`:756, `read_texture`:764, `drop`:795
+`wndproc`:124, `heap_props`:131, `buffer_desc`:135, `tex_desc`:142, `create`:149, `barrier`:155, `uav_barrier`:170, `bytecode`:178, `compute_pso`:182, `graphics_pso`:187, `root_signature`:208, `place`:230, `loaded_modules`:238, `dot`:254, `sun_dir`:256, `frame_cb`:262, `cpu_handle`:392, `gpu_handle`:395, `write_descriptors`:400, `init_rt`:443, `wait_value`:523, `wait_idle`:531, `hwnd_raw`:538, `pump`:540, `ids_to`:552, `record`:559, `submit`:671, `collect`:683, `gpu_clock`:701, `segment`:710, `capture`:750, `read_ldr`:769, `read_texture`:777, `drop`:808
 
 ## `native_gpubench/src/main.rs`
 
-`say`:16, `u32s_b64`:22, `vectors`:29, `run`:45, `main`:141
+`say`:17, `u32s_b64`:23, `vectors`:30, `run`:46, `main`:143
 
 ## `native_gpubench/src/proof.rs`
 
@@ -888,9 +904,21 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `pcg`:14, `hash2`:20, `tri`:24, `box_at`:34, `camera`:50, `basis`:61
 
+## `native_pacer/examples/pacer_testapp.rs`
+
+`RegisterClassW`:98, `CreateWindowExW`:99, `DefWindowProcW`:100, `PeekMessageW`:101, `TranslateMessage`:102, `DispatchMessageW`:103, `GetDC`:104, `ChoosePixelFormat`:108, `SetPixelFormat`:109, `SwapBuffers`:110, `wglCreateContext`:114, `wglMakeCurrent`:115, `wglGetProcAddress`:116, `wglSwapBuffers`:117, `glClearColor`:118, `glClear`:119, `D3D11CreateDeviceAndSwapChain`:123, `GetModuleHandleW`:126, `GetProcAddress`:127, `wndproc`:130, `wide`:134, `vfn`:138, `adapter_luid`:142, `run`:163, `main`:289, `main`:294
+
+## `native_pacer/src/bin/inject_x86.rs`
+
+`OpenProcess`:33, `CloseHandle`:34, `GetProcessTimes`:35, `GetExitCodeProcess`:36, `GetExitCodeThread`:37, `GetCurrentProcess`:38, `GetCurrentProcessId`:39, `ProcessIdToSessionId`:40, `IsWow64Process`:41, `GetModuleHandleW`:42, `GetProcAddress`:43, `VirtualAllocEx`:44, `VirtualFreeEx`:45, `WriteProcessMemory`:46, `CreateRemoteThread`:47, `WaitForSingleObject`:48, `GetLastError`:49, `GetFileAttributesW`:50, `OpenProcessToken`:55, `GetTokenInformation`:56, `EqualSid`:57, `out`:79, `wide`:84, `pe_machine`:89, `drop`:106, `token_user`:113, `target_machine`:129, `protection_level`:149, `main`:164, `main`:299, `main`:306
+
 ## `native_pacer/src/lib.rs`
 
-`CreateWindowExA`:66, `DestroyWindow`:80, `timeBeginPeriod`:85, `timeEndPeriod`:86, `QueryPerformanceCounter`:90, `QueryPerformanceFrequency`:91, `VirtualProtect`:92, `CreateFileMappingW`:93, `OpenFileMappingW`:94, `MapViewOfFile`:95, `CloseHandle`:96, `GetCurrentProcessId`:97, `Sleep`:98, `LoadLibraryA`:99, `GetProcAddress`:100, `CreateThread`:101, `CreateWaitableTimerExW`:102, `SetWaitableTimer`:103, `WaitForSingleObject`:104, `get_qpc_ms`:218, `precision_wait`:228, `hist_recent`:254, `push_sample`:258, `compute_stats`:267, `publish`:317, `is_main_swapchain`:356, `perform_pacing`:407, `hooked_present`:478, `hooked_present1`:488, `map_named`:502, `setup_shared_memory`:519, `patch_slot`:547, `com_release`:560, `install_vtable_hooks`:571, `remove_vtable_hooks`:659, `init_thread`:671, `DllMain`:687, `reset`:729, `stats_come_only_from_real_samples`:735, `low01_unavailable_with_few_samples`:754, `telemetry_layout_matches_reader`:766
+`CreateWindowExA`:151, `DestroyWindow`:165, `timeBeginPeriod`:170, `timeEndPeriod`:171, `QueryPerformanceCounter`:175, `QueryPerformanceFrequency`:176, `VirtualProtect`:177, `CreateFileMappingW`:178, `OpenFileMappingW`:179, `MapViewOfFile`:180, `CloseHandle`:181, `GetCurrentProcessId`:182, `GetCurrentThreadId`:183, `GetCurrentProcess`:184, `Sleep`:185, `LoadLibraryA`:186, `GetModuleHandleA`:187, `GetModuleHandleExW`:188, `FreeLibrary`:189, `K32EnumProcessModules`:190, `GetProcAddress`:191, `CreateThread`:192, `CreateWaitableTimerExW`:193, `SetWaitableTimer`:194, `WaitForSingleObject`:195, `get_qpc_ms`:328, `precision_wait`:338, `hist_recent`:364, `push_sample`:368, `compute_stats`:377, `publish`:427, `evaluate_config`:476, `current_directive`:499, `vfn`:523, `com_release`:528, `pack_luid`:537, `query_swapchain_luid`:546, `eligible`:593, `is_main_swapchain`:598, `main_is_eligible`:653, `perform_pacing`:663, `enter_present`:728, `leave_present`:737, `hooked_present`:744, `hooked_present1`:755, `gl_present`:797, `hooked_gdi_swap`:813, `hooked_gdifull_swap`:816, `hooked_wgl_swap`:819, `resolve_gl_targets`:823, `already_patched`:839, `patch_module_iat`:850, `patch_module_delay_iat`:901, `patch_thunks`:946, `install_gl_hooks`:978, `remove_gl_hooks`:1006, `map_named`:1021, `setup_shared_memory`:1040, `patch_slot`:1067, `install_vtable_hooks`:1082, `remove_vtable_hooks`:1170, `init_thread`:1184, `DllMain`:1214, `reset`:1258, `stats_come_only_from_real_samples`:1264, `low01_unavailable_with_few_samples`:1283, `telemetry_layout_matches_reader`:1295, `config_layout_is_fixed`:1303, `cfg`:1324, `fresh_heartbeat_applies_the_cap`:1343, `stale_or_missing_heartbeat_passes_through`:1350, `disabled_uncapped_or_foreign_blocks_pass_through`:1358, `adapter_filter`:1375
+
+## `native_pacer/tests/e2e.ps1`
+
+`Start-App`:19, `Get-Samples`:30, `Mean-Fps`:34, `Start-Limiter`:41, `Kill-Limiter`:60, `Last-Status`:66, `Wait-AppSecond`:72, `Test-Cap`:78, `Inject-Once`:105, `Test-Safety`:110, `Test-Luid`:148
 
 ## `scripts/dev.mjs`
 
@@ -899,6 +927,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `scripts/ext.mjs`
 
 `$`:46, `show`:59
+
+## `scripts/gen-integrity.mjs`
+
+`collect`:12, `add`:14
 
 ## `scripts/gpubench-check.mjs`
 
@@ -1042,7 +1074,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/components/monitor/AdvancedSensorsPanel.tsx`
 
-`Props`:6 _type_, `api`:12, `AdvancedSensorsPanel`:15 _component_, `toggle`:25, `missing`:41
+`Props`:6 _type_, `api`:12, `Rail`:14 _type_, `GpuRails`:19 _component_, `tick`:25, `fmt`:38, `AdvancedSensorsPanel`:66 _component_, `toggle`:76, `missing`:92
 
 ## `src/components/monitor/LhmSensorTree.tsx`
 
@@ -1050,7 +1082,15 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/components/monitor/PowerPanel.tsx`
 
-`api`:6, `f`:7, `Row`:10 _component_, `Block`:19 _component_, `PowerSettingsForm`:31 _component_, `num`:33, `PowerPanel`:78 _component_, `set`:93, `cpuVal`:109, `money`:111, `kwh`:112
+`api`:8, `f`:9, `Row`:12 _component_, `Block`:21 _component_, `isLowRail`:32, `RailRows`:35 _component_, `val`:38, `PowerSettingsForm`:72 _component_, `num`:74, `PowerPanel`:120 _component_, `set`:135, `cpuVal`:151, `money`:154, `kwh`:155
+
+## `src/components/monitor/PsuCatalogPicker.tsx`
+
+`api`:6, `eff`:7, `voltLabel`:8, `PsuCatalogPicker`:14 _component_, `search`:21, `use`:29, `errText`:37
+
+## `src/components/monitor/WallCalibration.tsx`
+
+`Step`:10 _type_, `Sample`:11 _type_, `fmt`:13, `ReadingInput`:16 _component_, `field`:25, `Stability`:57 _component_, `WallCalibration`:74 _component_, `ov`:91, `gb`:92, `tick`:101, `capture`:119, `reset`:125, `captureIdle`:127, `confirmIdle`:133, `startLoad`:140, `stopLoad`:161, `confirmLoad`:175, `save`:187, `errText`:200, `date`:201
 
 ## `src/components/network/LatencyLab.tsx`
 
@@ -1182,7 +1222,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/devtools/textTools.ts`
 
-`base64Encode`:4, `base64Decode`:11, `htmlEncode`:19, `htmlDecode`:23, `EncodeKind`:34 _type_, `encodeText`:36, `decodeText`:43, `jsonFormat`:50, `jsonMinify`:51, `ShaAlg`:54 _type_, `shaHex`:56, `uuidV4`:62, `ulid`:73, `ulidTime`:84, `JwtParts`:92 _type_, `decodeJwt`:94, `charsetSize`:109, `entropyBits`:119, `strengthLabel`:124, `PwOptions`:132 _type_, `generatePassword`:134, `lorem`:153, `rnd`:155, `RegexSegment`:172 _type_, `regexSegments`:174, `expandCronField`:200, `num`:203, `p2`:222, `join`:223, `explainCron`:226, `full`:233, `nextCronRuns`:249
+`base64Encode`:4, `base64Decode`:11, `htmlEncode`:19, `htmlDecode`:23, `EncodeKind`:34 _type_, `encodeText`:36, `decodeText`:43, `jsonMinify`:50, `ShaAlg`:53 _type_, `shaHex`:55, `uuidV4`:61, `ulid`:72, `ulidTime`:83, `JwtParts`:91 _type_, `decodeJwt`:93, `charsetSize`:108, `entropyBits`:118, `strengthLabel`:123, `PwOptions`:131 _type_, `generatePassword`:133, `lorem`:152, `rnd`:154, `RegexSegment`:171 _type_, `regexSegments`:173, `expandCronField`:199, `num`:202, `p2`:221, `join`:222, `explainCron`:225, `full`:232, `nextCronRuns`:248
 
 ## `src/devtools/ui.tsx`
 
@@ -1234,7 +1274,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/i18n/powerMessages.ts`
 
-`prefixed`:20
+`prefixed`:49
 
 ## `src/layouts/MainLayout.tsx`
 
@@ -1322,11 +1362,11 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/GameOverlay.tsx`
 
-`n`:10, `GameOverlay`:12 _component_, `api`:20, `metricLabel`:22, `set`:52, `toggle`:59, `toggleMetric`:68, `PlacementPicker`:203 _component_, `ratio`:206, `spotLabel`:207, `nudge`:212
+`n`:10, `GameOverlay`:12 _component_, `api`:20, `metricLabel`:22, `set`:52, `toggle`:59, `toggleMetric`:68, `PlacementPicker`:204 _component_, `ratio`:207, `spotLabel`:208, `nudge`:213
 
 ## `src/pages/GpuBench.tsx`
 
-`num`:10, `GpuBench`:12 _component_, `api`:25, `load`:26, `errorText`:43, `run`:51, `link`:62, `unlink`:71, `remove`:72, `testName`:78, `statusName`:79, `statusClass`:85, `phaseText`:86
+`num`:10, `GpuBench`:12 _component_, `api`:25, `load`:26, `errorText`:43, `run`:53, `link`:64, `unlink`:73, `remove`:74, `testName`:80, `statusName`:81, `statusClass`:87, `phaseText`:88
 
 ## `src/pages/Home.tsx`
 
@@ -1374,7 +1414,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/OverlayEditor.tsx`
 
-`api`:8, `encode`:13, `decode`:14, `newId`:18, `Row`:22 _component_, `ColorField`:31 _component_, `NumField`:41 _component_, `MetricSelect`:51 _component_, `Section`:64 _component_, `StyleEditor`:78 _component_, `set`:80, `ItemEditor`:113 _component_, `set`:116, `WidgetEditor`:141 _component_, `set`:143, `ThemeEditor`:226 _component_, `set`:228, `OverlayEditor`:263 _component_, `change`:305, `setWidget`:307, `move`:308, `add`:313, `save`:327, `switchTo`:336, `create`:340, `duplicate`:344, `remove`:349, `exportCode`:354, `doImport`:358, `typeName`:370, `typeLabel`:371
+`api`:8, `star`:13, `encode`:16, `decode`:17, `newId`:21, `Row`:25 _component_, `ColorField`:34 _component_, `NumField`:44 _component_, `MetricSelect`:54 _component_, `Section`:67 _component_, `StyleEditor`:81 _component_, `set`:83, `ItemEditor`:116 _component_, `set`:119, `WidgetEditor`:144 _component_, `set`:146, `ThemeEditor`:229 _component_, `set`:231, `OverlayEditor`:266 _component_, `change`:312, `setWidget`:314, `move`:315, `add`:320, `save`:334, `switchTo`:343, `create`:347, `duplicate`:351, `remove`:356, `exportCode`:361, `doImport`:365, `typeName`:377, `typeLabel`:378
 
 ## `src/pages/PasswordManager.tsx`
 
@@ -1492,6 +1532,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `run`:11, `best`:19
 
+## `tests/binaryIntegrity.test.ts`
+
+`fixture`:10
+
 ## `tests/cleaner.test.ts`
 
 `tmpDir`:13, `fakeIni`:16, `fakeFetch`:21, `put`:81, `execFileImpl`:154
@@ -1527,6 +1571,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/extensions.test.ts`
 
 `ext`:16
+
+## `tests/gpuBench.test.ts`
+
+`set`:84
 
 ## `tests/gpuStress.test.ts`
 
@@ -1576,6 +1624,14 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `isRdna2`:16, `mockGetLibraryStore`:37, `sectionKeys`:67
 
+## `tests/overlayProvenance.test.ts`
+
+`at`:173, `at2`:181
+
+## `tests/pacerConfigLayout.test.ts`
+
+`csLayout`:15, `rsAsserts`:22
+
 ## `tests/partitionManager.test.tsx`
 
 `part`:10, `disk`:14, `mount`:18, `plan`:54, `run`:68
@@ -1588,6 +1644,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `raw`:10
 
+## `tests/powerPanelRails.test.tsx`
+
+`Gpu`:8 _type_, `gpu`:9, `mount`:10
+
 ## `tests/powershellTools.test.ts`
 
 `make`:37
@@ -1595,6 +1655,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/psToolkit.test.ts`
 
 `mk`:151
+
+## `tests/psuCatalog.test.ts`
+
+`rec`:12, `fixture`:18, `fakeDownload`:102
 
 ## `tests/realtime.test.ts`
 
@@ -1635,6 +1699,14 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/vaultBridge.test.ts`
 
 `mkTmp`:23, `makeServer`:185, `FakeHost`:212 _class_, `connect`:219, `next`:231, `raw`:237, `handshake`:238, `call`:249, `close`:253, `setup`:261, `pair`:270, `runReg`:392, `readFile`:434, `writeFile`:435
+
+## `tests/wallCalibration.test.ts`
+
+`eta0`:10, `wallOf`:12, `pt`:13, `flat`:29, `W`:31, `rnd`:42, `ok`:75, `fail`:76, `series`:120
+
+## `tests/wallCalibrationPanel.test.tsx`
+
+`derived`:9, `backend`:20
 
 ## `tests/wuDiagnose.test.ts`
 

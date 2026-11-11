@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Cpu, Fan, Loader2, Zap } from '../icons';
 import { useI18n } from '../../i18n/I18nProvider';
-import type { HwSensorsStatus } from '../../global';
+import type { HwSensorsStatus, OverlayHw } from '../../global';
 
 interface Props {
   /** metrics.temps.values from the HAL */
@@ -10,6 +10,57 @@ interface Props {
 }
 
 const api = () => window.darkhub?.hwsensors;
+
+type Rail = NonNullable<NonNullable<NonNullable<OverlayHw['gpu']>['rails']>>[number];
+const RAIL_LOW_V = 11.4;
+const RAIL_BAD_V = 11.0;
+
+/** Per-connector GPU input power (NVIDIA, NVAPI power monitor): only the rails the card senses; others are not listed. */
+function GpuRails() {
+  const { t } = useI18n();
+  const [hw, setHw] = useState<OverlayHw | null>(null);
+  useEffect(() => {
+    const ov = window.darkhub?.overlay;
+    if (!ov?.power) return undefined;
+    const tick = () => { void ov.power().then((r) => { if (r?.ok) setHw(r.hw); }).catch(() => {}); };
+    tick();
+    const id = setInterval(tick, 1500);
+    return () => clearInterval(id);
+  }, []);
+  const g = hw?.gpu;
+  if (!g) return null;
+  const name: Record<string, string> = {
+    PCIE: t('rails.PCIE', 'Slot PCIe'), '16PIN0': t('rails.16PIN0', 'Cabo 16 pinos (12V-2x6)'), '8PIN0': t('rails.8PIN0', '8 pinos #1'),
+    '8PIN1': t('rails.8PIN1', '8 pinos #2'), '6PIN0': t('rails.6PIN0', '6 pinos #1'), '6PIN1': t('rails.6PIN1', '6 pinos #2')
+  };
+  const reason = g.railsState === 'non_nvidia' ? t('prov.non_nvidia', 'Só em placas NVIDIA') : t('rails.notSensed', 'Esta placa/driver não mede a entrada por conector');
+  const rails: Rail[] = g.rails || [];
+  const fmt = (x: number | null | undefined, d: number) => (x == null || !Number.isFinite(x) ? null : x.toFixed(d));
+  const cellNa = <span className="text-zinc-600" title={t('prov.not_exposed', 'Não exposto por este hardware/driver')}>—</span>;
+  return (
+    <div className="border-t border-zinc-800/80 pt-3">
+      <h3 className="flex items-center gap-1.5 text-[12px] text-zinc-500 mb-2"><Zap size={14} />{t('rails.title', 'Entrada de energia da GPU por conector')}
+        {g.railsW != null ? <span className="ml-auto font-mono text-zinc-400" title={t('rails.sumHelp', 'Soma dos conectores medidos (derivado). A diferença para o total da placa é o 3,3 V do slot, que o driver só estima.')}>{g.railsW.toFixed(0)} W*</span> : null}</h3>
+      {rails.length ? (
+        <table className="w-full text-[12.5px]">
+          <thead><tr className="text-[11px] text-zinc-500"><th className="text-left font-normal">{t('rails.connector', 'Conector')}</th><th className="text-right font-normal">W</th><th className="text-right font-normal">V</th><th className="text-right font-normal">A</th></tr></thead>
+          <tbody>{rails.map((r) => {
+            const low = r.v != null && r.v < RAIL_LOW_V;
+            const bad = r.v != null && r.v < RAIL_BAD_V;
+            return (
+              <tr key={r.id} title={t('rails.source', 'Medido pelo driver NVIDIA (NVAPI)')}>
+                <td className="text-zinc-400">{name[r.id] || r.id}</td>
+                <td className="text-right font-mono text-zinc-200">{fmt(r.w, 1) ?? cellNa}</td>
+                <td className={`text-right font-mono ${bad ? 'text-red-300' : low ? 'text-amber-300' : 'text-zinc-200'}`} title={low ? t('rails.lowV', 'Abaixo de 11,4 V: fora da tolerância ATX de 12 V (±5%). Verifique cabo, conector e fonte.') : undefined}>{fmt(r.v, 3) ?? cellNa}</td>
+                <td className="text-right font-mono text-zinc-200">{fmt(r.a, 2) ?? cellNa}</td>
+              </tr>
+            );
+          })}</tbody>
+        </table>
+      ) : <p className="text-zinc-500 text-[12px]" title={reason}>— {reason}</p>}
+    </div>
+  );
+}
 
 /** Opt-in advanced sensors (LibreHardwareMonitorLib + optional PawnIO driver) and their readings. */
 export default function AdvancedSensorsPanel({ values, gpuProbe }: Props) {
@@ -94,6 +145,7 @@ export default function AdvancedSensorsPanel({ values, gpuProbe }: Props) {
           </div>
         </div>
       ) : null}
+      {st.enabled ? <GpuRails /> : null}
     </section>
   );
 }

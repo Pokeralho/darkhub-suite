@@ -34,7 +34,7 @@ calls and which service does the work.
 The native helpers are **prebuilt and committed** to the repository:
 
 - C# (.NET Framework 4.x): `electron/services/DarkHub.*.exe` and `electron/services/hwsensors/DarkHub.HwSensors.exe`
-- Rust (`native_pacer/`): `electron/services/DarkHub.PacerHook.dll` and `DarkHub.PacerHook64.dll`
+- Rust (`native_pacer/`): `electron/services/DarkHub.PacerHook.x64.dll`, `DarkHub.PacerHook.x86.dll` and the 32-bit helper `DarkHub.PacerInject.x86.exe`
 
 So you do **not** need Visual Studio, the .NET SDK or Rust unless you change the `.cs` files or `native_pacer/`. For
 screens, translations, texts, tests, docs and packages, Node.js 22 LTS and npm are enough:

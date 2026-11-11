@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import Logger from '../../services/LoggerService.js';
+import { integrityError } from '../../services/binaryIntegrity.js';
 
 let electron = null;
 try { electron = createRequire(import.meta.url)('electron'); } catch { electron = null; }
@@ -81,6 +82,9 @@ class HwSensorsDaemon extends EventEmitter {
   start() {
     if (this.process || !this.enabled) return;
     if (!fs.existsSync(HWSENSORS_EXE)) { this.lastError = 'DarkHub.HwSensors.exe não encontrado.'; return; }
+    // the helper runs elevated and loads 18 libraries: an installed app starts it only when all of them are the shipped ones
+    const tampered = integrityError(['hwsensors/'], { log: (m) => Logger.warn('HwSensorsDaemon', m) });
+    if (tampered) { this.lastError = 'Arquivos dos sensores avançados foram alterados. Reinstale o DarkHub.'; Logger.error('HwSensorsDaemon', tampered); return; }
     this._stopped = false;
     this.lastError = null;
     Logger.info('HwSensorsDaemon', 'Iniciando sensores avançados (LibreHardwareMonitorLib).');

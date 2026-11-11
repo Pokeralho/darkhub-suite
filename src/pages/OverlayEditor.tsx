@@ -8,6 +8,9 @@ import type { OvlItem, OvlLayout, OvlLayoutsState, OvlPreview, OvlStyle, OvlThem
 const api = () => window.darkhub?.overlay;
 const FONTS = ['"Cascadia Mono", Consolas, monospace', 'Consolas, monospace', '"Segoe UI", system-ui, sans-serif', '"Segoe UI Variable Display", "Segoe UI", sans-serif', 'Bahnschrift, "Segoe UI", sans-serif', 'Arial, sans-serif', 'Verdana, sans-serif', 'Tahoma, sans-serif', '"Trebuchet MS", sans-serif', 'Impact, sans-serif', '"Courier New", monospace', '"Lucida Console", monospace'];
 const GROUPS = ['fps', 'gpu', 'cpu', 'ram', 'power', 'cost', 'session', 'other'];
+const PROV_REASONS = ['needs_admin', 'needs_pawnio', 'not_exposed', 'sentinel', 'non_nvidia'];
+/** Derived (computed / firmware) and estimated (model) metrics carry a * in their name, like on the overlay. */
+const star = (m: { kind?: string }) => (m.kind === 'derived' || m.kind === 'estimated' ? '*' : '');
 const ANCHORS = ['tl', 'tc', 'tr', 'ml', '', 'mr', 'bl', 'bc', 'br'] as const;
 const CODE_PREFIX = 'dhovl1:';
 const encode = (l: OvlLayout) => CODE_PREFIX + btoa(unescape(encodeURIComponent(JSON.stringify(l))));
@@ -54,7 +57,7 @@ function MetricSelect({ value, onChange, metrics }: { value: string; onChange: (
     <select className="dh-input h-7 w-full text-[12px]" value={value} onChange={(e) => onChange(e.target.value)}>
       {GROUPS.map((g) => (
         <optgroup key={g} label={t(`ovle.group.${g}`, g)}>
-          {metrics.filter((m) => m.group === g).map((m) => <option key={m.key} value={m.key}>{t(`ovle.m.${m.key}`, m.label)}{m.unit ? ` (${m.unit})` : ''}</option>)}
+          {metrics.filter((m) => m.group === g).map((m) => <option key={m.key} value={m.key}>{t(`ovle.m.${m.key}`, m.label)}{star(m)}{m.unit ? ` (${m.unit})` : ''}</option>)}
         </optgroup>
       ))}
     </select>
@@ -207,7 +210,7 @@ function WidgetEditor({ w, onChange, state }: { w: OvlWidget; onChange: (w: OvlW
                   {state.metrics.filter((m) => m.group === g).map((m) => {
                     const on = w.keys.includes(m.key);
                     return <button key={m.key} type="button" onClick={() => set({ keys: on ? w.keys.filter((k) => k !== m.key) : [...w.keys, m.key] })}
-                      className={`px-1.5 py-0.5 rounded border text-[11px] ${on ? 'border-blue-400/70 text-zinc-50 bg-zinc-800/60' : 'border-zinc-800 text-zinc-400'}`}>{t(`ovle.m.${m.key}`, m.label)}</button>;
+                      className={`px-1.5 py-0.5 rounded border text-[11px] ${on ? 'border-blue-400/70 text-zinc-50 bg-zinc-800/60' : 'border-zinc-800 text-zinc-400'}`} title={m.kind ? t(`prov.kind.${m.kind}`, m.kind) : undefined}>{t(`ovle.m.${m.key}`, m.label)}{star(m)}</button>;
                   })}
                 </div>
               </div>
@@ -285,7 +288,11 @@ export default function OverlayEditor({ onNavigate }: { onNavigate?: (page: stri
   useEffect(() => { void load(); }, []);
   // metric names in the app language for the statistics blocks drawn in game
   useEffect(() => {
-    if (state) void api()?.setSettings({ labels: Object.fromEntries(state.metrics.map((m) => [`m.${m.key}`, t(`ovle.m.${m.key}`, m.label)])) });
+    if (state) void api()?.setSettings({ labels: {
+      ...Object.fromEntries(state.metrics.map((m) => [`m.${m.key}`, t(`ovle.m.${m.key}`, m.label)])),
+      // why a metric shows — (tooltip in the preview)
+      ...Object.fromEntries(PROV_REASONS.map((r) => [`why.${r}`, t(`prov.${r}`, r)]))
+    } });
   }, [state?.metrics.length]);
 
   // live preview (debounced); while the overlay runs it uses the real numbers, refreshed every second

@@ -69,13 +69,23 @@ export type OvlWidget =
   | ({ id: string; type: 'spacer'; style: OvlStyle; hidden?: boolean; height: number });
 export interface OvlTheme { fontFamily: string; fontSize: number; fontWeight: number; color: string; labelColor: string; unitColor: string; good: string; warn: string; bad: string; background: string; backgroundOpacity: number; border: string; radius: number; padding: number; gap: number; direction: 'column' | 'row'; textShadow: boolean }
 export interface OvlLayout { version: 1; id: string; name: string; anchor: 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br'; offsetX: number; offsetY: number; scale: number; opacity: number; theme: OvlTheme; widgets: OvlWidget[]; css: string }
-export interface OvlLayoutsState { ok: boolean; error?: string; active: string; layouts: OvlLayout[]; presets: Record<string, string>; metrics: { key: string; group: string; label: string; unit: string; decimals: number }[]; series: { key: string; label: string }[]; saved?: OvlLayout }
+export interface OvlLayoutsState { ok: boolean; error?: string; active: string; layouts: OvlLayout[]; presets: Record<string, string>; metrics: { key: string; group: string; label: string; unit: string; decimals: number; kind?: 'measured' | 'derived' | 'estimated' | 'live' }[]; series: { key: string; label: string }[]; saved?: OvlLayout }
 export interface OvlCanvas { id: string; kind: 'graph' | 'bars'; series?: { color: string; values: number[] }[]; values?: number[]; floor?: number; ceil?: number; height: number; width?: number; fill?: boolean; lineWidth?: number; grid?: boolean; colors?: string[] }
 export interface OvlPreview { ok: boolean; error?: string; live: boolean; html: string; css: string; canvases: OvlCanvas[]; box: { anchor: string; offsetX: number; offsetY: number; scale: number; opacity: number } }
 export interface OverlayDisplay { id: string; name: string; primary: boolean; width: number; height: number; hz: number | null }
 export interface OverlaySettings { layout: 'compact' | 'advanced' | 'oc' | 'custom'; position: 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br'; offsetX: number; offsetY: number; monitor: string; scale: number; opacity: number; background: number; intervalMs: number; hotkey: string; metrics: string[]; logFolder: string;
   /** PSU, extra load and tariff for the power estimates */
-  psuWatts: number; psuRating: 'white' | 'bronze' | 'silver' | 'gold' | 'platinum' | 'titanium' | 'custom'; psuCustom: number[]; extraWatts: number; tariff: number; hoursPerDay: number }
+  psuWatts: number; psuRating: 'white' | 'bronze' | 'silver' | 'gold' | 'platinum' | 'titanium' | 'custom'; psuCustom: number[]; extraWatts: number; tariff: number; hoursPerDay: number;
+  /** Real PSU picked from the 80 PLUS catalog (kept only while psuWatts/psuCustom still match it), mains voltage, wall calibration. */
+  psuModel?: PsuModelSel | null; mainsVoltage?: '115' | '230' | null; powerCal?: WallCalibration | null }
+/** One certified unit from the 80 PLUS catalog (electron/services/overlay/psuCatalog.js). curve: efficiency % at 10/20/50/100 % load. */
+export interface PsuCatalogEntry { id: string; brand: string; model: string; watts: number; rating: string; category: string; voltage: '115' | '230'; curve: number[]; approx10: boolean; certified: string | null; pdf: string | null }
+export interface PsuCatalogGroup { key: string; brand: string; model: string; watts: number; variants: PsuCatalogEntry[]; pick: { id: string; fallback: boolean } | null }
+export interface PsuSearchResult { ok: boolean; error?: string | null; detail?: string; results?: PsuCatalogGroup[]; total?: number; fetchedAt?: number | null; count?: number; stale?: boolean; source?: string; mains?: '115' | '230' | null }
+export type PsuModelSel = Pick<PsuCatalogEntry, 'id' | 'brand' | 'model' | 'watts' | 'rating' | 'category' | 'voltage' | 'curve' | 'approx10' | 'certified'>;
+export interface WallCalPoint { measW: number; wallW: number; std: number; spread: number }
+export interface WallCalibration { at: number; hwId: string; extraW: number; effScale: number; points: { measW: number; wallW: number }[]; sigma: { extraW: number | null; effPct: number | null } }
+export interface WallCalResult { ok: boolean; error?: string; extraW?: number; effScale?: number; effAt?: number[]; sigma?: { extraW: number; effPct: number }; points?: { measW: number; wallW: number }[]; saved?: boolean; settings?: OverlaySettings }
 export interface OverlayFrameStats { fps: number | null; frameTimeMs: number | null; low1: number | null; low01: number | null; maxFrameTimeMs: number; gpuBusyMs: number | null; latencyMs: number | null; renderLatencyMs?: number | null; presentMode: string; graph: number[] }
 /** One cost scenario: kWh and R$ per period (R$ is null when no tariff is set). */
 export interface OverlayCost { kwhHour: number; kwhDay: number; kwhMonth: number; kwhYear: number; perHour: number | null; perDay: number | null; perMonth: number | null; perYear: number | null }
@@ -84,17 +94,29 @@ export interface OverlayDerived {
   gpuW: number | null; cpuW: number | null;
   efficiency: { fpsPerWatt: number | null; fpsPerWattAvg: number | null; joulesPerFrame: number | null; joulesPerFrameAvg: number | null; fpsPerWattSystem: number | null };
   energy: { gpuKj: number | null; cpuKj: number | null; source: 'nvml' | 'integrated' | null; seconds: number };
-  system: { dcW: number | null; loadPct: number | null; efficiency: number | null; acW: number | null; lossW: number | null; missing: string[]; partial: boolean; est: true };
+  system: { dcW: number | null; loadPct: number | null; efficiency: number | null; acW: number | null; lossW: number | null; missing: string[]; partial: boolean; est: true; calibrated?: boolean; extraW?: number | null };
+  /** Wall calibration status for the current hardware: applied, ignored because the GPU/CPU/PSU changed, or not checkable yet. */
+  calibration?: { state: 'none' | 'applied' | 'mismatch' | 'unverified'; at: number | null; hwId: string | null; extraW: number | null; effScale: number | null; sigma: { extraW: number | null; effPct: number | null } | null };
   cost: { est: true; gpu: OverlayCost | null; cpuGpu: OverlayCost | null; withExtra: OverlayCost | null; wall: OverlayCost | null };
 }
 /** LibreHardwareMonitor + direct NVML + SMBIOS readings (electron/services/overlay/lhmModel.js). Null = not read / not exposed. */
 export interface OverlayHw {
-  gpu: { name: string; load: number | null; temp: number | null; hotspot: number | null; memJunction: number | null; clock: number | null; memClock: number | null; power: number | null; powerPct: number | null; voltage: number | null; fanRpm: number | null; fanPct: number | null; vramUsedMb: number | null; vramTotalMb: number | null; memCtrlLoad: number | null; videoEngineLoad: number | null; busLoad: number | null; vramPct: number | null; vramFreeMb: number | null; d3dDedicatedMb: number | null; d3dSharedMb: number | null; pcieRxBps: number | null; pcieTxBps: number | null; engines: Record<string, number> } | null;
+  gpu: { name: string; load: number | null; temp: number | null; hotspot: number | null; memJunction: number | null; clock: number | null; memClock: number | null; power: number | null; powerPct: number | null; voltage: number | null; fanRpm: number | null; fanPct: number | null; vramUsedMb: number | null; vramTotalMb: number | null; memCtrlLoad: number | null; videoEngineLoad: number | null; busLoad: number | null; vramPct: number | null; vramFreeMb: number | null; d3dDedicatedMb: number | null; d3dSharedMb: number | null; pcieRxBps: number | null; pcieTxBps: number | null; engines: Record<string, number>; rails?: OverlayRail[] | null; pcieSlot?: OverlayRail | null; railsW?: number | null; railsState?: 'ok' | 'no_rails' | 'unsupported' | 'disabled' | 'non_nvidia' | string } | null;
   cpu: { name: string; load: number | null; temp: number | null; clock: number | null; power: number | null; vcore: number | null } | null;
   ram: { usedGb: number | null; totalGb: number | null; load: number | null; effectiveMts?: number; ratedMts?: number | null; baseClockMhz?: number; type?: string | null; derived?: boolean } | null;
   nvml?: { energyJ: number | null; powerW: number | null; powerLimitW: number | null; enforcedLimitW: number | null; pcieGen: number | null; pcieWidth: number | null; pcieMaxGen: number | null; pcieMaxWidth: number | null; encoderPct: number | null; decoderPct: number | null; throttle: string[] | null; computeMemMb: number | null; computeProcs: number | null; graphicsMemMb: number | null };
   access: { admin: boolean; pawnio: boolean; cpuNeedsAdmin: boolean; cpuNeedsPawnio: boolean };
+  /** Provenance per metric path ('gpu.temp', 'cpu.vcore', 'nvml.powerW', 'gpu.rails.16PIN0.v'). */
+  prov?: Record<string, OverlayProv>;
 }
+/** One GPU input connector (NVIDIA NVAPI power monitor). A connector the card does not sense has no entry. */
+export interface OverlayRail { id: 'PCIE' | '16PIN0' | '8PIN0' | '8PIN1' | '6PIN0' | '6PIN1'; w: number | null; v: number | null; a: number | null; bad?: string }
+export type OverlayProvReason = 'needs_admin' | 'needs_pawnio' | 'not_exposed' | 'sentinel' | 'non_nvidia';
+export type OverlayProv =
+  | { kind: 'measured'; source: 'lhm' | 'nvml' | 'nvapi' | 'system'; sensor?: string }
+  | { kind: 'derived'; source: string; basis?: string }
+  | { kind: 'estimated'; source?: string }
+  | { kind: 'unavailable'; reason: OverlayProvReason; state?: string };
 export interface OverlayPower { ok: boolean; at: number; gaming: boolean; hw: OverlayHw | null; derived: OverlayDerived | null }
 export interface OverlayStatus {
   ok: boolean; error?: string | null; visible?: boolean; settings?: OverlaySettings; target?: { pid: number; name: string } | null; mode?: 'foreground' | 'fixed';
@@ -157,6 +179,8 @@ export interface GpuBenchRun {
   flags: string[];
   score: { raster: number; rt: number | null; total: number | null };
   stats: { raster: GpuBenchStats; rt?: GpuBenchStats };
+  /** Driver settings away from their default ('driver_texture_quality', ...), or ['driver_unaudited']. */
+  driver?: string[];
   gpu: { name: string; vendorId: number; deviceId: number; vramMb: number; driver: string; dxr: boolean };
   sensors: { samples: number; gpuClockAvg: number | null; gpuClockMax: number | null; gpuTempAvg: number | null; gpuTempMax: number | null; gpuPowerAvg: number | null; gpuLoadAvg: number | null };
 }
@@ -674,6 +698,12 @@ export interface DarkHubAPI {
     setSettings: (payload: Partial<OverlaySettings> & { labels?: Record<string, string> }) => Promise<OverlayStatus & { hotkeyError?: string | null }>;
     power: () => Promise<OverlayPower>;
     resetEnergy: () => Promise<OverlayPower>;
+    /** 80 PLUS catalog (downloaded on request, cached in userData). */
+    psuCatalogStatus: () => Promise<{ ok: boolean; cached: boolean; fetchedAt: number | null; count: number; source: string }>;
+    psuSearch: (payload: { query: string; refresh?: boolean; mains?: '115' | '230' | null }) => Promise<PsuSearchResult>;
+    /** Two-point wall calibration: solve (and save when `save`) against the current PSU curve and hardware. */
+    calibrate: (payload: { points: WallCalPoint[]; save?: boolean }) => Promise<WallCalResult>;
+    clearCalibration: () => Promise<OverlayStatus>;
     processes: () => Promise<{ ok: boolean; processes: { pid: number; name: string; wsMb: number }[] }>;
     pickLogFolder: () => Promise<OverlayStatus & { canceled?: boolean }>;
     onEvent: (callback: (s: OverlayStatus) => void) => () => void;
@@ -861,9 +891,10 @@ export interface DarkHubAPI {
     onEvent: (callback: (payload: any) => void) => () => void;
   };
   darkpacer: {
-    start: (payload?: { targetFps?: number; pacingMode?: string }) => Promise<{ ok: boolean; isRunning: boolean; targetFps?: number; pacingMode?: string }>;
+    /** adapterLuid: DXGI adapter LUID as hex ('0' = any adapter) to pace only that GPU's swap chains. */
+    start: (payload?: { targetFps?: number; pacingMode?: string; adapterLuid?: string }) => Promise<{ ok: boolean; isRunning: boolean; targetFps?: number; pacingMode?: string }>;
     stop: () => Promise<{ ok: boolean; isRunning: boolean }>;
-    updateConfig: (payload: { targetFps?: number; pacingMode?: string }) => Promise<{ ok: boolean; targetFps?: number; pacingMode?: string }>;
+    updateConfig: (payload: { targetFps?: number; pacingMode?: string; adapterLuid?: string }) => Promise<{ ok: boolean; targetFps?: number; pacingMode?: string }>;
     getMetrics: () => Promise<{
       isRunning: boolean;
       targetFps: number;

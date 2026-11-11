@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Zap, RefreshCw } from '../icons';
 import { useI18n } from '../../i18n/I18nProvider';
-import type { OverlayPower, OverlaySettings, OverlayCost } from '../../global';
+import type { OverlayPower, OverlaySettings, OverlayCost, OverlayHw } from '../../global';
+import PsuCatalogPicker from './PsuCatalogPicker';
+import WallCalibration from './WallCalibration';
 
 const api = () => window.darkhub?.overlay;
 const f = (x: number | null | undefined, d = 0) => (x == null || !Number.isFinite(x) ? null : x.toFixed(d));
@@ -22,6 +24,45 @@ function Block({ title, children, icon }: { title: string; children: React.React
       <h3 className="flex items-center gap-1.5 text-[12px] text-zinc-500 mb-2">{icon}{title}</h3>
       <ul className="space-y-1">{children}</ul>
     </div>
+  );
+}
+
+/** A 12 V input below this is outside the ATX tolerance (12 V -5 %). Rails under 6 V are not 12 V rails. */
+export const RAIL_LOW_V = 11.4;
+const isLowRail = (v: number | null | undefined) => v != null && v >= 6 && v < RAIL_LOW_V;
+
+/** GPU input power per connector (NVAPI power monitor): measured, so no *. Not sensed: a dash and why. */
+export function RailRows({ gpu }: { gpu: OverlayHw['gpu'] | null | undefined }) {
+  const { t } = useI18n();
+  const dash = <span className="text-zinc-600">—</span>;
+  const val = (x: number | null | undefined, d: number, unit: string, cls = '') => (x == null || !Number.isFinite(x) ? dash : <span className={cls}>{x.toFixed(d)}<span className="text-zinc-500"> {unit}</span></span>);
+  const rails = gpu?.railsState === 'ok' && gpu.rails?.length ? gpu.rails : null;
+  if (!rails) {
+    const why = gpu?.railsState === 'non_nvidia' ? t('prov.non_nvidia', 'só em placas NVIDIA') : t('rails.notSensed', 'Esta placa/driver não mede a entrada por conector');
+    return (
+      <li className="flex justify-between gap-3" data-rails="none">
+        <span className="text-zinc-400">{t('rails.title', 'Entrada de energia da GPU por conector')}</span>
+        <span className="text-right">{dash} <span className="text-[11px] text-zinc-500">{why}</span></span>
+      </li>
+    );
+  }
+  const low = rails.filter((r) => isLowRail(r.v));
+  return (
+    <>
+      {rails.map((r) => (
+        <li key={r.id} className="flex justify-between gap-3" data-rail={r.id} title={isLowRail(r.v) ? t('rails.lowV', 'Abaixo de 11,4 V: fora da tolerância ATX de 12 V (±5%). Verifique cabo, conector e fonte.') : t('rails.source', 'Medido pelo driver NVIDIA (NVAPI)')}>
+          <span className="text-zinc-400">{t(`rails.${r.id}`, r.id)}</span>
+          <span className="font-mono text-zinc-200 text-right">{val(r.w, 1, 'W')} · {val(r.v, 2, 'V', isLowRail(r.v) ? 'text-amber-300' : '')} · {val(r.a, 1, 'A')}</span>
+        </li>
+      ))}
+      {gpu?.railsW != null ? (
+        <li className="flex justify-between gap-3" title={t('rails.sumHelp', 'Soma dos conectores medidos (derivado). A diferença para o total da placa é o 3,3 V do slot, que o driver só estima.')}>
+          <span className="text-zinc-400">{t('ovle.m.rail.total', 'Entrada da GPU (soma dos conectores)')}<span className="text-amber-300/80">*</span></span>
+          <span className="font-mono text-zinc-200 text-right">{gpu.railsW.toFixed(1)}<span className="text-zinc-500"> W</span></span>
+        </li>
+      ) : null}
+      {low.length ? <li className="text-[12px] text-amber-300" role="alert">{t('rails.lowV', 'Abaixo de 11,4 V: fora da tolerância ATX de 12 V (±5%). Verifique cabo, conector e fonte.')}</li> : null}
+    </>
   );
 }
 
@@ -46,7 +87,7 @@ export function PowerSettingsForm({ s, set }: { s: OverlaySettings; set: (p: Par
         {num('psuWatts', 50, t('pwr.psuWatts', 'Potência da fonte'), 'W')}
         <label className="flex flex-col gap-1 text-[12px] text-zinc-400">
           {t('pwr.psuRating', 'Certificação 80 Plus')}
-          <select className="dh-input" value={s.psuRating} onChange={(e) => set({ psuRating: e.target.value as OverlaySettings['psuRating'] })}>
+          <select className="dh-input" value={s.psuRating} onChange={(e) => set({ psuRating: e.target.value as OverlaySettings['psuRating'], psuModel: null })}>
             {RATINGS.map((r) => <option key={r} value={r}>{r === 'custom' ? t('pwr.custom', 'Curva própria') : r[0].toUpperCase() + r.slice(1)}</option>)}
           </select>
         </label>
@@ -69,6 +110,7 @@ export function PowerSettingsForm({ s, set }: { s: OverlaySettings; set: (p: Par
           ))}
         </div>
       ) : null}
+      <div className="border-t border-zinc-800/80 pt-3"><PsuCatalogPicker s={s} set={set} /></div>
       <p className="dh-help max-w-[80ch]">{t('pwr.settingsHelp', 'A eficiência da fonte vem dos pontos da certificação 80 Plus (10, 20, 50 e 100% de carga) com interpolação; abaixo de 20% é uma aproximação. Os componentes adicionais (placa-mãe, SSDs, ventoinhas, RAM) são um valor que você informa. Tudo marcado com * é uma estimativa.')}</p>
     </div>
   );
@@ -108,6 +150,7 @@ export default function PowerPanel({ cpuLoad }: { cpuLoad?: number | null }) {
   const needs = hw.access?.cpuNeedsAdmin ? t('pwr.needsAdmin', 'precisa de admin') : hw.access?.cpuNeedsPawnio ? t('pwr.needsPawnio', 'precisa do driver PawnIO') : null;
   const cpuVal = (v: number | null | undefined, d = 0) => (needs && v == null ? needs : f(v, d));
   const sys = d.system;
+  const cal = d.calibration;
   const money = (x: number | null | undefined) => (x == null ? '—' : `R$ ${x.toFixed(2)}`);
   const kwh = (x: number | null | undefined) => (x == null ? '—' : x.toFixed(1));
   const limiters = nv?.throttle ? nv.throttle.filter((k) => k !== 'idle' && k !== 'appClocks') : null;
@@ -155,7 +198,7 @@ export default function PowerPanel({ cpuLoad }: { cpuLoad?: number | null }) {
           <Row label={t('pwr.videoEngine', 'Motor de vídeo')} value={f(g?.videoEngineLoad)} unit="%" />
           <Row label={t('pwr.encDec', 'Codificador / decodificador')} value={nv?.encoderPct != null || nv?.decoderPct != null ? `${f(nv?.encoderPct) ?? '—'}% / ${f(nv?.decoderPct) ?? '—'}%` : null} />
           <Row label={t('pwr.limiters', 'Limitadores de clock')} value={limiters ? (limiters.length ? limiters.map((k) => t(`pwr.throttle.${k}`, k)).join(' · ') : t('pwr.none', 'nenhum')) : null} />
-          <Row label={t('pwr.slotRails', 'Slot PCIe e cabo 16 pinos (V/A)')} value={null} title={unavailable} />
+          <RailRows gpu={g} />
           <Row label={t('pwr.asic', 'Qualidade ASIC / speedo')} value={null} title={unavailable} />
         </Block>
 
@@ -185,11 +228,14 @@ export default function PowerPanel({ cpuLoad }: { cpuLoad?: number | null }) {
           <Row label={t('pwr.psuLoad', 'Carga da fonte')} value={f(sys.loadPct)} unit="%" est />
           <Row label={t('pwr.psuEff', 'Eficiência da fonte')} value={f(sys.efficiency, 1)} unit="%" est />
           <Row label={t('pwr.gpuCpu', 'GPU + CPU')} value={d.gpuW != null || d.cpuW != null ? f((d.gpuW ?? 0) + (d.cpuW ?? 0), 0) : null} unit="W" />
-          <Row label={t('pwr.extra', 'Componentes adicionais')} value={f(d.settings.extraWatts)} unit="W" est />
+          <Row label={sys.calibrated ? t('pwr.extraCal', 'Consumo oculto (calibrado)') : t('pwr.extra', 'Componentes adicionais')} value={f(sys.calibrated ? sys.extraW : d.settings.extraWatts)} unit="W" est />
           <Row label={t('pwr.dc', 'Total do PC (DC)')} value={f(sys.dcW)} unit="W" est />
-          <Row label={t('pwr.ac', 'Da tomada (AC)')} value={f(sys.acW)} unit="W" est />
+          <Row label={sys.calibrated ? t('pwr.acCal', 'Da tomada (AC), calibrado') : t('pwr.ac', 'Da tomada (AC)')} value={f(sys.acW)} unit="W" est
+            title={sys.calibrated && cal?.at ? t('pwr.calOn', 'Calibrado com medidor de tomada em {d}. Continua sendo uma estimativa.').replace('{d}', new Date(cal.at).toLocaleDateString()) : undefined} />
         </Block>
       </div>
+      {cal?.state === 'applied' && cal.at ? <p className="text-[12px] text-zinc-500">{t('pwr.calOn', 'Calibrado com medidor de tomada em {d}. Continua sendo uma estimativa.').replace('{d}', new Date(cal.at).toLocaleDateString())}</p> : null}
+      {cal?.state === 'mismatch' ? <p className="text-[12px] text-amber-300/90">{t('pwr.calIgnored', 'Calibração de {d} ignorada: a GPU, a CPU ou a fonte escolhida mudou desde então.').replace('{d}', cal.at ? new Date(cal.at).toLocaleDateString() : '')}</p> : null}
       {sys.partial && sys.dcW != null ? <p className="text-[12px] text-amber-300/90">{t('pwr.partial', 'Total sem a leitura de')} {sys.missing.map((m) => (m === 'cpu' ? 'CPU' : 'GPU')).join(' / ')}{sys.missing.includes('cpu') && needs ? ` (${needs})` : ''}.</p> : null}
 
       <div className="overflow-x-auto border-t border-zinc-800/80 pt-4">
@@ -208,6 +254,11 @@ export default function PowerPanel({ cpuLoad }: { cpuLoad?: number | null }) {
           </tbody>
         </table>
       </div>
+
+      <details className="border-t border-zinc-800/80 pt-3">
+        <summary className="cursor-pointer text-[12.5px] text-zinc-300">{t('pwr.cal.title', 'Calibrar com medidor de tomada')}</summary>
+        <div className="mt-3"><WallCalibration derived={d} needs={needs} onSaved={(ns) => { if (ns) setS(ns); refresh(); }} /></div>
+      </details>
 
       {s ? (
         <details className="border-t border-zinc-800/80 pt-3">

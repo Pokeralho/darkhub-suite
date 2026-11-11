@@ -5,6 +5,7 @@
 // overlay page has `default-src 'none'`, so CSS can restyle the overlay but cannot load anything or run code.
 
 import { buildDerived } from './powerModel.js'
+import { metric as lhmMetric, RAIL_IDS, RAIL_LOW_V, RAIL_BAD_V } from './lhmModel.js'
 
 const isNum = (x) => x != null && x !== '' && Number.isFinite(Number(x))
 const num = (x, lo, hi, d) => (isNum(x) ? Math.min(hi, Math.max(lo, Number(x))) : d)
@@ -16,6 +17,10 @@ const color = (v, d) => (typeof v === 'string' && /^(#[0-9a-f]{3,8}|rgba?\([\d\s
 
 // ---------------------------------------------------------------- metric catalog
 // get(ctx) → number|string|null. ctx = { frames, session, hw, sensors, history }. tone: [warn, bad, lowerIsBad]
+// Provenance: `p` is the readLhm() path the value comes from (its hw.prov entry says measured / derived / unavailable
+// and why); `est` marks model output (estimated), `drv` computed or firmware values (derived): both print a '*'.
+// `pos` marks physical quantities that are never 0 on a running PC (temperature, clock, power, voltage): a 0 is a
+// "not read" placeholder and prints as —, like any unavailable metric.
 
 const hw = (ctx) => ctx.hw || {}
 const gpu = (ctx) => hw(ctx).gpu || {}
@@ -38,6 +43,18 @@ for (const [scen, name] of [['gpu', 'GPU'], ['cpuGpu', 'CPU+GPU'], ['withExtra',
   }
 }
 
+// per-connector GPU input power (NVIDIA cards that sense it; DarkHub.HwSensors "nvrails")
+export const RAIL_NAMES = { PCIE: 'PCIe slot', '16PIN0': '16-pin (12V-2x6)', '8PIN0': '8-pin #1', '8PIN1': '8-pin #2', '6PIN0': '6-pin #1', '6PIN1': '6-pin #2' }
+const RAIL_METRICS = {}
+for (const id of RAIL_IDS) {
+  const k = id.toLowerCase()
+  const at = (u) => (c) => hw(c).gpu?.rails?.find((r) => r.id === id)?.[u] ?? null
+  RAIL_METRICS[`rail.${k}.w`] = { p: `gpu.rails.${id}.w`, pos: true, group: 'power', label: `${RAIL_NAMES[id]} power`, unit: 'W', d: 0, get: at('w') }
+  RAIL_METRICS[`rail.${k}.v`] = { p: `gpu.rails.${id}.v`, pos: true, group: 'power', label: `${RAIL_NAMES[id]} voltage`, unit: 'V', d: 2, get: at('v'), tone: [RAIL_LOW_V, RAIL_BAD_V, true] }
+  RAIL_METRICS[`rail.${k}.a`] = { p: `gpu.rails.${id}.a`, group: 'power', label: `${RAIL_NAMES[id]} current`, unit: 'A', d: 1, get: at('a') }
+}
+RAIL_METRICS['rail.total'] = { p: 'gpu.railsW', pos: true, drv: true, group: 'power', label: 'GPU input (sum of rails)', unit: 'W', d: 0, get: (c) => hw(c).gpu?.railsW ?? null }
+
 export const METRICS = {
   fps: { group: 'fps', label: 'FPS', unit: 'FPS', d: 0, get: (c) => fr(c)?.fps, tone: [50, 30, true] },
   frametime: { group: 'fps', label: 'Frame time', unit: 'ms', d: 1, get: (c) => fr(c)?.frameTimeMs },
@@ -50,48 +67,48 @@ export const METRICS = {
   renderLatency: { group: 'fps', label: 'Render latency', unit: 'ms', d: 1, get: (c) => fr(c)?.renderLatencyMs },
   presentMode: { group: 'fps', label: 'Present mode', unit: '', d: 0, get: (c) => fr(c)?.presentMode?.replace(/_/g, ' ') || null },
 
-  'gpu.load': { group: 'gpu', label: 'GPU load', unit: '%', d: 0, get: (c) => gpu(c).load ?? c.sensors?.gpu },
-  'gpu.temp': { group: 'gpu', label: 'GPU temp', unit: '°C', d: 0, get: (c) => gpu(c).temp ?? c.sensors?.gpuTemp, tone: [80, 88] },
-  'gpu.hotspot': { group: 'gpu', label: 'GPU hotspot', unit: '°C', d: 0, get: (c) => gpu(c).hotspot, tone: [95, 105] },
-  'gpu.memJunction': { group: 'gpu', label: 'VRAM junction', unit: '°C', d: 0, get: (c) => gpu(c).memJunction, tone: [95, 105] },
-  'gpu.clock': { group: 'gpu', label: 'GPU clock', unit: 'MHz', d: 0, get: (c) => gpu(c).clock ?? c.sensors?.gpuClock },
-  'gpu.memClock': { group: 'gpu', label: 'Memory clock', unit: 'MHz', d: 0, get: (c) => gpu(c).memClock },
-  'gpu.power': { group: 'gpu', label: 'GPU power', unit: 'W', d: 0, get: (c) => gpu(c).power },
-  'gpu.powerPct': { group: 'gpu', label: 'GPU % TDP', unit: '%', d: 0, get: (c) => gpu(c).powerPct },
-  'gpu.voltage': { group: 'gpu', label: 'GPU voltage', unit: 'V', d: 3, get: (c) => gpu(c).voltage },
-  'gpu.fanRpm': { group: 'gpu', label: 'GPU fan', unit: 'RPM', d: 0, get: (c) => gpu(c).fanRpm },
-  'gpu.fanPct': { group: 'gpu', label: 'GPU fan %', unit: '%', d: 0, get: (c) => gpu(c).fanPct },
-  'gpu.vram': { group: 'gpu', label: 'VRAM used', unit: 'GB', d: 2, get: (c) => { const mb = gpu(c).vramUsedMb ?? c.sensors?.vramMb; return mb != null ? mb / 1024 : null } },
-  'gpu.vramTotal': { group: 'gpu', label: 'VRAM total', unit: 'GB', d: 0, get: (c) => (gpu(c).vramTotalMb != null ? gpu(c).vramTotalMb / 1024 : null) },
-  'gpu.memCtrl': { group: 'gpu', label: 'Memory controller', unit: '%', d: 0, get: (c) => gpu(c).memCtrlLoad },
+  'gpu.load': { p: 'gpu.load', group: 'gpu', label: 'GPU load', unit: '%', d: 0, get: (c) => gpu(c).load ?? c.sensors?.gpu },
+  'gpu.temp': { p: 'gpu.temp', pos: true, group: 'gpu', label: 'GPU temp', unit: '°C', d: 0, get: (c) => gpu(c).temp ?? c.sensors?.gpuTemp, tone: [80, 88] },
+  'gpu.hotspot': { p: 'gpu.hotspot', pos: true, group: 'gpu', label: 'GPU hotspot', unit: '°C', d: 0, get: (c) => gpu(c).hotspot, tone: [95, 105] },
+  'gpu.memJunction': { p: 'gpu.memJunction', pos: true, group: 'gpu', label: 'VRAM junction', unit: '°C', d: 0, get: (c) => gpu(c).memJunction, tone: [95, 105] },
+  'gpu.clock': { p: 'gpu.clock', pos: true, group: 'gpu', label: 'GPU clock', unit: 'MHz', d: 0, get: (c) => gpu(c).clock ?? c.sensors?.gpuClock },
+  'gpu.memClock': { p: 'gpu.memClock', pos: true, group: 'gpu', label: 'Memory clock', unit: 'MHz', d: 0, get: (c) => gpu(c).memClock },
+  'gpu.power': { p: 'gpu.power', pos: true, group: 'gpu', label: 'GPU power', unit: 'W', d: 0, get: (c) => gpu(c).power },
+  'gpu.powerPct': { p: 'gpu.powerPct', pos: true, group: 'gpu', label: 'GPU % TDP', unit: '%', d: 0, get: (c) => gpu(c).powerPct },
+  'gpu.voltage': { p: 'gpu.voltage', pos: true, group: 'gpu', label: 'GPU voltage', unit: 'V', d: 3, get: (c) => gpu(c).voltage },
+  'gpu.fanRpm': { p: 'gpu.fanRpm', group: 'gpu', label: 'GPU fan', unit: 'RPM', d: 0, get: (c) => gpu(c).fanRpm },
+  'gpu.fanPct': { p: 'gpu.fanPct', group: 'gpu', label: 'GPU fan %', unit: '%', d: 0, get: (c) => gpu(c).fanPct },
+  'gpu.vram': { p: 'gpu.vramUsedMb', group: 'gpu', label: 'VRAM used', unit: 'GB', d: 2, get: (c) => { const mb = gpu(c).vramUsedMb ?? c.sensors?.vramMb; return mb != null ? mb / 1024 : null } },
+  'gpu.vramTotal': { p: 'gpu.vramTotalMb', pos: true, group: 'gpu', label: 'VRAM total', unit: 'GB', d: 0, get: (c) => (gpu(c).vramTotalMb != null ? gpu(c).vramTotalMb / 1024 : null) },
+  'gpu.memCtrl': { p: 'gpu.memCtrlLoad', group: 'gpu', label: 'Memory controller', unit: '%', d: 0, get: (c) => gpu(c).memCtrlLoad },
   'gpu.name': { group: 'gpu', label: 'GPU name', unit: '', d: 0, get: (c) => gpu(c).name || null },
-  'gpu.vramPct': { group: 'gpu', label: 'VRAM %', unit: '%', d: 0, get: (c) => gpu(c).vramPct, tone: [85, 95] },
-  'gpu.bus': { group: 'gpu', label: 'GPU bus load', unit: '%', d: 0, get: (c) => gpu(c).busLoad },
-  'gpu.videoEngine': { group: 'gpu', label: 'Video engine', unit: '%', d: 0, get: (c) => gpu(c).videoEngineLoad },
-  'gpu.encoder': { group: 'gpu', label: 'Encoder (NVENC)', unit: '%', d: 0, get: (c) => nv(c).encoderPct },
-  'gpu.decoder': { group: 'gpu', label: 'Decoder (NVDEC)', unit: '%', d: 0, get: (c) => nv(c).decoderPct },
-  'gpu.pcie': { group: 'gpu', label: 'PCIe link', unit: '', d: 0, get: (c) => (nv(c).pcieGen != null && nv(c).pcieWidth != null ? `${nv(c).pcieGen}.0 x${nv(c).pcieWidth}` : null) },
-  'gpu.pcieRx': { group: 'gpu', label: 'PCIe receive', unit: 'MB/s', d: 0, get: (c) => (gpu(c).pcieRxBps != null ? gpu(c).pcieRxBps / 1048576 : null) },
-  'gpu.pcieTx': { group: 'gpu', label: 'PCIe send', unit: 'MB/s', d: 0, get: (c) => (gpu(c).pcieTxBps != null ? gpu(c).pcieTxBps / 1048576 : null) },
-  'gpu.d3dShared': { group: 'gpu', label: 'Shared GPU memory', unit: 'MB', d: 0, get: (c) => gpu(c).d3dSharedMb },
-  'gpu.powerLimit': { group: 'gpu', label: 'Power limit', unit: 'W', d: 0, get: (c) => nv(c).enforcedLimitW ?? nv(c).powerLimitW },
-  'gpu.energy': { group: 'gpu', label: 'GPU energy (session)', unit: 'kJ', d: 2, get: (c) => dv(c)?.energy?.gpuKj },
-  'gpu.throttle': { group: 'gpu', label: 'Clock limiters', unit: '', d: 0, get: (c) => { const r = nv(c).throttle; if (!r) return null; const x = r.filter((k) => k !== 'idle' && k !== 'appClocks'); return x.length ? x.join(' · ') : 'none' } },
+  'gpu.vramPct': { p: 'gpu.vramPct', group: 'gpu', label: 'VRAM %', unit: '%', d: 0, get: (c) => gpu(c).vramPct, tone: [85, 95] },
+  'gpu.bus': { p: 'gpu.busLoad', group: 'gpu', label: 'GPU bus load', unit: '%', d: 0, get: (c) => gpu(c).busLoad },
+  'gpu.videoEngine': { p: 'gpu.videoEngineLoad', group: 'gpu', label: 'Video engine', unit: '%', d: 0, get: (c) => gpu(c).videoEngineLoad },
+  'gpu.encoder': { p: 'nvml.encoderPct', group: 'gpu', label: 'Encoder (NVENC)', unit: '%', d: 0, get: (c) => nv(c).encoderPct },
+  'gpu.decoder': { p: 'nvml.decoderPct', group: 'gpu', label: 'Decoder (NVDEC)', unit: '%', d: 0, get: (c) => nv(c).decoderPct },
+  'gpu.pcie': { p: 'nvml.pcieGen', group: 'gpu', label: 'PCIe link', unit: '', d: 0, get: (c) => (nv(c).pcieGen != null && nv(c).pcieWidth != null ? `${nv(c).pcieGen}.0 x${nv(c).pcieWidth}` : null) },
+  'gpu.pcieRx': { p: 'gpu.pcieRxBps', group: 'gpu', label: 'PCIe receive', unit: 'MB/s', d: 0, get: (c) => (gpu(c).pcieRxBps != null ? gpu(c).pcieRxBps / 1048576 : null) },
+  'gpu.pcieTx': { p: 'gpu.pcieTxBps', group: 'gpu', label: 'PCIe send', unit: 'MB/s', d: 0, get: (c) => (gpu(c).pcieTxBps != null ? gpu(c).pcieTxBps / 1048576 : null) },
+  'gpu.d3dShared': { p: 'gpu.d3dSharedMb', group: 'gpu', label: 'Shared GPU memory', unit: 'MB', d: 0, get: (c) => gpu(c).d3dSharedMb },
+  'gpu.powerLimit': { p: 'nvml.enforcedLimitW', pos: true, group: 'gpu', label: 'Power limit', unit: 'W', d: 0, get: (c) => nv(c).enforcedLimitW ?? nv(c).powerLimitW },
+  'gpu.energy': { group: 'gpu', label: 'GPU energy (session)', unit: 'kJ', d: 2, drv: true, get: (c) => dv(c)?.energy?.gpuKj },
+  'gpu.throttle': { p: 'nvml.throttle', group: 'gpu', label: 'Clock limiters', unit: '', d: 0, get: (c) => { const r = nv(c).throttle; if (!r) return null; const x = r.filter((k) => k !== 'idle' && k !== 'appClocks'); return x.length ? x.join(' · ') : 'none' } },
 
   'cpu.load': { group: 'cpu', label: 'CPU load', unit: '%', d: 0, get: (c) => c.sensors?.cpu ?? null },
-  'cpu.temp': { group: 'cpu', label: 'CPU temp', unit: '°C', d: 0, get: (c) => cpu(c).temp ?? c.sensors?.cpuTemp, tone: [80, 90] },
-  'cpu.clock': { group: 'cpu', label: 'CPU clock', unit: 'MHz', d: 0, get: (c) => cpu(c).clock },
-  'cpu.clockMax': { group: 'cpu', label: 'Top core clock', unit: 'MHz', d: 0, get: (c) => cpu(c).clockMax },
-  'cpu.power': { group: 'cpu', label: 'CPU power', unit: 'W', d: 0, get: (c) => cpu(c).power ?? c.sensors?.cpuPower },
-  'cpu.vcore': { group: 'cpu', label: 'Vcore', unit: 'V', d: 3, get: (c) => cpu(c).vcore },
+  'cpu.temp': { p: 'cpu.temp', pos: true, group: 'cpu', label: 'CPU temp', unit: '°C', d: 0, get: (c) => cpu(c).temp ?? c.sensors?.cpuTemp, tone: [80, 90] },
+  'cpu.clock': { p: 'cpu.clock', pos: true, group: 'cpu', label: 'CPU clock', unit: 'MHz', d: 0, get: (c) => cpu(c).clock },
+  'cpu.clockMax': { p: 'cpu.clockMax', pos: true, group: 'cpu', label: 'Top core clock', unit: 'MHz', d: 0, get: (c) => cpu(c).clockMax },
+  'cpu.power': { p: 'cpu.power', pos: true, group: 'cpu', label: 'CPU power', unit: 'W', d: 0, get: (c) => cpu(c).power ?? c.sensors?.cpuPower },
+  'cpu.vcore': { p: 'cpu.vcore', pos: true, group: 'cpu', label: 'Vcore', unit: 'V', d: 3, get: (c) => cpu(c).vcore },
   'cpu.loadMax': { group: 'cpu', label: 'Busiest thread', unit: '%', d: 0, get: (c) => { const t = c.sensors?.cores; return t?.length ? Math.max(...t) : null }, tone: [90, 98] },
   'cpu.name': { group: 'cpu', label: 'CPU name', unit: '', d: 0, get: (c) => cpu(c).name || null },
 
-  'ram.used': { group: 'ram', label: 'RAM used', unit: 'GB', d: 1, get: (c) => ram(c).usedGb },
-  'ram.total': { group: 'ram', label: 'RAM total', unit: 'GB', d: 0, get: (c) => ram(c).totalGb },
-  'ram.rate': { group: 'ram', label: 'RAM rate (SMBIOS)', unit: 'MT/s', d: 0, est: true, get: (c) => ram(c).effectiveMts },
-  'ram.base': { group: 'ram', label: 'RAM base clock (SMBIOS)', unit: 'MHz', d: 0, est: true, get: (c) => ram(c).baseClockMhz },
-  'ram.load': { group: 'ram', label: 'RAM %', unit: '%', d: 0, get: (c) => ram(c).load ?? c.sensors?.ram, tone: [85, 95] },
+  'ram.used': { p: 'ram.usedGb', group: 'ram', label: 'RAM used', unit: 'GB', d: 1, get: (c) => ram(c).usedGb },
+  'ram.total': { p: 'ram.totalGb', pos: true, group: 'ram', label: 'RAM total', unit: 'GB', d: 0, get: (c) => ram(c).totalGb },
+  'ram.rate': { p: 'ram.effectiveMts', pos: true, group: 'ram', label: 'RAM rate (SMBIOS)', unit: 'MT/s', d: 0, drv: true, get: (c) => ram(c).effectiveMts },
+  'ram.base': { p: 'ram.baseClockMhz', pos: true, group: 'ram', label: 'RAM base clock (SMBIOS)', unit: 'MHz', d: 0, drv: true, get: (c) => ram(c).baseClockMhz },
+  'ram.load': { p: 'ram.load', group: 'ram', label: 'RAM %', unit: '%', d: 0, get: (c) => ram(c).load ?? c.sensors?.ram, tone: [85, 95] },
 
   'session.time': { group: 'session', label: 'Session', unit: '', d: 0, get: (c) => { const s = ss(c)?.seconds; return s == null ? null : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` } },
   'session.avgFps': { group: 'session', label: 'Avg FPS', unit: '', d: 1, get: (c) => ss(c)?.avgFps },
@@ -115,6 +132,7 @@ export const METRICS = {
   'psu.dc': { group: 'power', label: 'PC total (DC)', unit: 'W', d: 0, est: true, get: (c) => dv(c)?.system?.dcW },
   'psu.ac': { group: 'power', label: 'PC at the wall (AC)', unit: 'W', d: 0, est: true, get: (c) => dv(c)?.system?.acW },
 
+  ...RAIL_METRICS,
   ...COST_METRICS,
   clock: { group: 'other', label: 'Clock', unit: '', d: 0, get: (c) => { const n = new Date(c.now || Date.now()); return `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}` } }
 }
@@ -233,9 +251,40 @@ const hexToRgba = (c, a) => {
 }
 const px = (v) => (isNum(v) ? `${Number(v)}px` : v)
 
+/** 'measured' | 'derived' | 'estimated' | 'live' (frame and session stats): the class of a catalog metric. */
+export function metricKind(m) { return m?.est ? 'estimated' : m?.drv ? 'derived' : m?.p ? 'measured' : 'live' }
+
+export const REASON_TEXT = {
+  needs_admin: 'needs DarkHub as administrator', needs_pawnio: 'needs the PawnIO driver', not_exposed: 'not exposed by this hardware/driver',
+  sentinel: 'placeholder value from the sensor (not a reading)', non_nvidia: 'NVIDIA only'
+}
+
+/**
+ * The value a metric shows and its provenance: { raw, kind: 'measured'|'derived'|'estimated'|'live'|'unavailable',
+ * source, reason }. A 0 on a `pos` metric or a value whose source is unavailable never passes as a reading.
+ */
+export function metricValue(key, ctx) {
+  const m = METRICS[key]
+  if (!m) return { raw: null, kind: 'unavailable', reason: 'not_exposed' }
+  let raw = m.get(ctx)
+  if (raw === '' || raw === undefined) raw = null
+  if (m.pos && isNum(raw) && !(Number(raw) > 0)) return { raw: null, kind: 'unavailable', reason: 'sentinel' }
+  if (m.est) return raw == null ? { raw, kind: 'unavailable', reason: 'not_exposed' } : { raw, kind: 'estimated' }
+  if (m.p && ctx.hw) {
+    const pm = lhmMetric(ctx.hw, m.p)
+    if (raw == null) return { raw, kind: 'unavailable', reason: pm.prov === 'unavailable' ? pm.reason : 'not_exposed' }
+    // the advanced sensor was not read and the value came from Windows' own counters
+    if (pm.prov === 'unavailable') return { raw, kind: m.drv ? 'derived' : 'measured', source: 'system' }
+    return { raw, kind: m.drv ? 'derived' : pm.prov, source: pm.source }
+  }
+  if (raw == null) return { raw, kind: 'unavailable', reason: 'not_exposed' }
+  return { raw, kind: m.drv ? 'derived' : metricKind(m) }
+}
+
 function value(item, ctx, theme) {
   const m = METRICS[item.metric]
-  const raw = m.get(ctx)
+  const mv = metricValue(item.metric, ctx)
+  const raw = mv.raw
   const isNumber = isNum(raw)
   const d = item.decimals ?? m.d
   const text = raw == null || raw === '' ? '—' : isNumber ? Number(raw).toFixed(d) : String(raw)
@@ -247,10 +296,12 @@ function value(item, ctx, theme) {
     const v = Number(raw)
     tone = lowBad ? (v <= bad ? 'bad' : v <= warn ? 'warn' : '') : (v >= bad ? 'bad' : v >= warn ? 'warn' : '')
   }
-  const unit = raw == null ? '' : `${item.unit ?? m.unit}${m.est ? '*' : ''}`
+  const star = mv.kind === 'estimated' || mv.kind === 'derived'
+  const unit = raw == null ? '' : `${item.unit ?? m.unit}${star ? '*' : ''}`
   const prefix = raw == null ? item.prefix : (item.prefix ?? m.pre)
   const style = [item.color && !tone ? `color:${item.color}` : '', item.size ? `font-size:${item.size}px` : ''].filter(Boolean).join(';')
-  return `<span class="val ${tone}"${style ? ` style="${esc(style)}"` : ''}>${prefix ? `<span class="pre">${esc(prefix)}</span>` : ''}${esc(text)}${unit ? `<span class="unit">${esc(unit)}</span>` : ''}</span>`
+  const why = raw == null ? (ctx.labels?.[`why.${mv.reason}`] || REASON_TEXT[mv.reason] || mv.reason) : ''
+  return `<span class="val ${tone}${raw == null ? ' na' : ''}"${why ? ` title="${esc(why)}"` : ''}${style ? ` style="${esc(style)}"` : ''}>${prefix ? `<span class="pre">${esc(prefix)}</span>` : ''}${esc(text)}${unit ? `<span class="unit">${esc(unit)}</span>` : ''}</span>`
 }
 
 /** Stable short hash of a layout's structure: the overlay page rebuilds only when it changes. */
@@ -306,7 +357,7 @@ export function renderLayout(layout, ctx, opts = {}) {
         break
       }
       case 'stats':
-        add(w, 'w-stats', w.keys.map((k) => `<span class="lbl">${esc(ctx.labels?.[`m.${k}`] || METRICS[k].label)}${METRICS[k].est ? '*' : ''}</span>${value({ metric: k }, ctx, t)}`).join(''))
+        add(w, 'w-stats', w.keys.map((k) => `<span class="lbl">${esc(ctx.labels?.[`m.${k}`] || METRICS[k].label)}${METRICS[k].est || METRICS[k].drv ? '*' : ''}</span>${value({ metric: k }, ctx, t)}`).join(''))
         break
       case 'text':
         add(w, 'w-text', esc(w.text))
@@ -450,6 +501,9 @@ export function sampleContext(now = Date.now()) {
       ram: { usedGb: 18.4, totalGb: 32, load: 57, effectiveMts: 3200, baseClockMhz: 1600 },
       nvml: { powerW: 138, enforcedLimitW: 145, pcieGen: 4, pcieWidth: 16, encoderPct: 0, decoderPct: 0, throttle: ['swPowerCap'] }
   }
+  hwSample.gpu.rails = [{ id: 'PCIE', w: 36, v: 12.14, a: 2.97 }, { id: '16PIN0', w: 98, v: 12.15, a: 8.07 }]
+  hwSample.gpu.pcieSlot = hwSample.gpu.rails[0]
+  hwSample.gpu.railsW = 134
   const sensorsSample = { cpu: 41, cores: [88, 34, 72, 21, 65, 40, 58, 12, 47, 30, 81, 25, 36, 18, 52, 29] }
   const session = { seconds: 1534, frames: 220000, avgFps: 143.2, minFps: 121, maxFps: 165, low1: 117, low01: 92, maxFrameMs: 24.1, stdDevMs: 1.42, stutters: 7 }
   return {

@@ -8,8 +8,9 @@ import path from 'node:path'
 import readline from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { OFFICIAL_HUB } from '../hub/hubKeys.js'
+import { integrityError } from '../binaryIntegrity.js'
 import { SCENE_VERSION } from './sceneModel.js'
-import { decodeFrameUs, frameStats, localPlan, sampleGpu, scoreOf, sensorSummary, LOCAL_SEGMENT_MS, MAX_HISTORY, WARM_MS } from './gpuBenchModel.js'
+import { decodeFrameUs, driverFlags, frameStats, localPlan, sampleGpu, scoreOf, sensorSummary, LOCAL_SEGMENT_MS, MAX_HISTORY, WARM_MS } from './gpuBenchModel.js'
 import { isDeviceLost, normalizeStress, stressPlan, summarizeStress, CHECK_FRAME, LOOP_MS } from './stressModel.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -58,8 +59,8 @@ class Engine {
 
 export class GpuBenchService {
   /** deps: { app, safeStorage, shell, hardware, onEvent, fetchImpl, spawnImpl, exe, toJpeg } */
-  constructor({ app, safeStorage, shell, hardware, onEvent, fetchImpl = globalThis.fetch, spawnImpl = spawn, exe = enginePath(), toJpeg = null }) {
-    Object.assign(this, { app, safeStorage, shell, hardware, onEvent, fetch: fetchImpl, spawnImpl, exe, toJpeg })
+  constructor({ app, safeStorage, shell, hardware, onEvent, fetchImpl = globalThis.fetch, spawnImpl = spawn, exe = enginePath(), toJpeg = null, integrity = null, logger = null }) {
+    Object.assign(this, { app, safeStorage, shell, hardware, onEvent, fetch: fetchImpl, spawnImpl, exe, toJpeg, integrity, logger })
     const dir = app.getPath('userData')
     this.historyFile = path.join(dir, 'gpubench.json')
     this.stressFile = path.join(dir, 'gpubench-stress.json')
@@ -95,6 +96,11 @@ export class GpuBenchService {
     this.rect = rect
     try { this.engine?.send({ cmd: 'rect', ...rect }) } catch { /* closing */ }
     return { ok: true }
+  }
+
+  /** Null when the engine on disk is the one this version shipped; an installed app refuses anything else. */
+  _engineIntegrity() {
+    return integrityError(['DarkHub.GpuBench.exe'], { ...this.integrity, log: (m) => this.logger?.warn?.('GpuBench', m) })
   }
 
   _startEngine(parent) {
@@ -169,6 +175,7 @@ export class GpuBenchService {
     if (this.engine) return { ok: false, error: 'already_running' }
     if (!fs.existsSync(this.exe)) return { ok: false, error: 'engine_missing' }
     if (ranked && !this._token()) return { ok: false, error: 'not_linked' }
+    if (this._engineIntegrity()) return { ok: false, error: 'integrity_failed' }
     this.stopReason = null
 
     const engine = this._startEngine(parent)
@@ -190,6 +197,7 @@ export class GpuBenchService {
       const record = (seg) => us[seg.test].push(...decodeFrameUs(seg.frameUs))
 
       let server = null
+      let localDriver = null
       if (ranked) server = await this._rankedRun(engine, ready, warm, record, samples)
       else {
         await warm()
@@ -198,6 +206,7 @@ export class GpuBenchService {
           this.onEvent?.({ type: 'progress', phase: 'run', test: plan[i].test, index: i + 1, total: plan.length })
           record(await engine.ask({ cmd: 'segment', ...plan[i], seed: crypto.randomInt(2 ** 32), ms: LOCAL_SEGMENT_MS }))
         }
+        localDriver = await engine.ask({ cmd: 'driver' }).catch(() => null)
       }
 
       for (const t of tests) stats[t] = frameStats(us[t])
@@ -207,7 +216,8 @@ export class GpuBenchService {
         sceneVersion: SCENE_VERSION, status: server?.status ?? 'local', flags: server?.flags ?? [],
         score: server?.score ?? local, stats,
         gpu: { name: ready.adapter, vendorId: ready.vendorId, deviceId: ready.deviceId, vramMb: ready.vramMb, driver: ready.driver, dxr: ready.dxr },
-        sensors: sensorSummary(samples)
+        sensors: sensorSummary(samples),
+        driver: driverFlags(server?.driver ?? localDriver)
       }
       this._save([entry, ...this.history()])
       return { ok: true, run: entry }
@@ -229,6 +239,7 @@ export class GpuBenchService {
   async stress(options = {}, { loopMs = LOOP_MS, warmMs = WARM_MS, parent = null } = {}) {
     if (this.engine) return { ok: false, error: 'already_running' }
     if (!fs.existsSync(this.exe)) return { ok: false, error: 'engine_missing' }
+    if (this._engineIntegrity()) return { ok: false, error: 'integrity_failed' }
     const opts = normalizeStress(options)
     const engine = this._startEngine(parent)
     this.stopReason = null
@@ -316,7 +327,7 @@ export class GpuBenchService {
         this.onEvent?.({ type: 'progress', phase: 'run', test, index: ++done, total })
         const seg = await engine.ask({ cmd: 'segment', test, seed, index, ms: plan.segmentMs })
         record(seg)
-        const answer = await this._api('POST', `/runs/${plan.runId}/segments`, { test, index, frames: seg.frames, segmentRoot: seg.root, frameUs: seg.frameUs })
+        const answer = await this._api('POST', `/runs/${plan.runId}/segments`, { test, index, frames: seg.frames, segmentRoot: seg.root, frameUs: seg.frameUs, clock: seg.clock })
         // the clock of the next segment starts with this answer: nothing but rendering may happen before it
         pending.push({ test, index, seed, open: answer.open || [] })
         seed = answer.nextSeed
@@ -334,8 +345,10 @@ export class GpuBenchService {
     this.onEvent?.({ type: 'progress', phase: 'finish', test: '', index: total, total })
     const preview = await this._preview(engine)
     const modules = await engine.ask({ cmd: 'modules' }).then((m) => m.modules).catch(() => [])
-    const environment = { os: os.release(), appVersion: this.app.getVersion(), modules }
+    // what the driver's control panel imposes on this process: reported, and tagged on the result by the server
+    const driver = await engine.ask({ cmd: 'driver' }).catch(() => null)
+    const environment = { os: os.release(), appVersion: this.app.getVersion(), modules, driver }
     const result = await this._api('POST', `/runs/${plan.runId}/finish`, { sensors: sensorSummary(samples), trace: samples.slice(-240), preview, environment })
-    return { runId: plan.runId, status: result.status, score: result.score, flags: result.flags || [] }
+    return { runId: plan.runId, status: result.status, score: result.score, flags: result.flags || [], driver }
   }
 }

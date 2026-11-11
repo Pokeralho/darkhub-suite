@@ -2,6 +2,7 @@
 //! scene.rs. Talks JSON lines on stdin/stdout; the app relays to the server. Contract: docs/GPU_BENCHMARK.md.
 #![windows_subsystem = "console"]
 
+mod audit;
 mod gpu;
 mod proof;
 mod scene;
@@ -94,7 +95,7 @@ fn run() -> Result<(), String> {
                 let Some(r) = r else { say(json!({"type": "aborted"})); return Ok(()); };
                 say(json!({"type": "segment", "test": test, "index": msg["index"], "frames": r.roots.len(),
                     "root": proof::hex(&proof::merkle_root(&r.roots)), "frameUs": u32s_b64(&r.frame_us),
-                    "wallMs": started.elapsed().as_millis() as u64}));
+                    "wallMs": started.elapsed().as_millis() as u64, "clock": r.clock}));
                 segments.insert(seed, r.roots);
             }
             "open" => {
@@ -126,6 +127,7 @@ fn run() -> Result<(), String> {
                 let ids_bytes: Vec<u8> = ids.iter().chain(hashes.iter()).flat_map(|x| x.to_le_bytes()).collect();
                 say(json!({"type": "fingerprint", "ids": proof::hex(&proof::frame_root(&ids_bytes)), "image": proof::hex(&proof::frame_root(&image))}));
             }
+            "driver" => say(audit::driver(g.info.vendor == 0x10DE)),
             "modules" => say(json!({"type": "modules", "modules": gpu::loaded_modules()})),
             "shot" => {
                 let path = msg["path"].as_str().unwrap_or("");

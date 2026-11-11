@@ -107,6 +107,25 @@ ranked, always labelled as such).
 A GPU without DXR 1.1 gets `raster` only and is ranked only in the raster table. Bumping `SCENE_VERSION` starts a new
 ranking season: scores across versions are not comparable.
 
+## Driver audit, engine clocks and binary integrity
+
+Three reports that go with a ranked run. All of them come from the client, so they are tripwires for common cases, not
+proof against a rebuilt engine: the server's own clock and the spot checks stay the real defense.
+
+- **Driver audit** (`{"cmd":"driver"}`, `native_gpubench/src/audit.rs`): on NVIDIA the engine reads, through the
+  documented NVAPI DRS calls, the profile that applies to its own executable: texture filtering quality, anisotropic and
+  trilinear optimizations, LOD bias, forced anisotropic filtering, vsync and the frame limiter. A setting away from the
+  driver's default becomes a `driver_<setting>` tag on the result. The scene samples no textures today, so these cannot
+  change the load: they are shown, not judged. AMD and Intel have no such read here and get `driver_unaudited`.
+- **Engine clocks**: each segment is timed on `QueryPerformanceCounter`, on the kernel interrupt time read from the
+  shared user page, and on the GPU's timestamp counter (`GetClockCalibration`). Measured on an RTX 5060 they agree within
+  0.01%. More than 1% apart, or a segment longer than the server saw, is `clock_skew` and goes to review. It catches a
+  speedhack that hooks one clock inside the process; a hypervisor that bends every clock is the server clock's job.
+- **Binary integrity** (`electron/services/binaryIntegrity.js`, `npm run integrity`): `integrity.json` holds the SHA-256
+  of every helper executable and DLL. An installed app refuses to start the engine, or the sensor helper and its
+  libraries, when one of them differs. The manifest ships in the same package, so it catches corruption and a swapped
+  file, not an attacker who rewrites both.
+
 ## Stress test
 
 Local only, never ranked (`electron/services/gpubench/stressModel.js`). Loops the load for 5 to 60 minutes in 30 s loops:

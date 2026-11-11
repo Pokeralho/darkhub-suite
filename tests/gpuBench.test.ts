@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as S from '../electron/services/gpubench/sceneModel.js';
-import { decodeFrameUs, frameStats, localPlan, scoreOf, sensorSummary } from '../electron/services/gpubench/gpuBenchModel.js';
+import { decodeFrameUs, driverFlags, frameStats, localPlan, scoreOf, sensorSummary } from '../electron/services/gpubench/gpuBenchModel.js';
 
 describe('scene model', () => {
   it('matches the known PCG values, which the engine and shaders share', () => {
@@ -78,5 +78,13 @@ describe('gpu bench model', () => {
     expect(s.gpuClockAvg).toBe(2550);
     expect(s.gpuTempMax).toBe(70);
     expect(s.gpuPowerAvg).toBeNull();
+  });
+
+  it('tags driver settings away from their default, and says when nothing was read', () => {
+    const set = (value: number, def: number | null) => ({ state: 'set', value, default: def });
+    expect(driverFlags({ ok: true, settings: { texture_quality: set(20, 0), vsync: set(5, 5), lod_bias: { state: 'default' }, frame_limiter: set(60, null) } })).toEqual(['driver_frame_limiter', 'driver_texture_quality']);
+    expect(driverFlags({ ok: true, settings: {} })).toEqual([]);
+    expect(driverFlags({ ok: false, reason: 'not_nvidia' })).toEqual(['driver_unaudited']);
+    expect(driverFlags(null)).toEqual(['driver_unaudited']);
   });
 });

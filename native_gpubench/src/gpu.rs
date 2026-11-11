@@ -59,6 +59,7 @@ pub struct Info {
 }
 
 pub struct Segment {
+    pub clock: serde_json::Value,
     pub roots: Vec<Hash>,
     pub frame_us: Vec<u32>,
 }
@@ -696,10 +697,20 @@ impl Gpu {
         Ok((root, us))
     }
 
+    /// The GPU's timestamp counter now, in seconds (the driver samples it together with the CPU clock).
+    fn gpu_clock(&self) -> Option<f64> {
+        unsafe {
+            let (mut gpu, mut cpu) = (0u64, 0u64);
+            self.queue.GetClockCalibration(&mut gpu, &mut cpu).ok()?;
+            Some(gpu as f64 / self.ts_freq as f64)
+        }
+    }
+
     /// Renders for `dur`. None when the window was closed.
     pub fn segment(&mut self, rt: bool, seed: u32, dur: Duration) -> Result<Option<Segment>> {
         unsafe {
             let (mut roots, mut frame_us) = (vec![], vec![]);
+            let (clock0, gpu0) = (crate::audit::clocks(), self.gpu_clock());
             let started = Instant::now();
             let mut frame = 0u32;
             let (mut tick_at, mut tick_frame) = (Instant::now(), 0u32);
@@ -729,7 +740,9 @@ impl Gpu {
                     frame_us.push(us);
                 }
             }
-            Ok(Some(Segment { roots, frame_us }))
+            let gpu_ms = match (gpu0, self.gpu_clock()) { (Some(a), Some(b)) => Some((b - a) * 1000.0), _ => None };
+            let clock = crate::audit::clock_report(clock0, crate::audit::clocks(), gpu_ms);
+            Ok(Some(Segment { roots, frame_us, clock }))
         }
     }
 

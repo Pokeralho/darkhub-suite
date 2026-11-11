@@ -11,7 +11,7 @@ async function toJpeg(rgba, width, height) {
 /** `gpubench:*`: GPU benchmark runs and the link to the Hub ranking. Progress goes out on `gpubench:event`. */
 export function registerGpuBenchIPC({ app, ipcMain, BrowserWindow, shell, safeStorage, logger } = {}) {
   const broadcast = (msg) => { for (const w of BrowserWindow.getAllWindows()) { try { w.webContents.send('gpubench:event', msg) } catch { /* closing */ } } }
-  const svc = new GpuBenchService({ app, safeStorage, shell, hardware: HardwareService, onEvent: broadcast, toJpeg })
+  const svc = new GpuBenchService({ app, safeStorage, shell, hardware: HardwareService, onEvent: broadcast, toJpeg, logger })
   /** HWND of the window that made the call: the engine draws inside it. */
   const parentOf = (e) => {
     const win = BrowserWindow.fromWebContents(e.sender)

@@ -167,6 +167,7 @@ export default function GameOverlay({ onNavigate }: { onNavigate?: (page: string
             <button type="button" onClick={() => void api()?.pickLogFolder().then((r) => r?.ok && setSt(r))} className="dh-btn dh-btn-ghost dh-btn-sm"><FolderOpen size={13} />{t('ovl.chooseFolder', 'Escolher pasta')}</button>
             {s.logFolder && <button type="button" onClick={() => void set({ logFolder: '' })} className="dh-btn dh-btn-ghost dh-btn-sm">{t('ovl.logDisable', 'Desligar')}</button>}
           </div>
+          {s.logFolder ? <p className="dh-help text-[12px]">{t('prov.logHelp', 'Cada sensor tem uma coluna _src: medido (e a fonte: LHM, NVML, NVAPI ou Windows), derivado, ou indisponível com o motivo. Valor não lido fica vazio, nunca 0.')}</p> : null}
         </section>
       )}
 

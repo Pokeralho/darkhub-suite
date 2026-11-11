@@ -31,6 +31,9 @@
 <body>
 <div id="box"></div>
 <script>
+  // An unavailable cell carries its reason in `r`. No tooltips here (the window is click-through): the two reasons
+  // the user can act on are written next to the dash.
+  const WHY = { needs_admin: 'admin', needs_pawnio: 'PawnIO' }
   // The main process calls window.__overlay(data) on every refresh (formatted text, layout) and window.__stream({ ft })
   // about 30 times a second with the new frame times. Graphs are drawn here at the display's refresh rate, so they
   // scroll smoothly instead of jumping once per refresh. Nothing here talks to Node.
@@ -210,7 +213,7 @@
     let lines = ''
     for (const l of p.lines) {
       lines += `<div class="ln${l.big ? ' big' : ''}"><span class="tag" style="color:${color(l.color)}">${esc(l.tag)}</span><span class="cells">`
-      lines += l.cells.map((c) => `<span class="c ${c.t || ''}">${c.p ? `<span class="u p">${esc(c.p)}</span>` : ''}${esc(c.v)}<span class="u">${esc(c.u)}</span></span>`).join('')
+      lines += l.cells.map((c) => `<span class="c ${c.t || ''}">${c.p ? `<span class="u p">${esc(c.p)}</span>` : ''}${esc(c.v)}<span class="u">${esc(c.u || WHY[c.r] || '')}</span></span>`).join('')
       lines += '</span></div>'
     }
     document.getElementById('lines').innerHTML = lines

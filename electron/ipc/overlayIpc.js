@@ -4,6 +4,10 @@ import { OverlayService } from '../services/overlay/OverlayService.js'
 import HardwareService from '../services/HardwareService.js'
 import nativeLatencyClient from '../services/NativeLatencyClient.js'
 import HwSensorsDaemon from '../hal/collectors/HwSensorsDaemon.js'
+import { downloadToFile } from '../services/SecureDownload.js'
+import { PsuCatalog } from '../services/overlay/psuCatalog.js'
+import { normalizePower, psuCurve, psuEfficiency } from '../services/overlay/powerModel.js'
+import { solveCalibration } from '../services/overlay/wallCalibration.js'
 
 /** `overlay:*`: in-game FPS/sensor overlay. Status goes out on `overlay:event`. */
 export function registerOverlayIPC({ app, ipcMain, BrowserWindow, screen, hotkeys, dialog, logger } = {}) {
@@ -32,6 +36,29 @@ export function registerOverlayIPC({ app, ipcMain, BrowserWindow, screen, hotkey
   handle('overlay:setSettings', (patch) => get().setSettings(patch))
   handle('overlay:power', () => get().power())
   handle('overlay:resetEnergy', () => get().resetEnergy())
+  // real PSU from the 80 PLUS catalog (downloaded on request, cached in userData; see psuCatalog.js)
+  let catalog = null
+  const psuCatalog = () => (catalog ||= new PsuCatalog({ dir: app.getPath('userData'), download: downloadToFile }))
+  handle('overlay:psuCatalogStatus', () => psuCatalog().status())
+  handle('overlay:psuSearch', ({ query, refresh, mains }) => psuCatalog().search({ query: String(query ?? '').slice(0, 80), refresh: Boolean(refresh), mains }))
+  // two-point wall calibration (wallCalibration.js): solve against the current PSU curve and hardware, optionally save
+  handle('overlay:calibrate', ({ points, save }) => {
+    const svc = get()
+    const now = svc.power()
+    const d = now.derived
+    if (d?.cpuW == null || d?.gpuW == null) return { ok: false, error: 'no_cpu' }
+    if (!d.calibration?.hwId) return { ok: false, error: 'no_hw_id' }
+    const pts = Array.isArray(points) ? points.slice(0, 3) : []
+    // the renderer measured the stability window; a point without it is not accepted
+    if (pts.some((p) => !Number.isFinite(Number(p?.spread)) || !Number.isFinite(Number(p?.std)))) return { ok: false, error: 'unstable' }
+    const s = normalizePower(svc.settings)
+    const curve = psuCurve(s.psuRating, s.psuCustom)
+    const fit = solveCalibration({ points: pts, psuWatts: s.psuWatts, efficiency: (load) => psuEfficiency(load, curve) })
+    if (!fit.ok || !save) return fit
+    const r = svc.setSettings({ powerCal: { at: Date.now(), hwId: d.calibration.hwId, extraW: fit.extraW, effScale: fit.effScale, points: fit.points, sigma: fit.sigma } })
+    return { ...fit, saved: true, settings: r.settings }
+  })
+  handle('overlay:clearCalibration', () => get().setSettings({ powerCal: null }))
   // layout editor
   handle('overlay:layouts', () => get().layoutsState())
   handle('overlay:saveLayout', ({ layout }) => get().saveLayout(layout))

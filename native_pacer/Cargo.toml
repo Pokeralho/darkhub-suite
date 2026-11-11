@@ -1,11 +1,27 @@
 [package]
 name = "darkhub_pacer_hook"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
+autobins = false
+autoexamples = false
 
+# Hook DLL, built twice by `npm run build:pacer`:
+#   x86_64-pc-windows-msvc -> electron/services/DarkHub.PacerHook.x64.dll
+#   i686-pc-windows-msvc   -> electron/services/DarkHub.PacerHook.x86.dll
 [lib]
 name = "DarkHub_PacerHook"
 crate-type = ["cdylib"]
+
+# x86 injection helper (only meaningful for i686; any other build refuses to run)
+#   i686-pc-windows-msvc   -> electron/services/DarkHub.PacerInject.x86.exe
+[[bin]]
+name = "DarkHub_PacerInject"
+path = "src/bin/inject_x86.rs"
+
+# Test target for the end-to-end check (tests/e2e.ps1): D3D11 / OpenGL present loop.
+[[example]]
+name = "pacer_testapp"
+path = "examples/pacer_testapp.rs"
 
 [profile.release]
 opt-level = 3

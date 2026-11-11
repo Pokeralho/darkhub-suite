@@ -41,6 +41,9 @@ jobs:
           cache: npm
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          # the frame limiter hook is built for 64-bit and 32-bit games (npm run build:pacer)
+          targets: x86_64-pc-windows-msvc,i686-pc-windows-msvc
 
       - name: PGE Portable (pinned download)
         shell: pwsh
@@ -65,14 +68,25 @@ jobs:
       # every native helper is rebuilt here from its source, so the release does not depend on the committed binaries
       - run: npm run build:native
       - run: npm run build:pacer
+      - name: Pacer binaries have the right bitness
+        shell: pwsh
+        run: |
+          foreach ($f in @(@('DarkHub.PacerHook.x64.dll', 0x8664), @('DarkHub.PacerHook.x86.dll', 0x14c), @('DarkHub.PacerInject.x86.exe', 0x14c))) {
+            $b = [IO.File]::ReadAllBytes("electron/services/$($f[0])"); $o = [BitConverter]::ToInt32($b, 0x3c)
+            if ([BitConverter]::ToUInt16($b, $o + 4) -ne $f[1]) { throw "$($f[0]) has the wrong machine type" }
+          }
       - run: npm run build:disk
       - run: npm run build:cleaner
       - run: cargo build --release --manifest-path native_gpubench/Cargo.toml
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
       - run: Copy-Item native_gpubench/target/release/DarkHub_GpuBench.exe electron/services/DarkHub.GpuBench.exe -Force
         shell: pwsh
       # Real-ESRGAN AI upscaler shipped in resources/realesrgan (pinned release, SHA-256 checked)
       - run: npm run build:upscaler
       - run: npm run build:renderer
+      # the helpers were just rebuilt from source: their hashes are the ones the installed app will check
+      - run: node scripts/gen-integrity.mjs
       - run: npx electron-builder --win --publish never
 
       - name: Release files

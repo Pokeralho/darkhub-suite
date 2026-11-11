@@ -5,6 +5,13 @@
 // certification points (plus an approximation below 20 % load), "additional components" is a number the user types, and
 // the cost uses the user's tariff. A missing input (for example CPU power without admin) is reported in `missing`, never
 // replaced by zero.
+//
+// Optional inputs that make the wall figure closer to reality (still an estimate):
+//   - psuModel: a real PSU picked from the 80 PLUS catalog (psuCatalog.js) fills psuWatts and the 4-point custom curve.
+//   - powerCal: a two-point watt-meter calibration (wallCalibration.js) replaces `extraWatts` with the fitted hidden DC
+//     draw and scales the curve. It only applies while the GPU, CPU and PSU selection match the ones it was made with.
+
+import { normalizeCalibration, calHardwareId, calibrationState } from './wallCalibration.js'
 
 /** 80 Plus efficiency at 10 / 20 / 50 / 100 % load (115 V). 10 % is only certified for Titanium; for the others it is an
  *  approximation (20 % point minus 5), as is everything below 10 %. */
@@ -96,9 +103,11 @@ export class EnergyMeter {
   cpuJoules() { return this.cpuJ }
 }
 
-/** DC load, PSU load %, efficiency and wall (AC) power. `partial`: some measured input was missing. */
-export function systemPower({ gpuW, cpuW, extraW, psuWatts, rating, custom }) {
-  const g = num(gpuW), c = num(cpuW), x = Math.max(0, num(extraW) ?? 0)
+/** DC load, PSU load %, efficiency and wall (AC) power. `partial`: some measured input was missing.
+ *  cal: { extraW, effScale } from an applied calibration (replaces extraW, scales the curve; capped at 99 %). */
+export function systemPower({ gpuW, cpuW, extraW, psuWatts, rating, custom, cal = null }) {
+  const g = num(gpuW), c = num(cpuW), x = Math.max(0, num(cal?.extraW) ?? num(extraW) ?? 0)
+  const scale = num(cal?.effScale) ?? 1
   const missing = []
   if (g == null) missing.push('gpu')
   if (c == null) missing.push('cpu')
@@ -106,7 +115,8 @@ export function systemPower({ gpuW, cpuW, extraW, psuWatts, rating, custom }) {
   const dcW = (g ?? 0) + (c ?? 0) + x
   const psu = posNum(psuWatts)
   const loadPct = psu != null ? (dcW / psu) * 100 : null
-  const efficiency = loadPct != null ? psuEfficiency(loadPct / 100, psuCurve(rating, custom)) : null
+  const base = loadPct != null ? psuEfficiency(loadPct / 100, psuCurve(rating, custom)) : null
+  const efficiency = base != null ? Math.min(99, base * scale) : null
   const acW = efficiency != null ? dcW / (efficiency / 100) : null
   return { dcW, loadPct, efficiency, acW, lossW: acW != null ? acW - dcW : null, missing, partial: missing.length > 0 }
 }
@@ -123,18 +133,51 @@ export function costOf(watts, tariff, hoursPerDay = 24) {
   return out
 }
 
-export const POWER_DEFAULTS = { psuWatts: 750, psuRating: 'gold', psuCustom: [82, 87, 90, 87], extraWatts: 40, tariff: 0.9, hoursPerDay: 24 }
+export const POWER_DEFAULTS = { psuWatts: 750, psuRating: 'gold', psuCustom: [82, 87, 90, 87], extraWatts: 40, tariff: 0.9, hoursPerDay: 24, psuModel: null, mainsVoltage: null, powerCal: null }
+export const MAINS_VOLTAGES = ['115', '230']
+
+const str = (v, max) => (typeof v === 'string' && v.trim() && v.length <= max ? v.trim() : null)
+/** A catalog PSU kept only while the settings still say what it set (watts + custom curve); editing either drops it. */
+function normalizeModel(m, s) {
+  if (!m || typeof m !== 'object') return null
+  const curve = Array.isArray(m.curve) && m.curve.length === 4 ? m.curve.map(Number) : null
+  const out = {
+    id: str(m.id, 200), brand: str(m.brand, 80), model: str(m.model, 120), watts: num(m.watts), rating: str(m.rating, 20),
+    voltage: MAINS_VOLTAGES.includes(String(m.voltage)) ? String(m.voltage) : null, category: str(m.category, 40), approx10: Boolean(m.approx10),
+    certified: str(m.certified, 20), curve
+  }
+  if (!out.id || !out.brand || !out.model || !out.watts || !out.voltage || !curve || curve.some((x) => !Number.isFinite(x))) return null
+  if (s.psuRating !== 'custom' || s.psuWatts !== Math.round(out.watts) || s.psuCustom.some((x, i) => Math.abs(x - curve[i]) > 0.051)) return null
+  return out
+}
 
 export function normalizePower(s = {}) {
   const clamp = (v, lo, hi, d) => (Number.isFinite(Number(v)) && v !== '' && v !== null ? Math.min(hi, Math.max(lo, Number(v))) : d)
   const custom = Array.isArray(s.psuCustom) && s.psuCustom.length === 4 ? s.psuCustom.map((x, i) => clamp(x, 50, 99.9, POWER_DEFAULTS.psuCustom[i])) : [...POWER_DEFAULTS.psuCustom]
-  return {
+  const out = {
     psuWatts: Math.round(clamp(s.psuWatts, 100, 3000, POWER_DEFAULTS.psuWatts)),
     psuRating: PSU_RATING_IDS.includes(s.psuRating) ? s.psuRating : POWER_DEFAULTS.psuRating,
     psuCustom: custom,
     extraWatts: Math.round(clamp(s.extraWatts, 0, 1000, POWER_DEFAULTS.extraWatts)),
     tariff: Math.round(clamp(s.tariff, 0, 100, POWER_DEFAULTS.tariff) * 10000) / 10000,
-    hoursPerDay: clamp(s.hoursPerDay, 0.25, 24, POWER_DEFAULTS.hoursPerDay)
+    hoursPerDay: clamp(s.hoursPerDay, 0.25, 24, POWER_DEFAULTS.hoursPerDay),
+    mainsVoltage: MAINS_VOLTAGES.includes(String(s.mainsVoltage)) ? String(s.mainsVoltage) : null,
+    psuModel: null,
+    powerCal: normalizeCalibration(s.powerCal)
+  }
+  out.psuModel = normalizeModel(s.psuModel, out)
+  return out
+}
+
+/** Calibration status for the current hardware, and the parameters to apply (only when state is 'applied'). */
+export function calibrationFor(settings, hw) {
+  const cal = settings.powerCal
+  const hwId = calHardwareId({ gpuName: hw?.gpu?.name, cpuName: hw?.cpu?.name, settings })
+  const state = calibrationState(cal, hwId)
+  return {
+    state, hwId, at: cal?.at ?? null,
+    extraW: cal?.extraW ?? null, effScale: cal?.effScale ?? null, sigma: cal?.sigma ?? null,
+    apply: state === 'applied' ? { extraW: cal.extraW, effScale: cal.effScale } : null
   }
 }
 
@@ -149,7 +192,8 @@ export function buildDerived({ frames, session, hw, sensors, settings, energy })
   // CPU power only counts when the sensor really read it (null without admin/PawnIO)
   const cpuW = posNum(hw?.cpu?.power) ?? posNum(sensors?.cpuPower)
   const fps = frames?.fps ?? null
-  const sys = systemPower({ gpuW, cpuW, extraW: p.extraWatts, psuWatts: p.psuWatts, rating: p.psuRating, custom: p.psuCustom })
+  const cal = calibrationFor(p, hw)
+  const sys = systemPower({ gpuW, cpuW, extraW: p.extraWatts, psuWatts: p.psuWatts, rating: p.psuRating, custom: p.psuCustom, cal: cal.apply })
 
   const gpuJ = energy ? energy.gpuJoules() : null
   const cpuJ = energy ? energy.cpuJoules() : null
@@ -173,7 +217,8 @@ export function buildDerived({ frames, session, hw, sensors, settings, energy })
       source: energy?.hasCounter ? 'nvml' : energy?.seconds > 0 ? 'integrated' : null,
       seconds: energy?.seconds ?? 0
     },
-    system: { ...sys, est: true },
+    system: { ...sys, est: true, calibrated: cal.state === 'applied', extraW: sys.dcW != null ? Math.max(0, cal.apply?.extraW ?? p.extraWatts) : null },
+    calibration: { state: cal.state, at: cal.at, hwId: cal.hwId, extraW: cal.extraW, effScale: cal.effScale, sigma: cal.sigma },
     cost: {
       est: true,
       gpu: gpuW != null ? scenario(gpuW) : null,
