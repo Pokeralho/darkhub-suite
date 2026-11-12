@@ -6,6 +6,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-11-12
+
+### Changed
+- File Converter, video: GPU encoding (NVENC, AMF, Quick Sync, detected with a real test encode) with automatic CPU
+  fallback, stream copy when only the container changes, progress per file and cancel. On an RTX 5060, MP4 to MP4 went
+  from 33.5 s to 9.3 s with 2% CPU instead of 48%; MKV to MP4 from 34 s to 0.6 s. CPU encodes run at low priority with
+  a thread cap so the PC stays usable.
+
+### Added
+- File Converter, documents: Word, Excel, PowerPoint, OpenDocument, Visio and legacy formats convert with nothing
+  installed (a trimmed LibreOffice ships with the app). PDF to text or page images, Markdown/HTML/TXT/EPUB to PDF,
+  CSV/JSON/YAML/XML data.
+- File Converter, images: DDS (BC1 to BC7, mipmaps), TGA, EXR, HDR, PSD, ICO/CUR, HEIC, JPEG XL, QOI, JPEG 2000 and
+  camera RAW (CR2, CR3, NEF, ARW, DNG and more).
+
+### Fixed
+- File Converter: PDF to TXT failed; BMP and ICO outputs were PNG files with another extension; converting to the same
+  format in the same folder overwrote the original.
+
 ## [0.8.6] - 2026-11-11
 
 ### Fixed
