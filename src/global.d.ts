@@ -23,6 +23,12 @@ export interface HubCatalogItem { id: string; type: 'module' | 'preset' | 'exten
 export interface HubCatalogDetail extends HubCatalogItem { owner: string; evidence: string[]; expects: { metric: string; direction: string }[]; versions: { version: string; sha256: string; risk: string; createdAt: string }[]; rows: Record<string, { index: number; kind: string; group: string; title: string; target: string; note: string; via: string | null; if: Record<string, unknown> | null }[]> }
 export interface HubMcpStatus { ok: boolean; enabled: boolean; running: boolean; url: string; token: string; configFile: string; bridge: string; error: string }
 export type HubEvent = { type: 'extReload'; id: string } | { type: 'extDevError'; folder: string; error: string } | { type: 'open'; id: string } | { type: 'approval'; id: string; client: string; title: string; preview: HubInspect & { remote?: { hub: string; tier: string; version: string; sha256: string }; uninstall?: { id: string; version: string; steps: number } } } | { type: 'approvalClosed'; id: string };
+export interface ConvertBasePayload { inputFiles: string[]; outputDir: string; outputFormat: string; jobId?: string }
+export interface ConvertImagesPayload extends ConvertBasePayload { quality?: number; lossless?: boolean; width?: number; height?: number; keepMetadata?: boolean; ddsFormat?: string; srgb?: boolean; mipmaps?: boolean; hotspotX?: number; hotspotY?: number }
+export interface ConvertMediaPayload extends ConvertBasePayload { codec?: 'auto' | 'h264' | 'hevc' | 'av1' | 'vp9'; quality?: 'fast' | 'balanced' | 'high'; maxHeight?: number; maxFps?: number; encoderPref?: 'auto' | 'gpu' | 'cpu'; copy?: 'auto' | 'never'; audioBitrate?: string; gifFps?: number; gifWidth?: number; responsive?: boolean }
+export interface ConvertResult { inputFile: string; outputFile?: string; ok: boolean; error?: string; cancelled?: boolean; encoder?: string | null; hardware?: string | null; copy?: boolean; seconds?: number; bytes?: number | null; durationSec?: number; engine?: string; outputs?: string[] }
+export interface ConvertProgress { jobId: string; kind: 'image' | 'media' | 'document'; index: number; total: number; inputFile: string; stage: 'probe' | 'encode' | 'done' | 'error' | 'cancelled'; percent: number | null; speed?: number | null; fps?: number | null; encoder?: string | null; hardware?: string | null; copy?: boolean; finished?: number }
+export interface ConverterCapabilities { ffmpeg: boolean; hwEncoders: string[]; gpuVendors: string[]; libreoffice: { available: boolean; bundled: boolean }; texconv: boolean; raw: boolean; cpuThreads: number; imageInputs: string[]; imageOutputs: string[]; ddsFormats: string[]; mediaOutputs: string[]; docInputs: string[] }
 type HubInstallResult = { ok: boolean; error?: string; errors?: HubError[]; id?: string; applied?: number; skipped?: number; missingTasks?: string[]; notes?: string[]; requiresReboot?: boolean };
 export type KgResult<T> = { ok: boolean; status?: number; error?: string } & T;
 export interface KgStatus { asfOnline: boolean; capacity: number | null; used: number; soldOut: boolean }
@@ -596,10 +602,14 @@ export interface DarkHubAPI {
     pathsForDroppedFiles: (files: FileList | File[]) => string[];
   };
   files: {
-    convertImages: (payload: any) => Promise<any>;
-    convertMedia: (payload: any) => Promise<any>;
-    checkLibreOffice: () => Promise<any>;
-    convertDocuments: (payload: any) => Promise<any>;
+    convertImages: (payload: ConvertImagesPayload) => Promise<ConvertResult[]>;
+    convertMedia: (payload: ConvertMediaPayload) => Promise<ConvertResult[]>;
+    checkLibreOffice: () => Promise<{ ok: boolean; soffice: string | null; bundled: boolean }>;
+    convertDocuments: (payload: ConvertBasePayload) => Promise<ConvertResult[]>;
+    cancelConvert: (jobId: string) => Promise<{ ok: boolean; error?: string }>;
+    converterCapabilities: () => Promise<ConverterCapabilities>;
+    docTargets: (exts: string[]) => Promise<{ outputs: string[] }>;
+    onConvertProgress: (callback: (info: ConvertProgress) => void) => () => void;
     archiveOperation: (payload: any) => Promise<any>;
   };
   youtube: {

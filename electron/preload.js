@@ -178,6 +178,14 @@ const darkhubApi = {
     convertMedia: (payload) => ipcRenderer.invoke('files:convertMedia', payload),
     checkLibreOffice: () => ipcRenderer.invoke('files:checkLibreOffice'),
     convertDocuments: (payload) => ipcRenderer.invoke('files:convertDocuments', payload),
+    cancelConvert: (jobId) => ipcRenderer.invoke('files:cancelConvert', { jobId }),
+    converterCapabilities: () => ipcRenderer.invoke('files:converterCapabilities'),
+    docTargets: (exts) => ipcRenderer.invoke('files:docTargets', { exts }),
+    onConvertProgress: (callback) => {
+      const listener = (_event, info) => callback(info)
+      ipcRenderer.on('files:convertProgress', listener)
+      return () => ipcRenderer.removeListener('files:convertProgress', listener)
+    },
     archiveOperation: (payload) => ipcRenderer.invoke('files:archiveOperation', payload)
   },
   youtube: {

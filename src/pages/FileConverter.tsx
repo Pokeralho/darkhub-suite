@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   FileText,
   Image as ImageIcon,
@@ -10,65 +10,51 @@ import {
   AlertCircle,
   FolderOpen,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  X
 } from '../components/icons';
 import { useI18n } from '../i18n/I18nProvider';
 import { HelpTip } from '../components/HelpTip';
 import PageHeader from '../components/ui/PageHeader';
+import type { ConverterCapabilities, ConvertProgress, ConvertResult } from '../global';
 
 type ConvertCategory = 'image' | 'audio' | 'video' | 'document' | 'archive';
 
-interface FormatOption {
-  ext: string;
-  name: string;
-  desc: string;
-  tag?: string;
+/** Input extensions per category (mirrors electron/services/converter; used to route the queue instantly). */
+export const IMAGE_EXTS = ['jpg', 'jpeg', 'jpe', 'jfif', 'png', 'webp', 'avif', 'tif', 'tiff', 'gif', 'svg', 'svgz', 'heic', 'heif', 'jxl', 'ico', 'cur', 'dds',
+  'bmp', 'dib', 'tga', 'psd', 'exr', 'hdr', 'pcx', 'sgi', 'qoi', 'jp2', 'j2k', 'pbm', 'pgm', 'ppm', 'pnm', 'pam', 'pfm', 'xbm', 'xwd', 'ras', 'dpx',
+  'cr2', 'cr3', 'crw', 'nef', 'nrw', 'arw', 'srf', 'sr2', 'dng', 'orf', 'rw2', 'raf', 'pef', 'srw', 'x3f', '3fr', 'erf', 'kdc', 'mrw', 'iiq', 'rwl', 'dcr'];
+export const AUDIO_EXTS = ['mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg', 'oga', 'opus', 'wma', 'aiff', 'aif', 'ac3', 'eac3', 'dts', 'amr', 'ape', 'wv', 'mka', 'mid'];
+export const VIDEO_EXTS = ['mp4', 'mkv', 'webm', 'mov', 'avi', 'wmv', 'flv', 'ts', 'm2ts', 'mts', 'm4v', 'mpg', 'mpeg', 'vob', '3gp', 'ogv', 'asf', 'f4v', 'rm', 'rmvb', 'divx'];
+export const ARCHIVE_EXTS = ['zip', 'tar', 'gz', 'tgz', 'bz2', 'xz', 'rar', '7z'];
+export const DOC_EXTS = ['pdf', 'doc', 'docx', 'docm', 'dot', 'dotx', 'odt', 'ott', 'fodt', 'rtf', 'wpd', 'wps', 'abw', 'lwp', 'hwp', 'pages', 'wri',
+  'xls', 'xlsx', 'xlsm', 'xlsb', 'xlt', 'xltx', 'ods', 'ots', 'fods', 'numbers', 'dbf', 'csv', 'tsv',
+  'ppt', 'pptx', 'pptm', 'pps', 'ppsx', 'pot', 'potx', 'odp', 'otp', 'fodp', 'key',
+  'vsd', 'vsdx', 'odg', 'cdr', 'pub', 'md', 'markdown', 'html', 'htm', 'xhtml', 'txt', 'log', 'epub', 'json', 'yaml', 'yml'];
+
+const IMAGE_OUT = ['png', 'jpg', 'webp', 'avif', 'jxl', 'tiff', 'gif', 'bmp', 'ico', 'cur', 'dds', 'tga', 'exr', 'hdr', 'qoi', 'jp2', 'ppm', 'pcx'];
+const IMAGE_TAG: Record<string, string> = { png: 'Lossless', webp: 'Web', avif: 'Next-Gen', jxl: 'Next-Gen', dds: 'Games', exr: 'HDR', hdr: 'HDR', ico: 'Icon', cur: 'Cursor' };
+const VIDEO_OUT = ['mp4', 'mkv', 'webm', 'mov', 'm4v', 'ts', 'avi', 'wmv', 'flv', 'gif', 'mp3'];
+const AUDIO_OUT = ['mp3', 'flac', 'wav', 'm4a', 'aac', 'opus', 'ogg', 'wma', 'aiff', 'ac3', 'alac'];
+const LOSSY_IMAGE = ['jpg', 'webp', 'avif', 'jxl'];
+const DDS_FORMATS = ['BC7', 'BC1', 'BC3', 'BC4', 'BC5', 'BC6H', 'RGBA'];
+
+export function detectCategory(filePath: string): ConvertCategory {
+  const lower = filePath.toLowerCase();
+  if (/\.(tar\.gz|tar\.bz2|tar\.xz)$/.test(lower)) return 'archive';
+  const ext = lower.split('.').pop() ?? '';
+  if (IMAGE_EXTS.includes(ext)) return 'image';
+  if (AUDIO_EXTS.includes(ext)) return 'audio';
+  if (VIDEO_EXTS.includes(ext)) return 'video';
+  if (ARCHIVE_EXTS.includes(ext)) return 'archive';
+  return 'document';
 }
 
-const FORMAT_MAP: Record<ConvertCategory, FormatOption[]> = {
-  image: [
-    { ext: 'png', name: 'PNG', desc: 'Sem perdas com suporte a transparência (Lossless)', tag: 'Lossless' },
-    { ext: 'jpg', name: 'JPEG / JPG', desc: 'Fotografia com alta taxa de compressão', tag: 'Padrão' },
-    { ext: 'webp', name: 'WebP (Google)', desc: 'Ultra-otimizado para web e alta fidelidade', tag: 'Recomendado' },
-    { ext: 'avif', name: 'AVIF (Next-Gen)', desc: 'Nova geração com máxima economia de dados', tag: 'Next-Gen' },
-    { ext: 'ico', name: 'ICO (Ícone)', desc: 'Ícone de aplicativo para Windows (256x256)', tag: 'Icon' },
-    { ext: 'tiff', name: 'TIFF', desc: 'Fidelidade máxima para impressão e edição', tag: 'Print' },
-    { ext: 'bmp', name: 'BMP', desc: 'Formato bitmap bruto sem compressão', tag: 'Raw' },
-    { ext: 'gif', name: 'GIF', desc: 'Animação ou paleta de 256 cores', tag: 'Anim' }
-  ],
-  audio: [
-    { ext: 'mp3', name: 'MP3', desc: 'Padrão universal (libmp3lame até 320kbps)', tag: 'Universal' },
-    { ext: 'wav', name: 'WAV', desc: 'Áudio PCM 16-bit sem compressão de estúdio', tag: 'Studio' },
-    { ext: 'flac', name: 'FLAC', desc: 'Compressão 100% sem perdas (Lossless Audiophile)', tag: 'Lossless' },
-    { ext: 'm4a', name: 'M4A / AAC', desc: 'Alta eficiência de codificação para Apple e Web', tag: 'High-Bitrate' },
-    { ext: 'ogg', name: 'OGG Vorbis', desc: 'Codec aberto de alta performance', tag: 'Open-Source' },
-    { ext: 'opus', name: 'OPUS', desc: 'Baixa latência com clareza cristalina', tag: 'Ultra-Low-Bitrate' },
-    { ext: 'wma', name: 'WMA', desc: 'Windows Media Audio', tag: 'Legacy' }
-  ],
-  video: [
-    { ext: 'mp4', name: 'MP4 (H.264 / AAC)', desc: 'Máxima compatibilidade universal com players e web', tag: 'Universal' },
-    { ext: 'webm', name: 'WebM (VP9 / Opus)', desc: 'Vídeo moderno de alta eficiência para web e streaming', tag: 'Web' },
-    { ext: 'mkv', name: 'MKV (Matroska)', desc: 'Container flexível para múltiplas faixas e legendas', tag: 'Master' },
-    { ext: 'avi', name: 'AVI (Xvid)', desc: 'Formato legado clássico', tag: 'Legacy' },
-    { ext: 'mov', name: 'MOV (QuickTime)', desc: 'Formato nativo para ecossistemas Apple e Premiere', tag: 'Apple' },
-    { ext: 'wmv', name: 'WMV', desc: 'Windows Media Video para players clássicos', tag: 'Windows' },
-    { ext: 'gif', name: 'GIF Animado', desc: 'Transforma trecho de vídeo em GIF com paleta otimizada', tag: 'Animation' },
-    { ext: 'mp3', name: 'Extrair Áudio (MP3)', desc: 'Separa e extrai a trilha sonora do vídeo em MP3 320k', tag: 'Audio Only' }
-  ],
-  document: [
-    { ext: 'txt', name: 'PDF para Texto (.txt)', desc: 'Extrai texto bruto de documentos PDF via parser', tag: 'PDF to TXT' },
-    { ext: 'html', name: 'Markdown para HTML (.html)', desc: 'Converte notas Markdown (.md) em página web estilizada', tag: 'MD to HTML' },
-    { ext: 'json', name: 'CSV para JSON (.json)', desc: 'Converte tabelas/planilhas CSV em array de objetos JSON', tag: 'CSV to JSON' },
-    { ext: 'csv', name: 'JSON para CSV (.csv)', desc: 'Converte objetos JSON em planilha CSV delimitada', tag: 'JSON to CSV' },
-    { ext: 'xml', name: 'JSON para XML (.xml)', desc: 'Gera estrutura de tags XML a partir de dados JSON', tag: 'JSON to XML' },
-    { ext: 'pdf', name: 'Documento para PDF (LibreOffice)', desc: 'Converte DOCX, DOC, ODT, RTF em documento PDF', tag: 'Office' }
-  ],
-  archive: [
-    { ext: 'zip', name: 'Compactar em ZIP (.zip)', desc: 'Cria arquivo compactado padrão Windows', tag: 'Compress' },
-    { ext: 'tar.gz', name: 'Compactar em TAR.GZ (.tar.gz)', desc: 'Formato de alta compressão Unix/Linux', tag: 'Compress' },
-    { ext: 'extract', name: 'Extrair Arquivo (Descompactar)', desc: 'Extrai arquivos .zip, .tar, .gz para a pasta de destino', tag: 'Extract' }
-  ]
-};
+const DEFAULT_TARGET: Record<ConvertCategory, string> = { image: 'png', audio: 'mp3', video: 'mp4', document: 'pdf', archive: 'zip' };
+
+const fill = (s: string, vars: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
+const extOf = (f: string) => (f.split(/[\\/]/).pop() ?? '').split('.').pop()?.toLowerCase() ?? '';
+const fmtBytes = (n?: number | null) => (n == null ? '' : n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
 const FileConverter = () => {
   const { t } = useI18n();
@@ -76,21 +62,59 @@ const FileConverter = () => {
   const [outputDir, setOutputDir] = useState<string | null>(null);
   const [category, setCategory] = useState<ConvertCategory>('image');
   const [targetFormat, setTargetFormat] = useState<string>('png');
+  const [caps, setCaps] = useState<ConverterCapabilities | null>(null);
+  const [docTargets, setDocTargets] = useState<string[]>([]);
+  // image
   const [quality, setQuality] = useState<number>(85);
+  const [lossless, setLossless] = useState(false);
+  const [resizeW, setResizeW] = useState('');
+  const [resizeH, setResizeH] = useState('');
+  const [keepMeta, setKeepMeta] = useState(false);
+  const [ddsFormat, setDdsFormat] = useState('BC7');
+  const [srgb, setSrgb] = useState(true);
+  const [mipmaps, setMipmaps] = useState(true);
+  // media
+  const [codec, setCodec] = useState<'auto' | 'h264' | 'hevc' | 'av1' | 'vp9'>('auto');
+  const [preset, setPreset] = useState<'fast' | 'balanced' | 'high'>('balanced');
+  const [maxHeight, setMaxHeight] = useState(0);
+  const [maxFps, setMaxFps] = useState(0);
+  const [encoderPref, setEncoderPref] = useState<'auto' | 'gpu' | 'cpu'>('auto');
+  const [allowCopy, setAllowCopy] = useState(true);
+  const [responsive, setResponsive] = useState(true);
   const [audioBitrate, setAudioBitrate] = useState<string>('320k');
   const [gifFps, setGifFps] = useState<number>(15);
+  const [gifWidth, setGifWidth] = useState<number>(480);
+  // run state
   const [isConverting, setIsConverting] = useState(false);
-  const [results, setResults] = useState<any[] | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [progress, setProgress] = useState<Record<number, ConvertProgress>>({});
+  const [results, setResults] = useState<ConvertResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const jobRef = useRef<string | null>(null);
 
-  const detectCategory = (filePath: string): ConvertCategory => {
-    const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
-    if (['jpg', 'jpeg', 'png', 'webp', 'tiff', 'tif', 'bmp', 'gif', 'avif', 'svg', 'ico', 'heic'].includes(ext)) return 'image';
-    if (['mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg', 'opus', 'wma', 'aiff'].includes(ext)) return 'audio';
-    if (['mp4', 'mkv', 'webm', 'mov', 'avi', 'wmv', 'flv', 'ts', 'm4v'].includes(ext)) return 'video';
-    if (['zip', 'tar', 'gz', 'tgz', 'rar', '7z'].includes(ext)) return 'archive';
-    return 'document';
-  };
+  useEffect(() => {
+    window.darkhub?.files?.converterCapabilities?.().then(setCaps).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const off = window.darkhub?.files?.onConvertProgress?.((info) => {
+      if (info.jobId !== jobRef.current) return;
+      setProgress((prev) => ({ ...prev, [info.index]: info }));
+    });
+    return () => { off?.(); };
+  }, []);
+
+  // Document targets depend on what is in the queue (Word, Excel, PDF, Markdown... each reach different formats).
+  useEffect(() => {
+    if (category !== 'document') return;
+    const exts = Array.from(new Set(inputFiles.map(extOf)));
+    if (!exts.length) { setDocTargets([]); return; }
+    window.darkhub?.files?.docTargets?.(exts).then((r) => {
+      const outs = r?.outputs ?? [];
+      setDocTargets(outs);
+      setTargetFormat((cur) => (outs.includes(cur) ? cur : outs[0] ?? cur));
+    }).catch(() => setDocTargets([]));
+  }, [category, inputFiles]);
 
   const getDir = (filePath: string) => {
     const idx = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'));
@@ -99,15 +123,12 @@ const FileConverter = () => {
 
   const applyFiles = (paths: string[]) => {
     if (!paths.length) return;
-    setInputFiles(prev => Array.from(new Set([...prev, ...paths])));
+    setInputFiles((prev) => Array.from(new Set([...prev, ...paths])));
     const firstCat = detectCategory(paths[0]);
-    setCategory(firstCat);
-    if (firstCat === 'image') setTargetFormat('png');
-    else if (firstCat === 'audio') setTargetFormat('mp3');
-    else if (firstCat === 'video') setTargetFormat('mp4');
-    else if (firstCat === 'document') setTargetFormat('txt');
-    else if (firstCat === 'archive') setTargetFormat('zip');
-
+    if (inputFiles.length === 0 || firstCat !== category) {
+      setCategory(firstCat);
+      setTargetFormat(DEFAULT_TARGET[firstCat]);
+    }
     const dir = getDir(paths[0]);
     if (dir && !outputDir) setOutputDir(dir);
     setResults(null);
@@ -117,101 +138,75 @@ const FileConverter = () => {
   const handlePickFiles = async () => {
     if (!window.darkhub?.dialog?.selectFiles) return;
     const res = await window.darkhub.dialog.selectFiles({
-      title: t('converter.browse', 'Selecionar Arquivos para Conversão'),
-      filters: [
-        {
-          name: 'Todos os Arquivos Suportados',
-          extensions: [
-            'jpg', 'jpeg', 'png', 'webp', 'tiff', 'tif', 'bmp', 'gif', 'avif', 'svg', 'ico', 'heic',
-            'mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg', 'opus', 'wma',
-            'mp4', 'mkv', 'webm', 'mov', 'avi', 'wmv', 'flv',
-            'pdf', 'csv', 'json', 'xml', 'md', 'html', 'docx', 'doc', 'odt', 'rtf', 'txt',
-            'zip', 'tar', 'gz', '7z'
-          ]
-        }
-      ]
+      title: t('conv.pickTitle', 'Selecionar arquivos para conversão'),
+      filters: [{ name: t('conv.filterAll', 'Todos os formatos suportados'), extensions: [...IMAGE_EXTS, ...AUDIO_EXTS, ...VIDEO_EXTS, ...DOC_EXTS, ...ARCHIVE_EXTS] }]
     });
-    if (!res?.canceled && Array.isArray(res.filePaths) && res.filePaths.length) {
-      applyFiles(res.filePaths);
-    }
+    if (!res?.canceled && Array.isArray(res.filePaths) && res.filePaths.length) applyFiles(res.filePaths);
   };
 
   const handlePickOutputDir = async () => {
     if (!window.darkhub?.dialog?.selectFolder) return;
-    const res = await window.darkhub.dialog.selectFolder({ title: 'Selecionar Pasta de Saída' });
+    const res = await window.darkhub.dialog.selectFolder({ title: t('conv.outDirTitle', 'Selecionar pasta de saída') });
     if (!res?.canceled && res.folderPath) {
       setOutputDir(res.folderPath);
       setError(null);
     }
   };
 
+  const handleCancel = useCallback(async () => {
+    if (!jobRef.current) return;
+    setCancelling(true);
+    await window.darkhub?.files?.cancelConvert?.(jobRef.current);
+  }, []);
+
   const handleConvert = async () => {
     if (!window.darkhub?.files) return;
-    if (!inputFiles.length) {
-      setError('Adicione pelo menos um arquivo na fila.');
-      return;
-    }
-    if (!outputDir) {
-      setError('Selecione uma pasta de destino para salvar os arquivos convertidos.');
-      return;
-    }
+    if (!inputFiles.length) { setError(t('conv.errNoFiles', 'Adicione pelo menos um arquivo na fila.')); return; }
+    if (!outputDir) { setError(t('conv.errNoDir', 'Selecione uma pasta de destino para salvar os arquivos convertidos.')); return; }
+    if (category === 'document' && !docTargets.includes(targetFormat)) { setError(t('conv.errNoTarget', 'Nenhum formato de saída serve para todos os arquivos da fila.')); return; }
 
+    const jobId = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    jobRef.current = jobId;
     setIsConverting(true);
+    setCancelling(false);
     setError(null);
     setResults(null);
+    setProgress({});
+    const base = { inputFiles, outputDir, outputFormat: targetFormat, jobId };
 
     try {
       if (category === 'archive') {
         if (targetFormat === 'extract') {
-          const res = await window.darkhub.files.archiveOperation({
-            action: 'extract',
-            inputFiles,
-            extractDir: outputDir
-          });
-          setResults([{ inputFile: inputFiles[0], outputFile: outputDir, ok: res?.ok, error: res?.error }]);
+          const res = await window.darkhub.files.archiveOperation({ action: 'extract', inputFiles, extractDir: outputDir });
+          setResults([{ inputFile: inputFiles[0], outputFile: outputDir, ok: Boolean(res?.ok), error: res?.error }]);
         } else {
           const archiveOut = `${outputDir}\\DarkHub_Archive_${Date.now()}.${targetFormat === 'tar.gz' ? 'tar.gz' : 'zip'}`;
-          const res = await window.darkhub.files.archiveOperation({
-            action: 'compress',
-            inputFiles,
-            outputArchive: archiveOut
-          });
-          setResults([{ inputFile: `${inputFiles.length} arquivos`, outputFile: archiveOut, ok: res?.ok, error: res?.error }]);
+          const res = await window.darkhub.files.archiveOperation({ action: 'compress', inputFiles, outputArchive: archiveOut });
+          setResults([{ inputFile: fill(t('conv.arc.files', '{n} arquivos'), { n: inputFiles.length }), outputFile: archiveOut, ok: Boolean(res?.ok), error: res?.error }]);
         }
       } else if (category === 'image') {
-        const res = await window.darkhub.files.convertImages({
-          inputFiles,
-          outputDir,
-          outputFormat: targetFormat,
-          quality
-        });
-        setResults(res || []);
+        const w = Number(resizeW) || undefined;
+        const h = Number(resizeH) || undefined;
+        setResults(await window.darkhub.files.convertImages({ ...base, quality, lossless, width: w, height: h, keepMetadata: keepMeta, ddsFormat, srgb, mipmaps }));
       } else if (category === 'document') {
-        const res = await window.darkhub.files.convertDocuments({
-          inputFiles,
-          outputDir,
-          outputFormat: targetFormat
-        });
-        setResults(res || []);
+        setResults(await window.darkhub.files.convertDocuments(base));
       } else {
-        const res = await window.darkhub.files.convertMedia({
-          inputFiles,
-          outputDir,
-          outputFormat: targetFormat,
-          bitrate: audioBitrate,
-          fps: gifFps
-        });
-        setResults(res || []);
+        setResults(await window.darkhub.files.convertMedia({
+          ...base, codec, quality: preset, maxHeight, maxFps, encoderPref, copy: allowCopy ? 'auto' : 'never',
+          audioBitrate, gifFps, gifWidth, responsive
+        }));
       }
     } catch (err: any) {
       setError(err?.message ?? String(err));
     } finally {
       setIsConverting(false);
+      setCancelling(false);
+      jobRef.current = null;
     }
   };
 
   const removeFile = (index: number) => {
-    setInputFiles(prev => prev.filter((_, i) => i !== index));
+    setInputFiles((prev) => prev.filter((_, i) => i !== index));
     setResults(null);
   };
 
@@ -219,44 +214,80 @@ const FileConverter = () => {
     setInputFiles([]);
     setResults(null);
     setError(null);
+    setProgress({});
   };
 
   const currentFormats = useMemo(() => {
-    return FORMAT_MAP[category] || [];
-  }, [category]);
+    const item = (ext: string, key: string, tag?: string) => ({ ext, name: ext.toUpperCase(), desc: t(key, ''), tag });
+    if (category === 'image') return IMAGE_OUT.map((e) => item(e, `conv.fmt.${e}`, IMAGE_TAG[e]));
+    if (category === 'audio') return AUDIO_OUT.map((e) => item(e, `conv.fmt.${e}`));
+    if (category === 'video') {
+      return VIDEO_OUT.map((e) => (e === 'gif' ? { ...item(e, 'conv.fmt.vgif'), name: 'GIF' } : e === 'mp3' ? { ...item(e, 'conv.fmt.vmp3'), name: 'MP3' } : item(e, `conv.fmt.${e}`)));
+    }
+    if (category === 'document') return docTargets.map((e) => item(e, `conv.doc.${e}`));
+    return [
+      { ext: 'zip', name: t('conv.arc.zip', 'Compactar em ZIP'), desc: t('conv.arc.zipDesc', ''), tag: 'ZIP' },
+      { ext: 'tar.gz', name: t('conv.arc.targz', 'Compactar em TAR.GZ'), desc: t('conv.arc.targzDesc', ''), tag: 'TAR.GZ' },
+      { ext: 'extract', name: t('conv.arc.extract', 'Extrair'), desc: t('conv.arc.extractDesc', ''), tag: 'Extract' }
+    ];
+  }, [category, docTargets, t]);
 
-  const categories: { id: ConvertCategory; fmt: string; icon: React.ReactNode; label: string }[] = [
-    { id: 'image', fmt: 'png', icon: <ImageIcon size={16} />, label: 'Imagens' },
-    { id: 'audio', fmt: 'mp3', icon: <Music size={16} />, label: 'Áudio' },
-    { id: 'video', fmt: 'mp4', icon: <Video size={16} />, label: 'Vídeo & GIF' },
-    { id: 'document', fmt: 'txt', icon: <FileText size={16} />, label: 'Documentos' },
-    { id: 'archive', fmt: 'zip', icon: <Archive size={16} />, label: 'Compactador' }
+  const categories: { id: ConvertCategory; icon: React.ReactNode; label: string }[] = [
+    { id: 'image', icon: <ImageIcon size={16} />, label: t('conv.cat.image', 'Imagens') },
+    { id: 'audio', icon: <Music size={16} />, label: t('conv.cat.audio', 'Áudio') },
+    { id: 'video', icon: <Video size={16} />, label: t('conv.cat.video', 'Vídeo e GIF') },
+    { id: 'document', icon: <FileText size={16} />, label: t('conv.cat.document', 'Documentos') },
+    { id: 'archive', icon: <Archive size={16} />, label: t('conv.cat.archive', 'Compactador') }
   ];
 
   const chip = (active: boolean) =>
-    `h-7 text-xs font-mono rounded-md border transition-colors ${
+    `h-7 px-2 text-xs font-mono rounded-md border transition-colors ${
       active ? 'border-blue-400/70 bg-zinc-800/60 text-zinc-50' : 'border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
     }`;
+
+  const hwList = caps?.hwEncoders ?? [];
+  const engineNote = (() => {
+    if (!caps) return null;
+    if (category === 'video' || category === 'audio') {
+      return hwList.length
+        ? fill(t('conv.engine.gpuFound', 'GPU detectada: {list}'), { list: hwList.join(', ') })
+        : t('conv.engine.gpuNone', 'Nenhum codificador de GPU funcionou neste PC; vídeos usam a CPU.');
+    }
+    if (category === 'document') {
+      if (!caps.libreoffice.available) return t('conv.engine.loMissing', 'LibreOffice embutido ausente nesta build.');
+      return caps.libreoffice.bundled ? t('conv.engine.loBundled', 'LibreOffice embutido pronto') : t('conv.engine.loInstalled', 'Usando o LibreOffice instalado no Windows');
+    }
+    return null;
+  })();
+
+  const toggle = (checked: boolean, onChange: (v: boolean) => void, label: string, id: string) => (
+    <label htmlFor={id} className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer select-none">
+      <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="accent-blue-400" />
+      <span>{label}</span>
+    </label>
+  );
+
+  const doneCount = Object.values(progress).filter((p) => p.stage === 'done' || p.stage === 'error').length;
 
   return (
     <div className="w-full space-y-6 pb-12">
       <PageHeader
-        title="Conversor Universal de Arquivos"
-        subtitle="Converta imagens, vídeos, áudios, documentos e compacte arquivos com máxima fidelidade e processamento paralelo multithread."
+        title={t('conv.title', 'Conversor Universal de Arquivos')}
+        subtitle={t('conv.subtitle', 'Imagens, vídeos, áudios, documentos, planilhas, apresentações e e-books, tudo no seu PC e sem instalar nada.')}
         actions={
           <HelpTip
-            title="Conversor Universal"
-            description="Converta múltiplos arquivos em lote. Suporta conversão cruzada de vídeo para áudio, criação de ícones ICO, extração de texto de PDF e compactação nativa."
+            title={t('conv.help.title', 'Conversor Universal')}
+            description={t('conv.help.desc', '')}
             sections={[
-              { title: "Multithread", content: "Imagens e mídias utilizam todos os núcleos da CPU simultaneamente." },
-              { title: "Vídeo para GIF", content: "Cria GIFs de alta resolução com paleta dinâmica calculada." }
+              { title: t('conv.help.gpu.title', 'GPU primeiro'), content: t('conv.help.gpu.desc', '') },
+              { title: t('conv.help.copy.title', 'Sem recodificar'), content: t('conv.help.copy.desc', '') },
+              { title: t('conv.help.docs.title', 'Documentos sem instalar nada'), content: t('conv.help.docs.desc', '') }
             ]}
-            buttonLabel="Guia"
+            buttonLabel={t('conv.help.button', 'Guia')}
           />
         }
       />
 
-      {/* Category */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-1 p-1 rounded-lg border border-zinc-800" role="tablist">
         {categories.map((c) => {
           const active = category === c.id;
@@ -265,7 +296,8 @@ const FileConverter = () => {
               key={c.id}
               role="tab"
               aria-selected={active}
-              onClick={() => { setCategory(c.id); setTargetFormat(c.fmt); }}
+              disabled={isConverting}
+              onClick={() => { setCategory(c.id); setTargetFormat(DEFAULT_TARGET[c.id]); }}
               className={`flex items-center justify-center gap-2 h-8 px-3 rounded-md text-[12.5px] font-medium transition-colors ${
                 active ? 'bg-zinc-800 text-zinc-50' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
               }`}
@@ -278,7 +310,6 @@ const FileConverter = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Input */}
         <div className="lg:col-span-7 space-y-4">
           <div
             role="button"
@@ -294,51 +325,67 @@ const FileConverter = () => {
               if (res?.granted?.length) applyFiles(res.granted);
             }}
           >
-            <p className="text-[12.5px] text-zinc-400">
-              Arraste e solte arquivos aqui: imagens, vídeos, áudios, documentos ou compactados.
-            </p>
+            <p className="text-[12.5px] text-zinc-400">{t('conv.drop', 'Arraste e solte arquivos aqui.')}</p>
             <button type="button" className="dh-btn dh-btn-sm">
               <FolderOpen size={14} />
-              Selecionar Arquivos
+              {t('conv.pick', 'Selecionar arquivos')}
             </button>
           </div>
 
           <section className="dh-card p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="dh-section-title">
-                Fila de Arquivos <span className="font-mono text-zinc-500 font-normal">{inputFiles.length}</span>
+                {t('conv.queue', 'Fila de arquivos')} <span className="font-mono text-zinc-500 font-normal">{inputFiles.length}</span>
               </h2>
-              {inputFiles.length > 0 && (
+              {inputFiles.length > 0 && !isConverting && (
                 <button onClick={clearQueue} className="dh-btn dh-btn-ghost dh-btn-sm hover:!text-red-300">
                   <Trash2 size={14} />
-                  Limpar Fila
+                  {t('conv.clear', 'Limpar fila')}
                 </button>
               )}
             </div>
 
             {inputFiles.length === 0 ? (
-              <p className="py-6 text-center text-[12.5px] text-zinc-500">
-                Nenhum arquivo adicionado ainda.
-              </p>
+              <p className="py-6 text-center text-[12.5px] text-zinc-500">{t('conv.empty', 'Nenhum arquivo adicionado ainda.')}</p>
             ) : (
               <div className="max-h-56 overflow-y-auto custom-scrollbar divide-y divide-zinc-800/80 border-y border-zinc-800/80">
                 {inputFiles.map((file, idx) => {
                   const filename = file.split(/[\\/]/).pop();
-                  const ext = filename?.split('.').pop()?.toLowerCase();
+                  const p = progress[idx];
+                  const pct = p?.stage === 'done' ? 100 : p?.percent ?? null;
                   return (
-                    <div key={idx} className="flex items-center justify-between gap-3 py-2 text-xs">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="dh-tag w-10 shrink-0">{ext}</span>
-                        <span className="text-zinc-200 truncate select-text" title={file}>{filename}</span>
+                    <div key={file} className="py-2 text-xs space-y-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="dh-tag w-12 shrink-0 text-center">{extOf(file)}</span>
+                          <span className="text-zinc-200 truncate select-text" title={file}>{filename}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {p && p.stage === 'encode' && (
+                            <span className="font-mono text-[11px] text-zinc-400">
+                              {pct != null ? `${pct.toFixed(0)}%` : t('conv.progress.encode', 'Convertendo')}
+                              {p.speed ? ` · ${fill(t('conv.progress.speed', '{x}x'), { x: p.speed.toFixed(1) })}` : ''}
+                              {p.copy ? ` · ${t('conv.copyBadge', 'cópia')}` : p.hardware ? ` · ${t('conv.gpuBadge', 'GPU')}` : ''}
+                            </span>
+                          )}
+                          {p?.stage === 'probe' && <span className="text-[11px] text-zinc-500">{t('conv.progress.probe', 'Analisando...')}</span>}
+                          {!isConverting && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); removeFile(idx); }}
+                              aria-label={t('conv.remove', 'Remover')}
+                              title={t('conv.remove', 'Remover')}
+                              className="dh-btn dh-btn-ghost dh-btn-sm !px-1.5 hover:!text-red-300"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); removeFile(idx); }}
-                        aria-label="Remover"
-                        title="Remover"
-                        className="dh-btn dh-btn-ghost dh-btn-sm !px-1.5 hover:!text-red-300 shrink-0"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {isConverting && p && (p.stage === 'encode' || p.stage === 'done') && (
+                        <div className="h-1 rounded bg-zinc-900 overflow-hidden" role="progressbar" aria-valuenow={pct ?? undefined} aria-valuemin={0} aria-valuemax={100}>
+                          <div className={`h-full bg-blue-400/80 transition-[width] duration-300 ${pct == null ? 'w-1/3 animate-pulse' : ''}`} style={pct != null ? { width: `${pct}%` } : undefined} />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -347,122 +394,206 @@ const FileConverter = () => {
 
             <div className="pt-1 flex items-end justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <span className="dh-label block mb-1">Pasta de Destino:</span>
+                <span className="dh-label block mb-1">{t('conv.outDir', 'Pasta de destino')}:</span>
                 <span className={`font-mono text-xs truncate block select-text ${outputDir ? 'text-zinc-300' : 'text-zinc-500'}`} title={outputDir || undefined}>
-                  {outputDir || 'Nenhuma pasta selecionada (clique ao lado)'}
+                  {outputDir || t('conv.outDirNone', 'Nenhuma pasta selecionada (clique ao lado)')}
                 </span>
               </div>
-              <button onClick={handlePickOutputDir} className="dh-btn dh-btn-sm shrink-0">
+              <button onClick={handlePickOutputDir} disabled={isConverting} className="dh-btn dh-btn-sm shrink-0">
                 <FolderOpen size={14} />
-                Alterar Pasta
+                {t('conv.outDirPick', 'Alterar pasta')}
               </button>
             </div>
           </section>
         </div>
 
-        {/* Output */}
         <div className="lg:col-span-5">
           <section className="dh-card p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="dh-section-title">Formato de Saída</h2>
+              <h2 className="dh-section-title">{t('conv.output', 'Formato de saída')}</h2>
               <span className="dh-tag">{category}</span>
             </div>
+            {engineNote && <p className="text-[11.5px] text-zinc-500">{engineNote}</p>}
 
-            <div className="max-h-72 overflow-y-auto pr-1 custom-scrollbar space-y-1" role="radiogroup">
-              {currentFormats.map((fmt) => {
-                const isSelected = targetFormat === fmt.ext;
-                return (
-                  <button
-                    key={fmt.ext}
-                    role="radio"
-                    aria-checked={isSelected}
-                    onClick={() => setTargetFormat(fmt.ext)}
-                    className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border text-left transition-colors ${
-                      isSelected
-                        ? 'border-blue-400/70 bg-zinc-800/60 text-zinc-50'
-                        : 'border-transparent hover:border-zinc-800 hover:bg-zinc-900 text-zinc-300'
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-[13px] font-medium">{fmt.name}</span>
-                        {fmt.tag && <span className="dh-tag">{fmt.tag}</span>}
+            {category === 'document' && docTargets.length === 0 ? (
+              <p className="py-4 text-center text-[12.5px] text-zinc-500">
+                {inputFiles.length ? t('conv.errNoTarget', 'Nenhum formato de saída serve para todos os arquivos da fila.') : t('conv.docPickFirst', 'Adicione arquivos para ver os formatos possíveis.')}
+              </p>
+            ) : (
+              <div className="max-h-72 overflow-y-auto pr-1 custom-scrollbar space-y-1" role="radiogroup">
+                {currentFormats.map((fmt) => {
+                  const isSelected = targetFormat === fmt.ext;
+                  return (
+                    <button
+                      key={fmt.ext}
+                      role="radio"
+                      aria-checked={isSelected}
+                      disabled={isConverting}
+                      onClick={() => setTargetFormat(fmt.ext)}
+                      className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg border text-left transition-colors ${
+                        isSelected ? 'border-blue-400/70 bg-zinc-800/60 text-zinc-50' : 'border-transparent hover:border-zinc-800 hover:bg-zinc-900 text-zinc-300'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[13px] font-medium">{fmt.name}</span>
+                          {fmt.tag && <span className="dh-tag">{fmt.tag}</span>}
+                        </div>
+                        {fmt.desc && <p className="text-xs text-zinc-500 mt-0.5">{fmt.desc}</p>}
                       </div>
-                      <p className="text-xs text-zinc-500 mt-0.5">{fmt.desc}</p>
-                    </div>
-                    {isSelected && <CheckCircle2 size={16} className="text-blue-300 shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
-
-            {category === 'image' && ['jpg', 'webp', 'avif', 'tiff'].includes(targetFormat) && (
-              <div className="pt-4 border-t border-zinc-800/80 space-y-2">
-                <div className="flex justify-between items-center">
-                  <label htmlFor="fc-quality" className="dh-label">Qualidade de Imagem</label>
-                  <span className="font-mono text-xs text-zinc-100">{quality}<span className="text-zinc-500">%</span></span>
-                </div>
-                <input
-                  id="fc-quality"
-                  type="range"
-                  min="20"
-                  max="100"
-                  value={quality}
-                  onChange={(e) => setQuality(Number(e.target.value))}
-                  className="w-full"
-                />
+                      {isSelected && <CheckCircle2 size={16} className="text-blue-300 shrink-0" />}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
-            {category === 'audio' && ['mp3', 'aac', 'm4a', 'opus'].includes(targetFormat) && (
+            {category === 'image' && (
+              <div className="pt-4 border-t border-zinc-800/80 space-y-3">
+                {LOSSY_IMAGE.includes(targetFormat) && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label htmlFor="fc-quality" className="dh-label">{t('conv.opt.quality', 'Qualidade')}</label>
+                      <span className="font-mono text-xs text-zinc-100">{lossless ? '-' : quality}</span>
+                    </div>
+                    <input id="fc-quality" type="range" min="20" max="100" value={quality} disabled={lossless} onChange={(e) => setQuality(Number(e.target.value))} className="w-full" />
+                    {targetFormat !== 'jpg' && toggle(lossless, setLossless, t('conv.opt.lossless', 'Sem perdas'), 'fc-lossless')}
+                  </div>
+                )}
+                {targetFormat === 'dds' && (
+                  <div className="space-y-2">
+                    <label htmlFor="fc-dds" className="dh-label block">{t('conv.opt.ddsFormat', 'Compressão DDS')}</label>
+                    <select id="fc-dds" value={ddsFormat} onChange={(e) => setDdsFormat(e.target.value)} className="dh-input w-full h-8 text-xs">
+                      {DDS_FORMATS.filter((f) => !caps || caps.ddsFormats.includes(f)).map((f) => (
+                        <option key={f} value={f}>{t(`conv.opt.dds.${f}`, f)}</option>
+                      ))}
+                    </select>
+                    {toggle(srgb, setSrgb, t('conv.opt.srgb', 'Cor sRGB'), 'fc-srgb')}
+                    {toggle(mipmaps, setMipmaps, t('conv.opt.mipmaps', 'Gerar mipmaps'), 'fc-mips')}
+                  </div>
+                )}
+                {!['ico', 'cur'].includes(targetFormat) && (
+                  <div className="space-y-1.5">
+                    <span className="dh-label block">{t('conv.opt.resize', 'Redimensionar')}</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input aria-label={t('conv.opt.width', 'Largura')} placeholder={t('conv.opt.width', 'Largura')} inputMode="numeric" value={resizeW} onChange={(e) => setResizeW(e.target.value.replace(/\D/g, '').slice(0, 5))} className="dh-input h-8 text-xs font-mono" />
+                      <input aria-label={t('conv.opt.height', 'Altura')} placeholder={t('conv.opt.height', 'Altura')} inputMode="numeric" value={resizeH} onChange={(e) => setResizeH(e.target.value.replace(/\D/g, '').slice(0, 5))} className="dh-input h-8 text-xs font-mono" />
+                    </div>
+                  </div>
+                )}
+                {toggle(keepMeta, setKeepMeta, t('conv.opt.keepMeta', 'Manter metadados'), 'fc-meta')}
+              </div>
+            )}
+
+            {category === 'video' && targetFormat !== 'gif' && targetFormat !== 'mp3' && (
+              <div className="pt-4 border-t border-zinc-800/80 space-y-3">
+                <div className="space-y-1.5">
+                  <span className="dh-label block">{t('conv.opt.codec', 'Codec de vídeo')}</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(['auto', 'h264', 'hevc', 'av1', 'vp9'] as const)
+                      .filter((c) => c === 'auto' || (targetFormat === 'webm' ? ['vp9', 'av1'].includes(c) : ['mp4', 'mkv'].includes(targetFormat) ? ['h264', 'hevc', 'av1'].includes(c) : ['mov', 'm4v', 'ts'].includes(targetFormat) ? ['h264', 'hevc'].includes(c) : false))
+                      .map((c) => (
+                        <button key={c} onClick={() => setCodec(c)} aria-pressed={codec === c} className={chip(codec === c)}>
+                          {c === 'auto' ? t('conv.opt.codecAuto', 'Automático') : c.toUpperCase()}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="dh-label block">{t('conv.opt.preset', 'Velocidade e qualidade')}</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(['fast', 'balanced', 'high'] as const).map((p) => (
+                      <button key={p} onClick={() => setPreset(p)} aria-pressed={preset === p} className={chip(preset === p)}>{t(`conv.opt.preset.${p}`, p)}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label htmlFor="fc-res" className="dh-label block">{t('conv.opt.resolution', 'Resolução máxima')}</label>
+                    <select id="fc-res" value={maxHeight} onChange={(e) => setMaxHeight(Number(e.target.value))} className="dh-input w-full h-8 text-xs">
+                      <option value={0}>{t('conv.opt.source', 'Original')}</option>
+                      {[2160, 1440, 1080, 720, 480].map((h) => <option key={h} value={h}>{h}p</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="fc-fps" className="dh-label block">{t('conv.opt.fps', 'FPS máximo')}</label>
+                    <select id="fc-fps" value={maxFps} onChange={(e) => setMaxFps(Number(e.target.value))} className="dh-input w-full h-8 text-xs">
+                      <option value={0}>{t('conv.opt.source', 'Original')}</option>
+                      {[60, 30, 24].map((f) => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="fc-enc" className="dh-label block">{t('conv.opt.encoder', 'Codificador')}</label>
+                  <select id="fc-enc" value={encoderPref} onChange={(e) => setEncoderPref(e.target.value as 'auto' | 'gpu' | 'cpu')} className="dh-input w-full h-8 text-xs">
+                    <option value="auto">{t('conv.opt.encoder.auto', 'Automático (GPU, depois CPU)')}</option>
+                    <option value="gpu" disabled={caps != null && hwList.length === 0}>{t('conv.opt.encoder.gpu', 'Só GPU')}</option>
+                    <option value="cpu">{t('conv.opt.encoder.cpu', 'Só CPU')}</option>
+                  </select>
+                </div>
+                {toggle(allowCopy, setAllowCopy, t('conv.opt.copy', 'Copiar sem recodificar quando possível'), 'fc-copy')}
+                {toggle(responsive, setResponsive, t('conv.opt.responsive', 'Manter o PC responsivo'), 'fc-resp')}
+              </div>
+            )}
+
+            {(category === 'audio' || (category === 'video' && targetFormat === 'mp3')) && ['mp3', 'aac', 'm4a', 'opus', 'ogg', 'wma', 'ac3'].includes(targetFormat) && (
               <div className="pt-4 border-t border-zinc-800/80 space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="dh-label">Bitrate de Áudio</span>
-                  <span className="font-mono text-xs text-zinc-100">{audioBitrate.replace('k', '')}<span className="text-zinc-500">k</span></span>
+                  <span className="dh-label">{t('conv.opt.bitrate', 'Bitrate de áudio')}</span>
+                  <span className="font-mono text-xs text-zinc-100">{audioBitrate}</span>
                 </div>
                 <div className="grid grid-cols-4 gap-1.5">
                   {['128k', '192k', '256k', '320k'].map((br) => (
-                    <button key={br} onClick={() => setAudioBitrate(br)} aria-pressed={audioBitrate === br} className={chip(audioBitrate === br)}>
-                      {br}
-                    </button>
+                    <button key={br} onClick={() => setAudioBitrate(br)} aria-pressed={audioBitrate === br} className={chip(audioBitrate === br)}>{br}</button>
                   ))}
                 </div>
+                {category === 'audio' && toggle(allowCopy, setAllowCopy, t('conv.opt.copy', 'Copiar sem recodificar quando possível'), 'fc-copy-a')}
               </div>
             )}
 
             {category === 'video' && targetFormat === 'gif' && (
-              <div className="pt-4 border-t border-zinc-800/80 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="dh-label">Taxa de Quadros (GIF FPS)</span>
-                  <span className="font-mono text-xs text-zinc-100">{gifFps}<span className="text-zinc-500"> FPS</span></span>
+              <div className="pt-4 border-t border-zinc-800/80 space-y-3">
+                <div className="space-y-1.5">
+                  <span className="dh-label block">{t('conv.opt.gifFps', 'Quadros por segundo do GIF')}</span>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[10, 15, 20, 24].map((f) => (
+                      <button key={f} onClick={() => setGifFps(f)} aria-pressed={gifFps === f} className={chip(gifFps === f)}>{f}</button>
+                    ))}
+                  </div>
                 </div>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {[10, 15, 20, 24].map((f) => (
-                    <button key={f} onClick={() => setGifFps(f)} aria-pressed={gifFps === f} className={chip(gifFps === f)}>
-                      {f} <span className="text-zinc-500">FPS</span>
-                    </button>
-                  ))}
+                <div className="space-y-1.5">
+                  <span className="dh-label block">{t('conv.opt.gifWidth', 'Largura do GIF')}</span>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[320, 480, 640, 800].map((w) => (
+                      <button key={w} onClick={() => setGifWidth(w)} aria-pressed={gifWidth === w} className={chip(gifWidth === w)}>{w}</button>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
 
-            <button
-              onClick={handleConvert}
-              disabled={isConverting || !inputFiles.length}
-              className="dh-btn dh-btn-primary w-full"
-            >
-              {isConverting ? (
-                <>
+            {isConverting ? (
+              <div className="flex gap-2">
+                <div className="dh-btn dh-btn-primary flex-1 pointer-events-none" aria-live="polite">
                   <RefreshCw className="animate-spin" size={14} />
-                  <span>Convertendo <span className="font-mono">{inputFiles.length}</span> arquivo(s)...</span>
-                </>
-              ) : (
-                <>
-                  <span>Converter Agora</span>
-                  <ArrowRight size={14} />
-                </>
-              )}
-            </button>
+                  <span>
+                    {fill(t('conv.converting', 'Convertendo {n} arquivo(s)...'), { n: inputFiles.length })}
+                    {inputFiles.length > 1 && <span className="font-mono"> {doneCount}/{inputFiles.length}</span>}
+                  </span>
+                </div>
+                {category !== 'archive' && (
+                  <button onClick={handleCancel} disabled={cancelling} className="dh-btn shrink-0 hover:!text-red-300">
+                    <X size={14} />
+                    {cancelling ? t('conv.cancelling', 'Cancelando...') : t('conv.cancel', 'Cancelar')}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button onClick={handleConvert} disabled={!inputFiles.length || (category === 'document' && !docTargets.length)} className="dh-btn dh-btn-primary w-full">
+                <span>{t('conv.convert', 'Converter agora')}</span>
+                <ArrowRight size={14} />
+              </button>
+            )}
           </section>
         </div>
       </div>
@@ -472,40 +603,21 @@ const FileConverter = () => {
           <AlertCircle size={14} className="shrink-0" />
           <span className="min-w-0">{error}</span>
           {inputFiles.length > 0 && outputDir && !isConverting && (
-            <button onClick={handleConvert} className="dh-btn dh-btn-ghost dh-btn-sm">Tentar novamente</button>
+            <button onClick={handleConvert} className="dh-btn dh-btn-ghost dh-btn-sm">{t('conv.retry', 'Tentar novamente')}</button>
           )}
         </div>
-      )}
-
-      {isConverting && (
-        <section className="space-y-3" aria-hidden>
-          <div className="h-3.5 w-48 rounded bg-zinc-900 animate-pulse" />
-          <div className="divide-y divide-zinc-800/80 border-y border-zinc-800/80">
-            {Array.from({ length: Math.min(Math.max(inputFiles.length, 1), 4) }).map((_, i) => (
-              <div key={i} className="py-3 flex items-center justify-between gap-4">
-                <div className="flex-1 space-y-1.5">
-                  <div className="h-3 w-1/3 rounded bg-zinc-900 animate-pulse" />
-                  <div className="h-2.5 w-1/2 rounded bg-zinc-900 animate-pulse" />
-                </div>
-                <div className="h-3 w-14 rounded bg-zinc-900 animate-pulse" />
-              </div>
-            ))}
-          </div>
-        </section>
       )}
 
       {results && results.length > 0 && (
         <section className="space-y-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="dh-section-title">
-              Resultado da Conversão{' '}
-              <span className="font-normal text-zinc-500">
-                (<span className="font-mono text-zinc-300">{results.filter(r => r.ok).length}</span> de <span className="font-mono text-zinc-300">{results.length}</span> concluídos)
-              </span>
+              {t('conv.results', 'Resultado da conversão')}{' '}
+              <span className="font-normal text-zinc-500">({fill(t('conv.resultsCount', '{ok} de {total} concluídos'), { ok: results.filter((r) => r.ok).length, total: results.length })})</span>
             </h2>
             {outputDir && (
               <span className="text-xs text-zinc-500 truncate max-w-full">
-                Salvo em: <span className="font-mono select-text">{outputDir}</span>
+                {t('conv.savedIn', 'Salvo em:')} <span className="font-mono select-text">{outputDir}</span>
               </span>
             )}
           </div>
@@ -515,13 +627,24 @@ const FileConverter = () => {
               <div key={i} className="py-2.5 text-xs flex items-center justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <div className="text-zinc-200 truncate select-text">{r.inputFile}</div>
-                  <div className="text-zinc-500 truncate font-mono text-[11px] mt-0.5 select-text">{r.outputFile}</div>
+                  <div className="text-zinc-500 truncate font-mono text-[11px] mt-0.5 select-text">
+                    {r.outputFile}
+                    {r.outputs && r.outputs.length > 1 ? ` (+${r.outputs.length - 1})` : ''}
+                  </div>
                 </div>
-                <div className="shrink-0 max-w-[45%] text-right">
+                <div className="shrink-0 max-w-[45%] text-right space-y-0.5">
                   {r.ok ? (
-                    <span className="text-emerald-300 text-[11px]">Sucesso</span>
+                    <>
+                      <span className="text-emerald-300 text-[11px]">{t('conv.ok', 'Concluído')}</span>
+                      <div className="font-mono text-[10.5px] text-zinc-500">
+                        {[r.copy ? t('conv.copyBadge', 'cópia sem recodificar') : r.encoder ? `${r.hardware ? t('conv.gpuBadge', 'GPU') : t('conv.cpuBadge', 'CPU')} ${r.encoder}` : r.engine,
+                          r.seconds != null ? `${r.seconds.toFixed(1)}s` : '', fmtBytes(r.bytes)].filter(Boolean).join(' · ')}
+                      </div>
+                    </>
+                  ) : r.cancelled ? (
+                    <span className="text-zinc-400 text-[11px]">{t('conv.cancelled', 'Cancelado')}</span>
                   ) : (
-                    <span className="text-red-300 text-[11px] break-words">{r.error || 'Erro'}</span>
+                    <span className="text-red-300 text-[11px] break-words">{r.error || t('conv.error', 'Erro')}</span>
                   )}
                 </div>
               </div>

@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-11T18:57:04. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-12T07:48:20. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -124,6 +124,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `registerCodeRunnerIPC`:4, `handle`:5
 
+## `electron/ipc/converterIpc.js`
+
+`registerConverterIPC`:18, `htmlToPdf`:25, `validate`:50, `withJob`:61, `onProgress`:67
+
 ## `electron/ipc/darkosIpc.js`
 
 `registerDarkOSIPC`:8, `pick`:14, `sendTo`:16, `handle`:22, `usbEvent`:80
@@ -218,7 +222,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/main.js`
 
-`getSystemInformation`:130, `get`:136, `getSharp`:145, `getOcrWorker`:154, `getExiftool`:174, `getFfmpegPath`:182, `getLibraryStore`:214, `safeRegister`:221, `getYtDlpTools`:260, `isDev`:265, `normalizeAccessPath`:289, `isPathInside`:299, `grantFilePath`:305, `grantDirectoryPath`:310, `hasFileAccessGrant`:315, `assertOutputDirGranted`:327, `assertFileAccessGranted`:333, `assertFileAccessGrantedMany`:342, `psSingleQuote`:348, `loadRuntimeConfig`:352, `isAllowedExternalProtocol`:362, `getAllowedExternalUrl`:366, `openAllowedExternalUrlDetached`:376, `isEmbeddedExternalProtocol`:387, `handleEmbeddedExternalNavigation`:391, `isTrustedAppNavigation`:403, `getAppIconPath`:413, `showMainWindow`:428, `ensureTray`:441, `hideWindowToBackground`:468, `computeJunkEstimate`:476, `work`:486, `createMainWindow`:510, `kickWindowsPaint`:575, `showWhenReady`:647, `eventSender`:732, `measureLatency`:759, `getActiveAdapterName`:789, `getMainCpuLoad`:1025, `broadcastLibraryEvent`:1169, `scoreExecutable`:1245, `key`:1250, `scanDirectoryForBestExe`:1271, `walk`:1274, `findPgeBat`:1415, `launchPgeBat`:1435, `isStartupTaskEnabled`:1511, `setStartupTask`:1521, `refreshLiveCounts`:1632, `sendEvent`:1892, `findLibreOfficeSoffice`:2124, `toXml`:2216, `buildArgs`:2309, `vaultFilePath`:2583, `setVaultAutoLockMinutes`:2591, `clearVaultAutoLock`:2598, `scheduleVaultAutoLock`:2605, `touchVault`:2614, `vaultFileExists`:2618, `readVaultFile`:2627, `writeVaultFile`:2632, `lockVault`:2640, `ensureUnlocked`:2647, `loadVaultUsingWrapper`:2652, `persistVaultData`:2673, `getSecurityScoreV2`:3045, `add`:3050, `isValidHostname`:3227, `getClickEnginePath`:3361, `autoClickerCall`:3387, `isValidWingetId`:3467, `installGithubReleaseMsi`:3479, `installFromOfficialUrl`:3507, `progress`:3543, `runWinget`:3568, `runDeferredStartup`:3650
+`getSystemInformation`:131, `get`:137, `getSharp`:146, `getOcrWorker`:155, `getExiftool`:175, `getFfmpegPath`:183, `getLibraryStore`:215, `safeRegister`:222, `getYtDlpTools`:262, `isDev`:267, `normalizeAccessPath`:291, `isPathInside`:301, `grantFilePath`:307, `grantDirectoryPath`:312, `hasFileAccessGrant`:317, `assertOutputDirGranted`:329, `assertFileAccessGranted`:335, `assertFileAccessGrantedMany`:344, `psSingleQuote`:350, `loadRuntimeConfig`:354, `isAllowedExternalProtocol`:364, `getAllowedExternalUrl`:368, `openAllowedExternalUrlDetached`:378, `isEmbeddedExternalProtocol`:389, `handleEmbeddedExternalNavigation`:393, `isTrustedAppNavigation`:405, `getAppIconPath`:415, `showMainWindow`:430, `ensureTray`:443, `hideWindowToBackground`:470, `computeJunkEstimate`:478, `work`:488, `createMainWindow`:512, `kickWindowsPaint`:577, `showWhenReady`:649, `eventSender`:734, `measureLatency`:761, `getActiveAdapterName`:791, `getMainCpuLoad`:1027, `broadcastLibraryEvent`:1171, `scoreExecutable`:1247, `key`:1252, `scanDirectoryForBestExe`:1273, `walk`:1276, `findPgeBat`:1417, `launchPgeBat`:1437, `isStartupTaskEnabled`:1513, `setStartupTask`:1523, `refreshLiveCounts`:1634, `sendEvent`:1894, `buildArgs`:2062, `vaultFilePath`:2336, `setVaultAutoLockMinutes`:2344, `clearVaultAutoLock`:2351, `scheduleVaultAutoLock`:2358, `touchVault`:2367, `vaultFileExists`:2371, `readVaultFile`:2380, `writeVaultFile`:2385, `lockVault`:2393, `ensureUnlocked`:2400, `loadVaultUsingWrapper`:2405, `persistVaultData`:2426, `getSecurityScoreV2`:2798, `add`:2803, `isValidHostname`:2980, `getClickEnginePath`:3114, `autoClickerCall`:3140, `isValidWingetId`:3220, `installGithubReleaseMsi`:3232, `installFromOfficialUrl`:3260, `progress`:3296, `runWinget`:3321, `runDeferredStartup`:3403
 
 ## `electron/networkIPC.js`
 
@@ -230,7 +234,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:188, `handler`:227, `handler`:290, `handler`:309, `handler`:319, `handler`:337, `handler`:349, `listener`:392, `handler`:444, `handler`:470, `handler`:476, `handler`:482, `handler`:488, `listener`:497, `listener`:508, `handler`:533, `listener`:546, `listener`:563, `handler`:601, `handler`:616, `listener`:639, `listener`:668, `listener`:703, `listener`:730, `handler`:771
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:185, `listener`:196, `handler`:235, `handler`:298, `handler`:317, `handler`:327, `handler`:345, `handler`:357, `listener`:400, `handler`:452, `handler`:478, `handler`:484, `handler`:490, `handler`:496, `listener`:505, `listener`:516, `handler`:541, `listener`:554, `listener`:571, `handler`:609, `handler`:624, `listener`:647, `listener`:676, `listener`:711, `listener`:738, `handler`:779
 
 ## `electron/services/CodeRunner.js`
 
@@ -363,6 +367,38 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `electron/services/consoleText.js`
 
 `decodeConsoleText`:8
+
+## `electron/services/converter/DocumentConverter.js`
+
+`findSoffice`:18, `htmlEsc`:30, `wrapHtml`:31, `htmlToText`:35, `epubToHtml`:50, `get`:53, `createDocumentConverter`:92, `profileUrl`:94, `runLo`:97, `chromiumPdf`:111, `markdownHtml`:116, `pdfjs`:124, `jsConvert`:149, `chromiumConvert`:191, `convert`:213, `progress`:227, `fail`:228, `ok`:229
+
+## `electron/services/converter/ImageConverter.js`
+
+`ddsFormatArg`:40, `ffmpegImageEncodeArgs`:46, `ffmpegImageDecodeArgs`:62, `jxlModules`:70, `decodeHeic`:90, `tail`:96, `createImageConverter`:100, `ffmpegDecode`:101, `texconvDecode`:111, `rawDecode`:120, `open`:139, `encode`:181, `convert`:242
+
+## `electron/services/converter/MediaConverter.js`
+
+`detectHwEncoders`:14, `probeMedia`:31, `lastError`:41, `convertMedia`:52, `emit`:64
+
+## `electron/services/converter/docRoutes.js`
+
+`familyOf`:40, `routesFor`:49, `add`:52, `commonOutputs`:101, `detectDelimiter`:108, `parseCsv`:118, `toCsv`:139, `cell`:140, `xmlEsc`:147, `xmlName`:148, `jsonToXml`:150
+
+## `electron/services/converter/imageCodecs.js`
+
+`encodeBmp`:5, `encodeIco`:48, `readIcoDirectory`:79, `decodeIcoDib`:102, `decodeIcoBest`:148
+
+## `electron/services/converter/mediaPlan.js`
+
+`parseProbe`:45, `encoderArgs`:104, `audioEncoderArgs`:127, `accepts`:137, `pickVideoEncoder`:143, `buildMediaPlan`:160, `make`:243, `parseProgressChunk`:271, `responsiveThreads`:282
+
+## `electron/services/converter/processUtil.js`
+
+`killTree`:8, `run`:23, `uniqueOutputPath`:59, `mapLimit`:70, `createJob`:84, `extOf`:88
+
+## `electron/services/converter/vendorTools.js`
+
+`vendorDir`:9, `existing`:14, `texconvPath`:17, `dcrawPath`:19, `bundledSofficePath`:21
 
 ## `electron/services/darkos/DarkOS.Cli.ps1`
 
@@ -1266,7 +1302,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/i18n/messages.ts`
 
-`SupportedLang`:31 _type_, `LanguageOption`:33 _type_, `getTranslationTemplate`:3446
+`SupportedLang`:32 _type_, `LanguageOption`:34 _type_, `getTranslationTemplate`:3447
 
 ## `src/i18n/overlayEditorMessages.ts`
 
@@ -1354,7 +1390,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/FileConverter.tsx`
 
-`ConvertCategory`:19 _type_, `FormatOption`:21 _type_, `FileConverter`:73 _component_, `detectCategory`:86, `getDir`:95, `applyFiles`:100, `handlePickFiles`:117, `handlePickOutputDir`:139, `handleConvert`:148, `removeFile`:213, `clearQueue`:218, `chip`:236
+`ConvertCategory`:21 _type_, `detectCategory`:42, `fill`:55, `extOf`:56, `fmtBytes`:57, `FileConverter`:59 _component_, `getDir`:119, `applyFiles`:124, `handlePickFiles`:138, `handlePickOutputDir`:147, `handleConvert`:162, `removeFile`:208, `clearQueue`:213, `item`:221, `chip`:243, `engineNote`:249, `toggle`:263
 
 ## `src/pages/FramePacer.tsx`
 
@@ -1544,6 +1580,22 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `target`:7, `mockApi`:13
 
+## `tests/converterDocs.test.ts`
+
+`outs`:12
+
+## `tests/converterImage.test.ts`
+
+`gradient`:9
+
+## `tests/converterMedia.test.ts`
+
+`argAfter`:30
+
+## `tests/converterVendor.test.ts`
+
+`read`:8, `sha`:9
+
 ## `tests/darkosService.test.ts`
 
 `fakeFs`:13, `out`:22, `makeService`:26, `make`:358
@@ -1571,6 +1623,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/extensions.test.ts`
 
 `ext`:16
+
+## `tests/fileConverterPage.test.tsx`
+
+`mockApi`:9, `pick`:30
 
 ## `tests/gpuBench.test.ts`
 

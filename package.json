@@ -24,7 +24,9 @@
     "test:cleaner": "cargo test --manifest-path native_cleaner/Cargo.toml",
     "build:cleaner": "set \"RUSTFLAGS=-C target-feature=+crt-static\" && cargo build --release --manifest-path native_cleaner/Cargo.toml && powershell -NoProfile -Command \"Copy-Item native_cleaner/target/release/DarkHub_Cleaner.exe electron/services/DarkHub.Cleaner.exe -Force\"",
     "build:upscaler": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-realesrgan.ps1",
-    "build": "npm run build:native && npm run build:pacer && npm run build:disk && npm run build:cleaner && npm run build:upscaler && npm run build:renderer && npm run integrity && electron-builder",
+    "build:libreoffice": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-libreoffice.ps1",
+    "build:imagetools": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-imagetools.ps1",
+    "build": "npm run build:native && npm run build:pacer && npm run build:disk && npm run build:cleaner && npm run build:upscaler && npm run build:libreoffice && npm run build:imagetools && npm run build:renderer && npm run integrity && electron-builder",
     "build:setup-sfx": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create-sfx-setup.ps1",
     "build:setup-nsis": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$nsis=Join-Path $env:LOCALAPPDATA 'electron-builder\\Cache\\nsis\\nsis-3.0.4.1-nsis-3.0.4.1\\Bin\\makensis.exe'; & $nsis installer\\darkhub.nsi\"",
     "build:setup-inno": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-inno-setup.ps1",
@@ -43,14 +45,18 @@
     "ext:pack": "node scripts/ext.mjs pack"
   },
   "dependencies": {
+    "@jsquash/jxl": "1.3.0",
     "ajv": "^8.17.1",
     "diff": "^9.0.0",
     "electron-log": "^5.4.3",
     "electron-updater": "^6.8.3",
     "exifr": "^7.1.3",
     "exiftool-vendored": "^30.3.0",
+    "fflate": "0.8.3",
     "ffmpeg-static": "^5.2.0",
+    "heic-decode": "2.1.0",
     "js-yaml": "^4.1.1",
+    "marked": "18.2.0",
     "pdf-parse": "^2.4.5",
     "qrcode": "1.5.4",
     "sharp": "^0.34.3",
@@ -118,6 +124,7 @@
       "node_modules/sharp/**",
       "node_modules/@img/**",
       "node_modules/ffmpeg-static/**",
+      "node_modules/@napi-rs/**",
       "node_modules/exiftool-vendored.exe/**"
     ],
     "extraResources": [
@@ -141,6 +148,14 @@
       {
         "from": "vendor/realesrgan",
         "to": "realesrgan"
+      },
+      {
+        "from": "vendor/libreoffice",
+        "to": "libreoffice"
+      },
+      {
+        "from": "vendor/imagetools",
+        "to": "imagetools"
       }
     ],
     "win": {
