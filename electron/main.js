@@ -487,7 +487,7 @@ async function computeJunkEstimate(payload) {
 
   const work = (async () => {
     const start = Date.now()
-    const r = await StorageEngine.analyzeTempFiles({ deadlineMs: timeoutMs })
+    const r = await StorageEngine.analyzeTempFiles({ deadlineMs: timeoutMs, recycleBin: true })
     const result = {
       ok: true,
       ts: Date.now(),
@@ -495,6 +495,7 @@ async function computeJunkEstimate(payload) {
       bytes: r.summary.bytes,
       files: r.summary.files,
       truncated: r.summary.truncated,
+      recycleBin: r.summary.recycleBin ?? null,
       roots: StorageEngine.tempDirs
     }
     junkEstimateCache = { ts: Date.now(), result, inFlight: null }
@@ -1830,7 +1831,7 @@ ipcMain.handle('optimizer:applyTweak', async (_event, id) => {
     switch (id) {
       case 'optimize-ram': return await MemoryEngine.optimizeRAM()
       case 'clean-temp': {
-        const r = await StorageEngine.cleanTempFiles()
+        const r = await StorageEngine.cleanTempFiles({ recycleBin: true }) // Dashboard button: the user clicked
         junkEstimateCache = { ts: 0, result: null, inFlight: null } // the next estimate must read the folders again
         return r
       }

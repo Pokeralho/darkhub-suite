@@ -384,6 +384,8 @@ export type CleanerResult<T> = ({ ok: true } & T) | { ok: false; code?: string; 
 export interface CleanerRule { dir: string; patterns: string[]; recurse: boolean; remove_self: boolean }
 export interface CleanerTarget {
   id: string; name: string; category: string; source: 'builtin' | 'winapp2'; warning: string | null;
+  /** Built-in target with no folder rules (the Recycle Bin is measured and emptied through the Shell API). */
+  special?: 'recycle_bin';
   rules: CleanerRule[]; rejected: { rule: string; reason: string }[]; ignored_registry: number;
 }
 export interface CleanerTotals { files: number; bytes: number; locked: number; denied: number; protected: number; links: number }

@@ -743,7 +743,7 @@ Limpa o cache local do resolvedor de DNS (ipconfig /flushdns). Útil se um site 
 
 **Limpar Arquivos Temporários** · risk: low · one-time action · any package
 
-Apaga arquivos temporários (TEMP do usuário, Windows\Temp, cache de download do Windows Update, minidumps). Arquivos em uso são ignorados e o espaço liberado é medido de verdade.
+Apaga arquivos temporários (TEMP do usuário, Windows\Temp, cache de download do Windows Update, minidumps) e esvazia a Lixeira de todas as unidades. Arquivos em uso são ignorados e o espaço liberado é medido de verdade. A manutenção agendada e os presets do Hub não mexem na Lixeira.
 
 ### `darkhub:op:optimizeRAM`
 

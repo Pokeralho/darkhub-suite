@@ -111,17 +111,39 @@ class StorageEngine {
    * What cleanTempFiles would remove: same folders, same protected names, so the dashboard estimate and the
    * cleaner can never disagree. `deadlineMs` stops early and marks the result as truncated (a lower bound).
    */
-  async analyzeTempFiles({ deadlineMs = 0 } = {}) {
+  /** The Recycle Bin goes through DarkHub.Cleaner.exe (Shell API, every drive). Loaded on first use. */
+  async _cleaner() {
+    if (!this.cleaner) {
+      const { CleanerService } = await import('../cleaner/CleanerService.js');
+      this.cleaner = new CleanerService();
+    }
+    return this.cleaner;
+  }
+
+  async analyzeTempFiles({ deadlineMs = 0, recycleBin = false } = {}) {
     const state = this._newState();
     if (deadlineMs > 0) state.deadline = Date.now() + deadlineMs;
     for (const dir of this.tempDirs) {
       await this._walk(dir, { dryRun: true, state });
       if (state.truncated) break;
     }
-    return { ok: true, summary: { files: state.files, bytes: state.bytes, dirs: this.tempDirs.length, truncated: state.truncated } };
+    const summary = { files: state.files, bytes: state.bytes, dirs: this.tempDirs.length, truncated: state.truncated };
+    if (recycleBin) {
+      const r = await (await this._cleaner()).recycleBin();
+      if (r?.ok) {
+        summary.recycleBin = { bytes: r.before.bytes, items: r.before.items };
+        summary.files += r.before.items;
+        summary.bytes += r.before.bytes;
+      }
+    }
+    return { ok: true, summary };
   }
 
-  async cleanTempFiles() {
+  /**
+   * `recycleBin: true` also empties the Recycle Bin (permanent). Only callers acting on a user's click pass it
+   * (Optimizer, Dashboard): scheduled maintenance, Hub packages and the privacy clean keep the bin as it is.
+   */
+  async cleanTempFiles({ recycleBin = false } = {}) {
     const started = Date.now();
     let totalDeleted = 0;
     let totalFreed = 0;
@@ -142,7 +164,23 @@ class StorageEngine {
       msg += ` ${totalLocked} item(ns) ignorado(s) por estarem em uso${totalDenied ? ` ou exigirem administrador (${totalDenied})` : ''}.`;
     }
 
+    let bin = null;
+    if (recycleBin) {
+      const r = await (await this._cleaner()).recycleBin({ apply: true });
+      if (r?.ok) {
+        bin = { items: r.files, bytes: r.bytes, left: r.locked };
+        totalFreed += r.bytes;
+        msg += r.before.items
+          ? ` Lixeira esvaziada: ${r.files} item(ns), ${formatBytes(r.bytes)}${r.locked ? ` (${r.locked} não saíram)` : ''}.`
+          : ' Lixeira já estava vazia.';
+      } else {
+        bin = { error: r?.error || 'falha' };
+        msg += ` Lixeira não esvaziada: ${r?.error || 'falha'}.`;
+      }
+    }
+
     return {
+      recycleBin: bin,
       ok: true,
       status,
       deniedFiles: totalDenied,
@@ -159,4 +197,5 @@ class StorageEngine {
   }
 }
 
+export { StorageEngine };
 export default new StorageEngine();

@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-12T07:48:20. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-12T22:06:46. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -222,7 +222,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/main.js`
 
-`getSystemInformation`:131, `get`:137, `getSharp`:146, `getOcrWorker`:155, `getExiftool`:175, `getFfmpegPath`:183, `getLibraryStore`:215, `safeRegister`:222, `getYtDlpTools`:262, `isDev`:267, `normalizeAccessPath`:291, `isPathInside`:301, `grantFilePath`:307, `grantDirectoryPath`:312, `hasFileAccessGrant`:317, `assertOutputDirGranted`:329, `assertFileAccessGranted`:335, `assertFileAccessGrantedMany`:344, `psSingleQuote`:350, `loadRuntimeConfig`:354, `isAllowedExternalProtocol`:364, `getAllowedExternalUrl`:368, `openAllowedExternalUrlDetached`:378, `isEmbeddedExternalProtocol`:389, `handleEmbeddedExternalNavigation`:393, `isTrustedAppNavigation`:405, `getAppIconPath`:415, `showMainWindow`:430, `ensureTray`:443, `hideWindowToBackground`:470, `computeJunkEstimate`:478, `work`:488, `createMainWindow`:512, `kickWindowsPaint`:577, `showWhenReady`:649, `eventSender`:734, `measureLatency`:761, `getActiveAdapterName`:791, `getMainCpuLoad`:1027, `broadcastLibraryEvent`:1171, `scoreExecutable`:1247, `key`:1252, `scanDirectoryForBestExe`:1273, `walk`:1276, `findPgeBat`:1417, `launchPgeBat`:1437, `isStartupTaskEnabled`:1513, `setStartupTask`:1523, `refreshLiveCounts`:1634, `sendEvent`:1894, `buildArgs`:2062, `vaultFilePath`:2336, `setVaultAutoLockMinutes`:2344, `clearVaultAutoLock`:2351, `scheduleVaultAutoLock`:2358, `touchVault`:2367, `vaultFileExists`:2371, `readVaultFile`:2380, `writeVaultFile`:2385, `lockVault`:2393, `ensureUnlocked`:2400, `loadVaultUsingWrapper`:2405, `persistVaultData`:2426, `getSecurityScoreV2`:2798, `add`:2803, `isValidHostname`:2980, `getClickEnginePath`:3114, `autoClickerCall`:3140, `isValidWingetId`:3220, `installGithubReleaseMsi`:3232, `installFromOfficialUrl`:3260, `progress`:3296, `runWinget`:3321, `runDeferredStartup`:3403
+`getSystemInformation`:131, `get`:137, `getSharp`:146, `getOcrWorker`:155, `getExiftool`:175, `getFfmpegPath`:183, `getLibraryStore`:215, `safeRegister`:222, `getYtDlpTools`:262, `isDev`:267, `normalizeAccessPath`:291, `isPathInside`:301, `grantFilePath`:307, `grantDirectoryPath`:312, `hasFileAccessGrant`:317, `assertOutputDirGranted`:329, `assertFileAccessGranted`:335, `assertFileAccessGrantedMany`:344, `psSingleQuote`:350, `loadRuntimeConfig`:354, `isAllowedExternalProtocol`:364, `getAllowedExternalUrl`:368, `openAllowedExternalUrlDetached`:378, `isEmbeddedExternalProtocol`:389, `handleEmbeddedExternalNavigation`:393, `isTrustedAppNavigation`:405, `getAppIconPath`:415, `showMainWindow`:430, `ensureTray`:443, `hideWindowToBackground`:470, `computeJunkEstimate`:478, `work`:488, `createMainWindow`:513, `kickWindowsPaint`:578, `showWhenReady`:650, `eventSender`:735, `measureLatency`:762, `getActiveAdapterName`:792, `getMainCpuLoad`:1028, `broadcastLibraryEvent`:1172, `scoreExecutable`:1248, `key`:1253, `scanDirectoryForBestExe`:1274, `walk`:1277, `findPgeBat`:1418, `launchPgeBat`:1438, `isStartupTaskEnabled`:1514, `setStartupTask`:1524, `refreshLiveCounts`:1635, `sendEvent`:1895, `buildArgs`:2063, `vaultFilePath`:2337, `setVaultAutoLockMinutes`:2345, `clearVaultAutoLock`:2352, `scheduleVaultAutoLock`:2359, `touchVault`:2368, `vaultFileExists`:2372, `readVaultFile`:2381, `writeVaultFile`:2386, `lockVault`:2394, `ensureUnlocked`:2401, `loadVaultUsingWrapper`:2406, `persistVaultData`:2427, `getSecurityScoreV2`:2799, `add`:2804, `isValidHostname`:2981, `getClickEnginePath`:3115, `autoClickerCall`:3141, `isValidWingetId`:3221, `installGithubReleaseMsi`:3233, `installFromOfficialUrl`:3261, `progress`:3297, `runWinget`:3322, `runDeferredStartup`:3404
 
 ## `electron/networkIPC.js`
 
@@ -362,7 +362,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/cleaner/CleanerService.js`
 
-`defaultExe`:16, `sanitizeIds`:22, `validateWinapp2`:31, `CleanerService`:44 _class_, `available`:55, `winapp2Path`:57, `metaPath`:58, `backupDir`:61, `run`:73, `_withIds`:84, `_exclusive`:91, `_winapp2Args`:98, `definitions`:100, `status`:109, `updateDefinitions`:116, `removeDefinitions`:141, `listTargets`:146, `scan`:148, `clean`:153, `browsers`:163, `regScan`:172, `regClean`:175, `listBackups`:185, `restoreBackup`:196
+`defaultExe`:16, `sanitizeIds`:22, `validateWinapp2`:31, `CleanerService`:44 _class_, `available`:55, `winapp2Path`:57, `metaPath`:58, `backupDir`:61, `run`:73, `_withIds`:84, `_exclusive`:91, `_winapp2Args`:98, `definitions`:100, `status`:109, `updateDefinitions`:116, `removeDefinitions`:141, `listTargets`:146, `scan`:148, `clean`:153, `browsers`:163, `recycleBin`:173, `regScan`:177, `regClean`:180, `listBackups`:190, `restoreBackup`:201
 
 ## `electron/services/consoleText.js`
 
@@ -606,7 +606,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/optimizer/StorageEngine.js`
 
-`StorageEngine`:6 _class_, `_getStandardizedTempDirs`:11, `add`:13, `_isProtectedPath`:34, `_walk`:59, `_newState`:100, `_deleteDirContents`:104, `analyzeTempFiles`:114, `cleanTempFiles`:124
+`StorageEngine`:6 _class_, `_getStandardizedTempDirs`:11, `add`:13, `_isProtectedPath`:34, `_walk`:59, `_newState`:100, `_deleteDirContents`:104, `_cleaner`:115, `analyzeTempFiles`:123, `cleanTempFiles`:146
 
 ## `electron/services/optimizer/SystemEngine.js`
 
@@ -614,7 +614,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/optimizer/SystemOptimizerService.js`
 
-`adaptResult`:20, `SystemOptimizerService`:35 _class_, `_tweakOp`:46, `_op`:71, `registerOperations`:82, `registerReverts`:534, `registerProfiles`:559, `_publicOp`:641, `listOperations`:677, `_statusContext`:687, `checkOperationsStatus`:697, `listProfiles`:718, `analyze`:722, `checkIsAdmin`:746, `validateTaskCompatibility`:754, `_runTasksNow`:775
+`adaptResult`:20, `SystemOptimizerService`:35 _class_, `_tweakOp`:46, `_op`:71, `registerOperations`:82, `registerReverts`:536, `registerProfiles`:561, `_publicOp`:643, `listOperations`:679, `_statusContext`:689, `checkOperationsStatus`:699, `listProfiles`:720, `analyze`:724, `checkIsAdmin`:748, `validateTaskCompatibility`:756, `_runTasksNow`:777
 
 ## `electron/services/optimizer/ToolboxEngine.js`
 
@@ -862,7 +862,11 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `native_cleaner/src/main.rs`
 
-`parse`:37, `get`:57, `flag`:60, `env_of`:65, `read_winapp2`:73, `read_ids`:82, `reg_exists`:88, `reg_sources`:99, `run`:106, `main`:157
+`parse`:42, `get`:62, `flag`:65, `env_of`:70, `read_winapp2`:78, `read_ids`:87, `reg_exists`:93, `reg_sources`:104, `recycle_target`:114, `recycle_run`:123, `run`:146, `main`:219
+
+## `native_cleaner/src/recycle.rs`
+
+`query`:7, `empty`:17
 
 ## `native_cleaner/src/registry.rs`
 
@@ -874,7 +878,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `native_cleaner/src/tests.rs`
 
-`tmp`:12, `put`:19, `no_reg`:24, `wildcard_matching`:29, `rules_outside_expected_folders_are_refused`:39, `winapp2_parsing_detection_and_validation`:60, `protected_files_survive_and_shred_unlinks`:121, `shred_overwrites_before_unlink`:142, `builtin_targets_parse`:157, `make_db`:165, `browser_vacuum_shrinks_and_keeps_rows`:176, `values_of`:211, `command_lines`:218, `scan_backup_clean_and_restore`:227, `test_root_is_confined`:305, `rules_aimed_at_passwords_are_refused`:312
+`tmp`:12, `put`:19, `no_reg`:24, `wildcard_matching`:29, `rules_outside_expected_folders_are_refused`:39, `winapp2_parsing_detection_and_validation`:60, `protected_files_survive_and_shred_unlinks`:121, `shred_overwrites_before_unlink`:142, `builtin_targets_parse`:157, `make_db`:165, `browser_vacuum_shrinks_and_keeps_rows`:176, `values_of`:211, `command_lines`:218, `scan_backup_clean_and_restore`:227, `test_root_is_confined`:305, `rules_aimed_at_passwords_are_refused`:312, `recycle_bin_is_never_touched_in_test_mode`:328
 
 ## `native_cleaner/src/util.rs`
 
@@ -1719,6 +1723,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/realtime.test.ts`
 
 `tmp`:19, `sha`:20, `waitFor`:21
+
+## `tests/recycleBin.test.ts`
+
+`fakeCleaner`:20, `engineWithTemp`:29
 
 ## `tests/restoreService.test.ts`
 

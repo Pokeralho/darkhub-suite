@@ -96,13 +96,15 @@ class SystemOptimizerService {
     this._op({
       id: 'optimizer:cleanTemp',
       name: 'Limpar Arquivos Temporários',
-      description: 'Apaga arquivos temporários (TEMP do usuário, Windows\\Temp, cache de download do Windows Update, minidumps). Arquivos em uso são ignorados e o espaço liberado é medido de verdade.',
-      technicalDescription: 'Varre recursivamente %TEMP%, %WINDIR%\\Temp, SoftwareDistribution\\Download, Minidump e CrashDumps preservando caches de shader. Pastas do sistema podem exigir administrador.',
+      description: 'Apaga arquivos temporários (TEMP do usuário, Windows\\Temp, cache de download do Windows Update, minidumps) e esvazia a Lixeira de todas as unidades. Arquivos em uso são ignorados e o espaço liberado é medido de verdade. A manutenção agendada e os presets do Hub não mexem na Lixeira.',
+      technicalDescription: 'Varre recursivamente %TEMP%, %WINDIR%\\Temp, SoftwareDistribution\\Download, Minidump e CrashDumps preservando caches de shader. A Lixeira é medida e esvaziada pela API do Windows (SHQueryRecycleBin/SHEmptyRecycleBin) via DarkHub.Cleaner.exe. Pastas do sistema podem exigir administrador.',
       category: 'storage',
       risk: 'safe',
       requiresAdmin: false,
       estimatedTimeMs: 1500,
-      execute: async () => adaptResult(await StorageEngine.cleanTempFiles(), { resources: ['Temp folders'] })
+      // From the Optimizer screen (optimizer:run passes eventSender) the user clicked: the Recycle Bin is included.
+      // Hub packages call execute() with no arguments and keep it.
+      execute: async (eventSender) => adaptResult(await StorageEngine.cleanTempFiles({ recycleBin: typeof eventSender === 'function' }), { resources: ['Temp folders', 'Recycle Bin'] })
     });
 
     this._op({

@@ -169,6 +169,11 @@ export class CleanerService {
     return this._exclusive('browsers', apply, () => this.run(args, { timeoutMs: 600000 }));
   }
 
+  /** Size of the Recycle Bin (all drives); `apply` empties it (permanent). Also used by the Optimizer's temp clean. */
+  recycleBin({ apply = false } = {}) {
+    return this._exclusive('recycle-bin', apply, () => this.run(['recycle-bin', ...(apply ? ['--apply'] : [])], { timeoutMs: 300000 }));
+  }
+
   regScan() { return this.run(['reg-scan'], { timeoutMs: 120000 }); }
 
   /** Always writes a .reg restore file in the backup folder before the engine touches a key. */

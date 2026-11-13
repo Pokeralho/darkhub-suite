@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-12T07:48:20. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-12T22:06:46. NAO edite a mao: rode `npm run map`. -->
 
 # Catalogo de operacoes registradas (106)
 
@@ -83,39 +83,39 @@ Cada item do Otimizador/tweaks/etc. com o arquivo e a linha onde e definido e a 
 
 | id | nome | categoria | risco | linha | executa |
 |---|---|---|---|---|---|
-| `optimizer:optimizeAudioLatency` | Garantir Prioridade Alta do Áudio (temporário) | audio | safe | 244 | `MemoryEngine.optimizeAudioLatency` |
-| `optimizer:disableGameBar` | Desativar Gravação em Segundo Plano (Game DVR) | gaming |  | 235 | `-> tweak:disableGameDvr (electron/services/optimizer/DeepTweaksEngine.js:251)` |
-| `optimizer:optimizeGameRoute` | Prioridade Multimídia para Jogos (MMCSS) | gaming | moderate | 256 | `NetworkEngine.optimizeGameRoute`<br>`NetworkEngine.revertGameRoute`<br>`-> tweak:mmcssGames (electron/services/optimizer/DeepTweaksEngine.js:260)` |
-| `optimizer:disableMouseAcceleration` | Desativar Aceleração do Mouse (precisão do ponteiro) | gaming |  | 378 | `-> tweak:disableMouseAcceleration (electron/services/optimizer/DeepTweaksEngine.js:272)` |
-| `optimizer:kernelExtreme` | Kernel e Latência: prioridade de primeiro plano, MMCSS, NTFS e timer | gaming | moderate | 438 | `SystemEngine.applyExtremeKernelMod`<br>`SystemEngine.revertExtremeKernelMod`<br>`-> group:kernelCore (electron/services/optimizer/DeepTweaksEngine.js:655)`<br>`-> tweak:mmcssGames (electron/services/optimizer/DeepTweaksEngine.js:260)` |
-| `optimizer:timerTuning` | Timer: desativar dynamic tick (BCD) | gaming | moderate | 455 | `SystemEngine.applyTimerTuning`<br>`SystemEngine.revertTimerTuning` |
-| `optimizer:msiMode` | Modo MSI para a(s) GPU(s)  [AVANÇADO] | gaming | advanced | 516 | `SystemEngine.applyMsiMode`<br>`SystemEngine.revertMsiMode` |
-| `optimizer:optimizeRAM` | Liberar Memória RAM (temporário) | memory | safe | 109 | `MemoryEngine.optimizeRAM` |
+| `optimizer:optimizeAudioLatency` | Garantir Prioridade Alta do Áudio (temporário) | audio | safe | 246 | `MemoryEngine.optimizeAudioLatency` |
+| `optimizer:disableGameBar` | Desativar Gravação em Segundo Plano (Game DVR) | gaming |  | 237 | `-> tweak:disableGameDvr (electron/services/optimizer/DeepTweaksEngine.js:251)` |
+| `optimizer:optimizeGameRoute` | Prioridade Multimídia para Jogos (MMCSS) | gaming | moderate | 258 | `NetworkEngine.optimizeGameRoute`<br>`NetworkEngine.revertGameRoute`<br>`-> tweak:mmcssGames (electron/services/optimizer/DeepTweaksEngine.js:260)` |
+| `optimizer:disableMouseAcceleration` | Desativar Aceleração do Mouse (precisão do ponteiro) | gaming |  | 380 | `-> tweak:disableMouseAcceleration (electron/services/optimizer/DeepTweaksEngine.js:272)` |
+| `optimizer:kernelExtreme` | Kernel e Latência: prioridade de primeiro plano, MMCSS, NTFS e timer | gaming | moderate | 440 | `SystemEngine.applyExtremeKernelMod`<br>`SystemEngine.revertExtremeKernelMod`<br>`-> group:kernelCore (electron/services/optimizer/DeepTweaksEngine.js:655)`<br>`-> tweak:mmcssGames (electron/services/optimizer/DeepTweaksEngine.js:260)` |
+| `optimizer:timerTuning` | Timer: desativar dynamic tick (BCD) | gaming | moderate | 457 | `SystemEngine.applyTimerTuning`<br>`SystemEngine.revertTimerTuning` |
+| `optimizer:msiMode` | Modo MSI para a(s) GPU(s)  [AVANÇADO] | gaming | advanced | 518 | `SystemEngine.applyMsiMode`<br>`SystemEngine.revertMsiMode` |
+| `optimizer:optimizeRAM` | Liberar Memória RAM (temporário) | memory | safe | 111 | `MemoryEngine.optimizeRAM` |
 | `optimizer:flushDns` | Limpar Cache de DNS | network | safe | 85 | `NetworkEngine.flushDns` |
-| `optimizer:networkExtreme` | Pilha TCP: RSC desligado, RSS ligado, timestamps off | network | moderate | 471 | `SystemEngine.applyExtremeNetworkMod`<br>`SystemEngine.revertExtremeNetworkMod` |
-| `optimizer:advancedNetwork` | Rede: TCP NoDelay/AckFrequency por adaptador, EEE off, QoS | network | moderate | 486 | `NetworkEngine.advancedNetworkApply`<br>`NetworkEngine.advancedNetworkRevert` |
-| `optimizer:powerPlanHighPerformance` | Plano de Energia: Alto Desempenho | power | moderate | 121 | `PowerEngine.setHighPerformance`<br>`PowerEngine.restorePrevious` |
-| `optimizer:powerPlanUltimate` | Plano de Energia: Desempenho Máximo | power | moderate | 139 | `PowerEngine.setUltimate`<br>`PowerEngine.restorePrevious` |
-| `optimizer:powerPlanBalanced` | Plano de Energia: Equilibrado | power | safe | 157 | `PowerEngine.setBalanced` |
-| `optimizer:powerPlanRestore` | Plano de Energia: Restaurar anterior | power | safe | 170 | `PowerEngine.restorePrevious` |
-| `optimizer:cpuUnpark` | CPU: manter todos os núcleos ativos (plano atual, na tomada) | power | moderate | 501 | `SystemEngine.applyCpuUnpark`<br>`SystemEngine.revertCpuUnpark` |
-| `optimizer:disableTelemetry` | Reduzir Telemetria ao Mínimo | privacy |  | 184 | `-> tweak:disableTelemetry (electron/services/optimizer/DeepTweaksEngine.js:181)` |
-| `optimizer:disableLocation` | Desativar Localização (política) | privacy |  | 193 | `-> tweak:disableLocation (electron/services/optimizer/DeepTweaksEngine.js:217)` |
-| `optimizer:disableActivityHistory` | Desativar Histórico de Atividades | privacy |  | 201 | `-> tweak:disableActivityHistory (electron/services/optimizer/DeepTweaksEngine.js:211)` |
-| `optimizer:disableCortana` | Desativar Cortana (política legada) | privacy |  | 209 | `-> tweak:disableCortana (electron/services/optimizer/DeepTweaksEngine.js:205)` |
-| `optimizer:disableAiAndAds` | Desativar Recall (IA), Copilot e Sugestões Web | privacy |  | 217 | `-> tweak:disableAiAndAds (electron/services/optimizer/DeepTweaksEngine.js:191)` |
-| `optimizer:blockAdsAndSuggestions` | Bloquear Anúncios e Sugestões do Windows | privacy |  | 225 | `-> tweak:blockAdsAndSuggestions (electron/services/optimizer/DeepTweaksEngine.js:236)` |
-| `optimizer:disableCoreIsolation` | Modo Hardcore: Desativar VBS / Integridade de Memória  [RISCO DE SEGURANÇA] | security | advanced | 292 | `SystemEngine.applyHardcoreGamerMode`<br>`SystemEngine.revertHardcoreGamerMode`<br>`-> tweak:disableVBS (electron/services/optimizer/DeepTweaksEngine.js:288)`<br>`-> tweak:disableHibernation (electron/services/optimizer/DeepTweaksEngine.js:299)` |
-| `optimizer:disableServices` | Desativar Serviços Redundantes (WSearch, DiagTrack, CDPSvc, lfsvc) | services | advanced | 272 | `ServicesEngine.applyServicesTweak`<br>`ServicesEngine.revertServicesTweak`<br>`ServicesEngine.readServices` |
+| `optimizer:networkExtreme` | Pilha TCP: RSC desligado, RSS ligado, timestamps off | network | moderate | 473 | `SystemEngine.applyExtremeNetworkMod`<br>`SystemEngine.revertExtremeNetworkMod` |
+| `optimizer:advancedNetwork` | Rede: TCP NoDelay/AckFrequency por adaptador, EEE off, QoS | network | moderate | 488 | `NetworkEngine.advancedNetworkApply`<br>`NetworkEngine.advancedNetworkRevert` |
+| `optimizer:powerPlanHighPerformance` | Plano de Energia: Alto Desempenho | power | moderate | 123 | `PowerEngine.setHighPerformance`<br>`PowerEngine.restorePrevious` |
+| `optimizer:powerPlanUltimate` | Plano de Energia: Desempenho Máximo | power | moderate | 141 | `PowerEngine.setUltimate`<br>`PowerEngine.restorePrevious` |
+| `optimizer:powerPlanBalanced` | Plano de Energia: Equilibrado | power | safe | 159 | `PowerEngine.setBalanced` |
+| `optimizer:powerPlanRestore` | Plano de Energia: Restaurar anterior | power | safe | 172 | `PowerEngine.restorePrevious` |
+| `optimizer:cpuUnpark` | CPU: manter todos os núcleos ativos (plano atual, na tomada) | power | moderate | 503 | `SystemEngine.applyCpuUnpark`<br>`SystemEngine.revertCpuUnpark` |
+| `optimizer:disableTelemetry` | Reduzir Telemetria ao Mínimo | privacy |  | 186 | `-> tweak:disableTelemetry (electron/services/optimizer/DeepTweaksEngine.js:181)` |
+| `optimizer:disableLocation` | Desativar Localização (política) | privacy |  | 195 | `-> tweak:disableLocation (electron/services/optimizer/DeepTweaksEngine.js:217)` |
+| `optimizer:disableActivityHistory` | Desativar Histórico de Atividades | privacy |  | 203 | `-> tweak:disableActivityHistory (electron/services/optimizer/DeepTweaksEngine.js:211)` |
+| `optimizer:disableCortana` | Desativar Cortana (política legada) | privacy |  | 211 | `-> tweak:disableCortana (electron/services/optimizer/DeepTweaksEngine.js:205)` |
+| `optimizer:disableAiAndAds` | Desativar Recall (IA), Copilot e Sugestões Web | privacy |  | 219 | `-> tweak:disableAiAndAds (electron/services/optimizer/DeepTweaksEngine.js:191)` |
+| `optimizer:blockAdsAndSuggestions` | Bloquear Anúncios e Sugestões do Windows | privacy |  | 227 | `-> tweak:blockAdsAndSuggestions (electron/services/optimizer/DeepTweaksEngine.js:236)` |
+| `optimizer:disableCoreIsolation` | Modo Hardcore: Desativar VBS / Integridade de Memória  [RISCO DE SEGURANÇA] | security | advanced | 294 | `SystemEngine.applyHardcoreGamerMode`<br>`SystemEngine.revertHardcoreGamerMode`<br>`-> tweak:disableVBS (electron/services/optimizer/DeepTweaksEngine.js:288)`<br>`-> tweak:disableHibernation (electron/services/optimizer/DeepTweaksEngine.js:299)` |
+| `optimizer:disableServices` | Desativar Serviços Redundantes (WSearch, DiagTrack, CDPSvc, lfsvc) | services | advanced | 274 | `ServicesEngine.applyServicesTweak`<br>`ServicesEngine.revertServicesTweak`<br>`ServicesEngine.readServices` |
 | `optimizer:cleanTemp` | Limpar Arquivos Temporários | storage | safe | 97 | `StorageEngine.cleanTempFiles` |
-| `optimizer:disableHibernation` | Desativar Hibernação (liberar espaço do hiberfil.sys) | storage | moderate | 397 | `-> tweak:disableHibernation (electron/services/optimizer/DeepTweaksEngine.js:299)` |
-| `optimizer:deepCleanOneDrive` | Desinstalar OneDrive | storage | moderate | 407 | `SystemEngine.deepCleanOneDrive` |
-| `optimizer:classicContextMenu` | Menu de Contexto Clássico (Windows 11) | system |  | 326 | `-> tweak:classicContextMenu (electron/services/optimizer/DeepTweaksEngine.js:104)` |
-| `optimizer:taskbarTweaks` | Barra de Tarefas: Esquerda, sem Pesquisa e sem Visão de Tarefas | system |  | 335 | `-> tweak:taskbarAlignLeft (electron/services/optimizer/DeepTweaksEngine.js:66)`<br>`-> tweak:hideSearchBox (electron/services/optimizer/DeepTweaksEngine.js:78)`<br>`-> tweak:hideTaskViewButton (electron/services/optimizer/DeepTweaksEngine.js:84)`<br>`-> tweak:taskbarEndTask (electron/services/optimizer/DeepTweaksEngine.js:72)` |
-| `optimizer:taskbarEndTask` | Habilitar "Finalizar Tarefa" na Barra de Tarefas | system |  | 344 | `-> tweak:taskbarEndTask (electron/services/optimizer/DeepTweaksEngine.js:72)` |
-| `optimizer:darkModeAndColors` | Modo Escuro no Sistema e Aplicativos | system |  | 353 | `-> tweak:darkModeAndColors (electron/services/optimizer/DeepTweaksEngine.js:157)` |
-| `optimizer:explorerTweaks` | Explorador: Este Computador, Extensões e Itens Ocultos | system |  | 361 | `-> tweak:explorerOpenThisPC (electron/services/optimizer/DeepTweaksEngine.js:111)`<br>`-> tweak:showFileExtensions (electron/services/optimizer/DeepTweaksEngine.js:117)`<br>`-> tweak:showHiddenFiles (electron/services/optimizer/DeepTweaksEngine.js:123)`<br>`-> tweak:explorerCompactMode (electron/services/optimizer/DeepTweaksEngine.js:129)` |
-| `optimizer:edgeOptimizations` | Microsoft Edge: Sem Execução em Segundo Plano | system |  | 370 | `-> tweak:edgeOptimizations (electron/services/optimizer/DeepTweaksEngine.js:339)` |
-| `optimizer:preventAutoBitLocker` | Impedir Criptografia Automática do Dispositivo (BitLocker) | system |  | 386 | `-> tweak:preventAutoBitLocker (electron/services/optimizer/DeepTweaksEngine.js:311)` |
-| `optimizer:removeCapabilities` | Remover Recursos Opcionais Legados & Recall | system | moderate | 421 | `SystemEngine.removeCapabilitiesAndRecall`<br>`SystemEngine.restoreCapabilities` |
-| `optimizer:disableVisualEffects` | Efeitos Visuais: Melhor Desempenho | visuals | safe | 311 | `VisualsEngine.disableVisualEffects`<br>`VisualsEngine.revertVisualEffects`<br>`-> group:visualEffects (electron/services/optimizer/DeepTweaksEngine.js:664)` |
+| `optimizer:disableHibernation` | Desativar Hibernação (liberar espaço do hiberfil.sys) | storage | moderate | 399 | `-> tweak:disableHibernation (electron/services/optimizer/DeepTweaksEngine.js:299)` |
+| `optimizer:deepCleanOneDrive` | Desinstalar OneDrive | storage | moderate | 409 | `SystemEngine.deepCleanOneDrive` |
+| `optimizer:classicContextMenu` | Menu de Contexto Clássico (Windows 11) | system |  | 328 | `-> tweak:classicContextMenu (electron/services/optimizer/DeepTweaksEngine.js:104)` |
+| `optimizer:taskbarTweaks` | Barra de Tarefas: Esquerda, sem Pesquisa e sem Visão de Tarefas | system |  | 337 | `-> tweak:taskbarAlignLeft (electron/services/optimizer/DeepTweaksEngine.js:66)`<br>`-> tweak:hideSearchBox (electron/services/optimizer/DeepTweaksEngine.js:78)`<br>`-> tweak:hideTaskViewButton (electron/services/optimizer/DeepTweaksEngine.js:84)`<br>`-> tweak:taskbarEndTask (electron/services/optimizer/DeepTweaksEngine.js:72)` |
+| `optimizer:taskbarEndTask` | Habilitar "Finalizar Tarefa" na Barra de Tarefas | system |  | 346 | `-> tweak:taskbarEndTask (electron/services/optimizer/DeepTweaksEngine.js:72)` |
+| `optimizer:darkModeAndColors` | Modo Escuro no Sistema e Aplicativos | system |  | 355 | `-> tweak:darkModeAndColors (electron/services/optimizer/DeepTweaksEngine.js:157)` |
+| `optimizer:explorerTweaks` | Explorador: Este Computador, Extensões e Itens Ocultos | system |  | 363 | `-> tweak:explorerOpenThisPC (electron/services/optimizer/DeepTweaksEngine.js:111)`<br>`-> tweak:showFileExtensions (electron/services/optimizer/DeepTweaksEngine.js:117)`<br>`-> tweak:showHiddenFiles (electron/services/optimizer/DeepTweaksEngine.js:123)`<br>`-> tweak:explorerCompactMode (electron/services/optimizer/DeepTweaksEngine.js:129)` |
+| `optimizer:edgeOptimizations` | Microsoft Edge: Sem Execução em Segundo Plano | system |  | 372 | `-> tweak:edgeOptimizations (electron/services/optimizer/DeepTweaksEngine.js:339)` |
+| `optimizer:preventAutoBitLocker` | Impedir Criptografia Automática do Dispositivo (BitLocker) | system |  | 388 | `-> tweak:preventAutoBitLocker (electron/services/optimizer/DeepTweaksEngine.js:311)` |
+| `optimizer:removeCapabilities` | Remover Recursos Opcionais Legados & Recall | system | moderate | 423 | `SystemEngine.removeCapabilitiesAndRecall`<br>`SystemEngine.restoreCapabilities` |
+| `optimizer:disableVisualEffects` | Efeitos Visuais: Melhor Desempenho | visuals | safe | 313 | `VisualsEngine.disableVisualEffects`<br>`VisualsEngine.revertVisualEffects`<br>`-> group:visualEffects (electron/services/optimizer/DeepTweaksEngine.js:664)` |

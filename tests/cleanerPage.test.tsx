@@ -65,4 +65,18 @@ describe('Cleaner page', () => {
     await waitFor(() => expect(dialog.isConnected).toBe(false))
     expect(await screen.findByRole('status')).toBeTruthy()
   })
+
+  it('the Recycle Bin has no folder rules but is offered, preselected and named in the page language', async () => {
+    const api = mockApi()
+    api.listTargets.mockResolvedValueOnce({ ok: true, stats: { builtin: 1, winapp2_sections: 0, winapp2_detected: 0, rejected_rules: 0 }, targets: [
+      { ...target('dh:recycle-bin', 'Lixeira'), rules: [], special: 'recycle_bin', warning: 'definitivo' } as any,
+      target('dh:user-temp', 'Temporários do usuário')
+    ] })
+    render(<I18nProvider><Cleaner /></I18nProvider>)
+    const bin = await screen.findByRole('checkbox', { name: 'Lixeira' }) as HTMLInputElement
+    expect(bin.disabled).toBe(false)
+    expect(bin.checked).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: /Analisar/ }))
+    await waitFor(() => expect(api.scan).toHaveBeenCalledWith({ ids: ['dh:recycle-bin', 'dh:user-temp'] }))
+  })
 })

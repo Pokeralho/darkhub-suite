@@ -127,7 +127,7 @@ function FilesTab({ defs, onGoDefs }: { defs: CleanerDefinitions | null; onGoDef
     const r = await api()?.listTargets();
     if (r?.ok) {
       setTargets(r.targets); setStats(r.stats);
-      setSelected(new Set(r.targets.filter((x) => x.source === 'builtin' && x.rules.length).map((x) => x.id)));
+      setSelected(new Set(r.targets.filter((x) => x.source === 'builtin' && (x.rules.length || x.special)).map((x) => x.id)));
     } else { setTargets([]); setError(r?.error ?? t('cleaner.loadFail', 'Não foi possível listar os itens.')); }
   }, [t]);
   useEffect(() => { void load(); }, [load, defs?.sha256]);
@@ -191,7 +191,7 @@ function FilesTab({ defs, onGoDefs }: { defs: CleanerDefinitions | null; onGoDef
               <ul className="space-y-1">
                 {items.map((x) => {
                   const res = scanValid ? byId.get(x.id) : undefined;
-                  const disabled = x.rules.length === 0;
+                  const disabled = x.rules.length === 0 && !x.special;
                   return (
                     <li key={x.id}>
                       <div className="flex items-center gap-2 text-[13px]">

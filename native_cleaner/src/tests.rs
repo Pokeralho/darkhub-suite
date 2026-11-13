@@ -323,3 +323,15 @@ fn rules_aimed_at_passwords_are_refused() {
     assert!(!crate::safety::is_protected_pattern("*.db"));
     let _ = fs::remove_dir_all(&base);
 }
+
+#[test]
+fn recycle_bin_is_never_touched_in_test_mode() {
+    let argv: Vec<String> = ["recycle-bin", "--apply", "--test-root", "C:\nope"].iter().map(|s| s.to_string()).collect();
+    let r = crate::run(&crate::Args::parse(&argv));
+    assert!(matches!(r, Err(ref f) if f.code == "bad_args"));
+    let base = tmp("rbt");
+    let argv: Vec<String> = vec!["targets".into(), "--test-root".into(), base.to_string_lossy().into()];
+    let v = crate::run(&crate::Args::parse(&argv)).unwrap();
+    assert!(!v["targets"].as_array().unwrap().iter().any(|t| t["id"] == "dh:recycle-bin"));
+    let _ = fs::remove_dir_all(&base);
+}

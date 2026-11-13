@@ -110,7 +110,9 @@ export const cleanerMessages: Record<'pt-BR' | 'en-US', Record<string, string>> 
     "cleaner.builtin.firefox-cache": "Cache do Firefox",
     "cleaner.builtin.brave-cache": "Cache do Brave",
     "cleaner.builtin.zen-cache": "Cache do Zen Browser",
-    "cleaner.builtin.thumbcache.warn": "O Explorer recria as miniaturas aos poucos; arquivos em uso são ignorados."
+    "cleaner.builtin.thumbcache.warn": "O Explorer recria as miniaturas aos poucos; arquivos em uso são ignorados.",
+    "cleaner.builtin.recycle-bin": "Lixeira",
+    "cleaner.builtin.recycle-bin.warn": "Esvaziar a Lixeira é definitivo: os itens não podem mais ser restaurados. A exclusão segura não se aplica a ela."
   },
   'en-US': {
     "cleaner.tab.files": "Files",
@@ -222,6 +224,8 @@ export const cleanerMessages: Record<'pt-BR' | 'en-US', Record<string, string>> 
     "cleaner.builtin.firefox-cache": "Firefox cache",
     "cleaner.builtin.brave-cache": "Brave cache",
     "cleaner.builtin.zen-cache": "Zen Browser cache",
-    "cleaner.builtin.thumbcache.warn": "Explorer rebuilds thumbnails gradually; files in use are skipped."
+    "cleaner.builtin.thumbcache.warn": "Explorer rebuilds thumbnails gradually; files in use are skipped.",
+    "cleaner.builtin.recycle-bin": "Recycle Bin",
+    "cleaner.builtin.recycle-bin.warn": "Emptying the Recycle Bin is permanent: its items can no longer be restored. Secure deletion does not apply to it."
   }
 };

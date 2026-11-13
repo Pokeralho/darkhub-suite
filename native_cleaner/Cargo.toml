@@ -12,7 +12,7 @@ serde_json = "1"
 rusqlite = { version = "0.32", features = ["bundled"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Registry"] }
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Registry", "Win32_UI_Shell"] }
 
 [profile.release]
 opt-level = 3

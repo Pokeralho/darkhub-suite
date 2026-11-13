@@ -9,11 +9,16 @@
 //!   browsers  [--browser chrome,edge,firefox] [--apply]   VACUUM of the browsers' SQLite databases
 //!   reg-scan                                         missing shared DLLs, orphan App Paths, dead Run/Startup entries
 //!   reg-clean --ids-file F --backup F.reg [--apply]  removes chosen findings after writing the .reg backup
+//!   recycle-bin [--apply]                            size of the Recycle Bin (all drives); --apply empties it
 //!
-//! Test-only options keep everything inside throwaway places: `--test-root DIR` (files and browsers),
-//! `--root HKCU\Software\DarkHubCleanerTest...` and `--startup-folder DIR` (registry).
+//! The Recycle Bin is also the built-in target `dh:recycle-bin` of scan/clean.
+//!
+//! Test-only options keep everything inside throwaway places: `--test-root DIR` (files and browsers; the Recycle
+//! Bin is left out entirely), `--root HKCU\Software\DarkHubCleanerTest...` and `--startup-folder DIR` (registry).
 mod browsers;
 mod files;
+#[cfg(windows)]
+mod recycle;
 #[cfg(windows)]
 mod registry;
 mod safety;
@@ -103,13 +108,52 @@ fn reg_sources(a: &Args) -> R<registry::Sources> {
     }
 }
 
+const RECYCLE_ID: &str = "dh:recycle-bin";
+
+/// The Recycle Bin as a built-in target of the page. It has no folder rules: the Shell API measures and empties it.
+fn recycle_target() -> Value {
+    json!({
+        "id": RECYCLE_ID, "name": "Lixeira", "category": "Windows", "source": "builtin", "special": "recycle_bin",
+        "warning": "Esvaziar a Lixeira é definitivo: os itens não podem mais ser restaurados.",
+        "rules": [], "rejected": [], "ignored_registry": 0,
+    })
+}
+
+/// Measures the Recycle Bin and, with `apply`, empties it and measures again (what was freed is what left it).
+fn recycle_run(apply: bool) -> R<Value> {
+    #[cfg(windows)]
+    {
+        let (bytes, items) = recycle::query()?;
+        let (mut freed_bytes, mut freed_items, mut left) = (bytes, items, (0u64, 0u64));
+        if apply && items > 0 {
+            recycle::empty()?;
+            left = recycle::query()?;
+            freed_bytes = bytes.saturating_sub(left.0);
+            freed_items = items.saturating_sub(left.1);
+        }
+        Ok(json!({
+            "id": RECYCLE_ID, "name": "Lixeira", "files": freed_items, "bytes": freed_bytes, "locked": left.1, "denied": 0,
+            "protected": 0, "links": 0, "sample": [], "refused": [], "before": { "bytes": bytes, "items": items },
+        }))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = apply;
+        Err(Fail::new("unsupported", "Lixeira só no Windows"))
+    }
+}
+
 fn run(a: &Args) -> R<Value> {
     match a.cmd.as_str() {
         "targets" => {
             let env = env_of(a);
             let text = read_winapp2(a)?;
             let (targets, stats) = winapp2::load_all(&env, text.as_deref(), &reg_exists);
-            Ok(json!({ "targets": targets.iter().map(|t| t.to_json()).collect::<Vec<_>>(), "stats": stats }))
+            let mut list: Vec<Value> = targets.iter().map(|t| t.to_json()).collect();
+            if a.get("test-root").is_none() {
+                list.insert(0, recycle_target());
+            }
+            Ok(json!({ "targets": list, "stats": stats }))
         }
         "scan" | "clean" => {
             let env = env_of(a);
@@ -124,7 +168,17 @@ fn run(a: &Args) -> R<Value> {
             }
             let sample = a.get("sample").and_then(|v| v.parse().ok()).unwrap_or(30);
             let mut out = files::run(&env, &chosen, &files::Opts { apply, shred, sample });
-            out["unknown_ids"] = json!(ids.iter().filter(|i| !targets.iter().any(|t| &t.id == *i)).collect::<Vec<_>>());
+            let bin = a.get("test-root").is_none() && ids.iter().any(|i| i == RECYCLE_ID);
+            if bin {
+                let r = recycle_run(apply)?;
+                for k in ["files", "bytes"] {
+                    out["total"][k] = json!(out["total"][k].as_u64().unwrap_or(0) + r[k].as_u64().unwrap_or(0));
+                }
+                if let Some(t) = out["targets"].as_array_mut() {
+                    t.insert(0, r);
+                }
+            }
+            out["unknown_ids"] = json!(ids.iter().filter(|i| !(bin && *i == RECYCLE_ID) && !targets.iter().any(|t| &t.id == *i)).collect::<Vec<_>>());
             Ok(out)
         }
         "browsers" => {
@@ -149,7 +203,15 @@ fn run(a: &Args) -> R<Value> {
             }
             registry::clean(&reg_sources(a)?, &ids, backup.as_deref(), a.flag("apply"))
         }
-        "" | "help" => Ok(json!({ "commands": ["targets", "scan", "clean", "browsers", "reg-scan", "reg-clean"] })),
+        "recycle-bin" => {
+            if a.get("test-root").is_some() || a.get("root").is_some() {
+                return Err(Fail::new("bad_args", "a Lixeira real não é usada em modo de teste"));
+            }
+            let mut r = recycle_run(a.flag("apply"))?;
+            r["dry_run"] = json!(!a.flag("apply"));
+            Ok(r)
+        }
+        "" | "help" => Ok(json!({ "commands": ["targets", "scan", "clean", "browsers", "reg-scan", "reg-clean", "recycle-bin"] })),
         other => Err(Fail::new("bad_args", format!("comando desconhecido: {other}"))),
     }
 }
