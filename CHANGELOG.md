@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.8] - 2026-11-12
+
+### Changed
+- "Clean temporary files" (Optimizer, and the clean button on the Dashboard) now also empties the Recycle Bin of
+  every drive, measured before and after through the Windows Shell API (`DarkHub.Cleaner.exe recycle-bin`). The
+  Dashboard junk estimate includes what is in the bin. Scheduled maintenance, Hub packages and the privacy clean keep
+  the Recycle Bin as it is, since emptying it is permanent.
+- Deep clean: the Recycle Bin is a built-in item (selected by default, with a warning that emptying it is permanent).
+
 ## [0.8.7] - 2026-11-12
 
 ### Changed
