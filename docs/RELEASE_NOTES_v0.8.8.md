@@ -16,8 +16,8 @@
 
 **SHA-256**
 ```
-SHA_SETUP  DarkHub-Setup-0.8.8.exe / DarkHub.Setup.0.8.8.exe
-SHA_PORTABLE  DarkHub.0.8.8-portable.exe
+a9f8dec719622600f6e05638fea30c56aa593d861dca2b593f4f8bf89accbaae  DarkHub-Setup-0.8.8.exe / DarkHub.Setup.0.8.8.exe
+d7166bca34bfc03e0dc679cb26998f2673ad95aeb84e2da504895b6e1ae2a28f  DarkHub.0.8.8-portable.exe
 ```
 
 This build was made on the maintainer's PC and is not code-signed, like earlier versions.
