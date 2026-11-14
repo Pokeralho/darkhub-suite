@@ -30,7 +30,8 @@ function relaunchAsAdmin(exe, args) {
  * chose to quit). Packaged Windows builds only; DARKHUB_NO_ELEVATE=1 or --no-elevate skips it.
  */
 export async function ensureElevated({ app, dialog, isElevated, log }) {
-  if (!app.isPackaged || process.platform !== 'win32' || process.env.DARKHUB_NO_ELEVATE === '1' || process.argv.includes('--no-elevate')) return true
+  if (process.platform !== 'win32') return true
+  if (!app.isPackaged || process.env.DARKHUB_NO_ELEVATE === '1' || process.argv.includes('--no-elevate')) return true
   if (await isElevated().catch(() => true)) return true
 
   const pt = String(app.getLocale?.() || '').toLowerCase().startsWith('pt')

@@ -139,6 +139,12 @@ class FramePacerEngine extends EventEmitter {
   }
 
   _spawnNativeProcess() {
+    if (process.platform !== 'win32') {
+      Logger.info('FramePacerEngine', 'Frame limiter nativo disponível apenas no Windows; ignorando no Linux.')
+      this.isRunning = false
+      this._latestMetrics.isRunning = false
+      return
+    }
     try {
       const exePath = this._getExePath()
       Logger.info('FramePacerEngine', `Executável nativo: ${exePath}`)
