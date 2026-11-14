@@ -18,11 +18,15 @@ export function registerOverlayIPC({ app, ipcMain, BrowserWindow, screen, hotkey
       try { w.webContents.send('overlay:event', msg) } catch { /* closing */ }
     }
   }
+  const unsupported = (extra = {}) => ({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'In-game overlay is only supported on Windows.', ...extra })
   // created after "ready": BrowserWindow and screen need it
-  const get = () => (svc ||= new OverlayService({
-    app, BrowserWindow, screen, hotkeys, hardware: HardwareService, native: nativeLatencyClient, onEvent: broadcast, lhmSource: HwSensorsDaemon,
-    presentMon: new PresentMonService({ toolsDir: path.join(app.getPath('userData'), 'tools') })
-  }))
+  const get = () => {
+    if (process.platform !== 'win32') return null
+    return (svc ||= new OverlayService({
+      app, BrowserWindow, screen, hotkeys, hardware: HardwareService, native: nativeLatencyClient, onEvent: broadcast, lhmSource: HwSensorsDaemon,
+      presentMon: new PresentMonService({ toolsDir: path.join(app.getPath('userData'), 'tools') })
+    }))
+  }
 
   const handle = (channel, fn) => ipcMain.handle(channel, async (event, payload) => {
     try { return await fn(payload ?? {}, event) } catch (err) {
@@ -30,20 +34,26 @@ export function registerOverlayIPC({ app, ipcMain, BrowserWindow, screen, hotkey
       return { ok: false, error: err?.message ?? String(err) }
     }
   })
-  handle('overlay:status', () => get().status())
-  handle('overlay:show', ({ pid }) => get().show({ pid: pid ? Number(pid) : null }))
-  handle('overlay:hide', () => get().hide())
-  handle('overlay:setSettings', (patch) => get().setSettings(patch))
-  handle('overlay:power', () => get().power())
-  handle('overlay:resetEnergy', () => get().resetEnergy())
+  const handleWin = (channel, fn) => ipcMain.handle(channel, async (event, payload) => {
+    if (process.platform !== 'win32') return unsupported()
+    try { return await fn(get(), payload ?? {}, event) } catch (err) {
+      logger?.error?.('Overlay', `${channel}: ${err?.message ?? err}`)
+      return { ok: false, error: err?.message ?? String(err) }
+    }
+  })
+  handle('overlay:status', () => process.platform === 'win32' ? get().status() : { ok: true, supported: false, unsupported: true, platform: process.platform, visible: false, settings: null, target: null, mode: 'foreground', capturing: false, presentMonInstalled: false, error: null, displays: [], displayId: null })
+  handleWin('overlay:show', (svc, { pid }) => svc.show({ pid: pid ? Number(pid) : null }))
+  handleWin('overlay:hide', (svc) => svc.hide())
+  handleWin('overlay:setSettings', (svc, patch) => svc.setSettings(patch))
+  handleWin('overlay:power', (svc) => svc.power())
+  handleWin('overlay:resetEnergy', (svc) => svc.resetEnergy())
   // real PSU from the 80 PLUS catalog (downloaded on request, cached in userData; see psuCatalog.js)
   let catalog = null
   const psuCatalog = () => (catalog ||= new PsuCatalog({ dir: app.getPath('userData'), download: downloadToFile }))
-  handle('overlay:psuCatalogStatus', () => psuCatalog().status())
-  handle('overlay:psuSearch', ({ query, refresh, mains }) => psuCatalog().search({ query: String(query ?? '').slice(0, 80), refresh: Boolean(refresh), mains }))
+  handle('overlay:psuCatalogStatus', () => process.platform === 'win32' ? psuCatalog().status() : unsupported())
+  handle('overlay:psuSearch', ({ query, refresh, mains }) => process.platform === 'win32' ? psuCatalog().search({ query: String(query ?? '').slice(0, 80), refresh: Boolean(refresh), mains }) : unsupported())
   // two-point wall calibration (wallCalibration.js): solve against the current PSU curve and hardware, optionally save
-  handle('overlay:calibrate', ({ points, save }) => {
-    const svc = get()
+  handleWin('overlay:calibrate', (svc, { points, save }) => {
     const now = svc.power()
     const d = now.derived
     if (d?.cpuW == null || d?.gpuW == null) return { ok: false, error: 'no_cpu' }
@@ -58,23 +68,24 @@ export function registerOverlayIPC({ app, ipcMain, BrowserWindow, screen, hotkey
     const r = svc.setSettings({ powerCal: { at: Date.now(), hwId: d.calibration.hwId, extraW: fit.extraW, effScale: fit.effScale, points: fit.points, sigma: fit.sigma } })
     return { ...fit, saved: true, settings: r.settings }
   })
-  handle('overlay:clearCalibration', () => get().setSettings({ powerCal: null }))
+  handleWin('overlay:clearCalibration', (svc) => svc.setSettings({ powerCal: null }))
   // layout editor
-  handle('overlay:layouts', () => get().layoutsState())
-  handle('overlay:saveLayout', ({ layout }) => get().saveLayout(layout))
-  handle('overlay:newLayout', ({ preset }) => get().newLayout(String(preset || 'rivatuner')))
-  handle('overlay:deleteLayout', ({ id }) => get().deleteLayout(String(id)))
-  handle('overlay:activateLayout', ({ id }) => get().activateLayout(String(id)))
-  handle('overlay:preview', ({ layout }) => get().preview(layout))
+  handleWin('overlay:layouts', (svc) => svc.layoutsState())
+  handleWin('overlay:saveLayout', (svc, { layout }) => svc.saveLayout(layout))
+  handleWin('overlay:newLayout', (svc, { preset }) => svc.newLayout(String(preset || 'rivatuner')))
+  handleWin('overlay:deleteLayout', (svc, { id }) => svc.deleteLayout(String(id)))
+  handleWin('overlay:activateLayout', (svc, { id }) => svc.activateLayout(String(id)))
+  handleWin('overlay:preview', (svc, { layout }) => svc.preview(layout))
   handle('overlay:processes', async () => {
+    if (process.platform !== 'win32') return unsupported({ processes: [] })
     const list = await nativeLatencyClient.listProcesses().catch(() => null)
     return { ok: Boolean(list), processes: (list?.processes || []).filter((p) => p.pid > 4 && p.wsMb >= 150).sort((a, b) => b.wsMb - a.wsMb).slice(0, 40) }
   })
-  handle('overlay:pickLogFolder', async (_p, event) => {
+  handleWin('overlay:pickLogFolder', async (svc, _p, event) => {
     const r = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), { properties: ['openDirectory', 'createDirectory'] })
-    return r.canceled || !r.filePaths[0] ? { ok: true, canceled: true } : get().setSettings({ logFolder: r.filePaths[0] })
+    return r.canceled || !r.filePaths[0] ? { ok: true, canceled: true } : svc.setSettings({ logFolder: r.filePaths[0] })
   })
-  app.whenReady().then(() => get())
+  app.whenReady().then(() => { if (process.platform === 'win32') get() })
   app.on('will-quit', () => { try { svc?.dispose() } catch { /* quitting */ } })
 }
 

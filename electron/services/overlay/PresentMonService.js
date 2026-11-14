@@ -26,6 +26,7 @@ export class PresentMonService extends EventEmitter {
   installed() { return fs.existsSync(this.exe) }
 
   async ensure() {
+    if (process.platform !== 'win32') throw new Error('PresentMon overlay capture is only supported on Windows.')
     if (this.installed()) return this.exe
     // a few tries: name resolution can fail for a moment (e.g. while Windows reloads a large hosts file)
     let buf = null
@@ -53,6 +54,7 @@ export class PresentMonService extends EventEmitter {
 
   /** Starts capturing one process. Emits 'frame' per presented frame and 'exit' when PresentMon stops. */
   async start({ pid }) {
+    if (process.platform !== 'win32') throw new Error('PresentMon overlay capture is only supported on Windows.')
     this.stop()
     const exe = await this.ensure()
     const args = ['--output_stdout', '--no_console_stats', '--session_name', SESSION, '--stop_existing_session', '--process_id', String(Number(pid)), '--terminate_on_proc_exit']
