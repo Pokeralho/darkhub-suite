@@ -2913,49 +2913,50 @@ ipcMain.handle('security:getSecurityScore', async () => {
 
 ipcMain.handle('security:auditTracking', async () => {
   try {
-    if (process.platform === 'win32') {
-      const domainsFile = path.join(app.getPath('userData'), 'tracking.domains.json')
-      let customDomains = []
-      try {
-        const raw = await fs.readFile(domainsFile, 'utf8')
-        const parsed = JSON.parse(raw)
-        if (Array.isArray(parsed?.custom)) customDomains = parsed.custom.map((d) => String(d).trim()).filter(Boolean)
-      } catch {}
+    const domainsFile = path.join(app.getPath('userData'), 'tracking.domains.json')
+    let customDomains = []
+    try {
+      const raw = await fs.readFile(domainsFile, 'utf8')
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed?.custom)) customDomains = parsed.custom.map((d) => String(d).trim()).filter(Boolean)
+    } catch {}
 
-      const hostsPath = path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
-      const content = await fs.readFile(hostsPath, 'utf8')
-      const lines = content.split(/\r?\n/g).map((l) => l.trim())
+    const hostsPath = process.platform === 'win32'
+      ? path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
+      : '/etc/hosts'
+    let content = ''
+    try { content = await fs.readFile(hostsPath, 'utf8') } catch { content = '' }
+    const lines = content.split(/\r?\n/g).map((l) => l.trim())
 
-      const allDomains = Array.from(new Set([...DEFAULT_TRACKING_DOMAINS, ...customDomains]))
+    const allDomains = Array.from(new Set([...DEFAULT_TRACKING_DOMAINS, ...customDomains]))
 
-      const present = new Set()
-      for (const line of lines) {
-        if (!line || line.startsWith('#')) continue
-        for (const domain of allDomains) {
-          if (line.includes(domain)) present.add(domain)
-        }
-      }
-
-      const hasDarkHubSection = lines.some((l) => l.includes('DarkHub Tracking Blocker - BEGIN'))
-
-      const trackers = Array.from(present).map((d) => ({
-        source: 'Hosts File',
-        details: d,
-        category: 'Analytics/Ads'
-      }))
-
-      return {
-        ok: true,
-        trackers,
-        summary: {
-          totalKnown: allDomains.length,
-          present: present.size,
-          missing: allDomains.length - present.size,
-          hasDarkHubSection
-        }
+    const present = new Set()
+    for (const line of lines) {
+      if (!line || line.startsWith('#')) continue
+      for (const domain of allDomains) {
+        if (line.includes(domain)) present.add(domain)
       }
     }
-    return { ok: true, trackers: [], summary: { totalKnown: 0, present: 0, missing: 0, hasDarkHubSection: false } }
+
+    const hasDarkHubSection = lines.some((l) => l.includes('DarkHub Tracking Blocker - BEGIN'))
+
+    const trackers = Array.from(present).map((d) => ({
+      source: 'Hosts File',
+      details: d,
+      category: 'Analytics/Ads'
+    }))
+
+    return {
+      ok: true,
+      trackers,
+      summary: {
+        totalKnown: allDomains.length,
+        present: present.size,
+        missing: allDomains.length - present.size,
+        hasDarkHubSection
+      },
+      hostsPath
+    }
   } catch (err) {
     return { ok: false, error: err.message }
   }
@@ -3019,7 +3020,6 @@ ipcMain.handle('security:setCustomTrackingDomains', async (_event, payload) => {
 })
 
 ipcMain.handle('security:blockTracking', async () => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
   try {
     const defaults = DEFAULT_TRACKING_DOMAINS
 
@@ -3033,13 +3033,16 @@ ipcMain.handle('security:blockTracking', async () => {
 
     const trackingDomains = Array.from(new Set([...defaults, ...customDomains]))
 
-    const hostsPath = path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
-    let content = await fs.readFile(hostsPath, 'utf8')
+    const hostsPath = process.platform === 'win32'
+      ? path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
+      : '/etc/hosts'
+    let content = ''
+    try { content = await fs.readFile(hostsPath, 'utf8') } catch { content = '' }
     const backupPath = path.join(app.getPath('userData'), 'hosts.backup')
     try {
       await fs.access(backupPath)
     } catch {
-      await fs.writeFile(backupPath, content, 'utf8')
+      if (content) await fs.writeFile(backupPath, content, 'utf8').catch(() => {})
     }
 
     const beginMarker = '# DarkHub Tracking Blocker - BEGIN'
@@ -3063,6 +3066,10 @@ ipcMain.handle('security:blockTracking', async () => {
     const section = [beginMarker, ...trackingDomains.map((d) => `127.0.0.1 ${d}`), endMarker].join(os.EOL)
     const nextContent = [...filtered, '', section, ''].join(os.EOL)
 
+    if (process.platform !== 'win32') {
+      return { ok: false, unsupported: true, platform: process.platform, reason: 'elevation-required', error: 'Bloquear trackers exige permissão para gravar em /etc/hosts (ação elevada) — ainda não automatizado no Linux.', hostsPath, count: trackingDomains.length }
+    }
+
     await fs.writeFile(hostsPath, nextContent, 'utf8')
     return { ok: true, msg: `Blocked ${trackingDomains.length} trackers via hosts file`, backupPath }
   } catch (err) {
@@ -3071,14 +3078,22 @@ ipcMain.handle('security:blockTracking', async () => {
 })
 
 ipcMain.handle('security:unblockTracking', async () => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
   try {
-    const hostsPath = path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
-    const content = await fs.readFile(hostsPath, 'utf8')
+    const hostsPath = process.platform === 'win32'
+      ? path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
+      : '/etc/hosts'
+    let content = ''
+    try { content = await fs.readFile(hostsPath, 'utf8') } catch { content = '' }
     const stripped = content
       .replace(/# DarkHub Tracking Blocker - BEGIN[\s\S]*?# DarkHub Tracking Blocker - END\r?\n?/g, '')
       .replace(/(\r?\n){3,}/g, os.EOL + os.EOL)
       .trimEnd() + os.EOL
+
+    if (process.platform !== 'win32') {
+      if (!content.includes('DarkHub Tracking Blocker - BEGIN')) return { ok: true, msg: 'Tracking blocker section not present in hosts' }
+      return { ok: false, unsupported: true, platform: process.platform, reason: 'elevation-required', error: 'Remover o bloqueio exige permissão para gravar em /etc/hosts (ação elevada) — ainda não automatizado no Linux.', hostsPath }
+    }
+
     await fs.writeFile(hostsPath, stripped, 'utf8')
     return { ok: true, msg: 'Tracking blocker section removed from hosts' }
   } catch (err) {
@@ -3315,6 +3330,7 @@ async function installFromOfficialUrl(id, progress) {
 }
 
 ipcMain.handle('setup:installWinget', async (event, appIds) => {
+  if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Instalação via winget é suportada apenas no Windows (Linux: use apt/Flatpak/Snap conforme disponibilidade).' }
   if (!Array.isArray(appIds) || appIds.length === 0) return { ok: false, error: 'Lista vazia' };
   // The window may be closed mid-queue; a send on a destroyed webContents would reject the handler.
   const progress = (msg) => {

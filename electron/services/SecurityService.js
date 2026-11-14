@@ -457,27 +457,35 @@ class SecurityService {
     };
   }
 
-  async enablePhishingShield() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
-    try {
-      const hostsPath = 'C:\\Windows\\System32\\drivers\\etc\\hosts';
-      const backupPath = 'C:\\Windows\\System32\\drivers\\etc\\hosts.darkhub.bak';
+  _hostsPath() {
+    return process.platform === 'win32'
+      ? path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
+      : '/etc/hosts';
+  }
 
+  async enablePhishingShield() {
+    try {
+      const hostsPath = this._hostsPath();
       let currentHosts = '';
       if (fs.existsSync(hostsPath)) {
-        currentHosts = fs.readFileSync(hostsPath, 'utf8');
+        try { currentHosts = fs.readFileSync(hostsPath, 'utf8'); } catch {}
       }
 
+      const backupPath = path.join(path.dirname(this._getRulesFilePath()), 'hosts.darkhub.bak');
       if (!fs.existsSync(backupPath) && currentHosts) {
         try { fs.writeFileSync(backupPath, currentHosts, 'utf8'); } catch {}
       }
 
-      const cleanHosts = currentHosts.replace(/# DarkHub Anti-Phishing Shield - BEGIN[\s\S]*?# DarkHub Anti-Phishing Shield - END/g, '').trim();
-
+      const cleanHosts = String(currentHosts || '').replace(/# DarkHub Anti-Phishing Shield - BEGIN[\s\S]*?# DarkHub Anti-Phishing Shield - END/g, '').trim();
       const blockRules = this.getAllPhishingDomains().map(d => `0.0.0.0 ${d}\n0.0.0.0 www.${d}`).join('\n');
       const newBlock = `\n\n# DarkHub Anti-Phishing Shield - BEGIN\n${blockRules}\n# DarkHub Anti-Phishing Shield - END\n`;
+      const finalContent = (cleanHosts ? cleanHosts + newBlock : newBlock.trimStart());
 
-      const finalContent = cleanHosts + newBlock;
+      if (process.platform !== 'win32') {
+        // Writing /etc/hosts requires root; do not attempt silent elevation on Linux.
+        return { ok: false, unsupported: true, platform: process.platform, reason: 'elevation-required', error: 'Ativar o escudo exige permissão para gravar em /etc/hosts (ação elevada) — ainda não automatizado no Linux.', hostsPath, previewBytes: finalContent.length };
+      }
+
       const tmpFile = path.join(os.tmpdir(), `hosts_shield_${process.pid}_${Date.now()}.tmp`);
       fs.writeFileSync(tmpFile, finalContent, 'utf8');
 
@@ -501,13 +509,17 @@ class SecurityService {
   }
 
   async disablePhishingShield() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
     try {
-      const hostsPath = 'C:\\Windows\\System32\\drivers\\etc\\hosts';
+      const hostsPath = this._hostsPath();
       if (!fs.existsSync(hostsPath)) { this._writeShieldPref(false); return { ok: true, msg: 'Hosts padrão mantido.' }; }
 
-      const currentHosts = fs.readFileSync(hostsPath, 'utf8');
-      const cleanHosts = currentHosts.replace(/# DarkHub Anti-Phishing Shield - BEGIN[\s\S]*?# DarkHub Anti-Phishing Shield - END/g, '').trim();
+      let currentHosts = '';
+      try { currentHosts = fs.readFileSync(hostsPath, 'utf8'); } catch {}
+      const cleanHosts = String(currentHosts || '').replace(/# DarkHub Anti-Phishing Shield - BEGIN[\s\S]*?# DarkHub Anti-Phishing Shield - END/g, '').trim();
+
+      if (process.platform !== 'win32') {
+        return { ok: false, unsupported: true, platform: process.platform, reason: 'elevation-required', error: 'Desativar o escudo exige permissão para gravar em /etc/hosts (ação elevada) — ainda não automatizado no Linux.', hostsPath };
+      }
 
       const tmpFile = path.join(os.tmpdir(), `hosts_shield_clean_${process.pid}_${Date.now()}.tmp`);
       fs.writeFileSync(tmpFile, cleanHosts + '\n', 'utf8');
@@ -530,15 +542,17 @@ class SecurityService {
 
   getPhishingShieldStatus() {
     try {
-      const hostsPath = 'C:\\Windows\\System32\\drivers\\etc\\hosts';
-      if (!fs.existsSync(hostsPath)) return { ok: true, active: false, count: 0 };
-      const content = fs.readFileSync(hostsPath, 'utf8');
+      const hostsPath = this._hostsPath();
+      if (!fs.existsSync(hostsPath)) return { ok: true, active: false, count: 0, hostsPath };
+      let content = '';
+      try { content = fs.readFileSync(hostsPath, 'utf8'); } catch { return { ok: true, active: false, count: 0, hostsPath }; }
       const active = content.includes('# DarkHub Anti-Phishing Shield - BEGIN');
       return {
         ok: true,
         active,
         totalDomains: this.getAllPhishingDomains().length,
-        rulesCount: this.getAllPhishingDomains().length * 2
+        rulesCount: this.getAllPhishingDomains().length * 2,
+        hostsPath
       };
     } catch (e) {
       return { ok: false, active: false, error: e.message };
