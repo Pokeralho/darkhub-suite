@@ -1378,57 +1378,108 @@ ipcMain.handle('library:discover', async () => {
     }
   } catch {}
 
-  // ── 2. Epic Games ─────────────────────────────────────────────────────────
-  try {
-    const epicManifestDir = path.join(process.env['ProgramData'] || 'C:\\ProgramData', 'Epic', 'EpicGamesLauncher', 'Data', 'Manifests');
-    const manifests = (await fs.readdir(epicManifestDir)).filter(f => f.endsWith('.item'));
-    for (const manifest of manifests) {
-      try {
-        const data = JSON.parse(await fs.readFile(path.join(epicManifestDir, manifest), 'utf8'));
-        if (data.InstallLocation && data.LaunchExecutable) {
-          discovered.push({ platform: 'Epic Games', name: data.DisplayName || data.AppName, exePath: path.join(data.InstallLocation, data.LaunchExecutable), workingDir: data.InstallLocation });
-        }
-      } catch {}
-    }
-  } catch {}
-
-  // ── 3. GOG Galaxy ─────────────────────────────────────────────────────────
-  try {
-    const gogDirs = ['C:\\Program Files (x86)\\GOG Galaxy\\Games', 'C:\\GOG Games'];
-    for (const dir of gogDirs) {
-      try {
-        const entries = await fs.readdir(dir, { withFileTypes: true });
-        for (const entry of entries) {
-          if (!entry.isDirectory()) continue;
-          const gameDir = path.join(dir, entry.name);
-          const bestExe = await scanDirectoryForBestExe(gameDir);
-          if (bestExe) {
-            discovered.push({ platform: 'GOG', name: entry.name, exePath: bestExe, workingDir: path.dirname(bestExe) });
+  // ── 2. Epic Games (Windows manifests) ──────────────────────────────────────
+  if (process.platform === 'win32') {
+    try {
+      const epicManifestDir = path.join(process.env['ProgramData'] || 'C:\\ProgramData', 'Epic', 'EpicGamesLauncher', 'Data', 'Manifests');
+      const manifests = (await fs.readdir(epicManifestDir)).filter(f => f.endsWith('.item'));
+      for (const manifest of manifests) {
+        try {
+          const data = JSON.parse(await fs.readFile(path.join(epicManifestDir, manifest), 'utf8'));
+          if (data.InstallLocation && data.LaunchExecutable) {
+            discovered.push({ platform: 'Epic Games', name: data.DisplayName || data.AppName, exePath: path.join(data.InstallLocation, data.LaunchExecutable), workingDir: data.InstallLocation });
           }
-        }
-      } catch {}
-    }
-  } catch {}
+        } catch {}
+      }
+    } catch {}
 
-  // ── 4. Xbox / Microsoft Store ─────────────────────────────────────────────
-  try {
-    const xboxDir = path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'WindowsApps');
-    const entries = await fs.readdir(xboxDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      try {
-        const gameDir = path.join(xboxDir, entry.name);
-        const lowerName = entry.name.toLowerCase();
-        const ignoredPrefixes = ['microsoft', 'windows', 'msteams', 'whatsapp', 'python', 'intel', 'nvidia', 'realtek', 'dolby', 'disney', 'spotify', 'netflix', 'appup', 'hewlettpackard', 'lenovo', 'dell'];
-        if (!ignoredPrefixes.some(p => lowerName.startsWith(p))) {
-          const bestExe = await scanDirectoryForBestExe(gameDir);
-          if (bestExe) {
-            discovered.push({ platform: 'Xbox', name: entry.name.split('_')[0], exePath: bestExe, workingDir: path.dirname(bestExe) });
+    // ── 3. GOG Galaxy ─────────────────────────────────────────────────────────
+    try {
+      const gogDirs = ['C:\\Program Files (x86)\\GOG Galaxy\\Games', 'C:\\GOG Games'];
+      for (const dir of gogDirs) {
+        try {
+          const entries = await fs.readdir(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (!entry.isDirectory()) continue;
+            const gameDir = path.join(dir, entry.name);
+            const bestExe = await scanDirectoryForBestExe(gameDir);
+            if (bestExe) {
+              discovered.push({ platform: 'GOG', name: entry.name, exePath: bestExe, workingDir: path.dirname(bestExe) });
+            }
           }
-        }
-      } catch {}
-    }
-  } catch {}
+        } catch {}
+      }
+    } catch {}
+
+    // ── 4. Xbox / Microsoft Store ─────────────────────────────────────────────
+    try {
+      const xboxDir = path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'WindowsApps');
+      const entries = await fs.readdir(xboxDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        try {
+          const gameDir = path.join(xboxDir, entry.name);
+          const lowerName = entry.name.toLowerCase();
+          const ignoredPrefixes = ['microsoft', 'windows', 'msteams', 'whatsapp', 'python', 'intel', 'nvidia', 'realtek', 'dolby', 'disney', 'spotify', 'netflix', 'appup', 'hewlettpackard', 'lenovo', 'dell'];
+          if (!ignoredPrefixes.some(p => lowerName.startsWith(p))) {
+            const bestExe = await scanDirectoryForBestExe(gameDir);
+            if (bestExe) {
+              discovered.push({ platform: 'Xbox', name: entry.name.split('_')[0], exePath: bestExe, workingDir: path.dirname(bestExe) });
+            }
+          }
+        } catch {}
+      }
+    } catch {}
+  } else {
+    // ── Linux: Heroic / Lutris / common game dirs (best-effort) ──────────────
+    const home = os.homedir();
+    try {
+      const heroicBase = path.join(home, '.config', 'heroic');
+      const heroicFiles = [
+        path.join(heroicBase, 'gog_store', 'installed.json'),
+        path.join(heroicBase, 'sideload_apps', 'library.json'),
+        path.join(heroicBase, 'legendaryConfig', 'legendary', 'installed.json'),
+      ];
+      for (const f of heroicFiles) {
+        try {
+          const raw = await fs.readFile(f, 'utf8');
+          const data = JSON.parse(raw);
+          const items = Array.isArray(data?.installed) ? data.installed : Array.isArray(data?.games) ? data.games : Array.isArray(data) ? data : [];
+          for (const g of items) {
+            const installPath = g?.install_path || g?.installPath || g?.folder_name || g?.app_install_path || '';
+            if (!installPath || typeof installPath !== 'string') continue;
+            try { await fs.access(installPath); } catch { continue; }
+            const title = g?.app_name || g?.appName || g?.title || g?.name || '';
+            let exePath = g?.executable || g?.launch_options?.executable || '';
+            let bestExe = '';
+            if (exePath && typeof exePath === 'string') bestExe = path.isAbsolute(exePath) ? exePath : path.join(installPath, exePath);
+            if (bestExe) { try { await fs.access(bestExe); } catch { bestExe = ''; } }
+            if (!bestExe) bestExe = await scanDirectoryForBestExe(installPath);
+            if (bestExe) discovered.push({ platform: 'Heroic', name: title || path.basename(installPath), exePath: bestExe, workingDir: path.dirname(bestExe) });
+          }
+        } catch {}
+      }
+    } catch {}
+
+    try {
+      const lutrisDirs = [
+        path.join(home, 'Games'),
+        path.join(home, '.local', 'share', 'lutris', 'runners', 'wine'),
+      ];
+      for (const dir of lutrisDirs) {
+        try {
+          const entries = await fs.readdir(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (!entry.isDirectory()) continue;
+            const gameDir = path.join(dir, entry.name);
+            if (/steam/i.test(gameDir)) continue;
+            const bestExe = await scanDirectoryForBestExe(gameDir);
+            if (bestExe) discovered.push({ platform: 'Lutris/Games', name: entry.name, exePath: bestExe, workingDir: path.dirname(bestExe) });
+          }
+        } catch {}
+      }
+    } catch {}
+  }
 
   return { ok: true, discovered };
 })
