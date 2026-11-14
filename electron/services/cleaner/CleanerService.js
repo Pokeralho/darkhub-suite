@@ -47,6 +47,7 @@ export class CleanerService {
     this.dataDir = dataDir || path.join(os.tmpdir(), 'DarkHub-Cleaner');
     this.backupDirPref = backupDir;
     this.execFile = execFileImpl;
+    this._injectedExec = execFileImpl !== execFile;
     this.fetch = fetchImpl;
     this.extraArgs = extraArgs; // tests: --test-root / --root
     this.busy = null;
@@ -71,8 +72,8 @@ export class CleanerService {
   }
 
   run(args, { timeoutMs = 120000 } = {}) {
-    if (process.platform !== 'win32') return Promise.resolve({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'DarkHub Cleaner (motor nativo Windows) não é suportado nesta plataforma.' });
-    if (!fs.existsSync(this.exePath)) return Promise.resolve({ ok: false, code: 'missing_engine', error: 'DarkHub.Cleaner.exe não foi encontrado (rode npm run build:cleaner).' });
+    if (process.platform !== 'win32' && !this._injectedExec) return Promise.resolve({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'DarkHub Cleaner (motor nativo Windows) não é suportado nesta plataforma.' });
+    if (!this._injectedExec && !fs.existsSync(this.exePath)) return Promise.resolve({ ok: false, code: 'missing_engine', error: 'DarkHub.Cleaner.exe não foi encontrado (rode npm run build:cleaner).' });
     return new Promise((resolve) => {
       this.execFile(this.exePath, [...args, ...this.extraArgs], { windowsHide: true, timeout: timeoutMs, maxBuffer: 256 << 20 }, (err, stdout, stderr) => {
         const line = String(stdout || '').trim().split(/\r?\n/).filter((l) => l.startsWith('{')).pop();
@@ -201,11 +202,11 @@ export class CleanerService {
 
   /** `reg import` of one of our own backups (only a bare file name inside the backup folder is accepted). */
   restoreBackup({ name } = {}) {
-    if (process.platform !== 'win32') return Promise.resolve({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Restauração de backups de registro (.reg) é suportada apenas no Windows.' });
     const n = String(name || '');
     if (!/^[\w.-]+\.reg$/i.test(n) || n !== path.basename(n)) throw new Error('Backup inválido.');
     const file = path.join(this.backupDir(), n);
     if (!fs.existsSync(file)) throw new Error('Backup não encontrado.');
+    if (process.platform !== 'win32') return Promise.resolve({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Restauração de backups de registro (.reg) é suportada apenas no Windows.' });
     return new Promise((resolve) => {
       this.execFile('reg.exe', ['import', file], { windowsHide: true, timeout: 60000 }, (err, _out, stderr) => {
         if (err) resolve({ ok: false, error: String(stderr || err.message).trim() || 'Falha ao importar (execute como administrador para chaves de HKLM).' });
