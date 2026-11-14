@@ -1300,12 +1300,20 @@ async function scanDirectoryForBestExe(dir) {
         const fullPath = path.join(currentDir, file.name);
         if (file.isDirectory()) {
           await walk(fullPath, depth + 1);
-        } else if (file.name.toLowerCase().endsWith('.exe')) {
-          const score = await scoreExecutable(fullPath, names, dir);
-          if (score > bestScore && score > 0) {
-            bestScore = score;
-            bestExe = fullPath;
-          }
+          continue;
+        }
+        const lower = file.name.toLowerCase();
+        const isCandidate = process.platform === 'win32'
+          ? lower.endsWith('.exe')
+          : (lower.endsWith('.sh') || (!lower.includes('.') && !file.name.startsWith('.')));
+        if (!isCandidate) continue;
+        if (process.platform !== 'win32') {
+          try { await fs.access(fullPath, fsRaw.constants?.X_OK ?? 1); } catch { continue; }
+        }
+        const score = await scoreExecutable(fullPath, names, dir);
+        if (score > bestScore && score > 0) {
+          bestScore = score;
+          bestExe = fullPath;
         }
       }
     } catch(e) {}
@@ -1318,21 +1326,36 @@ ipcMain.handle('library:discover', async () => {
   const discovered = [];
 
   try {
-    const steamPaths = [
-      'C:\\Program Files (x86)\\Steam\\steamapps\\common',
-      'C:\\Program Files\\Steam\\steamapps\\common',
-      path.join(os.homedir(), 'Steam', 'steamapps', 'common'),
-    ];
-    const vdfPaths = [
-      'C:\\Program Files (x86)\\Steam\\steamapps\\libraryfolders.vdf',
-      'C:\\Program Files\\Steam\\steamapps\\libraryfolders.vdf',
-    ];
+    const home = os.homedir();
+    const steamPaths = process.platform === 'win32'
+      ? [
+          'C:\\Program Files (x86)\\Steam\\steamapps\\common',
+          'C:\\Program Files\\Steam\\steamapps\\common',
+          path.join(home, 'Steam', 'steamapps', 'common'),
+        ]
+      : [
+          path.join(home, '.steam', 'steam', 'steamapps', 'common'),
+          path.join(home, '.local', 'share', 'Steam', 'steamapps', 'common'),
+          path.join(home, '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam', 'steamapps', 'common'),
+          path.join(home, 'snap', 'steam', 'common', '.local', 'share', 'Steam', 'steamapps', 'common'),
+        ];
+    const vdfPaths = process.platform === 'win32'
+      ? [
+          'C:\\Program Files (x86)\\Steam\\steamapps\\libraryfolders.vdf',
+          'C:\\Program Files\\Steam\\steamapps\\libraryfolders.vdf',
+        ]
+      : [
+          path.join(home, '.steam', 'steam', 'steamapps', 'libraryfolders.vdf'),
+          path.join(home, '.local', 'share', 'Steam', 'steamapps', 'libraryfolders.vdf'),
+          path.join(home, '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam', 'steamapps', 'libraryfolders.vdf'),
+        ];
     for (const vdf of vdfPaths) {
       try {
         const content = await fs.readFile(vdf, 'utf8');
         const matches = [...content.matchAll(/"path"\s+"([^"]+)"/g)];
         for (const m of matches) {
-          steamPaths.push(path.join(m[1], 'steamapps', 'common'));
+          const p = String(m[1] || '').replace(/\\\\/g, '\\');
+          steamPaths.push(path.join(p, 'steamapps', 'common'));
         }
       } catch {}
     }
@@ -1479,7 +1502,7 @@ async function launchPgeBat(batPath) {
 }
 
 ipcMain.handle('pge:openPortable', async () => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
+  if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'PGE Portable é suportado apenas no Windows.' }
   const batPath = findPgeBat()
   if (!batPath) {
     return { ok: false, error: 'Pokeralho Games Launcher.bat não encontrado.' }
