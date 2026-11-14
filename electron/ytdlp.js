@@ -138,6 +138,12 @@ export async function ensureFfmpeg(toolsDir, platform) {
     return dest
   }
 
+  try {
+    const { findOnPath } = await import('./services/binResolver.js')
+    const onPath = await findOnPath('ffmpeg', platform)
+    if (onPath) return onPath
+  } catch {}
+
   await fs.mkdir(toolsDir, { recursive: true }).catch(() => {})
 
   const candidatePaths = [
@@ -172,12 +178,6 @@ export async function ensureFfmpeg(toolsDir, platform) {
       } catch {}
       return p
     }
-  } catch {}
-
-  try {
-    const { findOnPath } = await import('./services/binResolver.js')
-    const onPath = await findOnPath('ffmpeg', platform)
-    if (onPath) return onPath
   } catch {}
 
   return dest
