@@ -21,14 +21,16 @@ function setup() {
   ]))
   fs.writeFileSync(path.join(userData, 'saves', 'manifest-meta.json'), JSON.stringify({ checkedAt: Date.now() }))
   const app = { getPath: (k: string) => (k === 'documents' ? docs : userData) }
-  const svc = new SaveBackupService({ app, getInstalledGames: async () => [{ name: 'Test Game', appId: '42', installDir: path.join(root, 'NoGameHere') }] })
+  let t = 1700000000000
+  const svc = new SaveBackupService({ app, getInstalledGames: async () => [{ name: 'Test Game', appId: '42', installDir: path.join(root, 'NoGameHere') }], now: () => t })
+  const advance = (ms = 1100) => { t += ms }
   svc.setSettings({ backupRoot: path.join(root, 'Backups'), keep: 2 })
-  return { root, saveDir, svc }
+  return { root, saveDir, svc, advance }
 }
 
 describe('SaveBackupService', () => {
   it('finds saves, backs up, skips unchanged, rotates and restores with a safety copy', async () => {
-    const { root, saveDir, svc } = setup()
+    const { root, saveDir, svc, advance } = setup()
     const scan = await svc.scan()
     expect(scan.games).toMatchObject([{ name: 'Test Game', files: 2 }])
 
@@ -37,7 +39,7 @@ describe('SaveBackupService', () => {
     expect((await svc.backup('Test Game')).skipped).toBe(true)
 
     fs.writeFileSync(path.join(saveDir, 'slot1', 'save.dat'), 'v2')
-    await new Promise((r) => setTimeout(r, 1100)) // version ids have 1 s resolution
+    advance() // version ids are second-resolution
     const b2 = await svc.backup('Test Game')
     expect(b2.ok).toBe(true)
 
@@ -52,7 +54,7 @@ describe('SaveBackupService', () => {
 
     // restoring over a state that was never backed up keeps it as "before-restore"
     fs.writeFileSync(path.join(saveDir, 'slot1', 'save.dat'), 'unsaved')
-    await new Promise((r) => setTimeout(r, 1100))
+    advance()
     const r2 = await svc.restore('Test Game', b2.id)
     expect(svc.versions('Test Game').find((v: any) => v.id === r2.safetyId)?.label).toBe('before-restore')
     expect(fs.readFileSync(path.join(saveDir, 'slot1', 'save.dat'), 'utf8')).toBe('v2')
@@ -69,7 +71,7 @@ describe('SaveBackupService', () => {
 
     // keep = 2: older regular versions are rotated away, the safety copy stays
     fs.writeFileSync(path.join(saveDir, 'config.ini'), 'a=3')
-    await new Promise((r) => setTimeout(r, 1100))
+    advance()
     await svc.backup('Test Game')
     const regular = svc.versions('Test Game').filter((v: any) => v.label !== 'before-restore')
     expect(regular.length).toBe(2)
