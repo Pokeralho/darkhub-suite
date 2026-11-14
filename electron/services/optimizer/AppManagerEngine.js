@@ -683,7 +683,15 @@ if ($k) { $v = $k.GetValue(${psQuote(appPath)}, $null); if ($null -ne $v) { Writ
   // ------------------------------------------------------------------ HAGS
   /** HwSchMode: 2 = on, 1 = off, absent = driver default (which may or may not be "on"). */
   async getHagsStatus() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') {
+      return {
+        ok: false,
+        unsupported: true,
+        platform: process.platform,
+        reason: 'windows-only',
+        error: 'HAGS is only supported on Windows.'
+      };
+    }
     const r = await this.runPowerShell(`$v = (Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' -Name 'HwSchMode' -ErrorAction SilentlyContinue).HwSchMode
 if ($null -eq $v) { Write-Output 'DHHAGS|default' } else { Write-Output ('DHHAGS|' + $v) }`);
     if (r.code !== 0) return { ok: false, error: r.stderr || 'Não foi possível ler o HAGS' };
@@ -692,7 +700,15 @@ if ($null -eq $v) { Write-Output 'DHHAGS|default' } else { Write-Output ('DHHAGS
   }
 
   async setHagsStatus({ enabled } = {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') {
+      return {
+        ok: false,
+        unsupported: true,
+        platform: process.platform,
+        reason: 'windows-only',
+        error: 'HAGS is only supported on Windows.'
+      };
+    }
     const res = enabled
       ? await DeepTweaksEngine.applyTweaks(['group:hags'])
       : await DeepTweaksEngine.applyChangeSet({
@@ -706,7 +722,15 @@ if ($null -eq $v) { Write-Output 'DHHAGS|default' } else { Write-Output ('DHHAGS
   }
 
   async revertHags() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') {
+      return {
+        ok: false,
+        unsupported: true,
+        platform: process.platform,
+        reason: 'windows-only',
+        error: 'HAGS is only supported on Windows.'
+      };
+    }
     const res = await DeepTweaksEngine.revertTweaks(['group:hags']);
     if (!res.ok) return { ok: false, error: res.error || 'Falha ao reverter HAGS' };
     return { ok: true, verified: true, requiresReboot: true, msg: 'HAGS restaurado ao valor anterior (ou ao padrão do driver). Reinicie o computador.' };

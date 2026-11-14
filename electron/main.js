@@ -78,6 +78,7 @@ import { registerKakuganIPC } from './ipc/kakuganIpc.js'
 import { registerHubIPC } from './ipc/hubIpc.js'
 import { registerUpscaleIPC } from './ipc/upscaleIpc.js'
 import { registerMetadataIPC } from './ipc/metadataIpc.js'
+import { getCapabilities } from './capabilities.js'
 import { SYSTEM_TAR } from './services/SecureDownload.js'
 import { createFramePacerOverlay, closeFramePacerOverlay, toggleFramePacerOverlay, setOverlayClickThrough, setOverlayConfig, getOverlayStatus } from './services/FramePacerOverlay.js'
 protocol.registerSchemesAsPrivileged([
@@ -193,12 +194,13 @@ async function getFfmpegPath() {
     } catch {}
 
     try {
-      const { code, stdout } = await runCommand('where.exe', ['ffmpeg'], { timeoutMs: 5000 })
+      const finder = process.platform === 'win32' ? 'where.exe' : 'which'
+      const { code, stdout } = await runCommand(finder, ['ffmpeg'], { timeoutMs: 5000 })
       const whereOut = code === 0 ? String(stdout ?? '').trim().split(/\r?\n/)[0] : ''
       if (whereOut && fsRaw.existsSync(whereOut)) return whereOut
     } catch {}
 
-    const localBin = path.join(app.getPath ? app.getPath('userData') : '', 'tools', 'ffmpeg.exe')
+    const localBin = path.join(app.getPath ? app.getPath('userData') : '', 'tools', process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg')
     if (fsRaw.existsSync(localBin)) return localBin
 
     try {
@@ -281,11 +283,23 @@ const LATENCY_CHANNELS = [
   'latency:enableUltra', 'latency:enableUltraStable', 'latency:disableUltra', 'latency:toggleUltra',
   'latency:boostNow', 'latency:launchGameWithProfile'
 ]
-for (const ch of LATENCY_CHANNELS) {
-  ipcMain.handle(ch, async () => ({
+const latencyDisabledPayload = () => {
+  const supported = process.platform === 'win32'
+  return {
     ok: false,
-    error: latencyServiceState === 'disabled' ? 'latency-service-disabled' : 'latency-service-starting'
-  }))
+    unsupported: !supported,
+    platform: process.platform,
+    reason: supported ? 'disabled' : 'windows-only',
+    error: supported ? 'latency-service-disabled' : 'Ultra Low Latency is only supported on Windows.'
+  }
+}
+for (const ch of LATENCY_CHANNELS) {
+  ipcMain.handle(ch, async () => {
+    if (latencyServiceState === 'starting' && process.platform === 'win32') {
+      return { ok: false, platform: process.platform, error: 'latency-service-starting' }
+    }
+    return latencyDisabledPayload()
+  })
 }
 
 function normalizeAccessPath(input) {
@@ -414,14 +428,15 @@ function isTrustedAppNavigation(url) {
 
 function getAppIconPath() {
   const candidates = [
-    path.join(process.resourcesPath, 'assets', 'DarkHub.ico'),
-    path.join(process.resourcesPath, 'assets', 'icon.ico'),
-    path.join(process.resourcesPath, 'icon.ico'),
-    path.resolve(__dirname, 'assets', 'icon.ico'),
-    path.resolve(__dirname, '..', 'build', 'icon.ico'),
-    path.resolve(__dirname, '..', 'icon.ico'),
-    path.resolve(__dirname, '..', 'public', 'icon.ico'),
-    path.resolve(__dirname, '..', '..', 'DarkHub', 'assets', 'icon.ico')
+    path.join(process.resourcesPath, 'assets', process.platform === 'win32' ? 'DarkHub.ico' : 'icon.png'),
+    path.join(process.resourcesPath, 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    path.join(process.resourcesPath, process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    path.resolve(__dirname, 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    path.resolve(__dirname, '..', 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    path.resolve(__dirname, '..', 'build', 'icon.png'),
+    path.resolve(__dirname, '..', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    path.resolve(__dirname, '..', 'public', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    path.resolve(__dirname, '..', '..', 'DarkHub', 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png')
   ]
 
   return candidates.find((candidate) => fsRaw.existsSync(candidate)) || null
@@ -441,30 +456,35 @@ function showMainWindow() {
 }
 
 function ensureTray() {
-  if (tray || process.platform !== 'win32') return
-
+  if (tray || process.platform === 'darwin') return
+  // Tray support varies by Linux desktop environment; create it when an icon is available but don't fail boot.
   const iconPath = getAppIconPath()
   if (!iconPath) {
     log.warn('Tray icon not found; background tray skipped')
     return
   }
 
-  tray = new Tray(iconPath)
-  tray.setToolTip('DarkHub')
-  tray.setContextMenu(Menu.buildFromTemplate([
-    {
-      label: 'Abrir DarkHub',
-      click: () => showMainWindow()
-    },
-    {
-      label: 'Sair',
-      click: () => {
-        appIsQuitting = true
-        app.quit()
+  try {
+    tray = new Tray(iconPath)
+    tray.setToolTip('DarkHub')
+    tray.setContextMenu(Menu.buildFromTemplate([
+      {
+        label: 'Abrir DarkHub',
+        click: () => showMainWindow()
+      },
+      {
+        label: 'Sair',
+        click: () => {
+          appIsQuitting = true
+          app.quit()
+        }
       }
-    }
-  ]))
-  tray.on('double-click', () => showMainWindow())
+    ]))
+    tray.on('double-click', () => showMainWindow())
+  } catch (err) {
+    tray = null
+    log.warn('[tray] unavailable on this platform/environment:', err?.message ?? String(err))
+  }
 }
 
 function hideWindowToBackground(win) {
@@ -1509,6 +1529,8 @@ ipcMain.handle('app:getAbout', async () => {
   }
 })
 
+ipcMain.handle('app:getCapabilities', async () => getCapabilities())
+
 const STARTUP_TASK_NAME = 'DarkHub Suite Autostart'
 
 async function isStartupTaskEnabled() {
@@ -2053,7 +2075,7 @@ ipcMain.handle('youtube:getVideoInfo', async (_event, payload) => {
     const ffmpegPath = await getFfmpegPath()
     const ffmpegLocation = typeof ffmpegPath === 'string' && fsRaw.existsSync(ffmpegPath)
       ? path.dirname(ffmpegPath)
-      : (fsRaw.existsSync(path.join(toolsDir, 'ffmpeg.exe')) ? toolsDir : null)
+      : (fsRaw.existsSync(path.join(toolsDir, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg')) ? toolsDir : null)
     let ytDlpError = null
 
     try {
@@ -2170,7 +2192,7 @@ ipcMain.handle('youtube:download', async (event, payload) => {
     const ffmpegPath = await getFfmpegPath()
     const ffmpegLocation = typeof ffmpegPath === 'string' && fsRaw.existsSync(ffmpegPath)
       ? path.dirname(ffmpegPath)
-      : (fsRaw.existsSync(path.join(toolsDir, 'ffmpeg.exe')) ? toolsDir : null)
+      : (fsRaw.existsSync(path.join(toolsDir, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg')) ? toolsDir : null)
 
     const { buildExtraArgs } = await import('./services/ytdlpOptions.js')
     const extraOpts = { ...(extra && typeof extra === 'object' ? extra : {}) }
@@ -3401,6 +3423,13 @@ app.whenReady().then(async () => {
     const Elevation = (await import('./services/optimizer/ElevationHelper.js')).default
     if (!(await ensureElevated({ app, dialog, isElevated: () => Elevation.isElevated(), log }))) return
   }
+
+  // DarkHub is Windows-first: on Linux/other platforms the renderer/UI can run, but Windows-only subsystems
+  // (PowerShell/registry/drivers/native daemons) must degrade gracefully instead of crashing at boot.
+  if (process.platform !== 'win32') {
+    log.warn(`[startup] running on ${process.platform}: Windows-only capabilities will be reported as unsupported`)
+  }
+
   const runDeferredStartup = async () => {
     let liveServices = { latencyGuardian: true, overlay: true, autoClicker: true }
 
@@ -3427,11 +3456,14 @@ app.whenReady().then(async () => {
     }
 
     // Earlier versions kept a hidden hardware fingerprint; remove what they left behind.
-    fs.rm(path.join(process.env.ProgramData || 'C:\\ProgramData', 'DarkHub', 'm.dat'), { force: true }).catch(() => {})
-    runCommand('reg.exe', ['delete', 'HKCU\\Software\\DarkHub\\MM', '/f'], { timeoutMs: 8000 }).catch(() => {})
+    if (process.platform === 'win32') {
+      fs.rm(path.join(process.env.ProgramData || 'C:\\ProgramData', 'DarkHub', 'm.dat'), { force: true }).catch(() => {})
+      runCommand('reg.exe', ['delete', 'HKCU\\Software\\DarkHub\\MM', '/f'], { timeoutMs: 8000 }).catch(() => {})
+    }
 
+    if (process.platform !== 'win32') latencyServiceState = 'disabled'
     if (liveServices.latencyGuardian === false) latencyServiceState = 'disabled'
-    if (liveServices.latencyGuardian !== false) {
+    if (process.platform === 'win32' && liveServices.latencyGuardian !== false) {
       try {
         log.info('[startup-bg] registering latency guardian')
         const { registerLatencyGuardian } = await import('./latencyGuardian.js')
@@ -3454,12 +3486,18 @@ app.whenReady().then(async () => {
         latencyServiceState = 'failed'
         for (const ch of LATENCY_CHANNELS) {
           try { ipcMain.removeHandler(ch) } catch {}
-          ipcMain.handle(ch, async () => ({ ok: false, error: 'latency-service-failed' }))
+          ipcMain.handle(ch, async () => ({ ok: false, platform: process.platform, error: 'latency-service-failed' }))
         }
+      }
+    } else if (latencyServiceState === 'disabled') {
+      // Refresh placeholders so they carry the final unsupported/disabled contract (not "starting").
+      for (const ch of LATENCY_CHANNELS) {
+        try { ipcMain.removeHandler(ch) } catch {}
+        ipcMain.handle(ch, async () => latencyDisabledPayload())
       }
     }
 
-    if (liveServices.overlay !== false) {
+    if (process.platform === 'win32' && liveServices.overlay !== false) {
 
       // Ctrl+Shift+F is a common shortcut (search in editors and browsers): it belongs to DarkHub only while the
       // Frame Pacer runs, the only time its overlay is useful
@@ -3473,6 +3511,13 @@ app.whenReady().then(async () => {
         }
       })
 
+      FramePacerEngine.on('metrics', (metrics) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('framepacer:metrics', metrics)
+        }
+      })
+    } else if (process.platform !== 'win32') {
+      // Frame pacer/overlay are Win32-specific today; keep status events harmless but avoid registering hotkeys.
       FramePacerEngine.on('metrics', (metrics) => {
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('framepacer:metrics', metrics)
@@ -3554,7 +3599,10 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin' && appIsQuitting) app.quit()
+  if (process.platform === 'darwin') return
+  // On Windows the app can live in the tray; on Linux tray support is environment-dependent,
+  // so quit when the last window closes unless we are explicitly backgrounded by a working tray.
+  if (appIsQuitting || !tray) app.quit()
 })
 
 let latencyGuardianStopHandled = false

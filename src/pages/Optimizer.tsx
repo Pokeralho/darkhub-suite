@@ -189,6 +189,7 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
     loading: false,
     state: 'unknown'
   });
+  const [hagsSupported, setHagsSupported] = useState(true);
 
   // Process Priority State
   const [processList, setProcessList] = useState<any[]>([]);
@@ -881,9 +882,15 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
     setHagsStatus((prev) => ({ ...prev, loading: true }));
     try {
       const res = await api().getHagsStatus();
+      if (res?.unsupported || res?.reason === 'windows-only') {
+        setHagsSupported(false);
+        setHagsStatus({ loading: false, state: 'unknown' });
+        return;
+      }
       if (res?.ok) {
         const state = res.state ?? (res.enabled ? 'on' : res.value === '1' ? 'off' : 'default');
         setHagsStatus({ loading: false, state });
+        setHagsSupported(true);
       } else {
         setHagsStatus({ loading: false, state: 'unknown', error: res?.error });
       }
@@ -1176,8 +1183,9 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
     const q = programSearch.toLowerCase();
     return installedPrograms.filter((p) => String(p.name || '').toLowerCase().includes(q) || String(p.publisher || '').toLowerCase().includes(q));
   }, [installedPrograms, programSearch]);
-  const hagsLabel =
-    hagsStatus.loading ? t('optimizer.audit.hags.checking', 'Verificando...')
+  const hagsLabel = !hagsSupported
+    ? t('optimizer.hags.unsupported', 'Indisponível nesta plataforma (somente Windows)')
+    : hagsStatus.loading ? t('optimizer.audit.hags.checking', 'Verificando...')
     : hagsStatus.state === 'on' ? t('optimizer.hags.enabled', 'Ativado (HwSchMode = 2)')
     : hagsStatus.state === 'off' ? t('optimizer.hags.disabled', 'Desativado (HwSchMode = 1)')
     : hagsStatus.state === 'default' ? t('optimizer.audit.hags.defaultState', 'Padrão do driver (sem override; pode estar ligado ou não)')
@@ -1310,7 +1318,7 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-zinc-800/80">
-          <HagsButtons variant="card" state={hagsStatus.state} disabled={busy} onToggle={handleToggleHags} onRevert={handleRevertHags} labels={hagsButtonLabels} />
+          <HagsButtons variant="card" state={hagsStatus.state} disabled={busy || !hagsSupported} onToggle={handleToggleHags} onRevert={handleRevertHags} labels={hagsButtonLabels} />
           <div className="flex items-center gap-3">
             <span className="text-[11.5px] text-zinc-500 hidden lg:inline">{t('optimizer.hags.restartNote', 'Necessário reiniciar o Windows após alterar o HAGS.')}</span>
             <button onClick={handleRestoreStreamingDefaults} disabled={busy} className="dh-btn dh-btn-sm">
@@ -1645,7 +1653,7 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
             )}
             {hagsStatus.error && <div className="text-[12px] text-red-400 font-mono">{hagsStatus.error}</div>}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-zinc-800/80">
-              <HagsButtons variant="tab" state={hagsStatus.state} disabled={isOptimizing} onToggle={handleToggleHags} onRevert={handleRevertHags} labels={hagsButtonLabels} />
+              <HagsButtons variant="tab" state={hagsStatus.state} disabled={isOptimizing || !hagsSupported} onToggle={handleToggleHags} onRevert={handleRevertHags} labels={hagsButtonLabels} />
               <span className="text-[11.5px] text-zinc-500">{t('optimizer.hags.restartNote', 'Necessário reiniciar o Windows após alterar o HAGS.')}</span>
             </div>
           </section>
