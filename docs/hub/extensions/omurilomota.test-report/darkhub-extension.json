@@ -1,0 +1,59 @@
+{
+  "$schema": "https://darkhub.ink/schema/v1.json",
+  "schemaVersion": 1,
+  "type": "extension",
+  "id": "omurilomota.test-report",
+  "version": "0.1.0",
+  "name": {
+    "pt-BR": "Test Report",
+    "en-US": "Test Report"
+  },
+  "description": {
+    "pt-BR": "Relatório completo de testes/diagnóstico: tempo, ambiente e ventilação, frequências/limites informados, hardware detectado e métricas capturadas (CPU/GPU/RAM/rede/disco) com marcadores, comparação e exportação em Markdown.",
+    "en-US": "Full test/diagnostic report: time, environment and cooling, reported clocks/limits, detected hardware and captured metrics (CPU/GPU/RAM/net/disk) with markers, comparison and Markdown export."
+  },
+  "author": {
+    "github": "omurilomota"
+  },
+  "license": "MIT",
+  "tags": [
+    "diagnostic",
+    "report",
+    "benchmark",
+    "session",
+    "experiment",
+    "sensors",
+    "compare",
+    "thermal"
+  ],
+  "minApp": "0.7.3",
+  "permissions": [
+    "sensors",
+    "hardware",
+    "storage",
+    "clipboard"
+  ],
+  "contributes": {
+    "pages": [
+      {
+        "id": "main",
+        "title": {
+          "pt-BR": "Test Report",
+          "en-US": "Test Report"
+        },
+        "icon": "chart",
+        "entry": "index.html"
+      }
+    ],
+    "widgets": [
+      {
+        "id": "status",
+        "title": {
+          "pt-BR": "Test Report",
+          "en-US": "Test Report"
+        },
+        "entry": "widget.html"
+      }
+    ]
+  }
+}
