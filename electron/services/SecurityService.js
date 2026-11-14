@@ -580,7 +580,50 @@ class SecurityService {
   }
 
   async getLiveNetworkConnections() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') {
+      try {
+        const { runCommand } = await import('./PowerShellRunner.js');
+        // Prefer `ss` (iproute2) for TCP state/PID/process info; fallback minimal.
+        let out = '';
+        const r = await runCommand('ss', ['-tunapH'], { timeoutMs: 10000, trim: true }).catch(() => null);
+        if (r && r.code === 0 && String(r.stdout || '').trim()) out = String(r.stdout);
+        else {
+          const r2 = await runCommand('ss', ['-tunap'], { timeoutMs: 10000, trim: true }).catch(() => null);
+          if (r2 && r2.code === 0) out = String(r2.stdout || '');
+        }
+        const list = [];
+        const lines = out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        for (const line of lines) {
+          // e.g. "LISTEN 0 4096 0.0.0.0:22 0.0.0.0:* users:(("sshd",pid=123,fd=3))"
+          if (/^State\s+/i.test(line) || /^Netid\s+/i.test(line)) continue;
+          const parts = line.split(/\s+/);
+          if (parts.length < 5) continue;
+          const state = parts[0];
+          if (!/^(LISTEN|ESTAB|ESTABLISHED|SYN-SENT|SYN-RECV|TIME-WAIT|CLOSE-WAIT)$/i.test(state)) continue;
+          const local = parts[4] || '';
+          const remote = parts[5] || 'N/A';
+          const procM = /users:\(\("([^"]+)",pid=(\d+)/.exec(line);
+          const processName = procM ? procM[1] : '';
+          const pid = procM ? Number(procM[2]) : 0;
+          const portM = /:(\d+)$/.exec(local.replace(/\]$/, ''));
+          const lport = portM ? Number(portM[1]) : 0;
+          const rportM = /:(\d+)$/.exec(String(remote).replace(/\]$/, ''));
+          const rport = rportM ? Number(rportM[1]) : 0;
+          const isSuspicious = [4444,5555,6666,6667,1337,31337,8888,9999].includes(lport) || [4444,5555,6666,6667,1337,31337].includes(rport);
+          list.push({ Local: local, Remote: remote || 'N/A', State: state, Pid: pid, ProcessName: processName || (pid ? `PID: ${pid}` : 'N/A'), IsSuspicious: isSuspicious });
+          if (list.length >= 60) break;
+        }
+        for (const c of list) {
+          const ip = String(c?.Remote || '').replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
+          let hit = null;
+          try { hit = ip && ip !== 'N/A' && ip !== '*' ? this.advanced.lookupIp(ip) : null; } catch { hit = null; }
+          if (hit) { c.Blocklisted = hit.source || true; c.IsSuspicious = true; }
+        }
+        return { ok: true, connections: list, platform: process.platform };
+      } catch (e) {
+        return { ok: false, error: e.message, connections: [] };
+      }
+    }
     const script = `
       $ErrorActionPreference = 'SilentlyContinue'
       $conns = Get-NetTCPConnection | Where-Object { $_.State -eq 'Listen' -or $_.State -eq 'Established' } | Select-Object -First 60 LocalAddress, LocalPort, RemoteAddress, RemotePort, State, OwningProcess
@@ -625,7 +668,7 @@ class SecurityService {
   }
 
   async checkRansomwareArmor() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Verificação de blindagem anti-ransomware (VSS/SMB1) é suportada apenas no Windows.' };
     const script = `
       $ErrorActionPreference = 'SilentlyContinue'
       $vss = (Get-Service -Name "VSS" -ErrorAction SilentlyContinue).Status
@@ -647,7 +690,7 @@ class SecurityService {
   }
 
   async enableRansomwareArmor() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Blindagem anti-ransomware (VSS/SMB1/ponto de restauração) é suportada apenas no Windows.' };
     const script = `
       $ErrorActionPreference = 'SilentlyContinue'
       # 1. Configura e inicia serviço de Volume Shadow Copy (VSS)
