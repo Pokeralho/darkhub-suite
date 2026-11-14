@@ -198,7 +198,20 @@
           "darkhub"
         ]
       }
-    ]
+    ],
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "target": [
+        "AppImage",
+        "deb",
+        "dir"
+      ],
+      "artifactName": "${productName}-${version}-linux-${arch}.${ext}"
+    },
+    "appImage": {
+      "artifactName": "${productName}-${version}-${arch}.AppImage"
+    }
   },
   "repository": {
     "type": "git",

@@ -45,6 +45,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: dtolnay/rust-toolchain@stable
       - run: npm ci
       - name: Type check
         run: npx tsc --noEmit -p .
@@ -52,3 +53,9 @@ jobs:
         run: npx vitest run
       - name: Renderer build
         run: npx vite build
+      - name: Rust crates (Linux)
+        run: |
+          cargo check --manifest-path native_cleaner/Cargo.toml
+          cargo check --manifest-path native_disk/Cargo.toml
+          cargo check --manifest-path native_pacer/Cargo.toml
+          cargo check --manifest-path native_gpubench/Cargo.toml
