@@ -371,7 +371,9 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
       return ids.map((id, i) => {
         const r = list[i];
         if (!r) return { id, ok: false, msg: '', error: t('optimizer.audit.err.noResult', 'Sem resultado do executor'), savingsBytes: 0 };
-        return { id, ok: Boolean(r.ok), msg: r.output?.msg || '', error: r.ok ? undefined : (r.error || r.output?.error || t('optimizer.audit.log.opFail', 'falhou')), savingsBytes: r.output?.savingsBytes || 0 };
+        const unsupported = Boolean(r.unsupported || r.output?.unsupported);
+        const err = r.ok ? undefined : (r.error || r.output?.error || t('optimizer.audit.log.opFail', 'falhou'));
+        return { id, ok: Boolean(r.ok), msg: r.output?.msg || r.output?.message || '', error: err, savingsBytes: r.output?.savingsBytes || 0, unsupported } as any;
       });
     } catch (e: any) {
       return ids.map((id) => ({ id, ok: false, msg: '', error: e?.message || String(e), savingsBytes: 0 }));
@@ -417,40 +419,47 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
   const handleOptimizeRAM = () =>
     withBusy(async () => {
       addLog('info', t('optimizer.audit.ram.start', 'Esvaziando o working set de processos em segundo plano (efeito temporário: o Windows traz as páginas de volta conforme necessário)...'));
-      const r = await runOne('optimizer:optimizeRAM');
+      const r = await runOne('optimizer:optimizeRAM') as any;
       if (r.ok) flash(setRamMsg, r.msg || t('optimizer.audit.ram.done', 'RAM otimizada'));
+      else if (r.unsupported) flash(setRamMsg, r.error || t('optimizer.audit.badge.unsupportedShort', 'não suportado'));
       else flash(setRamMsg, t('optimizer.audit.failedShort', 'Falhou: veja o terminal'));
     });
 
   const handleCleanTempFiles = () =>
     withBusy(async () => {
       addLog('info', t('optimizer.audit.disk.start', 'Apagando arquivos temporários e caches (apenas o que não está em uso)...'));
-      const r = await runOne('optimizer:cleanTemp');
+      const r = await runOne('optimizer:cleanTemp') as any;
       if (r.ok) flash(setDiskMsg, r.savingsBytes > 0 ? fmt(t('optimizer.audit.disk.freed', '{size} liberados'), { size: fmtBytes(r.savingsBytes) }) : (r.msg || t('optimizer.audit.disk.nothing', 'Nada para limpar')));
+      else if (r.unsupported) flash(setDiskMsg, r.error || t('optimizer.audit.badge.unsupportedShort', 'não suportado'));
       else flash(setDiskMsg, t('optimizer.audit.failedShort', 'Falhou: veja o terminal'));
     });
 
   const handleFlushDNS = () =>
     withBusy(async () => {
-      addLog('info', t('optimizer.audit.dns.flushStart', 'Executando ipconfig /flushdns (limpa só o cache local de DNS)...'));
-      const r = await runOne('optimizer:flushDns');
-      if (r.ok) flash(setDnsMsg, t('optimizer.audit.dns.flushed', 'Cache de DNS limpo'));
+      addLog('info', t('optimizer.audit.dns.flushStart', 'Limpando o cache local de DNS...'));
+      const r = await runOne('optimizer:flushDns') as any;
+      if (r.ok) flash(setDnsMsg, r.msg || t('optimizer.audit.dns.flushed', 'Cache de DNS limpo'));
+      else if (r.unsupported) flash(setDnsMsg, r.error || t('optimizer.audit.badge.unsupportedShort', 'não suportado'));
       else flash(setDnsMsg, t('optimizer.audit.failedShort', 'Falhou: veja o terminal'));
     });
 
   const handleSetPowerPlan = () =>
     withBusy(async () => {
       addLog('info', t('optimizer.audit.power.start', 'Ativando o plano de energia Alto Desempenho (o plano anterior fica salvo e pode ser restaurado na lista de ajustes)...'));
-      const r = await runOne('optimizer:powerPlanHighPerformance');
-      flash(setPowerMsg, r.ok ? (r.msg || t('optimizer.audit.power.done', 'Plano ativado')) : t('optimizer.audit.failedShort', 'Falhou: veja o terminal'));
+      const r = await runOne('optimizer:powerPlanHighPerformance') as any;
+      if (r.ok) flash(setPowerMsg, r.msg || t('optimizer.audit.power.done', 'Plano ativado'));
+      else if (r.unsupported) flash(setPowerMsg, r.error || t('optimizer.audit.badge.unsupportedShort', 'não suportado'));
+      else flash(setPowerMsg, t('optimizer.audit.failedShort', 'Falhou: veja o terminal'));
       await refreshStatus(); // only the applied state changed: no need to reload the whole catalog
     });
 
   const handleOptimizeAudioLatency = () =>
     withBusy(async () => {
       addLog('info', t('optimizer.audit.audio.start', 'Verificando a prioridade do processo de áudio do Windows (audiodg.exe)...'));
-      const r = await runOne('optimizer:optimizeAudioLatency');
-      flash(setAudioMsg, r.ok ? (r.msg || t('optimizer.audit.audio.done', 'Prioridade verificada')) : t('optimizer.audit.failedShort', 'Falhou: veja o terminal'));
+      const r = await runOne('optimizer:optimizeAudioLatency') as any;
+      if (r.ok) flash(setAudioMsg, r.msg || t('optimizer.audit.audio.done', 'Prioridade verificada'));
+      else if (r.unsupported) flash(setAudioMsg, r.error || t('optimizer.audit.badge.unsupportedShort', 'não suportado'));
+      else flash(setAudioMsg, t('optimizer.audit.failedShort', 'Falhou: veja o terminal'));
     });
 
   const handleCreateRestorePoint = () =>
@@ -462,6 +471,11 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
 
   // --- Advanced Network ---
   // verified state comes from opStatus/opPartial (the operation list itself always carries applied: null)
+  const opMap = useMemo(() => {
+    const m: Record<string, any> = {};
+    for (const o of operations) m[o.id] = o;
+    return m;
+  }, [operations]);
   const advNetApplied: boolean | null = opStatus['optimizer:advancedNetwork'] ?? null;
   const advNetPartial = Boolean(opPartial['optimizer:advancedNetwork']);
 
@@ -495,6 +509,7 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
     try {
       const res = await api().getInstalledPrograms();
       if (res?.ok && Array.isArray(res.programs)) setInstalledPrograms(res.programs);
+      else if (res?.unsupported) setInstalledPrograms([]);
       else if (res && !res.ok) addLog('err', res.error || t('optimizer.audit.prog.loadFail', 'Falha ao listar programas'));
     } catch (e: any) {
       addLog('err', e?.message || String(e));
@@ -973,6 +988,7 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
     try {
       const res = await api().getRunningProcesses();
       if (res?.ok && Array.isArray(res.processes)) setProcessList(res.processes);
+      else if (res?.unsupported) setProcessList([]);
       else if (res && !res.ok) addLog('err', res.error || t('optimizer.audit.proc.loadFail', 'Falha ao listar processos'));
     } catch (e: any) {
       addLog('err', e?.message || String(e));
@@ -1012,6 +1028,7 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
     try {
       const res = await api().listBloatware();
       if (res?.ok && Array.isArray(res.apps)) setBloatwareList(res.apps);
+      else if (res?.unsupported) setBloatwareList([]);
       else if (res && !res.ok) addLog('err', res.error || t('optimizer.audit.debloat.loadFail', 'Falha ao listar aplicativos'));
     } catch (e: any) {
       addLog('err', e?.message || String(e));
@@ -1051,6 +1068,7 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
     try {
       const res = await api().getStartupItems();
       if (res?.ok && Array.isArray(res.items)) setStartupItems(res.items);
+      else if (res?.unsupported) setStartupItems([]);
       else if (res && !res.ok) addLog('err', res.error || t('optimizer.audit.startup.loadFail', 'Falha ao listar itens de inicialização'));
     } catch (e: any) {
       addLog('err', e?.message || String(e));
@@ -1074,6 +1092,7 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
     try {
       const res = await api().getDefenderControlStatus();
       if (res?.ok && res.status) setDefenderStatus(res.status);
+      else if (res?.unsupported) setDefenderStatus(null);
       else if (res && !res.ok) addLog('err', res.error || t('optimizer.audit.defender.loadFail', 'Não foi possível ler o status do Defender'));
     } catch {} finally {
       setDefenderLoading(false);
@@ -1289,19 +1308,19 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
 
       {/* Quick actions: one hairline-divided strip instead of six coloured tiles */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px bg-zinc-800/80 border border-zinc-800/80 rounded-xl overflow-hidden">
-        <HeroButton onClick={handleOptimizeRAM} disabled={busy} icon={<Cpu size={16} />}
+        <HeroButton onClick={handleOptimizeRAM} disabled={busy || (opMap['optimizer:optimizeRAM']?.supported === false)} icon={<Cpu size={16} />}
           title={t('optimizer.hero.ramTitle', 'Otimizar RAM')}
           desc={ramMsg || t('optimizer.audit.hero.ramDesc', 'Esvazia working sets (temporário)')} />
-        <HeroButton onClick={handleCleanTempFiles} disabled={busy} icon={<Trash2 size={16} />}
+        <HeroButton onClick={handleCleanTempFiles} disabled={busy || (opMap['optimizer:cleanTemp']?.supported === false)} icon={<Trash2 size={16} />}
           title={t('optimizer.hero.diskTitle', 'Limpar Disco')}
           desc={diskMsg || t('optimizer.hero.diskDesc', 'Arquivos temporários')} />
-        <HeroButton onClick={handleFlushDNS} disabled={busy} icon={<Globe size={16} />}
+        <HeroButton onClick={handleFlushDNS} disabled={busy || (opMap['optimizer:flushDns']?.supported === false)} icon={<Globe size={16} />}
           title={t('optimizer.hero.dnsTitle', 'Limpar DNS')}
           desc={dnsMsg || t('optimizer.audit.hero.dnsDesc', 'Limpa o cache local de DNS')} />
-        <HeroButton onClick={handleSetPowerPlan} disabled={busy} icon={<Flame size={16} />}
+        <HeroButton onClick={handleSetPowerPlan} disabled={busy || (opMap['optimizer:powerPlanHighPerformance']?.supported === false)} icon={<Flame size={16} />}
           title={t('optimizer.audit.hero.powerTitle', 'Alto Desempenho')}
           desc={powerMsg || t('optimizer.audit.hero.powerDesc', 'Plano de energia (reversível)')} />
-        <HeroButton onClick={handleOptimizeAudioLatency} disabled={busy} icon={<Headphones size={16} />}
+        <HeroButton onClick={handleOptimizeAudioLatency} disabled={busy || (opMap['optimizer:optimizeAudioLatency']?.supported === false)} icon={<Headphones size={16} />}
           title={t('optimizer.audit.hero.audioTitle', 'Prioridade do Áudio')}
           desc={audioMsg || t('optimizer.audit.hero.audioDesc', 'audiodg.exe (temporário)')} />
         <HeroButton onClick={handleRevertAll} disabled={busy} icon={<RotateCcw size={16} />}

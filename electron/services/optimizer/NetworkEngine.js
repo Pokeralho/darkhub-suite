@@ -26,6 +26,7 @@ export function buildAdvancedNetworkChanges(adapters) {
 
 class NetworkEngine {
   async getActiveAdapterName() {
+    if (process.platform !== 'win32') return '';
     const ps = `
 $ErrorActionPreference='Stop'
 $a = Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | Sort-Object -Property LinkSpeed -Descending | Select-Object -First 1
@@ -40,6 +41,7 @@ if ($null -eq $a) { '' } else { $a.Name }`;
 
   /** Physical adapters that are up: [{ name, guid }] */
   async getUpAdapters() {
+    if (process.platform !== 'win32') return [];
     const ps = `
 $ErrorActionPreference='Stop'
 @(Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | ForEach-Object { [pscustomobject]@{ name = $_.Name; guid = $_.InterfaceGuid } }) | ConvertTo-Json -Compress`;
