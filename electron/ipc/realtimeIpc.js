@@ -15,6 +15,35 @@ const CLAM_CHECK_MS = 6 * 3600 * 1000
 
 /** `realtime:*`: real-time optimizer and protection (both off by default, running in the main process). */
 export function registerRealtimeIPC({ app, ipcMain, dialog, BrowserWindow, Notification, logger } = {}) {
+
+
+  if (process.platform !== 'win32') {
+    const unsupported = (extra = {}) => ({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Realtime optimizer/protection is only supported on Windows.', ...extra })
+    const configPath = path.join(app.getPath('userData'), 'realtime.json')
+    let store
+    try { store = new ConfigStore(configPath, os.homedir()) } catch { store = null }
+    const status = () => ({
+      ok: true,
+      supported: false,
+      unsupported: true,
+      platform: process.platform,
+      reason: 'windows-only',
+      config: store?.value ?? { optimizer: { enabled: false }, protection: { enabled: false } },
+      optimizer: { running: false, supported: false },
+      protection: { running: false, supported: false, hashes: 0, clamav: { installed: false, database: false }, defender: null },
+      quarantine: 0
+    })
+    handle('realtime:status', status)
+    handle('realtime:setConfig', () => unsupported({ config: store?.value ?? null }))
+    handle('realtime:quarantineList', () => ({ ok: true, unsupported: true, platform: process.platform, items: [] }))
+    handle('realtime:quarantineRestore', () => unsupported())
+    handle('realtime:quarantineDelete', () => unsupported())
+    handle('realtime:clamavInstall', () => unsupported())
+    handle('realtime:clamavUpdate', () => unsupported())
+    handle('realtime:scanFiles', () => unsupported({ queued: 0 }))
+    return
+  }
+
   const dataRoot = path.join(process.env.ProgramData || 'C:\\ProgramData', 'DarkHub')
   const store = new ConfigStore(path.join(app.getPath('userData'), 'realtime.json'), os.homedir())
   const quarantine = new Quarantine(path.join(dataRoot, 'Quarantine'))
