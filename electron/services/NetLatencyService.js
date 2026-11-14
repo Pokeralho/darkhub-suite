@@ -210,9 +210,26 @@ const EXTRA = (id) => `netx:${id}`;
 const ICMP_TIMEOUT = 1000;
 
 function runPing(args, timeoutMs) {
-  return runCommand('ping.exe', args, { timeoutMs, encoding: 'latin1' })
+  const cmd = process.platform === 'win32' ? 'ping.exe' : 'ping';
+  return runCommand(cmd, args, { timeoutMs, encoding: 'latin1' })
     .then((r) => String(r.stdout || '') + String(r.stderr || ''))
     .catch(() => '');
+}
+
+function pingArgs({ host, count = 1, timeoutMs = ICMP_TIMEOUT, df = false, size = null } = {}) {
+  const h = String(host);
+  if (process.platform === 'win32') {
+    const args = ['-4', '-n', String(count), '-w', String(Math.max(200, Math.trunc(timeoutMs)))];
+    if (df) args.push('-f');
+    if (size != null) args.push('-l', String(size));
+    args.push(h);
+    return args;
+  }
+  const args = ['-4', '-n', '-c', String(count), '-W', String(Math.max(1, Math.ceil(Math.max(200, timeoutMs) / 1000)))];
+  if (df) args.push('-M', 'do');
+  if (size != null) args.push('-s', String(size));
+  args.push(h);
+  return args;
 }
 
 function tcpConnectMs(host, port = 443, timeoutMs = 2000) {
@@ -297,14 +314,14 @@ class NetLatencyService {
     return LATENCY_PRESETS;
   }
 
-  /** One latency sample: ICMP (ping.exe, IPv4) or TCP handshake time to port 443. */
+  /** One latency sample: ICMP or TCP handshake time to port 443. */
   async probe({ host, mode } = {}) {
     const h = assertSafeHost(host);
     if (mode === 'tcp') {
       const ms = await tcpConnectMs(h, 443, 2000);
       return { ok: true, ms: ms === null ? null : round1(ms), mode: 'tcp' };
     }
-    const out = await runPing(['-4', '-n', '1', '-w', String(ICMP_TIMEOUT), h], 5000);
+    const out = await runPing(pingArgs({ host: h, count: 1, timeoutMs: ICMP_TIMEOUT }), 5000);
     const t = parsePingOutput(out);
     return { ok: true, ms: t.length ? t[0] : null, mode: 'icmp' };
   }
@@ -312,16 +329,39 @@ class NetLatencyService {
   async traceroute({ host, maxHops } = {}) {
     const h = assertSafeHost(host);
     const hops = Math.max(1, Math.min(30, Math.trunc(Number(maxHops) || 20)));
-    const r = await runCommand('tracert.exe', ['-d', '-4', '-h', String(hops), '-w', '700', h], { timeoutMs: hops * 3 * 900 + 15000, encoding: 'latin1' });
-    const output = String(r.stdout || '') + String(r.stderr || '');
-    return { ok: true, hops: parseTracertOutput(output), output };
+    let output = '';
+    let parsed = [];
+    if (process.platform === 'win32') {
+      const r = await runCommand('tracert.exe', ['-d', '-4', '-h', String(hops), '-w', '700', h], { timeoutMs: hops * 3 * 900 + 15000, encoding: 'latin1' });
+      output = String(r.stdout || '') + String(r.stderr || '');
+      parsed = parseTracertOutput(output);
+    } else {
+      let r = await runCommand('traceroute', ['-n', '-m', String(hops), '-w', '1', '-q', '3', h], { timeoutMs: hops * 3 * 1500 + 15000, encoding: 'latin1' }).catch(() => null);
+      if (!r || (!String(r.stdout || '').trim() && r.code !== 0)) {
+        r = await runCommand('tracepath', ['-n', h], { timeoutMs: hops * 3 * 1500 + 15000, encoding: 'latin1' }).catch(() => null);
+      }
+      output = r ? (String(r.stdout || '') + String(r.stderr || '')) : 'traceroute/tracepath não encontrado.';
+      // best-effort parse linux traceroute lines: " 1  1.2.3.4  0.5 ms  0.4 ms  0.4 ms"
+      const lines = String(output).split(/\r?\n/);
+      parsed = [];
+      for (const line of lines) {
+        const hm = /^\s*(\d{1,2})\s+(.*)$/.exec(line);
+        if (!hm) continue;
+        const ipm = /(\d{1,3}(?:\.\d{1,3}){3}|[0-9a-f]*:[0-9a-f:]+)/i.exec(hm[2]);
+        const times = [...hm[2].matchAll(/(\d+(?:[.,]\d+)?)\s*ms/gi)].map((m) => Number(m[1].replace(',', '.')));
+        const rtts = [times[0] ?? null, times[1] ?? null, times[2] ?? null];
+        const valid = rtts.filter((x) => x !== null);
+        parsed.push({ hop: Number(hm[1]), rtts, ip: ipm ? ipm[1] : null, best: valid.length ? Math.min(...valid) : null });
+      }
+    }
+    return { ok: true, hops: parsed, output };
   }
 
   /** Idle ping, then ping while 2 parallel HTTPS downloads saturate the link. ~20 s. */
   async bufferbloat({ host = '1.1.1.1', seconds = 10 } = {}) {
     const h = assertSafeHost(host);
     const n = Math.max(5, Math.min(20, Math.trunc(Number(seconds) || 10)));
-    const idleOut = await runPing(['-4', '-n', '8', '-w', String(ICMP_TIMEOUT), h], 20000);
+    const idleOut = await runPing(pingArgs({ host: h, count: 8, timeoutMs: ICMP_TIMEOUT }), 20000);
     const idle = parsePingOutput(idleOut);
 
     let bytes = 0;
@@ -343,7 +383,7 @@ class NetLatencyService {
     };
     for (let i = 0; i < 3; i += 1) startDownload();
     await new Promise((r) => setTimeout(r, 1500)); // let TCP ramp up before sampling
-    const loadedOut = await runPing(['-4', '-n', String(n), '-w', String(ICMP_TIMEOUT), h], (n + 5) * 1500);
+    const loadedOut = await runPing(pingArgs({ host: h, count: n, timeoutMs: ICMP_TIMEOUT }), (n + 5) * 1500);
     const elapsed = (Date.now() - started) / 1000;
     stopped = true;
     for (const q of reqs) { try { q.destroy(); } catch { /* ignore */ } }
@@ -359,16 +399,16 @@ class NetLatencyService {
 
   async mtu({ host = '1.1.1.1' } = {}) {
     const h = assertSafeHost(host);
-    const base = parsePingOutput(await runPing(['-4', '-n', '1', '-w', String(ICMP_TIMEOUT), h], 5000));
+    const base = parsePingOutput(await runPing(pingArgs({ host: h, count: 1, timeoutMs: ICMP_TIMEOUT }), 5000));
     if (!base.length) return { ok: false, error: `O host ${h} não respondeu ao ping (ICMP). Escolha outro host.` };
-    const probe = async (size) => parsePingOutput(await runPing(['-4', '-f', '-l', String(size), '-n', '1', '-w', String(ICMP_TIMEOUT), h], 5000)).length > 0;
+    const probe = async (size) => parsePingOutput(await runPing(pingArgs({ host: h, count: 1, timeoutMs: ICMP_TIMEOUT, df: true, size }), 5000)).length > 0;
     const r = await findMaxPayload(probe);
     if (r.mtu === null) return { ok: false, error: 'Nenhum tamanho entre 576 e 1500 passou sem fragmentar (ICMP filtrado no caminho?).' };
     return { ok: true, host: h, ...r };
   }
 
   async getState() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Ajustes de latência/rede do Windows não são suportados nesta plataforma.' };
     try {
       const r = await runPowerShell(STATE_SCRIPT, { timeoutMs: 30000, trim: true });
       if (!r.stdout) return { ok: false, error: r.stderr || 'Falha ao ler o estado da rede' };
@@ -382,7 +422,7 @@ class NetLatencyService {
   }
 
   async applyTweak({ id, value, exe } = {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Ajustes de latência/rede do Windows não são suportados nesta plataforma.' };
     const st = await this.getState();
     if (!st.ok) return st;
 
@@ -445,7 +485,7 @@ Write-Output ('DHAFT|ecn|' + [string](Get-NetTCPSetting -SettingName InternetCus
   }
 
   async restoreTweak({ id } = {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Ajustes de latência/rede do Windows não são suportados nesta plataforma.' };
     const snap = DeepTweaksEngine.getExtra(EXTRA(id));
     if (!snap) return { ok: false, error: 'Não há valor anterior salvo para restaurar.' };
 
@@ -478,7 +518,7 @@ Write-Output ('DHAFT|ecn|' + [string](Get-NetTCPSetting -SettingName InternetCus
 
   /** netsh winsock reset + int ip reset (elevated). Not reversible; needs a reboot. */
   async resetStack() {
-    if (process.platform !== 'win32') return { ok: false, output: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', output: 'Redefinição de pilha TCP/IP via netsh não suportada nesta plataforma.' };
     const r = await this._runMarked(`& netsh.exe winsock reset
 DhCheck 'netsh winsock reset'
 & netsh.exe int ip reset | Out-Null
