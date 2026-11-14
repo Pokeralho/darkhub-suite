@@ -743,7 +743,7 @@ Limpa o cache local do resolvedor de DNS. Útil se um site não abre após troca
 
 **Limpar Arquivos Temporários** · risk: low · one-time action · any package
 
-Apaga arquivos temporários seguros do usuário (XDG cache/tmp da sessão e /tmp quando permitido), ignorando arquivos em uso e preservando caches sensíveis. No Linux a Lixeira do Windows não é usada.
+Apaga arquivos temporários seguros, ignorando arquivos em uso. No Windows: TEMP do usuário, Windows\Temp, cache de download do Windows Update e minidumps (a limpeza manual pode esvaziar a Lixeira; manutenção agendada/presets do Hub não). No Linux: XDG cache/tmp da sessão e /tmp quando permitido, preservando caches sensíveis e sem Lixeira do Windows.
 
 ### `darkhub:op:optimizeRAM`
 

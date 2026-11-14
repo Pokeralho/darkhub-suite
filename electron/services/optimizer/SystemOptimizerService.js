@@ -109,9 +109,7 @@ class SystemOptimizerService {
     this._op({
       id: 'optimizer:cleanTemp',
       name: 'Limpar Arquivos Temporários',
-      description: process.platform === 'linux'
-        ? 'Apaga arquivos temporários seguros do usuário (XDG cache/tmp da sessão e /tmp quando permitido), ignorando arquivos em uso e preservando caches sensíveis. No Linux a Lixeira do Windows não é usada.'
-        : 'Apaga arquivos temporários (TEMP do usuário, Windows\\Temp, cache de download do Windows Update, minidumps) e esvazia a Lixeira de todas as unidades. Arquivos em uso são ignorados e o espaço liberado é medido de verdade. A manutenção agendada e os presets do Hub não mexem na Lixeira.',
+      description: 'Apaga arquivos temporários seguros, ignorando arquivos em uso. No Windows: TEMP do usuário, Windows\\Temp, cache de download do Windows Update e minidumps (a limpeza manual pode esvaziar a Lixeira; manutenção agendada/presets do Hub não). No Linux: XDG cache/tmp da sessão e /tmp quando permitido, preservando caches sensíveis e sem Lixeira do Windows.',
       technicalDescription: process.platform === 'linux'
         ? 'Limpa diretórios temporários/caches permitidos do usuário no Linux, sem operações de Lixeira/Win32.'
         : 'Varre recursivamente %TEMP%, %WINDIR%\\Temp, SoftwareDistribution\\Download, Minidump e CrashDumps preservando caches de shader. A Lixeira é medida e esvaziada pela API do Windows (SHQueryRecycleBin/SHEmptyRecycleBin) via DarkHub.Cleaner.exe. Pastas do sistema podem exigir administrador.',
