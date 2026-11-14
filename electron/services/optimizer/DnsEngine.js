@@ -147,7 +147,21 @@ try { $static = (Get-ItemProperty -LiteralPath ('HKLM:\\SYSTEM\\CurrentControlSe
   }
 
   async getState() {
-    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
+    if (process.platform !== 'win32') {
+      try {
+        const fs = await import('node:fs/promises');
+        let servers = [];
+        try {
+          const txt = await fs.readFile('/etc/resolv.conf', 'utf8');
+          servers = txt.split(/\r?\n/).map((l) => l.trim()).filter((l) => /^nameserver\s+/i.test(l)).map((l) => l.split(/\s+/)[1]).filter((ip) => isValidIpv4(ip));
+        } catch {}
+        // dedupe preserving order
+        servers = [...new Set(servers)];
+        return { ok: true, adapter: 'system', servers, isStatic: null, partial: true, platform: process.platform, data: { adapter: 'system', servers, isStatic: null } };
+      } catch (err) {
+        return { ok: false, error: err?.message ?? String(err) };
+      }
+    }
     try {
       const adapter = await this.getActiveAdapter();
       if (!adapter) return { ok: false, error: 'Nenhum adaptador de rede físico ativo encontrado' };
