@@ -755,7 +755,9 @@ ipcMain.handle('optimizer:listProfiles', async () => {
 })
 
 ipcMain.handle('optimizer:checkIsAdmin', async () => {
-  return await SystemOptimizerService.checkIsAdmin()
+  if (process.platform !== 'win32') return false
+  const isAdmin = await SystemOptimizerService.checkIsAdmin()
+  return typeof isAdmin === 'object' ? Boolean(isAdmin.isAdmin) : Boolean(isAdmin)
 })
 
 ipcMain.handle('optimizer:createRestorePoint', async () => {
@@ -1924,7 +1926,7 @@ ipcMain.handle('optimizer:applyTweak', async (_event, id) => {
     switch (id) {
       case 'optimize-ram': return await MemoryEngine.optimizeRAM()
       case 'clean-temp': {
-        const r = await StorageEngine.cleanTempFiles({ recycleBin: true }) // Dashboard button: the user clicked
+        const r = await StorageEngine.cleanTempFiles({ recycleBin: process.platform === 'win32' }) // Dashboard button: the user clicked (Recycle Bin only on Windows)
         junkEstimateCache = { ts: 0, result: null, inFlight: null } // the next estimate must read the folders again
         return r
       }
@@ -1939,8 +1941,17 @@ ipcMain.handle('optimizer:deepTweaksStatus', async () => DeepTweaksEngine.checkT
 ipcMain.handle('optimizer:deepTweaksAnalyze', async (_event, payload) => {
   const ids = payload?.tweakIds || [];
   const selected = DeepTweaksEngine.listTweaks().filter((t) => ids.includes(t.id));
-  const changes = selected.flatMap((t) => t.changes.map((c) => ({ tweakId: t.id, ...c })));
-  return { ok: true, summary: { count: selected.length, requiresAdmin: selected.some(t => t.requiresAdmin) }, changes };
+  const changes = selected.flatMap((t) => (t.changes || []).map((c) => ({ tweakId: t.id, ...c })));
+  const unsupported = selected.filter((t) => t.supported === false).map((t) => t.id);
+  return {
+    ok: unsupported.length === 0,
+    unsupported: unsupported.length ? true : undefined,
+    platform: unsupported.length ? process.platform : undefined,
+    reason: unsupported.length ? 'platform-unsupported' : undefined,
+    unsupportedIds: unsupported,
+    summary: { count: selected.length, requiresAdmin: selected.some(t => t.requiresAdmin) },
+    changes
+  };
 });
 ipcMain.handle('optimizer:deepTweaksApply', async (event, payload) => DeepTweaksEngine.applyTweaks(payload?.tweakIds || [], (channel, msg) => event.sender.send(channel, msg)));
 ipcMain.handle('optimizer:deepTweaksRevert', async (event, payload) => DeepTweaksEngine.revertTweaks(payload?.tweakIds || [], (channel, msg) => event.sender.send(channel, msg)));
@@ -2062,7 +2073,14 @@ ipcMain.handle('optimizer:runRoutine', async (_event, routineId) => {
         default: throw new Error(`Unknown routine: ${routineId}`);
       }
     }
-    if (!res.ok) throw new Error(res.error || 'Operation failed');
+    if (!res || typeof res !== 'object') res = { ok: false, error: 'Invalid routine result' };
+    if (!res.ok) {
+      if (res.unsupported) {
+        sendEvent('complete', `Rotina indisponível: ${routineId} (${res.error || res.msg || 'unsupported'})`, { progress: 100, ok: false, unsupported: true, platform: res.platform || process.platform, reason: res.reason, elapsedMs: Date.now() - startedAt });
+        return res;
+      }
+      throw new Error(res.error || res.msg || 'Operation failed');
+    }
     sendEvent('complete', `Rotina encerrada: ${routineId} (${res.msg || 'Concluído'})`, { progress: 100, ok: true, elapsedMs: Date.now() - startedAt });
     return res;
   } catch (err) {
