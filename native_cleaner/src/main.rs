@@ -139,8 +139,12 @@ fn recycle_run(apply: bool) -> R<Value> {
     #[cfg(not(windows))]
     {
         let _ = apply;
-        Err(Fail::new("unsupported", "Lixeira só no Windows"))
+        Err(Fail::new("unsupported", "Lixeira não é suportada nesta plataforma"))
     }
+}
+
+fn recycle_supported() -> bool {
+    cfg!(windows)
 }
 
 fn run(a: &Args) -> R<Value> {
@@ -150,7 +154,7 @@ fn run(a: &Args) -> R<Value> {
             let text = read_winapp2(a)?;
             let (targets, stats) = winapp2::load_all(&env, text.as_deref(), &reg_exists);
             let mut list: Vec<Value> = targets.iter().map(|t| t.to_json()).collect();
-            if a.get("test-root").is_none() {
+            if a.get("test-root").is_none() && recycle_supported() {
                 list.insert(0, recycle_target());
             }
             Ok(json!({ "targets": list, "stats": stats }))
@@ -168,7 +172,7 @@ fn run(a: &Args) -> R<Value> {
             }
             let sample = a.get("sample").and_then(|v| v.parse().ok()).unwrap_or(30);
             let mut out = files::run(&env, &chosen, &files::Opts { apply, shred, sample });
-            let bin = a.get("test-root").is_none() && ids.iter().any(|i| i == RECYCLE_ID);
+            let bin = recycle_supported() && a.get("test-root").is_none() && ids.iter().any(|i| i == RECYCLE_ID);
             if bin {
                 let r = recycle_run(apply)?;
                 for k in ["files", "bytes"] {
@@ -192,6 +196,8 @@ fn run(a: &Args) -> R<Value> {
             let f = registry::scan(&reg_sources(a)?);
             Ok(json!({ "findings": f.iter().map(|x| x.to_json()).collect::<Vec<_>>() }))
         }
+        #[cfg(not(windows))]
+        "reg-scan" => Err(Fail::new("unsupported", "Registro do Windows não é suportado nesta plataforma")),
         #[cfg(windows)]
         "reg-clean" => {
             let ids = read_ids(a)?;
@@ -203,6 +209,8 @@ fn run(a: &Args) -> R<Value> {
             }
             registry::clean(&reg_sources(a)?, &ids, backup.as_deref(), a.flag("apply"))
         }
+        #[cfg(not(windows))]
+        "reg-clean" => Err(Fail::new("unsupported", "Registro do Windows não é suportado nesta plataforma")),
         "recycle-bin" => {
             if a.get("test-root").is_some() || a.get("root").is_some() {
                 return Err(Fail::new("bad_args", "a Lixeira real não é usada em modo de teste"));

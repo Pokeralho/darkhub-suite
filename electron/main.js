@@ -3590,9 +3590,8 @@ app.whenReady().then(async () => {
       runCommand('reg.exe', ['delete', 'HKCU\\Software\\DarkHub\\MM', '/f'], { timeoutMs: 8000 }).catch(() => {})
     }
 
-    if (process.platform !== 'win32') latencyServiceState = 'disabled'
     if (liveServices.latencyGuardian === false) latencyServiceState = 'disabled'
-    if (process.platform === 'win32' && liveServices.latencyGuardian !== false) {
+    if (liveServices.latencyGuardian !== false) {
       try {
         log.info('[startup-bg] registering latency guardian')
         const { registerLatencyGuardian } = await import('./latencyGuardian.js')

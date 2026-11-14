@@ -11,6 +11,15 @@ import ManagedProcessRegistry from './services/ManagedProcessRegistry.js'
 import { encodePowerShellScript, powerShellArgsForEncodedScript } from './services/PowerShellRunner.js'
 import nativeLatencyClient from './services/NativeLatencyClient.js'
 import appEvents from './services/appEvents.js'
+import {
+  linuxFlushDns,
+  linuxSetPerformancePower,
+  linuxRestorePerformancePower,
+  linuxBoostProcessPriority,
+  basicCpuTopology,
+  matchGameProcess,
+  buildLatencyCapabilities
+} from './services/latency/linuxOps.js'
 
 const PROCESS_OWNER = 'latencyGuardian'
 
@@ -206,19 +215,24 @@ export function registerLatencyGuardian(deps) {
   }
 
   async function findGameProcess() {
-
     const exe = String(config.gameExePath ?? '').trim()
     if (!exe) return null
 
     const list = await getProcessSnapshot()
-    const normalized = exe.toLowerCase()
-    const exeName = path.basename(normalized)
-    const hit =
-      list.find((p) => typeof p?.path === 'string' && p.path.toLowerCase() === normalized) ||
-      list.find((p) => typeof p?.path === 'string' && path.basename(p.path.toLowerCase()) === exeName) ||
-      list.find((p) => typeof p?.name === 'string' && String(p.name).toLowerCase() === exeName)
+    if (process.platform === 'win32') {
+      const normalized = exe.toLowerCase()
+      const exeName = path.basename(normalized)
+      const hit =
+        list.find((p) => typeof p?.path === 'string' && p.path.toLowerCase() === normalized) ||
+        list.find((p) => typeof p?.path === 'string' && path.basename(p.path.toLowerCase()) === exeName) ||
+        list.find((p) => typeof p?.name === 'string' && String(p.name).toLowerCase() === exeName)
+      if (!hit) return null
+      return { pid: hit.pid, name: hit.name, path: hit.path }
+    }
+    // Linux/other: resilient matching (resolved path, basename, cmd)
+    const hit = matchGameProcess(list, exe)
     if (!hit) return null
-    return { pid: hit.pid, name: hit.name, path: hit.path }
+    return { pid: hit.pid, name: hit.name, path: hit.path || hit.command || hit.cmd }
   }
 
   async function setPowerPlanHighPerformance() {
@@ -640,9 +654,17 @@ public static class NtTimer {
     return serializeTransition(() => ultraDisableImpl())
   }
 
-  async function ultraEnableImpl(manual = false) {
+  async function ultraEnableImpl(manual = false, overridesArg = null) {
+    const isWin = process.platform === 'win32'
+    const isLin = process.platform === 'linux'
 
-    if (process.platform !== 'win32') throw Object.assign(new Error('Apenas suportado no Windows.'), { unsupported: true, platform: process.platform, reason: 'windows-only' })
+    if (!isWin && !isLin) {
+      throw Object.assign(new Error('Ultra Low Latency não é suportado nesta plataforma.'), {
+        unsupported: true,
+        platform: process.platform,
+        reason: 'unsupported-platform'
+      })
+    }
     if (state.ultraEnabled) return { ok: true, status: state }
 
     state.lastError = null
@@ -653,21 +675,25 @@ public static class NtTimer {
     if (game) state.game = game
 
     const exePath = game?.path || String(config.gameExePath || '').trim()
-    if (!exePath) throw new Error('Selecione o executável do jogo')
 
-    normalizeConfig()
-    const overrides = arguments.length >= 2 && arguments[1] && typeof arguments[1] === 'object' ? arguments[1] : null
-    const effectiveTweaks = overrides?.tweaks && typeof overrides.tweaks === 'object' ? overrides.tweaks : config.tweaks || {}
-    const applied = {}
-    const setApplied = (key, status, error) => {
-      applied[key] = { status, ...(error ? { error } : {}) }
+    // Windows preserves the original requirement: a valid executable path is needed for per-exe tweaks.
+    // Linux allows best-effort platform-wide ops (power profile, DNS flush via boost) without a game exe.
+    if (isWin) {
+      if (!exePath) throw new Error('Selecione o executável do jogo')
+      try {
+        const p = String(exePath).trim()
+        if (p) await fs.access(p)
+      } catch (e) {
+        throw new Error('Executável inválido ou inacessível')
+      }
     }
 
-    try {
-      const p = String(exePath).trim()
-      if (p) await fs.access(p)
-    } catch (e) {
-      throw new Error('Executável inválido ou inacessível')
+    normalizeConfig()
+    const overrides = overridesArg && typeof overridesArg === 'object' ? overridesArg : null
+    const effectiveTweaks = overrides?.tweaks && typeof overrides.tweaks === 'object' ? overrides.tweaks : config.tweaks || {}
+    const applied = {}
+    const setApplied = (key, status, error, extra) => {
+      applied[key] = { status, ...(error ? { error } : {}), ...(extra && typeof extra === 'object' ? extra : {}) }
     }
 
     const tweaks = effectiveTweaks
@@ -682,116 +708,196 @@ public static class NtTimer {
     const tBg = Boolean(tweaks.killBackground)
     const tDns = Boolean(tweaks.dnsCloudflare)
 
+    // --- Power plan / power profile ---
     if (tPower) {
-      try {
-        state.undo.powerPlan = await setPowerPlanHighPerformance()
-        setApplied('powerPlanHigh', state.undo.powerPlan.verified === false ? 'unverified' : 'ok')
-      } catch (e) {
-        state.undo.powerPlan = { error: String(e?.message ?? e) }
-        setApplied('powerPlanHigh', 'failed', String(e?.message ?? e))
+      if (isWin) {
+        try {
+          state.undo.powerPlan = await setPowerPlanHighPerformance()
+          setApplied('powerPlanHigh', state.undo.powerPlan.verified === false ? 'unverified' : 'ok')
+        } catch (e) {
+          state.undo.powerPlan = { error: String(e?.message ?? e) }
+          setApplied('powerPlanHigh', 'failed', String(e?.message ?? e))
+        }
+      } else {
+        try {
+          const res = await linuxSetPerformancePower(runCommand)
+          state.undo.powerPlan = res.prev || null
+          if (res.status === 'ok' || res.status === 'unverified') {
+            setApplied('powerPlanHigh', res.status, null, { method: res.method })
+          } else {
+            setApplied('powerPlanHigh', res.status || 'failed', res.error || res.reason)
+          }
+        } catch (e) {
+          setApplied('powerPlanHigh', 'failed', String(e?.message ?? e))
+        }
       }
     } else setApplied('powerPlanHigh', 'skipped')
 
+    // --- Timer resolution 0.5ms (Windows-only) ---
     if (tTimer) {
-      try {
-        await startTimerResolution05ms()
-        state.undo.timerResolution = { enabled: true }
-        setApplied('timerResolution05', 'ok')
-      } catch (e) {
-        state.undo.timerResolution = { error: String(e?.message ?? e) }
-        setApplied('timerResolution05', 'failed', String(e?.message ?? e))
+      if (isWin) {
+        try {
+          await startTimerResolution05ms()
+          state.undo.timerResolution = { enabled: true }
+          setApplied('timerResolution05', 'ok')
+        } catch (e) {
+          state.undo.timerResolution = { error: String(e?.message ?? e) }
+          setApplied('timerResolution05', 'failed', String(e?.message ?? e))
+        }
+      } else {
+        setApplied('timerResolution05', 'unsupported', 'Timer resolution 0.5ms não é suportado no Linux')
       }
     } else setApplied('timerResolution05', 'skipped')
 
+    // --- Fullscreen Optimizations (Windows-only) ---
     if (tFso) {
-      try {
-        state.undo.fullscreen = await setDisableFullscreenOptimizations(exePath)
-        setApplied('disableFullscreenOptimizations', 'ok')
-      } catch (e) {
-        state.undo.fullscreen = { error: String(e?.message ?? e) }
-        setApplied('disableFullscreenOptimizations', 'failed', String(e?.message ?? e))
+      if (isWin && exePath) {
+        try {
+          state.undo.fullscreen = await setDisableFullscreenOptimizations(exePath)
+          setApplied('disableFullscreenOptimizations', 'ok')
+        } catch (e) {
+          state.undo.fullscreen = { error: String(e?.message ?? e) }
+          setApplied('disableFullscreenOptimizations', 'failed', String(e?.message ?? e))
+        }
+      } else {
+        setApplied('disableFullscreenOptimizations', 'unsupported', isWin ? 'Executável do jogo não definido' : 'Apenas suportado no Windows')
       }
     } else setApplied('disableFullscreenOptimizations', 'skipped')
 
+    // --- Mouse acceleration (Windows-only by default) ---
     if (tMouse) {
-      try {
-        state.undo.mouseAccel = await setMouseAccelerationDisabled()
-        setApplied('disableMouseAcceleration', 'ok')
-      } catch (e) {
-        state.undo.mouseAccel = { error: String(e?.message ?? e) }
-        setApplied('disableMouseAcceleration', 'failed', String(e?.message ?? e))
+      if (isWin) {
+        try {
+          state.undo.mouseAccel = await setMouseAccelerationDisabled()
+          setApplied('disableMouseAcceleration', 'ok')
+        } catch (e) {
+          state.undo.mouseAccel = { error: String(e?.message ?? e) }
+          setApplied('disableMouseAcceleration', 'failed', String(e?.message ?? e))
+        }
+      } else {
+        setApplied('disableMouseAcceleration', 'unsupported', 'Desativar aceleração do mouse (registro Windows) não é suportado no Linux')
       }
     } else setApplied('disableMouseAcceleration', 'skipped')
 
+    // --- GPU high performance preference per-exe (Windows-only) ---
     if (tGpu) {
-      try {
-        state.undo.gpuPref = await setGpuHighPerformancePreference(exePath)
-        setApplied('gpuHighPerformance', 'ok')
-      } catch (e) {
-        state.undo.gpuPref = { error: String(e?.message ?? e) }
-        setApplied('gpuHighPerformance', 'failed', String(e?.message ?? e))
+      if (isWin && exePath) {
+        try {
+          state.undo.gpuPref = await setGpuHighPerformancePreference(exePath)
+          setApplied('gpuHighPerformance', 'ok')
+        } catch (e) {
+          state.undo.gpuPref = { error: String(e?.message ?? e) }
+          setApplied('gpuHighPerformance', 'failed', String(e?.message ?? e))
+        }
+      } else {
+        setApplied('gpuHighPerformance', 'unsupported', isWin ? 'Executável do jogo não definido' : 'Apenas suportado no Windows')
       }
     } else setApplied('gpuHighPerformance', 'skipped')
 
+    // --- QoS DSCP per-exe (Windows-only) ---
     if (tQos) {
-      try {
-        state.undo.qos = await setQosForExe(exePath)
-        setApplied('qosForExe', state.undo.qos.verified === false ? 'unverified' : 'ok')
-      } catch (e) {
-        state.undo.qos = { error: String(e?.message ?? e) }
-        setApplied('qosForExe', 'failed', String(e?.message ?? e))
+      if (isWin && exePath) {
+        try {
+          state.undo.qos = await setQosForExe(exePath)
+          setApplied('qosForExe', state.undo.qos.verified === false ? 'unverified' : 'ok')
+        } catch (e) {
+          state.undo.qos = { error: String(e?.message ?? e) }
+          setApplied('qosForExe', 'failed', String(e?.message ?? e))
+        }
+      } else {
+        setApplied('qosForExe', 'unsupported', isWin ? 'Executável do jogo não definido' : 'Apenas suportado no Windows')
       }
     } else setApplied('qosForExe', 'skipped')
 
+    // --- Nagle disable (Windows-only) ---
     if (tNagle) {
-      try {
-        state.undo.nagle = await setNagleDisabledOnActiveInterface()
-        setApplied('disableNagle', state.undo.nagle.verified === false ? 'unverified' : 'ok')
-      } catch (e) {
-        state.undo.nagle = { error: String(e?.message ?? e) }
-        setApplied('disableNagle', 'failed', String(e?.message ?? e))
+      if (isWin) {
+        try {
+          state.undo.nagle = await setNagleDisabledOnActiveInterface()
+          setApplied('disableNagle', state.undo.nagle.verified === false ? 'unverified' : 'ok')
+        } catch (e) {
+          state.undo.nagle = { error: String(e?.message ?? e) }
+          setApplied('disableNagle', 'failed', String(e?.message ?? e))
+        }
+      } else {
+        setApplied('disableNagle', 'unsupported', 'Apenas suportado no Windows')
       }
     } else setApplied('disableNagle', 'skipped')
 
+    // --- DNS Cloudflare (apply+restore adapter on Windows; unsupported on Linux for now) ---
     if (tDns) {
-      try {
-        state.undo.dns = await applyDnsCloudflareWithUndo()
-        setApplied('dnsCloudflare', state.undo.dns.verified === false ? 'unverified' : 'ok')
-      } catch (e) {
-        state.undo.dns = { error: String(e?.message ?? e) }
-        setApplied('dnsCloudflare', 'failed', String(e?.message ?? e))
+      if (isWin) {
+        try {
+          state.undo.dns = await applyDnsCloudflareWithUndo()
+          setApplied('dnsCloudflare', state.undo.dns.verified === false ? 'unverified' : 'ok')
+        } catch (e) {
+          state.undo.dns = { error: String(e?.message ?? e) }
+          setApplied('dnsCloudflare', 'failed', String(e?.message ?? e))
+        }
+      } else {
+        setApplied('dnsCloudflare', 'unsupported', 'Alterar DNS do adaptador e restaurar não é suportado no Linux (use Boost Now para flush)')
       }
     } else setApplied('dnsCloudflare', 'skipped')
 
-    try {
-      state.undo.tcpStack = await optimizeGlobalTcpStack()
-      setApplied('tcpStack', 'ok')
-    } catch (e) {
-      setApplied('tcpStack', 'failed', String(e?.message ?? e))
+    // --- Global TCP stack (Windows netsh only) ---
+    if (isWin) {
+      try {
+        state.undo.tcpStack = await optimizeGlobalTcpStack()
+        setApplied('tcpStack', 'ok')
+      } catch (e) {
+        setApplied('tcpStack', 'failed', String(e?.message ?? e))
+      }
+    } else {
+      // No implicit sysctls on Linux
+      setApplied('tcpStack', 'unsupported', 'Ajustes globais de TCP (netsh) não são suportados no Linux')
     }
 
+    // --- Kill background processes (Windows-only list) ---
     if (tBg) {
-      try {
-        state.undo.bg = await killBackgroundProcesses()
-        setApplied('killBackground', 'ok')
-      } catch (e) {
-        state.undo.bg = { error: String(e?.message ?? e) }
-        setApplied('killBackground', 'failed', String(e?.message ?? e))
+      if (isWin) {
+        try {
+          state.undo.bg = await killBackgroundProcesses()
+          setApplied('killBackground', 'ok')
+        } catch (e) {
+          state.undo.bg = { error: String(e?.message ?? e) }
+          setApplied('killBackground', 'failed', String(e?.message ?? e))
+        }
+      } else {
+        setApplied('killBackground', 'unsupported', 'Lista de processos de fundo é específica do Windows')
       }
     } else setApplied('killBackground', 'skipped')
 
-    if (tPrio && game?.pid) {
-      try {
-        await setGamePriorityHigh(game.pid)
-
-        ManagedProcessRegistry.claim(game.pid, PROCESS_OWNER)
-        setApplied('processPriorityHigh', 'ok')
-      } catch (e) {
-        state.undo.priority = { error: String(e?.message ?? e) }
-        setApplied('processPriorityHigh', 'failed', String(e?.message ?? e))
+    // --- Process priority (game) ---
+    if (tPrio) {
+      if (game?.pid) {
+        if (isWin) {
+          try {
+            await setGamePriorityHigh(game.pid)
+            ManagedProcessRegistry.claim(game.pid, PROCESS_OWNER)
+            setApplied('processPriorityHigh', 'ok')
+          } catch (e) {
+            state.undo.priority = { error: String(e?.message ?? e) }
+            setApplied('processPriorityHigh', 'failed', String(e?.message ?? e))
+          }
+        } else {
+          try {
+            const res = await linuxBoostProcessPriority(runCommand, game.pid)
+            if (res.ok) {
+              state.undo.priority = { pid: game.pid, platform: 'linux', method: 'renice', applied: res.applied }
+              ManagedProcessRegistry.claim(game.pid, PROCESS_OWNER)
+              setApplied('processPriorityHigh', 'ok', null, { method: 'renice' })
+            } else {
+              setApplied('processPriorityHigh', res.status || 'failed', res.error || 'Falha ao ajustar prioridade')
+            }
+          } catch (e) {
+            setApplied('processPriorityHigh', 'failed', String(e?.message ?? e))
+          }
+        }
+      } else if (tPrio) {
+        setApplied('processPriorityHigh', 'skipped', 'Jogo não detectado em execução')
+      } else {
+        setApplied('processPriorityHigh', 'skipped')
       }
-    } else if (tPrio) {
-      setApplied('processPriorityHigh', 'skipped', 'Jogo não detectado em execução')
     } else setApplied('processPriorityHigh', 'skipped')
 
     state.ultraEnabled = true
@@ -804,45 +910,54 @@ public static class NtTimer {
   }
 
   async function ultraDisableImpl() {
-
     if (!state.ultraEnabled) return { ok: true, status: state }
+    const isWin = process.platform === 'win32'
+    const isLin = process.platform === 'linux'
     const exePath = String(config.gameExePath || '').trim()
 
-    try {
-      await restorePowerPlan(state.undo?.powerPlan?.prev)
-    } catch {}
+    if (isWin) {
+      try {
+        await restorePowerPlan(state.undo?.powerPlan?.prev)
+      } catch {}
 
-    try {
-      await stopTimerResolution()
-    } catch {}
+      try {
+        await stopTimerResolution()
+      } catch {}
 
-    try {
-      if (exePath) await restoreFullscreenOptimizations(exePath, state.undo?.fullscreen?.prev)
-    } catch {}
+      try {
+        if (exePath) await restoreFullscreenOptimizations(exePath, state.undo?.fullscreen?.prev)
+      } catch {}
 
-    try {
-      if (state.undo?.mouseAccel?.prev) await restoreMouseAcceleration(state.undo.mouseAccel.prev)
-    } catch {}
+      try {
+        if (state.undo?.mouseAccel?.prev) await restoreMouseAcceleration(state.undo.mouseAccel.prev)
+      } catch {}
 
-    try {
-      if (exePath) await restoreGpuPreference(exePath, state.undo?.gpuPref?.prev)
-    } catch {}
+      try {
+        if (exePath) await restoreGpuPreference(exePath, state.undo?.gpuPref?.prev)
+      } catch {}
 
-    try {
-      if (state.undo?.qos?.policyName) await removeQosPolicy(state.undo.qos.policyName)
-    } catch {}
+      try {
+        if (state.undo?.qos?.policyName) await removeQosPolicy(state.undo.qos.policyName)
+      } catch {}
 
-    try {
-      if (state.undo?.nagle?.key) await restoreNagle(state.undo.nagle)
-    } catch {}
+      try {
+        if (state.undo?.nagle?.key) await restoreNagle(state.undo.nagle)
+      } catch {}
 
-    try {
-      if (state.undo?.dns?.adapter) await restoreDns(state.undo.dns.adapter, state.undo.dns.prev)
-    } catch {}
+      try {
+        if (state.undo?.dns?.adapter) await restoreDns(state.undo.dns.adapter, state.undo.dns.prev)
+      } catch {}
 
-    try {
-      if (state.undo?.tcpStack?.optimized) await restoreGlobalTcpStack()
-    } catch {}
+      try {
+        if (state.undo?.tcpStack?.optimized) await restoreGlobalTcpStack()
+      } catch {}
+    } else if (isLin) {
+      // Best-effort Linux restores (only for ops we applied)
+      try {
+        if (state.undo?.powerPlan) await linuxRestorePerformancePower(runCommand, state.undo.powerPlan)
+      } catch {}
+      // renice/ionice are not "restored" to previous values (not tracked) — release claim only
+    }
 
     ManagedProcessRegistry.releaseAllBy(PROCESS_OWNER)
 
@@ -888,7 +1003,10 @@ public static class NtTimer {
   }
 
   async function updateGpuUsage() {
-    if (process.platform !== 'win32') return
+    if (process.platform !== 'win32') {
+      metrics.gpuPct = null
+      return
+    }
     if (!config.gpuPollingEnabled) {
       metrics.gpuPct = null
       return
@@ -909,7 +1027,6 @@ public static class NtTimer {
   }
 
   async function updatePing() {
-    if (process.platform !== 'win32') return
     const host = String(config.pingHost ?? '1.1.1.1').trim() || '1.1.1.1'
     if (!isSafePingHost(host)) {
       metrics.pingMs = null
@@ -917,14 +1034,18 @@ public static class NtTimer {
       return
     }
 
-    try {
-      const nativeRes = await nativeLatencyClient.pingNative(host, 1200)
-      if (nativeRes && typeof nativeRes.latency_ms === 'number') {
-        metrics.pingMs = nativeRes.latency_ms
-        return
-      }
-    } catch {}
+    // Native daemon path only makes sense on Windows (daemon is win32-only).
+    if (process.platform === 'win32') {
+      try {
+        const nativeRes = await nativeLatencyClient.pingNative(host, 1200)
+        if (nativeRes && typeof nativeRes.latency_ms === 'number') {
+          metrics.pingMs = nativeRes.latency_ms
+          return
+        }
+      } catch {}
+    }
 
+    // Cross-platform TCP connect probe (port 53) as fallback/supported method on Linux.
     await new Promise((resolve) => {
       const start = Date.now()
       const socket = new net.Socket()
@@ -1019,7 +1140,7 @@ public static class Psapi {
         smartCleanRam(state.game?.pid).catch(() => {})
       }, clampInt(config.smartCleanMinutes, 1, 240, 10) * 60_000)
     }
-    if (config.gpuPollingEnabled) {
+    if (process.platform === 'win32' && config.gpuPollingEnabled) {
       updateGpuUsage().catch(() => {})
       timers.gpu = setInterval(() => updateGpuUsage().catch(() => {}), 15000)
     } else {
@@ -1045,15 +1166,24 @@ public static class Psapi {
     // Polled every 1.5 s by the page and the global GuardianWidget: don't spawn
     // the native daemon just to read the timer; only ask it when it is alive.
     let timerRes = null
-    if (nativeLatencyClient.process) {
+    if (process.platform === 'win32' && nativeLatencyClient.process) {
       try {
         timerRes = await nativeLatencyClient.queryTimer()
       } catch {}
     }
-    return { ok: true, config, status: { ...state, timerResolutionInfo: timerRes || state.timerResolutionInfo }, metrics }
+    const capabilities = buildLatencyCapabilities()
+    return {
+      ok: true,
+      config,
+      status: { ...state, timerResolutionInfo: timerRes || state.timerResolutionInfo, capabilities },
+      metrics
+    }
   })
 
   ipcMain.handle('latency:queryTimer', async () => {
+    if (process.platform !== 'win32') {
+      return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Timer resolution query is not supported on Linux (native daemon unavailable).' }
+    }
     try {
       const res = await nativeLatencyClient.queryTimer()
       return { ok: true, data: res }
@@ -1063,11 +1193,17 @@ public static class Psapi {
   })
 
   ipcMain.handle('latency:getCpuTopology', async () => {
+    if (process.platform === 'win32') {
+      try {
+        const res = await nativeLatencyClient.getCpuTopology()
+        if (res) return { ok: true, data: res }
+      } catch {}
+    }
+    // Cross-platform fallback: basic informational topology from os.cpus()
     try {
-      const res = await nativeLatencyClient.getCpuTopology()
-      return { ok: true, data: res }
+      return { ok: true, data: basicCpuTopology() }
     } catch (e) {
-      return { ok: false, error: String(e?.message ?? e) }
+      return { ok: false, unsupported: true, platform: process.platform, reason: 'unavailable', error: String(e?.message ?? e) }
     }
   })
 
@@ -1115,13 +1251,13 @@ public static class Psapi {
       return res
     } catch (e) {
       state.lastError = String(e?.message ?? e)
-      return { ok: false, error: state.lastError }
+      const unsupported = Boolean(e?.unsupported)
+      return { ok: false, error: state.lastError, ...(unsupported ? { unsupported: true, platform: e?.platform || process.platform, reason: e?.reason } : {}) }
     }
   })
 
   ipcMain.handle('latency:enableUltraStable', async (_event, payload) => {
     try {
-      if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' }
       if (payload && typeof payload === 'object') {
         if (typeof payload.gameExePath === 'string') config.gameExePath = payload.gameExePath
         if (typeof payload.hotkey === 'string') config.hotkey = payload.hotkey
@@ -1135,12 +1271,15 @@ public static class Psapi {
       }
       normalizeConfig()
       await saveConfig().catch(() => {})
+
+      // Stable preset: only safe/low-risk tweaks. On Linux this becomes best-effort (power profile, priority renice)
+      // and others will be reported as unsupported/skipped per-op.
       const stableTweaks = {
         powerPlanHigh: true,
         timerResolution05: false,
         processPriorityHigh: true,
         disableFullscreenOptimizations: false,
-        disableMouseAcceleration: true,
+        disableMouseAcceleration: process.platform === 'win32', // Windows-only tweak, mark unsupported on Linux by apply logic
         gpuHighPerformance: false,
         qosForExe: false,
         disableNagle: false,
@@ -1150,7 +1289,40 @@ public static class Psapi {
       return await ultraEnable(true, { tweaks: stableTweaks })
     } catch (e) {
       state.lastError = String(e?.message ?? e)
-      return { ok: false, error: state.lastError }
+      const unsupported = Boolean(e?.unsupported)
+      return { ok: false, error: state.lastError, ...(unsupported ? { unsupported: true, platform: e?.platform || process.platform, reason: e?.reason } : {}) }
+    }
+  })
+
+  ipcMain.handle('latency:boostNow', async () => {
+    try {
+      if (process.platform === 'win32') {
+        await runCommand('ipconfig', ['/flushdns'], { timeoutMs: 8000 }).catch(() => {})
+        if (!state.game?.pid) {
+          await smartCleanRam(null).catch(() => {})
+          return { ok: true, msg: 'BOOST NOW aplicado (DNS flush + Smart Clean)', applied: { dnsFlush: { status: 'ok' }, smartCleanRam: { status: 'ok' } } }
+        }
+        return { ok: true, msg: 'BOOST NOW aplicado (DNS flush). Smart Clean foi pulado durante o jogo.', applied: { dnsFlush: { status: 'ok' }, smartCleanRam: { status: 'skipped', error: 'Jogo em execução' } } }
+      }
+
+      if (process.platform === 'linux') {
+        const dns = await linuxFlushDns(runCommand)
+        const applied = {
+          dnsFlush: dns.ok ? { status: 'ok', method: dns.method } : { status: dns.status || 'failed', error: dns.error || dns.reason },
+          smartCleanRam: { status: 'unsupported', reason: 'windows-only' }
+        }
+        const ok = dns.ok
+        return {
+          ok,
+          ...(ok ? {} : { error: dns.error || 'Falha ao limpar cache DNS' }),
+          msg: ok ? `BOOST NOW aplicado (DNS flush via ${dns.method})` : 'BOOST NOW parcial/falhou no Linux (DNS flush indisponível)',
+          applied
+        }
+      }
+
+      return { ok: false, unsupported: true, platform: process.platform, reason: 'unsupported-platform', error: 'BOOST NOW não é suportado nesta plataforma.' }
+    } catch (e) {
+      return { ok: false, error: String(e?.message ?? e) }
     }
   })
 
@@ -1170,20 +1342,6 @@ public static class Psapi {
     } catch (e) {
       state.lastError = String(e?.message ?? e)
       return { ok: false, error: state.lastError }
-    }
-  })
-
-  ipcMain.handle('latency:boostNow', async () => {
-    try {
-      if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' }
-      await runCommand('ipconfig', ['/flushdns'], { timeoutMs: 8000 }).catch(() => {})
-      if (!state.game?.pid) {
-        await smartCleanRam(null).catch(() => {})
-        return { ok: true, msg: 'BOOST NOW aplicado (DNS flush + Smart Clean)' }
-      }
-      return { ok: true, msg: 'BOOST NOW aplicado (DNS flush). Smart Clean foi pulado durante o jogo.' }
-    } catch (e) {
-      return { ok: false, error: String(e?.message ?? e) }
     }
   })
 
@@ -1219,7 +1377,16 @@ public static class Psapi {
   }
 
   ipcMain.handle('latency:launchGameWithProfile', async (_event, payload) => {
-    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' }
+    if (process.platform !== 'win32') {
+      return {
+        ok: false,
+        unsupported: true,
+        platform: process.platform,
+        reason: 'windows-only',
+        error: 'Lançar jogo com perfil de latência não é suportado no Linux (semântica de perfil/tweaks é específica do Windows).'
+      }
+    }
+    // ... Windows implementation follows below (unchanged)
     const exePath = String(payload?.exePath ?? '').trim()
     if (!exePath) return { ok: false, error: 'exePath inválido' }
     const args = payload?.argsArray && Array.isArray(payload.argsArray) ? payload.argsArray.map(String) : splitArgs(payload?.args)

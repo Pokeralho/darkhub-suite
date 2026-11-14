@@ -35,6 +35,7 @@ fn wildcard_matching() {
     assert!(!wild_match("a*b", "ac"));
 }
 
+#[cfg(windows)]
 #[test]
 fn rules_outside_expected_folders_are_refused() {
     let base = tmp("safety");
@@ -56,6 +57,33 @@ fn rules_outside_expected_folders_are_refused() {
     assert!(env.check_rule(Path::new("\\\\server\\share\\x"), &any, true).is_err());
 }
 
+#[cfg(not(windows))]
+#[test]
+fn rules_outside_expected_folders_are_refused() {
+    let base = tmp("safety");
+    let env = Env::rooted(&base);
+    let cache = base.join("home/me/.cache");
+    let config = base.join("home/me/.config");
+    let data = base.join("home/me/.local/share");
+    let any = vec!["*.*".to_string()];
+    // Allowed: temp/cache roots and their contents
+    let r = env.check_rule(&cache.join("app"), &any, true);
+    assert!(r.is_ok(), "cache subdir allowed: {:?}", r);
+    let r = env.check_rule(&cache, &any, true);
+    assert!(r.is_ok(), "cache root allowed: {:?}", r);
+    let tmpdir = base.join("tmp");
+    let r = env.check_rule(&tmpdir, &any, true);
+    assert!(r.is_ok(), "temp may be emptied: {:?}", r);
+    // Refused: outside allowed roots (home docs, config, data not whitelisted for file cleaning)
+    assert!(env.check_rule(&base.join("home/me/Documents/x"), &any, true).is_err());
+    assert!(env.check_rule(&config.join("app"), &any, true).is_err(), "config not a cleaning root");
+    assert!(env.check_rule(&data.join("app"), &any, true).is_err(), "data not a cleaning root");
+    assert!(env.check_rule(&cache.join("app/../../x"), &any, true).is_err());
+    assert!(env.check_rule(&cache.join("app"), &["../*".into()], true).is_err());
+    assert!(env.check_rule(&cache.join("nvcache"), &any, true).is_err(), "shader cache kept");
+}
+
+#[cfg(windows)]
 #[test]
 fn winapp2_parsing_detection_and_validation() {
     let base = tmp("w2");
@@ -117,6 +145,7 @@ FileKey1=%LocalAppData%\Foo\Cache|*.*
     let _ = fs::remove_dir_all(&base);
 }
 
+#[cfg(windows)]
 #[test]
 fn protected_files_survive_and_shred_unlinks() {
     let base = tmp("shred");
@@ -133,6 +162,28 @@ fn protected_files_survive_and_shred_unlinks() {
     assert_eq!(r["total"]["protected"], 2);
     assert!(!cache.join("x.bin").exists());
     assert!(cache.join("Login Data").exists());
+    let left: Vec<_> = fs::read_dir(&cache).unwrap().flatten().map(|e| e.file_name().to_string_lossy().to_string()).collect();
+    assert!(!left.iter().any(|n| n.ends_with(".dhs")), "no renamed leftovers: {left:?}");
+    let _ = fs::remove_dir_all(&base);
+}
+
+#[cfg(not(windows))]
+#[test]
+fn protected_files_survive_and_shred_unlinks() {
+    let base = tmp("shred");
+    let env = Env::rooted(&base);
+    let cache = base.join("home/me/.cache/app");
+    put(&cache.join("x.bin"), 3 << 20);
+    put(&cache.join("logins.json"), 10);
+    put(&cache.join("vault.kdbx"), 10);
+    let ini = "[App]\nFileKey1=%xdg_cache_home%/app|*.*|RECURSE\n";
+    let (targets, _) = winapp2::load_all(&env, Some(ini), &no_reg);
+    let t = targets.iter().find(|t| t.id == "w2:App").unwrap();
+    let r = files::run(&env, &[t], &Opts { apply: true, shred: 3, sample: 10 });
+    assert_eq!(r["total"]["files"], 1);
+    assert_eq!(r["total"]["protected"], 2);
+    assert!(!cache.join("x.bin").exists());
+    assert!(cache.join("logins.json").exists());
     let left: Vec<_> = fs::read_dir(&cache).unwrap().flatten().map(|e| e.file_name().to_string_lossy().to_string()).collect();
     assert!(!left.iter().any(|n| n.ends_with(".dhs")), "no renamed leftovers: {left:?}");
     let _ = fs::remove_dir_all(&base);
@@ -172,6 +223,7 @@ fn make_db(path: &Path) {
     c.execute("DELETE FROM t WHERE rowid % 4 != 0", []).unwrap();
 }
 
+#[cfg(windows)]
 #[test]
 fn browser_vacuum_shrinks_and_keeps_rows() {
     let base = tmp("vac");

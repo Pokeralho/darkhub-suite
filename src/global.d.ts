@@ -877,16 +877,16 @@ export interface DarkHubAPI {
     onChanged: (callback: (payload: { running: boolean; state: any }) => void) => () => void;
   };
   latency: {
-    queryTimer: () => Promise<any>;
-    getCpuTopology: () => Promise<any>;
-    getConfig: () => Promise<any>;
-    setConfig: (payload: any) => Promise<any>;
-    enableUltra: () => Promise<any>;
-    enableUltraStable: (payload: any) => Promise<any>;
-    disableUltra: () => Promise<any>;
-    toggleUltra: () => Promise<any>;
-    boostNow: () => Promise<any>;
-    launchGameWithProfile: (payload: any) => Promise<any>;
+    queryTimer: () => Promise<{ ok: boolean; data?: any; error?: string; unsupported?: boolean; platform?: string; reason?: string }>;
+    getCpuTopology: () => Promise<{ ok: boolean; data?: any; error?: string; unsupported?: boolean; platform?: string; reason?: string }>;
+    getConfig: () => Promise<{ ok: boolean; config?: any; status?: any; metrics?: any; applied?: any; unsupported?: boolean; platform?: string; reason?: string; error?: string }>;
+    setConfig: (payload: any) => Promise<{ ok: boolean; config?: any; hotkey?: any; error?: string; unsupported?: boolean; platform?: string; reason?: string }>;
+    enableUltra: () => Promise<{ ok: boolean; status?: any; applied?: any; error?: string; unsupported?: boolean; platform?: string; reason?: string }>;
+    enableUltraStable: (payload: any) => Promise<{ ok: boolean; status?: any; applied?: any; error?: string; unsupported?: boolean; platform?: string; reason?: string }>;
+    disableUltra: () => Promise<{ ok: boolean; status?: any; error?: string }>;
+    toggleUltra: () => Promise<{ ok: boolean; status?: any; applied?: any; error?: string; unsupported?: boolean; platform?: string; reason?: string }>;
+    boostNow: () => Promise<{ ok: boolean; msg?: string; applied?: any; error?: string; unsupported?: boolean; platform?: string; reason?: string }>;
+    launchGameWithProfile: (payload: any) => Promise<{ ok: boolean; pid?: number; exePath?: string; args?: string[]; workingDir?: string; applied?: any; applyError?: string | null; error?: string; unsupported?: boolean; platform?: string; reason?: string }>;
   };
   library: {
     fetchCover: (payload: { gameName: string; gameId?: string; forceRefresh?: boolean }) => Promise<any>;
@@ -1111,9 +1111,9 @@ export interface DarkHubAPI {
     onProgress: (callback: (status: DiskMapStatus) => void) => () => void;
   };
   cleaner: {
-    status: () => Promise<{ ok: boolean; engine: boolean; busy: string | null; backupDir: string | null; winapp2: CleanerDefinitions; url: string }>;
+    status: () => Promise<{ ok: boolean; platform?: string; supported?: boolean; partial?: boolean; unsupported?: boolean; reason?: string; engine: boolean; busy: string | null; backupDir: string | null; winapp2: CleanerDefinitions; url: string; capabilities?: { fileClean?: boolean; browserVacuum?: boolean; registry?: boolean; recycleBin?: boolean; definitions?: boolean } }>;
     updateDefinitions: () => Promise<CleanerResult<Omit<CleanerDefinitions, 'installed'>>>;
-    removeDefinitions: () => Promise<{ ok: boolean; error?: string }>;
+    removeDefinitions: () => Promise<{ ok: boolean }>;
     listTargets: () => Promise<CleanerResult<{ targets: CleanerTarget[]; stats: { builtin: number; winapp2_sections: number; winapp2_detected: number; rejected_rules: number } }>>;
     scan: (payload: { ids: string[] }) => Promise<CleanerResult<CleanerRunResult>>;
     clean: (payload: { ids: string[]; apply?: boolean; confirm?: boolean; shred?: number }) => Promise<CleanerResult<CleanerRunResult>>;
@@ -1121,8 +1121,8 @@ export interface DarkHubAPI {
     regScan: () => Promise<CleanerResult<{ findings: CleanerFinding[] }>>;
     regClean: (payload: { ids: string[]; apply?: boolean; confirm?: boolean }) => Promise<CleanerResult<CleanerRegCleanResult>>;
     listBackups: () => Promise<CleanerResult<{ dir: string; backups: { name: string; bytes: number; modified: string }[] }>>;
-    restoreBackup: (payload: { name: string }) => Promise<{ ok: boolean; error?: string; file?: string }>;
-    openBackups: () => Promise<{ ok: boolean; error?: string }>;
+    restoreBackup: (payload: { name: string }) => Promise<CleanerResult<{ file: string }>>;
+    openBackups: () => Promise<CleanerResult<Record<string, never>>>;
   };
   recovery: {
     listDrives: () => Promise<RescueResult<{ drives: RescueDrive[]; system_disks: number[] }>>;

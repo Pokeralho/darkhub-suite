@@ -21,13 +21,16 @@ export default function Cleaner() {
   const [defs, setDefs] = useState<CleanerDefinitions | null>(null);
   const [backupDir, setBackupDir] = useState<string | null>(null);
   const [engine, setEngine] = useState<boolean | null>(null);
+  const [status, setStatus] = useState<{ platform?: string; supported?: boolean; partial?: boolean; reason?: string; capabilities?: { fileClean?: boolean; browserVacuum?: boolean; registry?: boolean; recycleBin?: boolean } } | null>(null);
 
   const loadStatus = useCallback(async () => {
     const r = await api()?.status();
-    if (r?.ok) { setDefs(r.winapp2); setBackupDir(r.backupDir); setEngine(r.engine); }
+    if (r?.ok) { setDefs(r.winapp2); setBackupDir(r.backupDir); setEngine(r.engine); setStatus({ platform: r.platform, supported: r.supported, partial: r.partial, reason: r.reason, capabilities: r.capabilities }); }
   }, []);
   useEffect(() => { void loadStatus(); }, [loadStatus]);
 
+  const caps = status?.capabilities || { fileClean: true, browserVacuum: true, registry: true, recycleBin: true };
+  const registryAvailable = caps.registry !== false;
   const tabs: { id: Tab; label: string }[] = [
     { id: 'files', label: t('cleaner.tab.files', 'Arquivos') },
     { id: 'browsers', label: t('cleaner.tab.browsers', 'Bancos dos navegadores') },
@@ -45,15 +48,21 @@ export default function Cleaner() {
           {tabs.map((x) => (
             <button key={x.id} type="button" role="tab" aria-selected={tab === x.id} onClick={() => setTab(x.id)}
               className={`px-3 py-2 text-[12.5px] border-b-2 -mb-px transition-colors duration-150 ${tab === x.id ? 'border-blue-400 text-zinc-50' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}>
-              {x.label}
+              {x.label}{x.id === 'registry' && !registryAvailable ? ' (Windows)' : ''}
             </button>
           ))}
         </nav>
       </PageHeader>
-      {engine === false ? <ErrorLine text={t('cleaner.noEngine', 'O motor DarkHub.Cleaner.exe não foi encontrado (rode npm run build:cleaner).')} /> : null}
-      {tab === 'files' ? <FilesTab defs={defs} onGoDefs={() => setTab('defs')} /> : null}
-      {tab === 'browsers' ? <BrowsersTab /> : null}
-      {tab === 'registry' ? <RegistryTab backupDir={backupDir} /> : null}
+      {status?.partial ? (
+        <div className="dh-card px-4 py-3 mb-4 text-[12.5px] text-amber-200 border border-amber-500/30 bg-amber-500/5 flex items-start gap-2">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+          <span>{t('cleaner.partialLinux', 'Modo parcial no Linux: limpeza de arquivos/cache e compactação de bancos de navegadores disponíveis (motor nativo). Registro do Windows, Lixeira e backups .reg não são suportados nesta plataforma.')}</span>
+        </div>
+      ) : null}
+      {engine === false ? <ErrorLine text={t('cleaner.noEngine', 'O motor nativo do Cleaner não foi encontrado. Compile/instale o binário DarkHub.Cleaner para esta plataforma.')} /> : null}
+      {tab === 'files' ? <FilesTab defs={defs} onGoDefs={() => setTab('defs')} engineReady={engine !== false} /> : null}
+      {tab === 'browsers' ? <BrowsersTab engineReady={engine !== false} /> : null}
+      {tab === 'registry' ? (registryAvailable ? <RegistryTab backupDir={backupDir} /> : <p className="dh-help">{t('cleaner.registryUnsupported', 'Limpeza e restauração de registro do Windows não são suportadas nesta plataforma.')}</p>) : null}
       {tab === 'defs' ? <DefsTab defs={defs} onChanged={loadStatus} /> : null}
     </div>
   );
@@ -107,7 +116,7 @@ function Stat({ label, value, tone = 'text-zinc-50' }: { label: string; value: R
 
 // ---------------------------------------------------------------- Arquivos
 
-function FilesTab({ defs, onGoDefs }: { defs: CleanerDefinitions | null; onGoDefs: () => void }) {
+function FilesTab({ defs, onGoDefs, engineReady }: { defs: CleanerDefinitions | null; onGoDefs: () => void; engineReady: boolean }) {
   const { t } = useI18n();
   const [targets, setTargets] = useState<CleanerTarget[] | null>(null);
   const [stats, setStats] = useState<{ winapp2_sections: number; winapp2_detected: number; rejected_rules: number } | null>(null);
@@ -123,13 +132,14 @@ function FilesTab({ defs, onGoDefs }: { defs: CleanerDefinitions | null; onGoDef
   const [open, setOpen] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (!engineReady) { setTargets([]); setError(null); return; }
     setError(null); setTargets(null);
     const r = await api()?.listTargets();
     if (r?.ok) {
       setTargets(r.targets); setStats(r.stats);
       setSelected(new Set(r.targets.filter((x) => x.source === 'builtin' && (x.rules.length || x.special)).map((x) => x.id)));
     } else { setTargets([]); setError(r?.error ?? t('cleaner.loadFail', 'Não foi possível listar os itens.')); }
-  }, [t]);
+  }, [t, engineReady]);
   useEffect(() => { void load(); }, [load, defs?.sha256]);
 
   // built-in items have stable ids ("dh:user-temp"): their names and warnings are translated here
@@ -151,6 +161,7 @@ function FilesTab({ defs, onGoDefs }: { defs: CleanerDefinitions | null; onGoDef
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const runScan = async () => {
+    if (!engineReady) { setError(t('cleaner.noEngine', 'O motor nativo do Cleaner não foi encontrado.')); return; }
     setBusy(true); setError(null); setDone(null);
     try {
       const r = await api()?.scan({ ids });
@@ -282,7 +293,7 @@ function FilesTab({ defs, onGoDefs }: { defs: CleanerDefinitions | null; onGoDef
 
 // ---------------------------------------------------------------- Navegadores (VACUUM)
 
-function BrowsersTab() {
+function BrowsersTab({ engineReady }: { engineReady: boolean }) {
   const { t } = useI18n();
   const [chosen, setChosen] = useState<Set<string>>(new Set(BROWSERS.map((b) => b.id)));
   const [res, setRes] = useState<CleanerVacuumResult | null>(null);
@@ -291,13 +302,14 @@ function BrowsersTab() {
   const [confirming, setConfirming] = useState(false);
 
   const run = async (apply: boolean) => {
+    if (!engineReady) { setError(t('cleaner.noEngine', 'O motor nativo do Cleaner não foi encontrado.')); return; }
     setBusy(true); setError(null);
     try {
       const r = await api()?.browsers({ browsers: [...chosen], apply, confirm: apply });
       if (r?.ok) setRes(r); else setError(r?.error ?? t('cleaner.vacuumFail', 'Falhou.'));
     } finally { setBusy(false); setConfirming(false); }
   };
-  useEffect(() => { void run(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (engineReady) void run(false); }, [engineReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const status = (d: CleanerDb) => ({
     ok: <span className="text-zinc-400">{t('cleaner.db.ok', 'pronto')}</span>,

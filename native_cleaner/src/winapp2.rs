@@ -87,6 +87,72 @@ Section=Navegadores
 DetectFile=%LocalAppData%\zen\Profiles
 FileKey1=%LocalAppData%\zen\Profiles\*\cache2|*.*|RECURSE
 FileKey2=%LocalAppData%\zen\Profiles\*\startupCache|*.*|RECURSE
+
+"#;
+
+#[cfg(not(windows))]
+pub const BUILTIN_LINUX: &str = r#"
+[Temporários do usuário]
+DhId=user-temp
+Section=Sistema
+FileKey1=%temp%|*.*|RECURSE
+FileKey2=%var_tmp%|*.*|RECURSE
+
+[Cache de miniaturas]
+DhId=thumbcache
+Section=Sistema
+Warning=As miniaturas serão recriadas pelo gerenciador de arquivos.
+FileKey1=%xdg_cache_home%/thumbnails|*.*|RECURSE
+
+[Cache do usuário (XDG)]
+DhId=xdg-cache
+Section=Sistema
+Warning=Remove arquivos de cache de aplicativos; eles serão recriados conforme necessário.
+FileKey1=%xdg_cache_home%|*.*|RECURSE
+
+[Cache do Google Chrome]
+DhId=chrome-cache
+Section=Navegadores
+DetectFile=%xdg_config_home%/google-chrome
+FileKey1=%xdg_cache_home%/google-chrome|*.*|RECURSE
+FileKey2=%xdg_config_home%/google-chrome/*/Cache|*.*|RECURSE
+FileKey3=%xdg_config_home%/google-chrome/*/Code Cache|*.*|RECURSE
+FileKey4=%xdg_config_home%/google-chrome/*/GPUCache|*.*|RECURSE
+
+[Cache do Chromium]
+DhId=chromium-cache
+Section=Navegadores
+DetectFile=%xdg_config_home%/chromium
+FileKey1=%xdg_cache_home%/chromium|*.*|RECURSE
+FileKey2=%xdg_config_home%/chromium/*/Cache|*.*|RECURSE
+FileKey3=%xdg_config_home%/chromium/*/Code Cache|*.*|RECURSE
+FileKey4=%xdg_config_home%/chromium/*/GPUCache|*.*|RECURSE
+
+[Cache do Microsoft Edge]
+DhId=edge-cache
+Section=Navegadores
+DetectFile=%xdg_config_home%/microsoft-edge
+FileKey1=%xdg_cache_home%/microsoft-edge|*.*|RECURSE
+FileKey2=%xdg_config_home%/microsoft-edge/*/Cache|*.*|RECURSE
+FileKey3=%xdg_config_home%/microsoft-edge/*/Code Cache|*.*|RECURSE
+FileKey4=%xdg_config_home%/microsoft-edge/*/GPUCache|*.*|RECURSE
+
+[Cache do Brave]
+DhId=brave-cache
+Section=Navegadores
+DetectFile=%xdg_config_home%/BraveSoftware/Brave-Browser
+FileKey1=%xdg_cache_home%/BraveSoftware/Brave-Browser|*.*|RECURSE
+FileKey2=%xdg_config_home%/BraveSoftware/Brave-Browser/*/Cache|*.*|RECURSE
+FileKey3=%xdg_config_home%/BraveSoftware/Brave-Browser/*/Code Cache|*.*|RECURSE
+FileKey4=%xdg_config_home%/BraveSoftware/Brave-Browser/*/GPUCache|*.*|RECURSE
+
+[Cache do Firefox]
+DhId=firefox-cache
+Section=Navegadores
+DetectFile=%home%/.mozilla/firefox
+FileKey1=%xdg_cache_home%/mozilla/firefox|*.*|RECURSE
+FileKey2=%home%/.mozilla/firefox/*/cache2|*.*|RECURSE
+FileKey3=%home%/.mozilla/firefox/*/startupCache|*.*|RECURSE
 "#;
 
 pub struct Section {
@@ -181,14 +247,24 @@ fn category_of(sec: &Section) -> String {
 }
 
 /// "%LocalAppData%\Foo\*\Cache" → every existing folder it names. Unknown variables are an error.
+/// On Windows paths use '\' and env vars like %Temp%; on Unix '/' and $-less vars (e.g. %home% or %xdg_cache_home%).
 pub fn expand(env: &Env, raw: &str) -> Result<Vec<PathBuf>, String> {
-    let raw = raw.trim().trim_matches('"').replace('/', "\\");
+    let raw = raw.trim().trim_matches('"');
+    #[cfg(windows)]
+    let raw = raw.replace('/', "\\");
+    #[cfg(not(windows))]
+    let raw = raw.replace('\\', "/");
     let mut bases: Vec<String> = Vec::new();
     if let Some(rest) = raw.strip_prefix('%') {
         let (var, tail) = rest.split_once('%').ok_or("variável sem fechamento")?;
         let vals = env.vars.get(&var.to_lowercase()).ok_or_else(|| format!("variável desconhecida %{var}%"))?;
         for v in vals {
-            bases.push(format!("{}{}", v.to_string_lossy().trim_end_matches('\\'), tail));
+            let vs = v.to_string_lossy();
+            #[cfg(windows)]
+            let joined = format!("{}{}", vs.trim_end_matches('\\'), tail);
+            #[cfg(not(windows))]
+            let joined = format!("{}{}", vs.trim_end_matches('/'), tail);
+            bases.push(joined);
         }
     } else {
         bases.push(raw.clone());
@@ -205,11 +281,24 @@ pub fn expand(env: &Env, raw: &str) -> Result<Vec<PathBuf>, String> {
 
 /// Resolves wildcard folder segments against the disk (never through links). Capped to avoid explosions.
 fn expand_wild(path: &str, out: &mut Vec<PathBuf>) {
-    let segs: Vec<&str> = path.split('\\').filter(|s| !s.is_empty()).collect();
+    #[cfg(windows)]
+    let sep = '\\';
+    #[cfg(not(windows))]
+    let sep = '/';
+    let segs: Vec<&str> = path.split(sep).filter(|s| !s.is_empty()).collect();
     if segs.is_empty() {
         return;
     }
+    #[cfg(windows)]
     let mut cur: Vec<PathBuf> = vec![PathBuf::from(format!("{}\\", segs[0]))];
+    #[cfg(not(windows))]
+    let mut cur: Vec<PathBuf> = {
+        if path.starts_with('/') {
+            vec![PathBuf::from("/").join(segs[0])]
+        } else {
+            vec![PathBuf::from(segs[0])]
+        }
+    };
     for seg in &segs[1..] {
         let mut next = Vec::new();
         for c in &cur {
@@ -351,7 +440,11 @@ pub fn build(sec: &Section, env: &Env, source: &'static str, reg_exists: &dyn Fn
 
 /// Built-in targets plus every applicable winapp2 entry (when a file is given). Returns targets and stats.
 pub fn load_all(env: &Env, winapp2: Option<&str>, reg_exists: &dyn Fn(&str) -> bool) -> (Vec<Target>, Value) {
-    let mut out: Vec<Target> = parse(BUILTIN).iter().filter_map(|s| build(s, env, "builtin", reg_exists)).collect();
+    #[cfg(windows)]
+    let builtin_src = BUILTIN;
+    #[cfg(not(windows))]
+    let builtin_src = BUILTIN_LINUX;
+    let mut out: Vec<Target> = parse(builtin_src).iter().filter_map(|s| build(s, env, "builtin", reg_exists)).collect();
     let mut stats = json!({ "builtin": out.len(), "winapp2_sections": 0, "winapp2_detected": 0, "rejected_rules": 0 });
     if let Some(text) = winapp2 {
         let secs = parse(text);

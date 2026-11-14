@@ -104,6 +104,12 @@ temp/
 .antigravity/
 .system_generated/
 brain/
+murilo.session-lab/
+murilo.session-lab.*.json
+murilo.test-report/
+murilo.test-report.*.json
+omurilomota.test-report*.json
+omurilomota.test-report*/
 
 # ── IDEs & Operating System ──
 .vscode/*
