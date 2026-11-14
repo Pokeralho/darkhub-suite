@@ -32,6 +32,8 @@ type TweakItem = {
   applied: boolean | null;
   partial: boolean;
   recommended: boolean;
+  supported: boolean;
+  supportedPlatforms?: string[];
   /** Original (backend) id + name + description, so search works in both languages. */
   altText: string;
 };
@@ -557,6 +559,8 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
         applied: isApplied,
         partial: Boolean(op.partial || opPartial[op.id]),
         recommended: false,
+        supported: op.supported !== false,
+        supportedPlatforms: Array.isArray(op.supportedPlatforms) ? op.supportedPlatforms : undefined,
         altText: `${op.id} ${op.name || ''} ${op.description || ''}`
       });
     }
@@ -577,6 +581,8 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
         applied: tweakStatus[dt.id] !== undefined ? Boolean(tweakStatus[dt.id]) : null,
         partial: Boolean(tweakPartial[dt.id]),
         recommended: dt.recommended === true,
+        supported: dt.supported !== false,
+        supportedPlatforms: Array.isArray(dt.supportedPlatforms) ? dt.supportedPlatforms : undefined,
         altText: `${dt.id} ${dt.title || ''} ${dt.description || ''}`
       });
     }
@@ -733,16 +739,21 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
   const handleRunBatch = async (action: 'apply' | 'revert') => {
     const picked = allTweaksList.filter((i) => selectedTweakIds.has(i.id));
     if (picked.length === 0) return;
-    let targets = picked;
+    let targets = picked.filter((i) => i.supported !== false);
+    if (targets.length === 0) {
+      setShowConsole(true);
+      addLog('warn', t('optimizer.audit.batch.unsupported', 'Os itens selecionados não são suportados nesta plataforma.'));
+      return;
+    }
     if (action === 'revert') {
-      targets = picked.filter((i) => i.applied === true && (i.kind === 'deep' || i.revertId));
+      targets = targets.filter((i) => i.applied === true && (i.kind === 'deep' || i.revertId));
       if (targets.length === 0) {
         setShowConsole(true);
         addLog('warn', t('optimizer.audit.batch.nothingToRevert', 'Nenhum dos itens selecionados está ativo, então não há o que reverter.'));
         return;
       }
     } else {
-      targets = picked.filter((i) => i.applied !== true);
+      targets = targets.filter((i) => i.applied !== true);
       if (targets.length === 0) {
         setShowConsole(true);
         addLog('warn', t('optimizer.audit.batch.alreadyApplied', 'Todos os itens selecionados já estão aplicados.'));
@@ -1501,8 +1512,9 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
                   const isRunningThis = optimizingId === tweak.id;
                   const rb = riskBadge(tweak.risk);
                   const canRevert = tweak.kind === 'deep' || Boolean(tweak.revertId);
-                  const showApply = tweak.kind === 'op' ? tweak.applied !== true : tweak.applied !== true;
-                  const showRevert = canRevert && (tweak.kind === 'deep' ? tweak.applied === true : tweak.applied !== false);
+                  const isSupported = tweak.supported !== false;
+                  const showApply = isSupported && (tweak.kind === 'op' ? tweak.applied !== true : tweak.applied !== true);
+                  const showRevert = isSupported && canRevert && (tweak.kind === 'deep' ? tweak.applied === true : tweak.applied !== false);
                   return (
                     <div
                       key={tweak.id}
@@ -1547,6 +1559,9 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
                             {tweak.applied === null && !tweak.revertId && tweak.kind === 'op' && (
                               <span className="text-zinc-500 lowercase">{t('optimizer.audit.badge.action', 'AÇÃO PONTUAL')}</span>
                             )}
+                            {!isSupported && (
+                              <span className="text-zinc-500 lowercase">{t('optimizer.audit.badge.unsupported', 'indisponível nesta plataforma')}</span>
+                            )}
                             <span className={`lowercase ${rb.cls}`}>{rb.label}</span>
                             {tweak.securityRelated && (
                               <span className="text-rose-400 lowercase">{t('optimizer.audit.badge.security', 'SEGURANÇA')}</span>
@@ -1566,15 +1581,21 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
                       </div>
 
                       <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {showRevert && (
-                          <button onClick={(e) => { e.stopPropagation(); handleRevertItem(tweak); }} disabled={isOptimizing} className="dh-btn dh-btn-ghost dh-btn-sm">
-                            {isRunningThis && !showApply ? <Loader2 size={14} className="animate-spin" /> : t('optimizer.audit.revert', 'Reverter')}
-                          </button>
-                        )}
-                        {showApply && (
-                          <button onClick={(e) => { e.stopPropagation(); handleApplyItem(tweak); }} disabled={isOptimizing} className="dh-btn dh-btn-sm min-w-[72px]">
-                            {isRunningThis ? <Loader2 size={14} className="animate-spin" /> : tweak.kind === 'deep' || tweak.revertId ? t('optimizer.audit.activate', 'Ativar') : t('optimizer.audit.run', 'Executar')}
-                          </button>
+                        {!isSupported ? (
+                          <span className="text-[11.5px] text-zinc-500 lowercase px-2">{t('optimizer.audit.badge.unsupportedShort', 'não suportado')}</span>
+                        ) : (
+                          <>
+                            {showRevert && (
+                              <button onClick={(e) => { e.stopPropagation(); handleRevertItem(tweak); }} disabled={isOptimizing} className="dh-btn dh-btn-ghost dh-btn-sm">
+                                {isRunningThis && !showApply ? <Loader2 size={14} className="animate-spin" /> : t('optimizer.audit.revert', 'Reverter')}
+                              </button>
+                            )}
+                            {showApply && (
+                              <button onClick={(e) => { e.stopPropagation(); handleApplyItem(tweak); }} disabled={isOptimizing} className="dh-btn dh-btn-sm min-w-[72px]">
+                                {isRunningThis ? <Loader2 size={14} className="animate-spin" /> : tweak.kind === 'deep' || tweak.revertId ? t('optimizer.audit.activate', 'Ativar') : t('optimizer.audit.run', 'Executar')}
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
