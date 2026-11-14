@@ -191,7 +191,11 @@ export async function readFsInfo(filePath) {
     readOnly: false, hidden: false, system: false, archive: false, attributes: null,
     streams: [], zone: null, streamsSupported: process.platform === 'win32'
   }
-  if (process.platform !== 'win32') return info
+  if (process.platform !== 'win32') {
+    try { info.readOnly = await fs.access(filePath, fs.constants.W_OK).then(() => false, () => true) } catch {}
+    try { info.hidden = path.basename(filePath).startsWith('.') } catch {}
+    return info
+  }
   try {
     const parsed = JSON.parse(await runPs(PS_INFO, { DH_META_PATH: filePath }) || '{}')
     const attrs = Number(parsed.attributes) || 0
@@ -213,6 +217,7 @@ export function validStreamName(name) {
 }
 
 export async function removeStream(filePath, name) {
+  if (process.platform !== 'win32') throw new Error('Alternate data streams are only supported on Windows')
   if (!validStreamName(name)) throw new Error('invalid stream name')
   await fs.unlink(`${filePath}:${name}`)
 }
@@ -256,6 +261,13 @@ export async function setFsProps(filePath, props = {}) {
   if (set) env.DH_ATTR_SET = String(set)
   if (clr) env.DH_ATTR_CLR = String(clr)
   if (process.platform !== 'win32') {
+    if (typeof props.readOnly === 'boolean') {
+      try {
+        const mode = (await fs.stat(filePath)).mode
+        if (props.readOnly) await fs.chmod(filePath, mode & ~0o222)
+        else await fs.chmod(filePath, mode | 0o200)
+      } catch {}
+    }
     if (mt != null || at != null) {
       const st = await fs.stat(filePath)
       await fs.utimes(filePath, new Date(at ?? st.atimeMs), new Date(mt ?? st.mtimeMs))
