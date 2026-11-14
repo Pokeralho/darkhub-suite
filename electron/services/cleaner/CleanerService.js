@@ -13,11 +13,26 @@ export const WINAPP2_URL = 'https://content.thewebatom.net/files/winapp2.ini';
 const WINAPP2_MAX = 16 << 20;
 export const BROWSERS = ['chrome', 'edge', 'brave', 'firefox', 'zen', 'chromium'];
 
-function defaultExe() {
+function exeCandidates() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const base = here.replace(/app\.asar(?![.\w])/, 'app.asar.unpacked');
-  const name = process.platform === 'win32' ? 'DarkHub.Cleaner.exe' : 'DarkHub.Cleaner';
-  return path.join(base, '..', name);
+  if (process.platform === 'win32') {
+    return [path.join(base, '..', 'DarkHub.Cleaner.exe')];
+  }
+  return [
+    path.join(base, '..', 'DarkHub.Cleaner'),
+    path.join(base, '..', 'DarkHub_Cleaner'),
+    path.resolve(here, '..', '..', '..', 'native_cleaner', 'target', 'release', 'DarkHub_Cleaner'),
+    path.resolve(here, '..', '..', '..', 'native_cleaner', 'target', 'debug', 'DarkHub_Cleaner')
+  ];
+}
+
+function defaultExe() {
+  const candidates = exeCandidates();
+  for (const p of candidates) {
+    try { if (fs.existsSync(p)) return p; } catch { /* ignore */ }
+  }
+  return candidates[0];
 }
 
 /** Ids are short strings the engine produced; anything else is dropped before reaching it. */

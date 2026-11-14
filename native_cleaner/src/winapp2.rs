@@ -115,36 +115,24 @@ DhId=chrome-cache
 Section=Navegadores
 DetectFile=%xdg_config_home%/google-chrome
 FileKey1=%xdg_cache_home%/google-chrome|*.*|RECURSE
-FileKey2=%xdg_config_home%/google-chrome/*/Cache|*.*|RECURSE
-FileKey3=%xdg_config_home%/google-chrome/*/Code Cache|*.*|RECURSE
-FileKey4=%xdg_config_home%/google-chrome/*/GPUCache|*.*|RECURSE
 
 [Cache do Chromium]
 DhId=chromium-cache
 Section=Navegadores
 DetectFile=%xdg_config_home%/chromium
 FileKey1=%xdg_cache_home%/chromium|*.*|RECURSE
-FileKey2=%xdg_config_home%/chromium/*/Cache|*.*|RECURSE
-FileKey3=%xdg_config_home%/chromium/*/Code Cache|*.*|RECURSE
-FileKey4=%xdg_config_home%/chromium/*/GPUCache|*.*|RECURSE
 
 [Cache do Microsoft Edge]
 DhId=edge-cache
 Section=Navegadores
 DetectFile=%xdg_config_home%/microsoft-edge
 FileKey1=%xdg_cache_home%/microsoft-edge|*.*|RECURSE
-FileKey2=%xdg_config_home%/microsoft-edge/*/Cache|*.*|RECURSE
-FileKey3=%xdg_config_home%/microsoft-edge/*/Code Cache|*.*|RECURSE
-FileKey4=%xdg_config_home%/microsoft-edge/*/GPUCache|*.*|RECURSE
 
 [Cache do Brave]
 DhId=brave-cache
 Section=Navegadores
 DetectFile=%xdg_config_home%/BraveSoftware/Brave-Browser
 FileKey1=%xdg_cache_home%/BraveSoftware/Brave-Browser|*.*|RECURSE
-FileKey2=%xdg_config_home%/BraveSoftware/Brave-Browser/*/Cache|*.*|RECURSE
-FileKey3=%xdg_config_home%/BraveSoftware/Brave-Browser/*/Code Cache|*.*|RECURSE
-FileKey4=%xdg_config_home%/BraveSoftware/Brave-Browser/*/GPUCache|*.*|RECURSE
 
 [Cache do Firefox]
 DhId=firefox-cache

@@ -112,6 +112,8 @@
     "asarUnpack": [
       "electron/*.ps1",
       "electron/services/*.exe",
+      "electron/services/DarkHub.Cleaner",
+      "electron/services/DarkHub_Cleaner",
       "electron/services/*.dll",
       "electron/services/*.ps1",
       "electron/services/darkos/*.ps1",
