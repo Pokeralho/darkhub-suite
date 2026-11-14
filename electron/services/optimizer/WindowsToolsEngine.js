@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import ElevationHelper from './ElevationHelper.js';
 import { psQuote } from './OptimizerUtils.js';
 
-const NOT_WINDOWS = { ok: false, error: 'Only Windows supported' };
+const NOT_WINDOWS = { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
 
 /** Optional features. `names`: Windows optional features (missing ones are skipped); `capability`: Get-WindowsCapability prefix. */
 export const WINDOWS_FEATURES = Object.freeze([

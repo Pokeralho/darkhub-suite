@@ -99,6 +99,7 @@ describe('DLSS runtime updater', () => {
 
 describe('game scan (shared with the OptiScaler screen)', () => {
   it('detects the graphics API and loader from PE headers', async () => {
+    if (process.platform !== 'win32') return // requires Windows system PE fixture
     const service: any = new (Dlss5Service as any)();
     const apiResult = await service.detectGraphicsAPI('C:\\Windows\\System32\\notepad.exe', 'C:\\Windows\\System32', 'C:\\Windows');
     expect(apiResult.primaryApi).toBeDefined();

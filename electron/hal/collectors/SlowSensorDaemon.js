@@ -136,6 +136,7 @@ class SlowSensorDaemon extends EventEmitter {
   }
 
   start() {
+    if (process.platform !== 'win32') return;
     if (this.process) return;
     this._stopped = false;
     Logger.info(

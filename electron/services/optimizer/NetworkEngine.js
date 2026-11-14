@@ -26,6 +26,7 @@ export function buildAdvancedNetworkChanges(adapters) {
 
 class NetworkEngine {
   async getActiveAdapterName() {
+    if (process.platform !== 'win32') return '';
     const ps = `
 $ErrorActionPreference='Stop'
 $a = Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | Sort-Object -Property LinkSpeed -Descending | Select-Object -First 1
@@ -40,6 +41,7 @@ if ($null -eq $a) { '' } else { $a.Name }`;
 
   /** Physical adapters that are up: [{ name, guid }] */
   async getUpAdapters() {
+    if (process.platform !== 'win32') return [];
     const ps = `
 $ErrorActionPreference='Stop'
 @(Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | ForEach-Object { [pscustomobject]@{ name = $_.Name; guid = $_.InterfaceGuid } }) | ConvertTo-Json -Compress`;
@@ -56,12 +58,29 @@ $ErrorActionPreference='Stop'
   async flushDns() {
     const started = Date.now();
     try {
-      const r = await runCommand('ipconfig.exe', ['/flushdns'], { timeoutMs: 15000 });
-      if (r.code !== 0) {
-        const detail = (r.stdout || r.stderr || '').replace(/\s+/g, ' ').trim();
-        return this._res('Error', `ipconfig /flushdns falhou (código ${r.code}). ${detail}${/admin|elev/i.test(detail) ? '' : ' Pode ser necessário executar como administrador.'}`, started);
+      if (process.platform === 'win32') {
+        const r = await runCommand('ipconfig.exe', ['/flushdns'], { timeoutMs: 15000 });
+        if (r.code !== 0) {
+          const detail = (r.stdout || r.stderr || '').replace(/\s+/g, ' ').trim();
+          return this._res('Error', `ipconfig /flushdns falhou (código ${r.code}). ${detail}${/admin|elev/i.test(detail) ? '' : ' Pode ser necessário executar como administrador.'}`, started);
+        }
+        return this._res('Success', 'Cache do resolvedor de DNS limpo (ipconfig /flushdns concluído). Apenas o cache local foi limpo; a conexão não foi reiniciada.', started);
       }
-      return this._res('Success', 'Cache do resolvedor de DNS limpo (ipconfig /flushdns concluído). Apenas o cache local foi limpo; a conexão não foi reiniciada.', started);
+      // Linux/other: best-effort (systemd-resolved). Not all distros run a local cache.
+      let r = await runCommand('resolvectl', ['flush-caches'], { timeoutMs: 15000 }).catch(() => null);
+      if (!r || r.code !== 0) r = await runCommand('systemd-resolve', ['--flush-caches'], { timeoutMs: 15000 }).catch(() => null);
+      if (r && r.code === 0) {
+        return this._res('Success', 'Cache de DNS do resolvedor do sistema limpo (resolvectl/systemd-resolve).', started);
+      }
+      const detail = r ? (r.stdout || r.stderr || '').replace(/\s+/g, ' ').trim() : '';
+      return {
+        ok: false, unsupported: !r || r.code === 127, partial: true, platform: process.platform,
+        status: 'Warning', durationMs: Date.now() - started,
+        affectedResources: ['DNS Cache'], processedItems: 0, savings: 0, savingsBytes: 0,
+        message: detail || 'Nenhum cache de DNS local conhecido para limpar (sem systemd-resolved?).',
+        msg: detail || 'Nenhum cache de DNS local conhecido para limpar (sem systemd-resolved?).',
+        error: detail || 'Flush DNS indisponível nesta plataforma/configuração.'
+      };
     } catch (e) {
       return this._res('Error', `Falha: ${e?.message ?? String(e)}`, started);
     }
@@ -83,7 +102,7 @@ $ErrorActionPreference='Stop'
   }
 
   async cleanNetwork() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const script = `
 $ErrorActionPreference = 'Continue'
 & ipconfig.exe /flushdns | Out-Null
@@ -119,7 +138,7 @@ ConvertTo-Json -InputObject @($out) -Compress`;
    * All previous values are snapshotted and restored by advancedNetworkRevert().
    */
   async advancedNetworkApply() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const adapters = await this.getUpAdapters();
     if (adapters.length === 0) return { ok: false, error: 'Nenhum adaptador de rede físico ativo encontrado' };
 
@@ -157,7 +176,7 @@ ConvertTo-Json -InputObject @($out) -Compress`;
   }
 
   async advancedNetworkRevert() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const adapters = await this.getUpAdapters();
     const fallbackChanges = [
       { key: PSCHED, name: 'NonBestEffortLimit', deleteValue: true },

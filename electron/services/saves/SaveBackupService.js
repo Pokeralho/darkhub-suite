@@ -27,7 +27,7 @@ const safeName = (s) => String(s).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace
 const templatePrefix = (tpl) => staticPrefix(String(tpl).replace(/\//g, '\\'))
 
 export class SaveBackupService {
-  constructor({ app, getInstalledGames, onEvent }) {
+  constructor({ app, getInstalledGames, onEvent, now = Date.now }) {
     this.app = app
     this.dir = path.join(app.getPath('userData'), 'saves')
     this.settingsFile = path.join(this.dir, 'settings.json')
@@ -35,6 +35,9 @@ export class SaveBackupService {
     this.onEvent = onEvent
     this.index = null
     this.busy = false
+    this._now = now
+    this._lastStamp = ''
+    this._stampSeq = 0
     fs.mkdirSync(this.dir, { recursive: true })
   }
 
@@ -188,8 +191,11 @@ export class SaveBackupService {
       const prev = this.versions(name)[0]
       if (prev && prev.fingerprint === fingerprint && !regKeys.length) return { ok: true, skipped: true, reason: 'unchanged', id: prev.id }
 
-      const d = new Date()
-      const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}${String(d.getSeconds()).padStart(2, '0')}`
+      const d = new Date(this._now())
+      const baseStamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}${String(d.getSeconds()).padStart(2, '0')}`
+      // deterministic uniqueness even when tests inject a fixed clock
+      if (baseStamp === this._lastStamp) this._stampSeq += 1; else { this._lastStamp = baseStamp; this._stampSeq = 0 }
+      const stamp = this._stampSeq ? `${baseStamp}-${this._stampSeq + 1}` : baseStamp
       // two backups in the same second (e.g. the safety copy right before a restore) must never share a folder:
       // the second one would overwrite the version being restored
       let id = stamp

@@ -642,7 +642,7 @@ public static class NtTimer {
 
   async function ultraEnableImpl(manual = false) {
 
-    if (process.platform !== 'win32') throw new Error('Only supported on Windows')
+    if (process.platform !== 'win32') throw Object.assign(new Error('Apenas suportado no Windows.'), { unsupported: true, platform: process.platform, reason: 'windows-only' })
     if (state.ultraEnabled) return { ok: true, status: state }
 
     state.lastError = null
@@ -1121,7 +1121,7 @@ public static class Psapi {
 
   ipcMain.handle('latency:enableUltraStable', async (_event, payload) => {
     try {
-      if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
+      if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' }
       if (payload && typeof payload === 'object') {
         if (typeof payload.gameExePath === 'string') config.gameExePath = payload.gameExePath
         if (typeof payload.hotkey === 'string') config.hotkey = payload.hotkey
@@ -1175,7 +1175,7 @@ public static class Psapi {
 
   ipcMain.handle('latency:boostNow', async () => {
     try {
-      if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
+      if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' }
       await runCommand('ipconfig', ['/flushdns'], { timeoutMs: 8000 }).catch(() => {})
       if (!state.game?.pid) {
         await smartCleanRam(null).catch(() => {})
@@ -1219,7 +1219,7 @@ public static class Psapi {
   }
 
   ipcMain.handle('latency:launchGameWithProfile', async (_event, payload) => {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' }
     const exePath = String(payload?.exePath ?? '').trim()
     if (!exePath) return { ok: false, error: 'exePath inválido' }
     const args = payload?.argsArray && Array.isArray(payload.argsArray) ? payload.argsArray.map(String) : splitArgs(payload?.args)

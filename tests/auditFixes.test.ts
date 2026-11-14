@@ -29,6 +29,7 @@ describe('CPU core parking revert', () => {
   }
 
   it('restores a hidden default by dropping the value it wrote', async () => {
+    if (process.platform !== 'win32') return // requires Windows powercfg/PowerShell
     const engine = await engineWith({ scheme: '381b4222-f694-41f0-9685-ff5bb260df2e', CPMINCORES: '-', CPMAXCORES: '-' })
     const r = await engine.revertCpuUnpark()
     expect(r.ok).toBe(true)
@@ -37,6 +38,7 @@ describe('CPU core parking revert', () => {
   })
 
   it('still writes numeric snapshots back', async () => {
+    if (process.platform !== 'win32') return // requires Windows powercfg/PowerShell
     const engine = await engineWith({ scheme: '381b4222-f694-41f0-9685-ff5bb260df2e', CPMINCORES: '5', CPMAXCORES: '100' })
     await engine.revertCpuUnpark()
     expect(script).toMatch(/SUB_PROCESSOR CPMINCORES 5 /)

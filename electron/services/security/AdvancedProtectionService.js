@@ -21,7 +21,9 @@ import {
 } from './hardeningCatalog.js';
 
 const TAG = 'AdvancedProtection';
-const HOSTS_PATH = path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts');
+const DEFAULT_HOSTS_PATH = process.platform === 'win32'
+  ? path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
+  : '/etc/hosts';
 
 /** Reads a fetch() body up to maxBytes; aborts (and throws) above it. */
 export async function readCapped(response, maxBytes) {
@@ -49,7 +51,7 @@ export async function readCapped(response, maxBytes) {
 }
 
 export class AdvancedProtectionService {
-  constructor({ dataDir = null, securityService = null, hostsPath = HOSTS_PATH, fetchImpl = null } = {}) {
+  constructor({ dataDir = null, securityService = null, hostsPath = DEFAULT_HOSTS_PATH, fetchImpl = null } = {}) {
     this.dataDir = dataDir;
     this.securityService = securityService;
     this.hostsPath = hostsPath;
@@ -216,7 +218,9 @@ export class AdvancedProtectionService {
   }
 
   async _writeHosts(content) {
-    if (process.platform !== 'win32') return { ok: false, error: 'windows-only' };
+    if (process.platform !== 'win32') {
+      return { ok: false, unsupported: true, platform: process.platform, reason: 'elevation-required', error: 'Gravar em /etc/hosts exige elevação/permissão — não automatizado nesta plataforma.' };
+    }
     const dir = path.join(process.env.LOCALAPPDATA || os.tmpdir(), 'DarkHub', 'elevate');
     fs.mkdirSync(dir, { recursive: true });
     const staged = path.join(dir, `hosts_${Date.now()}_${crypto.randomBytes(6).toString('hex')}.txt`);
@@ -281,7 +285,10 @@ export class AdvancedProtectionService {
   // ---------------------------------------------------------------- firewall
 
   async firewallStatus() {
-    if (process.platform !== 'win32') return { ok: false, rules: 0, error: 'windows-only' };
+    if (process.platform !== 'win32') {
+      const st = this._loadState();
+      return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', rules: 0, group: FIREWALL_GROUP, addresses: st.firewall?.addresses || 0, sources: st.firewall?.sources || [], appliedAt: st.firewall?.appliedAt || null };
+    }
     const st = this._loadState();
     try {
       const r = await runPowerShell(buildFirewallStatusScript(), { timeoutMs: 30000, trim: true });
@@ -294,7 +301,7 @@ export class AdvancedProtectionService {
 
   applyFirewall() {
     return this._exclusive('firewall', async () => {
-      if (process.platform !== 'win32') return { ok: false, error: 'windows-only' };
+      if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Firewall de bloqueio por IP é suportado apenas no Windows.' };
       const { sources, entries } = await this._collect('ip');
       const addresses = sanitizeFirewallAddresses(entries);
       if (!addresses.length) return { ok: false, error: 'no-entries' };
@@ -311,7 +318,7 @@ export class AdvancedProtectionService {
 
   restoreFirewall() {
     return this._exclusive('firewall', async () => {
-      if (process.platform !== 'win32') return { ok: false, error: 'windows-only' };
+      if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Firewall de bloqueio por IP é suportado apenas no Windows.' };
       const res = await ElevationHelper.runMarked(buildFirewallRemoveScript(), 300000);
       if (!res.ok) return { ok: false, error: res.error };
       const left = parseFirewallCount(res.out);
@@ -387,7 +394,7 @@ export class AdvancedProtectionService {
     return this._exclusive(`hardening:${id}`, async () => {
       const item = getHardeningItem(id);
       if (!item) return { ok: false, error: 'unknown-item' };
-      if (process.platform !== 'win32') return { ok: false, error: 'windows-only' };
+      if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Endurecimento do Windows é suportado apenas no Windows.' };
       const before = await this._readHardening();
       if (item.requiresDefender && !defenderActive(before.raw)) return { ok: false, error: 'defender-inactive' };
       const opts = id === 'asr' ? { mode: options?.mode === 'block' ? 'block' : 'audit' } : {};

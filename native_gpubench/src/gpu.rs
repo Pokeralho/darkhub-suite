@@ -1,3 +1,4 @@
+#![cfg(windows)]
 //! The D3D12 renderer: device, passes and the frame loop. One queue, three frames in flight.
 use crate::proof::{self, Hash};
 use crate::scene::*;

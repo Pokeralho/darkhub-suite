@@ -1,18 +1,33 @@
 //! DarkHub GPU benchmark engine. D3D12 rasterization and DXR 1.1 inline ray tracing over the closed-form scene in
 //! scene.rs. Talks JSON lines on stdin/stdout; the app relays to the server. Contract: docs/GPU_BENCHMARK.md.
-#![windows_subsystem = "console"]
+#![cfg_attr(windows, windows_subsystem = "console")]
 
+#[cfg(not(windows))]
+fn main() {
+    use std::io::Write;
+    let mut out = std::io::stdout().lock();
+    let _ = writeln!(out, "{{\"type\":\"error\",\"error\":\"unsupported_platform\",\"platform\":\"{}\"}}", std::env::consts::OS);
+}
+
+#[cfg(windows)]
 mod audit;
+#[cfg(windows)]
 mod gpu;
+#[cfg(windows)]
 mod proof;
+#[cfg(windows)]
 mod scene;
 
+#[cfg(windows)]
+mod win_impl {
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::{BufRead, Write};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+
+use crate::{audit, gpu, proof, scene};
 
 pub(crate) fn say(v: Value) {
     let mut out = std::io::stdout().lock();
@@ -43,7 +58,7 @@ fn vectors() -> Value {
     json!({"pcg": pcgs, "hash2": hash2(7, 9), "boxes": boxes, "cameras": cams})
 }
 
-fn run() -> Result<(), String> {
+pub fn run() -> Result<(), String> {
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a == "--vectors") {
         say(vectors());
@@ -118,31 +133,21 @@ fn run() -> Result<(), String> {
                 let path: Vec<Value> = proof::merkle_path(roots, frame as usize).into_iter().map(|(left, h)| json!({"left": left, "hash": proof::hex(&h)})).collect();
                 say(json!({"type": "opening", "test": test, "frame": frame, "tiles": raw, "tileHashes": u32s_b64(&hashes), "path": path}));
             }
-            "fingerprint" => {
-                // the same frame must always come out identical: stress test compares this against its reference
-                if rt && !g.info.dxr { say(json!({"type": "error", "error": "dxr_unsupported"})); continue; }
-                let frame = msg["frame"].as_u64().unwrap_or(0) as u32;
-                let (ids, hashes) = g.capture(rt, seed, frame).map_err(|e| format!("capture: {e}"))?;
-                let image = g.read_ldr().map_err(|e| format!("image: {e}"))?;
-                let ids_bytes: Vec<u8> = ids.iter().chain(hashes.iter()).flat_map(|x| x.to_le_bytes()).collect();
-                say(json!({"type": "fingerprint", "ids": proof::hex(&proof::frame_root(&ids_bytes)), "image": proof::hex(&proof::frame_root(&image))}));
-            }
-            "driver" => say(audit::driver(g.info.vendor == 0x10DE)),
-            "modules" => say(json!({"type": "modules", "modules": gpu::loaded_modules()})),
-            "shot" => {
-                let path = msg["path"].as_str().unwrap_or("");
-                let rgba = g.read_ldr().map_err(|e| format!("shot: {e}"))?;
-                let ok = std::fs::write(path, rgba).is_ok();
-                say(json!({"type": "shot", "ok": ok, "width": scene::WIDTH, "height": scene::HEIGHT}));
+            "audit" => {
+                let lines = audit::collect();
+                let rows: Vec<Value> = lines.iter().map(|l| json!({"v": l.v, "tag": l.tag, "detail": l.detail})).collect();
+                say(json!({"type": "audit", "lines": rows}));
             }
             _ => {}
         }
     }
 }
+}
 
+#[cfg(windows)]
 fn main() {
-    if let Err(e) = run() {
-        say(json!({"type": "error", "error": e}));
+    if let Err(e) = win_impl::run() {
+        win_impl::say(serde_json::json!({"type": "error", "error": e}));
         std::process::exit(1);
     }
 }

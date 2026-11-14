@@ -81,7 +81,7 @@ describe('dashboard estimate wiring', () => {
     expect(main).toMatch(/StorageEngine\.analyzeTempFiles\(\{ deadlineMs: timeoutMs, recycleBin: true \}\)/)
     expect(main).not.toMatch(/app\.getPath\('cache'\)/)
     const clean = main.slice(main.indexOf("case 'clean-temp': {"), main.indexOf("case 'repair-windows'"))
-    expect(clean).toMatch(/StorageEngine\.cleanTempFiles\(\{ recycleBin: true \}\)/)
+    expect(clean).toMatch(/StorageEngine\.cleanTempFiles\(\{ recycleBin: process\.platform === 'win32' \}\)/)
     expect(clean).toMatch(/junkEstimateCache = \{ ts: 0, result: null, inFlight: null \}/)
   })
 })

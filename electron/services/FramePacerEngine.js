@@ -38,6 +38,11 @@ class FramePacerEngine extends EventEmitter {
   }
 
   start({ targetFps = 144, pacingMode = 'flatline', adapterLuid } = {}) {
+    if (process.platform !== 'win32') {
+      this.isRunning = false
+      this._latestMetrics.isRunning = false
+      return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Frame pacing/limiter nativo é suportado apenas no Windows.', isRunning: false, targetFps: Number(targetFps) || 144, pacingMode: pacingMode || 'flatline' }
+    }
     if (this.isRunning) {
       this.updateConfig({ targetFps, pacingMode, adapterLuid })
       return { ok: true, isRunning: true, targetFps: this.targetFps, pacingMode: this.pacingMode }
@@ -139,6 +144,12 @@ class FramePacerEngine extends EventEmitter {
   }
 
   _spawnNativeProcess() {
+    if (process.platform !== 'win32') {
+      Logger.info('FramePacerEngine', 'Frame limiter nativo disponível apenas no Windows; ignorando nesta plataforma.')
+      this.isRunning = false
+      this._latestMetrics.isRunning = false
+      return
+    }
     try {
       const exePath = this._getExePath()
       Logger.info('FramePacerEngine', `Executável nativo: ${exePath}`)

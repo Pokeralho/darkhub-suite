@@ -22,7 +22,7 @@ class MemoryEngine {
    * emptied the Recycle Bin and flushed DNS, which has been removed).
    */
   async optimizeRAM() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const totalBytes = os.totalmem();
     const beforeFree = os.freemem();
 
@@ -94,7 +94,7 @@ Write-Output "DHRAM|$ok|$fail|$skipped"
    * The change lasts only until the audio engine restarts.
    */
   async optimizeAudioLatency() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const script = `
 $ErrorActionPreference = 'Stop'
 $a = Get-Process -Name audiodg -ErrorAction SilentlyContinue | Select-Object -First 1

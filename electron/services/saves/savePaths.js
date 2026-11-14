@@ -3,6 +3,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+const isWin = process.platform === 'win32'
+
 // Placeholder → key of the env object built by the service. Unknown or missing ones make the path unusable.
 const PLACEHOLDERS = {
   '<home>': 'home', '<winAppData>': 'appData', '<winLocalAppData>': 'localAppData', '<winLocalAppDataLow>': 'localAppDataLow',
@@ -22,11 +24,20 @@ export function resolveTemplate(template, env) {
     return String(val).replace(/[\\/]+$/, '')
   })
   if (unresolved) return null
-  return path.win32.normalize(out.replace(/\//g, '\\'))
+  // Ludusavi templates/paths are Windows-formatted. Keep Windows normalization for drive-letter paths
+  // (and on Windows) so existing behavior/tests hold; on Linux with POSIX-resolved env values, use host paths.
+  if (isWin || /^[A-Za-z]:[\\/]/.test(out)) return path.win32.normalize(out.replace(/\//g, '\\'))
+  return path.posix.normalize(out.replace(/\\/g, '/'))
 }
 
 /** Normalized key for matching names across stores ("Hollow Knight™: Silksong" → "hollowknightsilksong"). */
-export const nameKey = (s) => String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '')
+export const nameKey = (s) => String(s || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')
+
+function basenameAny(p) {
+  const s = String(p || '').replace(/[\\/]+$/, '')
+  const i = Math.max(s.lastIndexOf('/'), s.lastIndexOf('\\'))
+  return i >= 0 ? s.slice(i + 1) : s
+}
 
 /**
  * Pairs installed games with manifest entries: Steam app id first, then the install folder name, then the name.
@@ -45,7 +56,7 @@ export function matchGames(index, installed) {
   const out = []
   const seen = new Set()
   for (const g of installed) {
-    const e = (g.appId && bySteam.get(String(g.appId))) || (g.installDir && byDir.get(nameKey(path.basename(g.installDir)))) || byName.get(nameKey(g.name))
+    const e = (g.appId && bySteam.get(String(g.appId))) || (g.installDir && byDir.get(nameKey(basenameAny(g.installDir)))) || byName.get(nameKey(g.name))
     if (!e || seen.has(e.name)) continue
     seen.add(e.name)
     out.push({ game: g, entry: e })
@@ -55,10 +66,19 @@ export function matchGames(index, installed) {
 
 const globToRegex = (seg) => new RegExp(`^${seg.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`, 'i')
 
-/** Expands a Windows pattern with * ? ** into existing files (directories are walked). Capped for safety. */
+/** Expands a pattern with * ? ** into existing files (directories are walked). Capped for safety. */
 export function expandGlob(pattern, { maxFiles = 20000, maxDepth = 12 } = {}) {
-  const parts = pattern.split('\\')
+  const raw = String(pattern)
+  const sep = raw.includes('/') ? '/' : '\\'
+  const parts = raw.split(/[\\/]+/)
   const files = []
+  const join = (base, name) => {
+    if (!base) return name
+    if (base === '/') return '/' + name
+    if (/^[A-Za-z]:$/.test(base) && sep === '\\') return base + '\\' + name
+    if (/^[A-Za-z]:$/.test(base) && sep === '/') return base + '/' + name
+    return base.replace(/[\\/]+$/, '') + sep + name
+  }
   const addTree = (p, depth) => {
     if (files.length >= maxFiles) return
     let st
@@ -67,7 +87,7 @@ export function expandGlob(pattern, { maxFiles = 20000, maxDepth = 12 } = {}) {
     if (!st.isDirectory() || depth > maxDepth) return
     let names = []
     try { names = fs.readdirSync(p) } catch { return }
-    for (const n of names) addTree(path.join(p, n), depth + 1)
+    for (const n of names) addTree(join(p, n), depth + 1)
   }
   const walk = (base, i) => {
     if (files.length >= maxFiles) return
@@ -77,14 +97,25 @@ export function expandGlob(pattern, { maxFiles = 20000, maxDepth = 12 } = {}) {
       walk(base, i + 1)
       let names = []
       try { names = fs.readdirSync(base, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name) } catch { return }
-      for (const n of names) walk(path.join(base, n), i)
+      for (const n of names) walk(join(base, n), i)
       return
     }
-    if (!/[*?]/.test(seg)) { walk(i === 0 ? `${seg}\\` : path.join(base, seg), i + 1); return }
+    if (!/[*?]/.test(seg)) {
+      let next
+      if (i === 0) {
+        if (seg === '' && raw.startsWith('/')) next = '/'
+        else if (/^[A-Za-z]:$/.test(seg)) next = sep === '\\' ? seg + '\\' : seg
+        else next = seg
+      } else {
+        next = join(base, seg)
+      }
+      walk(next, i + 1)
+      return
+    }
     const re = globToRegex(seg)
     let names = []
     try { names = fs.readdirSync(base) } catch { return }
-    for (const n of names) if (re.test(n)) walk(path.join(base, n), i + 1)
+    for (const n of names) if (re.test(n)) walk(join(base, n), i + 1)
   }
   walk('', 0)
   return [...new Set(files)]
@@ -92,7 +123,12 @@ export function expandGlob(pattern, { maxFiles = 20000, maxDepth = 12 } = {}) {
 
 /** Relative path of `file` under the non-glob prefix of `pattern`, used to store files portably. */
 export function staticPrefix(pattern) {
-  const parts = pattern.split('\\')
+  const raw = String(pattern)
+  const sep = raw.includes('/') ? '/' : '\\'
+  const parts = raw.split(/[\\/]+/)
   const i = parts.findIndex((p) => /[*?]/.test(p))
-  return (i < 0 ? parts : parts.slice(0, i)).join('\\')
+  const prefixParts = i < 0 ? parts : parts.slice(0, i)
+  if (prefixParts.length === 1 && prefixParts[0] === '' && raw.startsWith('/')) return '/'
+  if (prefixParts.length === 1 && /^[A-Za-z]:$/.test(prefixParts[0])) return prefixParts[0] + sep
+  return prefixParts.join(sep)
 }

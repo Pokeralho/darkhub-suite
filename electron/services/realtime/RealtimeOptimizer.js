@@ -40,9 +40,9 @@ export function planRuleActions(processes, rules, { foregroundPid = -1, selfPid 
 }
 
 export class RealtimeOptimizer extends EventEmitter {
-  constructor({ native, getConfig, setPriority = os.setPriority, kill = process.kill.bind(process), memory = () => ({ availMb: os.freemem() / 1048576, totalMb: os.totalmem() / 1048576 }), now = Date.now } = {}) {
+  constructor({ native, getConfig, setPriority = os.setPriority, kill = process.kill.bind(process), memory = () => ({ availMb: os.freemem() / 1048576, totalMb: os.totalmem() / 1048576 }), now = Date.now, settleMs = 1500, memoryTickMs = MEMORY_TICK_MS, rulesTickMs = RULES_TICK_MS } = {}) {
     super()
-    Object.assign(this, { native, getConfig, setPriority, kill, memory, now })
+    Object.assign(this, { native, getConfig, setPriority, kill, memory, now, settleMs, memoryTickMs, rulesTickMs })
     this.timers = []
     this.log = []
     this.stats = { trims: 0, freedMb: 0, lowered: 0, closed: 0, since: 0 }
@@ -58,7 +58,7 @@ export class RealtimeOptimizer extends EventEmitter {
     if (this.running) return
     this.stats.since = this.now()
     this.cooldownMin = this.getConfig().cooldownMin
-    for (const [fn, ms] of [[() => this.#memoryTick(), MEMORY_TICK_MS], [() => this.#rulesTick(), RULES_TICK_MS]]) {
+    for (const [fn, ms] of [[() => this.#memoryTick(), this.memoryTickMs], [() => this.#rulesTick(), this.rulesTickMs]]) {
       const t = setInterval(fn, ms)
       t.unref?.() // never keeps the process alive on its own
       this.timers.push(t)
@@ -94,7 +94,7 @@ export class RealtimeOptimizer extends EventEmitter {
     try {
       const res = await this.native.cleanRam(process.pid, cfg.minProcessMb)
       // let the memory manager settle before measuring what actually became available
-      await new Promise((r) => setTimeout(r, 1500))
+      await new Promise((r) => setTimeout(r, this.settleMs))
       const freedMb = Math.max(0, Math.round(this.memory().availMb - before.availMb))
       this.cooldownMin = nextCooldownMin(this.cooldownMin, freedMb, cfg)
       this.nextAllowedAt = this.now() + this.cooldownMin * 60000

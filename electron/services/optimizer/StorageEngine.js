@@ -26,7 +26,21 @@ class StorageEngine {
       add(path.join(winDir, 'Minidump'));
       add(path.join(localAppData, 'CrashDumps'));
     } else {
-      add('/tmp');
+      const home = os.homedir();
+      const xdgCache = process.env.XDG_CACHE_HOME || path.join(home, '.cache');
+      const xdgRuntime = process.env.XDG_RUNTIME_DIR;
+      add(process.env.TMPDIR);
+      if (xdgRuntime) add(path.join(xdgRuntime, 'tmp'));
+      // User-owned cache/temp locations only (reversible/safe scope). Avoid broad system dirs.
+      add(path.join(xdgCache, 'thumbnails'));
+      add(path.join(xdgCache, 'fontconfig'));
+      add(path.join(xdgCache, 'mesa_shader_cache'));
+      add(path.join(xdgCache, 'pip'));
+      add(path.join(xdgCache, 'npm'));
+      add(path.join(xdgCache, 'yarn'));
+      add(path.join(xdgCache, 'electron'));
+      add(path.join(xdgCache, 'chromium'));
+      add(path.join(xdgCache, 'DarkHub'));
     }
     return Array.from(dirs.values());
   }
@@ -128,13 +142,17 @@ class StorageEngine {
       if (state.truncated) break;
     }
     const summary = { files: state.files, bytes: state.bytes, dirs: this.tempDirs.length, truncated: state.truncated };
-    if (recycleBin) {
-      const r = await (await this._cleaner()).recycleBin();
-      if (r?.ok) {
-        summary.recycleBin = { bytes: r.before.bytes, items: r.before.items };
-        summary.files += r.before.items;
-        summary.bytes += r.before.bytes;
-      }
+    if (recycleBin && process.platform === 'win32') {
+      try {
+        const r = await (await this._cleaner()).recycleBin();
+        if (r?.ok) {
+          summary.recycleBin = { bytes: r.before.bytes, items: r.before.items };
+          summary.files += r.before.items;
+          summary.bytes += r.before.bytes;
+        }
+      } catch { /* unavailable: keep temp-only estimate */ }
+    } else if (recycleBin) {
+      summary.recycleBin = { bytes: 0, items: 0, unsupported: true, platform: process.platform };
     }
     return { ok: true, summary };
   }
@@ -160,22 +178,31 @@ class StorageEngine {
 
     const status = totalLocked > 0 ? 'Warning' : 'Success';
     let msg = `${totalDeleted} arquivo(s) removido(s), ${formatBytes(totalFreed)} liberados (medido).`;
+    if (process.platform !== 'win32') msg += ' (áreas temporárias/cache do usuário no Linux)';
     if (totalLocked > 0) {
       msg += ` ${totalLocked} item(ns) ignorado(s) por estarem em uso${totalDenied ? ` ou exigirem administrador (${totalDenied})` : ''}.`;
     }
 
     let bin = null;
-    if (recycleBin) {
-      const r = await (await this._cleaner()).recycleBin({ apply: true });
-      if (r?.ok) {
-        bin = { items: r.files, bytes: r.bytes, left: r.locked };
-        totalFreed += r.bytes;
-        msg += r.before.items
-          ? ` Lixeira esvaziada: ${r.files} item(ns), ${formatBytes(r.bytes)}${r.locked ? ` (${r.locked} não saíram)` : ''}.`
-          : ' Lixeira já estava vazia.';
-      } else {
-        bin = { error: r?.error || 'falha' };
-        msg += ` Lixeira não esvaziada: ${r?.error || 'falha'}.`;
+    if (recycleBin && process.platform !== 'win32') {
+      bin = { unsupported: true, platform: process.platform, items: 0, bytes: 0 };
+    }
+    if (recycleBin && process.platform === 'win32') {
+      try {
+        const r = await (await this._cleaner()).recycleBin({ apply: true });
+        if (r?.ok) {
+          bin = { items: r.files, bytes: r.bytes, left: r.locked };
+          totalFreed += r.bytes;
+          msg += r.before.items
+            ? ` Lixeira esvaziada: ${r.files} item(ns), ${formatBytes(r.bytes)}${r.locked ? ` (${r.locked} não saíram)` : ''}.`
+            : ' Lixeira já estava vazia.';
+        } else {
+          bin = { error: r?.error || 'falha' };
+          msg += ` Lixeira não esvaziada: ${r?.error || 'falha'}.`;
+        }
+      } catch (e) {
+        bin = { error: e?.message || 'falha' };
+        msg += ` Lixeira não esvaziada: ${e?.message || 'falha'}.`;
       }
     }
 

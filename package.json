@@ -9,28 +9,28 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "dev:admin": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-admin.ps1",
+    "dev:admin": "node scripts/require-win32.mjs dev:admin && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-admin.ps1",
     "dev:legacy": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\"",
     "dev:renderer": "vite",
     "dev:electron": "wait-on http://localhost:5173 && electron .",
-    "build:native": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.LatencyEngine.exe electron\\services\\DarkHub.LatencyEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.FrameLimiter.exe electron\\services\\DarkHub.FrameLimiter.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.ClickEngine.exe electron\\services\\DarkHub.ClickEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.SensorDaemon.exe electron\\services\\DarkHub.SensorDaemon.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.DiskScan.exe electron\\services\\DarkHub.DiskScan.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\hwsensors\\DarkHub.HwSensors.exe /r:electron\\services\\hwsensors\\LibreHardwareMonitorLib.dll /r:System.Management.dll electron\\services\\hwsensors\\DarkHub.HwSensors.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:anycpu /optimize+ /out:electron\\services\\DarkHub.VaultBridgeHost.exe electron\\services\\DarkHub.VaultBridgeHost.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:anycpu /optimize+ /r:System.Web.Extensions.dll /out:electron\\services\\DarkHub.Mcp.exe electron\\services\\DarkHub.Mcp.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:anycpu /optimize+ /out:electron\\services\\DarkHub.HotkeyWatch.exe electron\\services\\DarkHub.HotkeyWatch.cs\"",
+    "build:native": "node scripts/require-win32.mjs build:native && powershell -NoProfile -ExecutionPolicy Bypass -Command \"& C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.LatencyEngine.exe electron\\services\\DarkHub.LatencyEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.FrameLimiter.exe electron\\services\\DarkHub.FrameLimiter.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.ClickEngine.exe electron\\services\\DarkHub.ClickEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.SensorDaemon.exe electron\\services\\DarkHub.SensorDaemon.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.DiskScan.exe electron\\services\\DarkHub.DiskScan.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\hwsensors\\DarkHub.HwSensors.exe /r:electron\\services\\hwsensors\\LibreHardwareMonitorLib.dll /r:System.Management.dll electron\\services\\hwsensors\\DarkHub.HwSensors.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:anycpu /optimize+ /out:electron\\services\\DarkHub.VaultBridgeHost.exe electron\\services\\DarkHub.VaultBridgeHost.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:anycpu /optimize+ /r:System.Web.Extensions.dll /out:electron\\services\\DarkHub.Mcp.exe electron\\services\\DarkHub.Mcp.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:anycpu /optimize+ /out:electron\\services\\DarkHub.HotkeyWatch.exe electron\\services\\DarkHub.HotkeyWatch.cs\"",
     "build:renderer": "vite build",
     "integrity": "node scripts/gen-integrity.mjs",
-    "build:pacer": "set \"RUSTFLAGS=-C target-feature=+crt-static\" && cargo build --release --target x86_64-pc-windows-msvc --manifest-path native_pacer/Cargo.toml --lib && cargo build --release --target i686-pc-windows-msvc --manifest-path native_pacer/Cargo.toml --lib --bins && powershell -NoProfile -Command \"Copy-Item native_pacer/target/x86_64-pc-windows-msvc/release/DarkHub_PacerHook.dll electron/services/DarkHub.PacerHook.x64.dll -Force; Copy-Item native_pacer/target/i686-pc-windows-msvc/release/DarkHub_PacerHook.dll electron/services/DarkHub.PacerHook.x86.dll -Force; Copy-Item native_pacer/target/i686-pc-windows-msvc/release/DarkHub_PacerInject.exe electron/services/DarkHub.PacerInject.x86.exe -Force\"",
+    "build:pacer": "node scripts/require-win32.mjs build:pacer && set \"RUSTFLAGS=-C target-feature=+crt-static\" && cargo build --release --target x86_64-pc-windows-msvc --manifest-path native_pacer/Cargo.toml --lib && cargo build --release --target i686-pc-windows-msvc --manifest-path native_pacer/Cargo.toml --lib --bins && powershell -NoProfile -Command \"Copy-Item native_pacer/target/x86_64-pc-windows-msvc/release/DarkHub_PacerHook.dll electron/services/DarkHub.PacerHook.x64.dll -Force; Copy-Item native_pacer/target/i686-pc-windows-msvc/release/DarkHub_PacerHook.dll electron/services/DarkHub.PacerHook.x86.dll -Force; Copy-Item native_pacer/target/i686-pc-windows-msvc/release/DarkHub_PacerInject.exe electron/services/DarkHub.PacerInject.x86.exe -Force\"",
     "test:pacer": "cargo test --manifest-path native_pacer/Cargo.toml -- --test-threads=1",
-    "build:gpubench": "bash native_gpubench/build-shaders.sh && set \"RUSTFLAGS=-C target-feature=+crt-static\" && cargo build --release --manifest-path native_gpubench/Cargo.toml && powershell -NoProfile -Command \"Copy-Item native_gpubench/target/release/DarkHub_GpuBench.exe electron/services/DarkHub.GpuBench.exe -Force\"",
-    "build:disk": "set \"RUSTFLAGS=-C target-feature=+crt-static\" && cargo build --release --manifest-path native_disk/Cargo.toml && powershell -NoProfile -Command \"Copy-Item native_disk/target/release/DarkHub_DiskRescue.exe electron/services/DarkHub.DiskRescue.exe -Force\"",
+    "build:gpubench": "node scripts/require-win32.mjs build:gpubench && bash native_gpubench/build-shaders.sh && set \"RUSTFLAGS=-C target-feature=+crt-static\" && cargo build --release --manifest-path native_gpubench/Cargo.toml && powershell -NoProfile -Command \"Copy-Item native_gpubench/target/release/DarkHub_GpuBench.exe electron/services/DarkHub.GpuBench.exe -Force\"",
+    "build:disk": "node scripts/require-win32.mjs build:disk && set \"RUSTFLAGS=-C target-feature=+crt-static\" && cargo build --release --manifest-path native_disk/Cargo.toml && powershell -NoProfile -Command \"Copy-Item native_disk/target/release/DarkHub_DiskRescue.exe electron/services/DarkHub.DiskRescue.exe -Force\"",
     "test:disk": "cargo test --manifest-path native_disk/Cargo.toml",
     "test:cleaner": "cargo test --manifest-path native_cleaner/Cargo.toml",
-    "build:cleaner": "set \"RUSTFLAGS=-C target-feature=+crt-static\" && cargo build --release --manifest-path native_cleaner/Cargo.toml && powershell -NoProfile -Command \"Copy-Item native_cleaner/target/release/DarkHub_Cleaner.exe electron/services/DarkHub.Cleaner.exe -Force\"",
-    "build:upscaler": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-realesrgan.ps1",
-    "build:libreoffice": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-libreoffice.ps1",
-    "build:imagetools": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-imagetools.ps1",
-    "build": "npm run build:native && npm run build:pacer && npm run build:disk && npm run build:cleaner && npm run build:upscaler && npm run build:libreoffice && npm run build:imagetools && npm run build:renderer && npm run integrity && electron-builder",
-    "build:setup-sfx": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create-sfx-setup.ps1",
-    "build:setup-nsis": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$nsis=Join-Path $env:LOCALAPPDATA 'electron-builder\\Cache\\nsis\\nsis-3.0.4.1-nsis-3.0.4.1\\Bin\\makensis.exe'; & $nsis installer\\darkhub.nsi\"",
-    "build:setup-inno": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-inno-setup.ps1",
-    "build:portable": "npm run build:renderer && electron-builder --win portable",
+    "build:cleaner": "node scripts/require-win32.mjs build:cleaner && set \"RUSTFLAGS=-C target-feature=+crt-static\" && cargo build --release --manifest-path native_cleaner/Cargo.toml && powershell -NoProfile -Command \"Copy-Item native_cleaner/target/release/DarkHub_Cleaner.exe electron/services/DarkHub.Cleaner.exe -Force\"",
+    "build:upscaler": "node scripts/require-win32.mjs build:upscaler && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-realesrgan.ps1",
+    "build:libreoffice": "node scripts/require-win32.mjs build:libreoffice && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-libreoffice.ps1",
+    "build:imagetools": "node scripts/require-win32.mjs build:imagetools && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-imagetools.ps1",
+    "build": "node scripts/require-win32.mjs build && npm run build:native && npm run build:pacer && npm run build:disk && npm run build:cleaner && npm run build:upscaler && npm run build:libreoffice && npm run build:imagetools && npm run build:renderer && npm run integrity && electron-builder",
+    "build:setup-sfx": "node scripts/require-win32.mjs build:setup-sfx && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create-sfx-setup.ps1",
+    "build:setup-nsis": "node scripts/require-win32.mjs build:setup-nsis && powershell -NoProfile -ExecutionPolicy Bypass -Command \"$nsis=Join-Path $env:LOCALAPPDATA 'electron-builder\\Cache\\nsis\\nsis-3.0.4.1-nsis-3.0.4.1\\Bin\\makensis.exe'; & $nsis installer\\darkhub.nsi\"",
+    "build:setup-inno": "node scripts/require-win32.mjs build:setup-inno && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-inno-setup.ps1",
+    "build:portable": "node scripts/require-win32.mjs build:portable && npm run build:renderer && electron-builder --win portable",
     "test:unit": "vitest run",
     "map": "python \"D:/Workspace/NexusOrchestrator/pytools/electron_feature_map.py\" --project . && graphify update .",
     "map:find": "python \"D:/Workspace/NexusOrchestrator/pytools/electron_feature_map.py\" --project . --find",
@@ -198,7 +198,20 @@
           "darkhub"
         ]
       }
-    ]
+    ],
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "target": [
+        "AppImage",
+        "deb",
+        "dir"
+      ],
+      "artifactName": "${productName}-${version}-linux-${arch}.${ext}"
+    },
+    "appImage": {
+      "artifactName": "${productName}-${version}-${arch}.AppImage"
+    }
   },
   "repository": {
     "type": "git",

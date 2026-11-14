@@ -88,7 +88,21 @@ export class GpuBenchService {
   }
 
   status() {
-    return { ok: true, engine: fs.existsSync(this.exe), running: Boolean(this.engine), linked: Boolean(this._token()), canStoreToken: Boolean(this.safeStorage?.isEncryptionAvailable?.()), hub: this.hubUrl(), runs: this.history(), stress: this.stressHistory() }
+    const supported = process.platform === 'win32'
+    return {
+      ok: true,
+      supported,
+      unsupported: !supported,
+      platform: process.platform,
+      reason: supported ? undefined : 'windows-only',
+      engine: supported ? fs.existsSync(this.exe) : false,
+      running: Boolean(this.engine),
+      linked: Boolean(this._token()),
+      canStoreToken: Boolean(this.safeStorage?.isEncryptionAvailable?.()),
+      hub: this.hubUrl(),
+      runs: this.history(),
+      stress: this.stressHistory()
+    }
   }
 
   /** Where the engine draws, in physical pixels of the app window. Remembered: the screen may report it before the engine is up. */
@@ -172,6 +186,7 @@ export class GpuBenchService {
   _sensorSample() { return sampleGpu(this.hardware?.snapshot?.()) }
 
   async run({ ranked = false, quick = false, label = '', parent = null } = {}) {
+    if (process.platform !== 'win32' && this.spawnImpl === spawn) return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Benchmark de GPU (D3D12/DXR) é suportado apenas no Windows.' }
     if (this.engine) return { ok: false, error: 'already_running' }
     if (!fs.existsSync(this.exe)) return { ok: false, error: 'engine_missing' }
     if (ranked && !this._token()) return { ok: false, error: 'not_linked' }
@@ -237,6 +252,7 @@ export class GpuBenchService {
    * each loop: it must match the reference taken at the start. `loopMs` exists for tests; the screen never sets it.
    */
   async stress(options = {}, { loopMs = LOOP_MS, warmMs = WARM_MS, parent = null } = {}) {
+    if (process.platform !== 'win32' && this.spawnImpl === spawn) return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Stress de GPU (D3D12) é suportado apenas no Windows.' }
     if (this.engine) return { ok: false, error: 'already_running' }
     if (!fs.existsSync(this.exe)) return { ok: false, error: 'engine_missing' }
     if (this._engineIntegrity()) return { ok: false, error: 'integrity_failed' }

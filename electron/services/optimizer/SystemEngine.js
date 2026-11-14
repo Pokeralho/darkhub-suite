@@ -19,7 +19,7 @@ import {
   parseMarkedOutput
 } from './OptimizerUtils.js';
 
-const NOT_WINDOWS = { ok: false, error: 'Only Windows supported' };
+const NOT_WINDOWS = { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
 const BCD_EXTRA = 'sys:bcd';
 const LASTACCESS_EXTRA = 'sys:lastaccess';
 const NETWORK_EXTRA = 'sys:networkExtreme';
@@ -75,7 +75,19 @@ Write-Output ('DHRP|' + $after.SequenceNumber)`;
    * file and the temp folders (measured). It does NOT "clean the registry" of orphan keys - that is not safe nor useful.
    */
   async cleanRegistryAndTemp() {
-    if (process.platform !== 'win32') return NOT_WINDOWS;
+    if (process.platform !== 'win32') {
+      const temp = await StorageEngine.cleanTempFiles();
+      return {
+        ok: Boolean(temp?.ok),
+        unsupported: true,
+        partial: true,
+        platform: process.platform,
+        reason: 'windows-only',
+        freedBytes: temp?.freedBytes || 0,
+        msg: `Limpeza de histórico/registro do Windows indisponível nesta plataforma. ${temp?.msg || 'Arquivos temporários verificados.'}`,
+        error: temp?.ok ? undefined : (temp?.error || 'Nada pôde ser limpo.')
+      };
+    }
     const script = `
 $ErrorActionPreference = 'SilentlyContinue'
 $base = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer'

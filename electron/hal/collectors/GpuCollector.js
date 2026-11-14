@@ -40,15 +40,29 @@ class GpuCollector extends BaseCollector {
   _ensureStaticData() {
     if (this._staticStarted) return;
     this._staticStarted = true;
-    si.graphics()
-      .then((graphics) => {
+    const load = async () => {
+      try {
+        const graphics = await si.graphics();
         if (!graphics || !Array.isArray(graphics.controllers)) return;
         this._staticGpus = graphics.controllers
-          .filter((c) => !/basic render|remote display|virtual/i.test(`${c.vendor} ${c.model}`))
-          .map((c) => ({ name: `${c.vendor || ''} ${c.model || ''}`.trim(), vram: c.vram || 0 }));
+          .filter((c) => !/basic render|remote display|virtual|llvmpipe|software/i.test(`${c.vendor} ${c.model}`))
+          .map((c) => {
+            // si vram may be in MB or other units depending on platform; keep sane values
+            let vram = Number(c.vram) || 0;
+            if (vram > 0 && vram < 64) vram = Math.round(vram * 1024); // likely GB
+            return { name: `${c.vendor || ''} ${c.model || ''}`.trim(), vram };
+          });
         this._staticStamp = Date.now();
-      })
-      .catch((err) => Logger.warn('GpuCollector', 'Falha ao buscar dados estáticos de GPU', err.message));
+      } catch (err) {
+        Logger.warn('GpuCollector', 'Falha ao buscar dados estáticos de GPU', err.message);
+      }
+    };
+    load();
+    // refresh periodically to pick up late info on Linux
+    if (process.platform === 'linux') {
+      this._staticRefresh = setInterval(load, 30000);
+      if (this._staticRefresh.unref) this._staticRefresh.unref();
+    }
   }
 
   poll() {

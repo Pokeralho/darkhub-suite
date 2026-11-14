@@ -128,6 +128,7 @@ class DnsEngine {
   }
 
   async getActiveAdapter() {
+    if (process.platform !== 'win32') return null;
     const ps = `
 $ErrorActionPreference='Stop'
 $a = Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | Sort-Object -Property LinkSpeed -Descending | Select-Object -First 1
@@ -147,7 +148,21 @@ try { $static = (Get-ItemProperty -LiteralPath ('HKLM:\\SYSTEM\\CurrentControlSe
   }
 
   async getState() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' };
+    if (process.platform !== 'win32') {
+      try {
+        const fs = await import('node:fs/promises');
+        let servers = [];
+        try {
+          const txt = await fs.readFile('/etc/resolv.conf', 'utf8');
+          servers = txt.split(/\r?\n/).map((l) => l.trim()).filter((l) => /^nameserver\s+/i.test(l)).map((l) => l.split(/\s+/)[1]).filter((ip) => isValidIpv4(ip));
+        } catch {}
+        // dedupe preserving order
+        servers = [...new Set(servers)];
+        return { ok: true, adapter: 'system', servers, isStatic: null, partial: true, platform: process.platform, data: { adapter: 'system', servers, isStatic: null } };
+      } catch (err) {
+        return { ok: false, error: err?.message ?? String(err) };
+      }
+    }
     try {
       const adapter = await this.getActiveAdapter();
       if (!adapter) return { ok: false, error: 'Nenhum adaptador de rede físico ativo encontrado' };
@@ -160,7 +175,7 @@ try { $static = (Get-ItemProperty -LiteralPath ('HKLM:\\SYSTEM\\CurrentControlSe
 
   /** Applies DNS on the active adapter (needs administrator), reads it back and keeps a persistent undo. */
   async apply({ primary, secondary } = {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     if (!isUsableDnsServer(primary) || !isUsableDnsServer(secondary)) return { ok: false, error: 'IP de servidor DNS inválido' };
     try {
       const adapter = await this.getActiveAdapter();
@@ -201,7 +216,7 @@ try { $static = (Get-ItemProperty -LiteralPath ('HKLM:\\SYSTEM\\CurrentControlSe
   }
 
   async undo({ undoToken } = {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const entry = (undoToken && DeepTweaksEngine.getExtra(undoToken)) || DeepTweaksEngine.getExtra('dns:last');
     if (!entry) return { ok: false, error: 'Undo token inválido ou expirado' };
     try {

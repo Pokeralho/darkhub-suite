@@ -737,13 +737,13 @@ Operations that only wrap built-in tweaks are installed as those tweaks.
 
 **Limpar Cache de DNS** · risk: low · one-time action · any package
 
-Limpa o cache local do resolvedor de DNS (ipconfig /flushdns). Útil se um site não abre após troca de IP; não acelera a internet.
+Limpa o cache local do resolvedor de DNS. Útil se um site não abre após troca de IP; não acelera a internet.
 
 ### `darkhub:op:cleanTemp`
 
 **Limpar Arquivos Temporários** · risk: low · one-time action · any package
 
-Apaga arquivos temporários (TEMP do usuário, Windows\Temp, cache de download do Windows Update, minidumps) e esvazia a Lixeira de todas as unidades. Arquivos em uso são ignorados e o espaço liberado é medido de verdade. A manutenção agendada e os presets do Hub não mexem na Lixeira.
+Apaga arquivos temporários seguros do usuário (XDG cache/tmp da sessão e /tmp quando permitido), ignorando arquivos em uso e preservando caches sensíveis. No Linux a Lixeira do Windows não é usada.
 
 ### `darkhub:op:optimizeRAM`
 

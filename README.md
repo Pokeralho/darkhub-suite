@@ -209,8 +209,10 @@ Code map for contributors: [docs/PROJECT_MAP.md](./docs/PROJECT_MAP.md). Design 
 
 ## Building from source
 
+### Windows (full development)
+
 Prerequisites: Windows 10/11 x64, Node.js 22 LTS, npm 10, .NET Framework 4.x (for the C# helpers), Rust/cargo
-(only to rebuild `native_pacer`).
+(only to rebuild native crates/helpers).
 
 ```bash
 git clone https://github.com/Pokeralho/darkhub-suite.git
@@ -225,7 +227,32 @@ npm run selftest       # every screen and read-only backend channel on this mach
 npm run build          # native helpers + renderer + installer
 ```
 
-Installers are written to `dist_release/` (`DarkHub Setup x.y.z.exe` and `DarkHub x.y.z-portable.exe`).
+Windows installers are written to `dist_release/` (`DarkHub Setup x.y.z.exe` and `DarkHub x.y.z-portable.exe`).
+
+### Linux/Ubuntu (incremental, capability-gated)
+
+Linux support is being added incrementally (Option A: keep Electron/React + stable IPC/preload contracts and gate
+Windows-only capabilities with structured `{ ok:false, unsupported, platform, reason }` responses). The app/UI can run
+for development on Ubuntu, but many system-changing features remain Windows-only.
+
+```bash
+git clone https://github.com/Pokeralho/darkhub-suite.git
+cd darkhub-suite
+npm install
+# Ensure ELECTRON_SKIP_BINARY_DOWNLOAD is unset so Electron's binary is installed for `npm run dev`
+node node_modules/electron/install.js  # if needed
+
+npm run dev
+npx tsc --noEmit -p .
+npx vitest run --pool=forks --maxWorkers=2
+npx vite build
+```
+
+Notes: Windows-native helpers/daemons, registry/services/Defender/power/HAGS tweaks, frame pacing/overlay,
+OptiScaler/Limiter/capture and other Windows-coupled features report as unsupported on Linux. `cargo check` is
+validated on Linux for `native_cleaner`, `native_disk`, `native_pacer`, and `native_gpubench` (gpubench runtime is
+gated to Windows). electron-builder Linux targets (AppImage/deb/dir) are configured for packaging experiments; runtime
+capability parity is still in progress.
 
 **Where things are.** Contributor docs live in [.github/](./.github) (CONTRIBUTING, SECURITY) and [docs/](./docs)
 (design rules, translations, project map). Instructions for AI coding assistants are in [docs/AGENTS.md](./docs/AGENTS.md)

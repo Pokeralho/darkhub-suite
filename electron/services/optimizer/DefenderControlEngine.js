@@ -49,7 +49,7 @@ Write-Output 'DKRESTORE-OK'`;
  */
 class DefenderControlEngine {
   async getStatus() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Controle do Microsoft Defender é suportado apenas no Windows.' };
     try {
       const script = `
 $ErrorActionPreference = 'SilentlyContinue'
@@ -86,7 +86,7 @@ if ($null -ne $wmi.IsTamperProtected) { $tamper = [bool]$wmi.IsTamperProtected }
   }
 
   async runNativeDefenderControl(action = 'disable') {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Controle do Microsoft Defender é suportado apenas no Windows.' };
     if (action !== 'disable' && action !== 'enable') return { ok: false, error: 'Ação inválida' };
     Logger.info('DefenderControlEngine', `Controle do Defender (${action})`);
 
@@ -147,7 +147,7 @@ if ($null -ne $wmi.IsTamperProtected) { $tamper = [bool]$wmi.IsTamperProtected }
    * override, and asks for a reboot. Elevated; a single UAC prompt. Does NOT reinstall removed capabilities/FODs.
    */
   async restoreImageDefender() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Restaurar o Defender no nível da imagem é suportado apenas no Windows.' };
     const before = await this.getStatus();
     if (before.ok && !before.status?.imageLevelRemoved) {
       return { ok: false, error: 'Este sistema não teve o Defender removido no nível da imagem (marcador DarkOS ausente). Use o botão de proteção em tempo real.' };
@@ -169,7 +169,7 @@ if ($null -ne $wmi.IsTamperProtected) { $tamper = [bool]$wmi.IsTamperProtected }
 
   /** Synchronous on purpose (callers do not await it): opens Windows Security > Tamper Protection page, not elevated. */
   openTamperSettings() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Configurações do Microsoft Defender são suportadas apenas no Windows.' };
     try {
       const child = spawn('cmd.exe', ['/c', 'start', '', 'windowsdefender://threatsettings'], { windowsHide: true, detached: true, stdio: 'ignore' });
       child.once('error', (e) => Logger.warn('DefenderControlEngine', 'Falha ao abrir a Segurança do Windows', e));

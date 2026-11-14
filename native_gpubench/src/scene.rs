@@ -1,3 +1,4 @@
+#![cfg(windows)]
 //! The benchmark scene. Mirrors electron/services/gpubench/sceneModel.js exactly (tests/gpuBenchScene.test.ts).
 
 pub const GRID: u32 = 64;

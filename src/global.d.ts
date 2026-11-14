@@ -499,6 +499,16 @@ export interface DarkHubAPI {
   };
   app: {
     getAbout: () => Promise<any>;
+    getCapabilities: () => Promise<{
+      ok: boolean;
+      platform: string;
+      isWindows: boolean;
+      isLinux: boolean;
+      isMac: boolean;
+      latency: { level: 'supported' | 'partial' | 'unsupported'; supported: boolean; reason?: string; error?: string };
+      hags: { level: 'supported' | 'partial' | 'unsupported'; supported: boolean; reason?: string; error?: string };
+      darkos: { level: 'supported' | 'partial' | 'unsupported'; supported: boolean; reason?: string; error?: string };
+    }>;
     getResourceUsage: () => Promise<
       | { ok: true; totalCpuPercent: number; totalWorkingSetMb: number; processes: Array<{ pid: number; type: string; name: string; cpuPercent: number; workingSetMb: number }> }
       | { ok: false; error: string }
@@ -565,9 +575,9 @@ export interface DarkHubAPI {
     setGpuPreference: (payload: { appPath: string; preference: 'high_performance' | 'power_saving' | 'default' }) => Promise<{ ok: boolean; msg?: string; error?: string }>;
     removeGpuPreference: (payload: { appPath: string }) => Promise<{ ok: boolean; msg?: string; error?: string }>;
     getGpuInfo: () => Promise<{ ok: boolean; controllers?: Array<{ model: string; vendor: string; vram: number; bus: string; isDedicated: boolean }>; error?: string }>;
-    getHagsStatus: () => Promise<{ ok: boolean; enabled: boolean; value: string; error?: string }>;
-    setHagsStatus: (payload: { enabled: boolean }) => Promise<{ ok: boolean; msg?: string; error?: string }>;
-    revertHags: () => Promise<{ ok: boolean; msg?: string; error?: string }>;
+    getHagsStatus: () => Promise<{ ok: boolean; enabled?: boolean; value?: string; state?: 'on' | 'off' | 'default' | 'unknown'; unsupported?: boolean; platform?: string; reason?: string; error?: string }>;
+    setHagsStatus: (payload: { enabled: boolean }) => Promise<{ ok: boolean; msg?: string; verified?: boolean; requiresReboot?: boolean; unsupported?: boolean; platform?: string; reason?: string; error?: string }>;
+    revertHags: () => Promise<{ ok: boolean; msg?: string; verified?: boolean; requiresReboot?: boolean; unsupported?: boolean; platform?: string; reason?: string; error?: string }>;
     deepTweaksList: () => Promise<any>;
     deepTweaksStatus: () => Promise<{ ok: boolean; status: Record<string, boolean> }>;
     deepTweaksAnalyze: (payload: { tweakIds: string[] }) => Promise<any>;

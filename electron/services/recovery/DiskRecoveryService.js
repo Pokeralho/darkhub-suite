@@ -17,7 +17,8 @@ export function normalizeTarget(t) {
   const s = String(t ?? '').trim();
   const m = /^(?:disk:|\\\\\.\\physicaldrive)(\d{1,2})$/i.exec(s);
   if (m) return `disk:${Number(m[1])}`;
-  if (s && path.isAbsolute(s) && !s.startsWith('-') && !/[\r\n"]/.test(s)) return s;
+  const isWinAbs = /^[A-Za-z]:[\\/]/.test(s) || /^\\\\/.test(s);
+  if (s && (path.isAbsolute(s) || isWinAbs) && !s.startsWith('-') && !/[\r\n"]/.test(s)) return s;
   throw new Error('Alvo inválido: escolha um disco ou um arquivo de imagem.');
 }
 

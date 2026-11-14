@@ -168,18 +168,11 @@ export async function ensureFfmpeg(toolsDir, platform) {
     }
   } catch {}
 
-  if (platform === 'win32') {
-    try {
-      // async lookup: execSync here blocked the Electron main process
-      const stdout = await new Promise((resolve, reject) => {
-        execFile('where.exe', ['ffmpeg'], { windowsHide: true, encoding: 'utf8', timeout: 5000 }, (err, out) => (err ? reject(err) : resolve(out)))
-      })
-      const whereOut = String(stdout ?? '').trim().split(/\r?\n/)[0]
-      if (whereOut && fsRaw.existsSync(whereOut)) {
-        return whereOut
-      }
-    } catch {}
-  }
+  try {
+    const { findOnPath } = await import('./services/binResolver.js')
+    const onPath = await findOnPath('ffmpeg', platform)
+    if (onPath) return onPath
+  } catch {}
 
   return dest
 }

@@ -57,6 +57,7 @@ class SystemOptimizerService {
       requiresAdmin: defs.some((d) => d.requiresAdmin),
       requiresReboot: defs.some((d) => d.requiresReboot),
       securityRelated: defs.some((d) => d.securityRelated),
+      supportedPlatforms: ['win32'],
       risk,
       ...def,
       description: def.description || defs.map((d) => d.description).join(' '),
@@ -69,14 +70,24 @@ class SystemOptimizerService {
   }
 
   _op(def) {
-    this.operations.set(def.id, {
+    const op = {
       compatibility: 'Windows 10/11',
       estimatedTimeMs: 500,
       requiresReboot: false,
       isReversible: false,
       securityRelated: false,
+      supportedPlatforms: ['win32'],
       ...def
-    });
+    };
+    op.supportedPlatforms = Array.isArray(op.supportedPlatforms) && op.supportedPlatforms.length
+      ? op.supportedPlatforms
+      : ['win32'];
+    this.operations.set(def.id, op);
+  }
+
+  _isOpSupported(op, platform = process.platform) {
+    const list = Array.isArray(op?.supportedPlatforms) ? op.supportedPlatforms : ['win32'];
+    return list.includes(platform);
   }
 
   registerOperations() {
@@ -84,11 +95,13 @@ class SystemOptimizerService {
     this._op({
       id: 'optimizer:flushDns',
       name: 'Limpar Cache de DNS',
-      description: 'Limpa o cache local do resolvedor de DNS (ipconfig /flushdns). Útil se um site não abre após troca de IP; não acelera a internet.',
-      technicalDescription: 'Executa "ipconfig /flushdns" e confere o código de saída.',
+      description: 'Limpa o cache local do resolvedor de DNS. Útil se um site não abre após troca de IP; não acelera a internet.',
+      technicalDescription: 'No Windows executa "ipconfig /flushdns". No Linux usa resolvectl/systemd-resolve quando disponível.',
       category: 'network',
       risk: 'safe',
       requiresAdmin: false,
+      supportedPlatforms: ['win32', 'linux'],
+      compatibility: 'Windows 10/11, Linux',
       estimatedTimeMs: 200,
       execute: async () => adaptResult(await NetworkEngine.flushDns(), { resources: ['DNS Cache'] })
     });
@@ -96,15 +109,21 @@ class SystemOptimizerService {
     this._op({
       id: 'optimizer:cleanTemp',
       name: 'Limpar Arquivos Temporários',
-      description: 'Apaga arquivos temporários (TEMP do usuário, Windows\\Temp, cache de download do Windows Update, minidumps) e esvazia a Lixeira de todas as unidades. Arquivos em uso são ignorados e o espaço liberado é medido de verdade. A manutenção agendada e os presets do Hub não mexem na Lixeira.',
-      technicalDescription: 'Varre recursivamente %TEMP%, %WINDIR%\\Temp, SoftwareDistribution\\Download, Minidump e CrashDumps preservando caches de shader. A Lixeira é medida e esvaziada pela API do Windows (SHQueryRecycleBin/SHEmptyRecycleBin) via DarkHub.Cleaner.exe. Pastas do sistema podem exigir administrador.',
+      description: process.platform === 'linux'
+        ? 'Apaga arquivos temporários seguros do usuário (XDG cache/tmp da sessão e /tmp quando permitido), ignorando arquivos em uso e preservando caches sensíveis. No Linux a Lixeira do Windows não é usada.'
+        : 'Apaga arquivos temporários (TEMP do usuário, Windows\\Temp, cache de download do Windows Update, minidumps) e esvazia a Lixeira de todas as unidades. Arquivos em uso são ignorados e o espaço liberado é medido de verdade. A manutenção agendada e os presets do Hub não mexem na Lixeira.',
+      technicalDescription: process.platform === 'linux'
+        ? 'Limpa diretórios temporários/caches permitidos do usuário no Linux, sem operações de Lixeira/Win32.'
+        : 'Varre recursivamente %TEMP%, %WINDIR%\\Temp, SoftwareDistribution\\Download, Minidump e CrashDumps preservando caches de shader. A Lixeira é medida e esvaziada pela API do Windows (SHQueryRecycleBin/SHEmptyRecycleBin) via DarkHub.Cleaner.exe. Pastas do sistema podem exigir administrador.',
       category: 'storage',
       risk: 'safe',
       requiresAdmin: false,
+      supportedPlatforms: ['win32', 'linux'],
+      compatibility: 'Windows 10/11, Linux (usuário)',
       estimatedTimeMs: 1500,
-      // From the Optimizer screen (optimizer:run passes eventSender) the user clicked: the Recycle Bin is included.
-      // Hub packages call execute() with no arguments and keep it.
-      execute: async (eventSender) => adaptResult(await StorageEngine.cleanTempFiles({ recycleBin: typeof eventSender === 'function' }), { resources: ['Temp folders', 'Recycle Bin'] })
+      // From the Optimizer screen (optimizer:run passes eventSender) the user clicked: the Recycle Bin is included on Windows.
+      // Hub packages call execute() with no arguments and keep it. Linux never touches a Windows recycle bin.
+      execute: async (eventSender) => adaptResult(await StorageEngine.cleanTempFiles({ recycleBin: process.platform === 'win32' && typeof eventSender === 'function' }), { resources: process.platform === 'linux' ? ['User temp/cache'] : ['Temp folders', 'Recycle Bin'] })
     });
 
     this._op({
@@ -641,6 +660,7 @@ class SystemOptimizerService {
   }
 
   _publicOp(op) {
+    const supportedPlatforms = Array.isArray(op.supportedPlatforms) && op.supportedPlatforms.length ? op.supportedPlatforms : ['win32'];
     return {
       id: op.id,
       name: op.name,
@@ -658,13 +678,16 @@ class SystemOptimizerService {
       isRevert: Boolean(op.isRevert),
       revertOf: op.revertOf || null,
       compatibility: op.compatibility,
-      estimatedTimeMs: op.estimatedTimeMs
+      estimatedTimeMs: op.estimatedTimeMs,
+      supportedPlatforms,
+      supported: supportedPlatforms.includes(process.platform)
     };
   }
 
   /** applied: true/false from the REAL system state when it can be known, null for one-shot actions. */
   async _appliedState(op, statusMap, ctx = this._statusContext()) {
     try {
+      if (!this._isOpSupported(op)) return null;
       if (op.isRevert) return null;
       if (op.statusFn) return await op.statusFn(ctx);
       if (op.statusExtra) return Boolean(DeepTweaksEngine.getExtra(op.statusExtra));
@@ -754,11 +777,18 @@ class SystemOptimizerService {
   }
 
   async validateTaskCompatibility(id) {
-    if (process.platform !== 'win32') {
-      return { ok: false, error: 'O otimizador é compatível apenas com sistemas operacionais Windows.' };
-    }
     const op = this.operations.get(id);
     if (!op) return { ok: false, error: `A operação '${id}' não foi encontrada.` };
+    if (!this._isOpSupported(op)) {
+      return {
+        ok: false,
+        unsupported: true,
+        platform: process.platform,
+        reason: 'platform-unsupported',
+        supportedPlatforms: Array.isArray(op.supportedPlatforms) ? op.supportedPlatforms : ['win32'],
+        error: `A operação '${id}' não é suportada nesta plataforma.`
+      };
+    }
     return { ok: true };
   }
 
@@ -797,26 +827,47 @@ class SystemOptimizerService {
         try {
           Logger.info('SystemOptimizer', `[EXEC] Executando: ${id}`);
           const comp = await this.validateTaskCompatibility(id);
-          if (!comp.ok) throw new Error(comp.error);
-
-          const raw = await op.execute(eventSender);
-          const output = raw && raw.status ? raw : adaptResult(raw);
-          const durationMs = Date.now() - start;
-          const standardOut = {
-            ok: output.status === 'Success' || output.status === 'Warning',
-            status: output.status || 'Success',
-            msg: output.message || 'Operação realizada com sucesso.',
-            error: output.error || undefined,
-            durationMs,
-            affectedResources: output.affectedResources || [],
-            processedItems: output.processedItems || 0,
-            savingsBytes: output.savingsBytes || 0,
-            requiresReboot: Boolean(output.requiresReboot),
-            verified: output.verified
-          };
-          results[index] = { id, ok: standardOut.ok, error: standardOut.error, output: standardOut, durationMs };
-          Logger.info('SystemOptimizer', `[DONE] Concluído: ${id} em ${durationMs}ms | Status: ${standardOut.status}`);
-          Logger.auditOptimizer({ type: 'operation', runId, opId: id, ok: standardOut.ok, status: standardOut.status, message: standardOut.msg, error: standardOut.error, durationMs, affectedResources: standardOut.affectedResources, processedItems: standardOut.processedItems });
+          if (!comp.ok) {
+            const durationMs = Date.now() - start;
+            const out = {
+              ok: false,
+              unsupported: Boolean(comp.unsupported),
+              platform: comp.platform || process.platform,
+              reason: comp.reason,
+              supportedPlatforms: comp.supportedPlatforms,
+              status: comp.unsupported ? 'Unsupported' : 'Error',
+              error: comp.error,
+              message: comp.error,
+              durationMs,
+              affectedResources: [],
+              processedItems: 0
+            };
+            results[index] = { id, ok: false, error: comp.error, unsupported: out.unsupported, platform: out.platform, reason: out.reason, supportedPlatforms: out.supportedPlatforms, output: out, durationMs };
+            Logger.auditOptimizer({ type: 'operation', runId, opId: id, ok: false, status: out.status, error: comp.error, durationMs, unsupported: out.unsupported, platform: out.platform });
+          } else {
+            const raw = await op.execute(eventSender);
+            const output = raw && raw.status ? raw : adaptResult(raw);
+            const durationMs = Date.now() - start;
+            const standardOut = {
+              ok: output.status === 'Success' || output.status === 'Warning',
+              unsupported: Boolean(output.unsupported),
+              platform: output.platform,
+              reason: output.reason,
+              status: output.status || 'Success',
+              msg: output.message || output.msg || 'Operação realizada com sucesso.',
+              message: output.message || output.msg || 'Operação realizada com sucesso.',
+              error: output.error || undefined,
+              durationMs,
+              affectedResources: output.affectedResources || [],
+              processedItems: output.processedItems || 0,
+              savingsBytes: output.savingsBytes || 0,
+              requiresReboot: Boolean(output.requiresReboot),
+              verified: output.verified
+            };
+            results[index] = { id, ok: standardOut.ok, error: standardOut.error, output: standardOut, durationMs };
+            Logger.info('SystemOptimizer', `[DONE] Concluído: ${id} em ${durationMs}ms | Status: ${standardOut.status}`);
+            Logger.auditOptimizer({ type: 'operation', runId, opId: id, ok: standardOut.ok, status: standardOut.status, message: standardOut.msg, error: standardOut.error, durationMs, affectedResources: standardOut.affectedResources, processedItems: standardOut.processedItems });
+          }
         } catch (e) {
           const durationMs = Date.now() - start;
           Logger.error('SystemOptimizer', `[FAIL] Falha crítica na tarefa: ${id}`, e);

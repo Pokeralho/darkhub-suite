@@ -78,6 +78,7 @@ import { registerKakuganIPC } from './ipc/kakuganIpc.js'
 import { registerHubIPC } from './ipc/hubIpc.js'
 import { registerUpscaleIPC } from './ipc/upscaleIpc.js'
 import { registerMetadataIPC } from './ipc/metadataIpc.js'
+import { getCapabilities } from './capabilities.js'
 import { SYSTEM_TAR } from './services/SecureDownload.js'
 import { createFramePacerOverlay, closeFramePacerOverlay, toggleFramePacerOverlay, setOverlayClickThrough, setOverlayConfig, getOverlayStatus } from './services/FramePacerOverlay.js'
 protocol.registerSchemesAsPrivileged([
@@ -183,31 +184,26 @@ async function getExiftool() {
 async function getFfmpegPath() {
   if (ffmpegStaticPromise) return ffmpegStaticPromise
   ffmpegStaticPromise = (async () => {
+    const { platformBinaryName, fileExists, findOnPath } = await import('./services/binResolver.js')
     try {
       const toolsDir = path.join(app.getPath ? app.getPath('userData') : '', 'tools')
       const { ensureFfmpeg } = await getYtDlpTools()
       if (typeof ensureFfmpeg === 'function') {
         const p = await ensureFfmpeg(toolsDir, process.platform)
-        if (p && fsRaw.existsSync(p)) return p
+        if (fileExists(p)) return p
       }
     } catch {}
 
-    try {
-      const { code, stdout } = await runCommand('where.exe', ['ffmpeg'], { timeoutMs: 5000 })
-      const whereOut = code === 0 ? String(stdout ?? '').trim().split(/\r?\n/)[0] : ''
-      if (whereOut && fsRaw.existsSync(whereOut)) return whereOut
-    } catch {}
-
-    const localBin = path.join(app.getPath ? app.getPath('userData') : '', 'tools', 'ffmpeg.exe')
-    if (fsRaw.existsSync(localBin)) return localBin
+    const localBin = path.join(app.getPath ? app.getPath('userData') : '', 'tools', platformBinaryName('ffmpeg'))
+    if (fileExists(localBin)) return localBin
 
     try {
       const mod = await import('ffmpeg-static')
       const p = mod.default ?? mod
-      if (p && fsRaw.existsSync(p)) return p
+      if (fileExists(p)) return p
     } catch {}
 
-    return null
+    return await findOnPath('ffmpeg')
   })()
   return ffmpegStaticPromise
 }
@@ -281,11 +277,23 @@ const LATENCY_CHANNELS = [
   'latency:enableUltra', 'latency:enableUltraStable', 'latency:disableUltra', 'latency:toggleUltra',
   'latency:boostNow', 'latency:launchGameWithProfile'
 ]
-for (const ch of LATENCY_CHANNELS) {
-  ipcMain.handle(ch, async () => ({
+const latencyDisabledPayload = () => {
+  const supported = process.platform === 'win32'
+  return {
     ok: false,
-    error: latencyServiceState === 'disabled' ? 'latency-service-disabled' : 'latency-service-starting'
-  }))
+    unsupported: !supported,
+    platform: process.platform,
+    reason: supported ? 'disabled' : 'windows-only',
+    error: supported ? 'latency-service-disabled' : 'Ultra Low Latency is only supported on Windows.'
+  }
+}
+for (const ch of LATENCY_CHANNELS) {
+  ipcMain.handle(ch, async () => {
+    if (latencyServiceState === 'starting' && process.platform === 'win32') {
+      return { ok: false, platform: process.platform, error: 'latency-service-starting' }
+    }
+    return latencyDisabledPayload()
+  })
 }
 
 function normalizeAccessPath(input) {
@@ -414,14 +422,15 @@ function isTrustedAppNavigation(url) {
 
 function getAppIconPath() {
   const candidates = [
-    path.join(process.resourcesPath, 'assets', 'DarkHub.ico'),
-    path.join(process.resourcesPath, 'assets', 'icon.ico'),
-    path.join(process.resourcesPath, 'icon.ico'),
-    path.resolve(__dirname, 'assets', 'icon.ico'),
-    path.resolve(__dirname, '..', 'build', 'icon.ico'),
-    path.resolve(__dirname, '..', 'icon.ico'),
-    path.resolve(__dirname, '..', 'public', 'icon.ico'),
-    path.resolve(__dirname, '..', '..', 'DarkHub', 'assets', 'icon.ico')
+    path.join(process.resourcesPath, 'assets', process.platform === 'win32' ? 'DarkHub.ico' : 'icon.png'),
+    path.join(process.resourcesPath, 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    path.join(process.resourcesPath, process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    path.resolve(__dirname, 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    path.resolve(__dirname, '..', 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    path.resolve(__dirname, '..', 'build', 'icon.png'),
+    path.resolve(__dirname, '..', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    path.resolve(__dirname, '..', 'public', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    path.resolve(__dirname, '..', '..', 'DarkHub', 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png')
   ]
 
   return candidates.find((candidate) => fsRaw.existsSync(candidate)) || null
@@ -441,30 +450,35 @@ function showMainWindow() {
 }
 
 function ensureTray() {
-  if (tray || process.platform !== 'win32') return
-
+  if (tray || process.platform === 'darwin') return
+  // Tray support varies by Linux desktop environment; create it when an icon is available but don't fail boot.
   const iconPath = getAppIconPath()
   if (!iconPath) {
     log.warn('Tray icon not found; background tray skipped')
     return
   }
 
-  tray = new Tray(iconPath)
-  tray.setToolTip('DarkHub')
-  tray.setContextMenu(Menu.buildFromTemplate([
-    {
-      label: 'Abrir DarkHub',
-      click: () => showMainWindow()
-    },
-    {
-      label: 'Sair',
-      click: () => {
-        appIsQuitting = true
-        app.quit()
+  try {
+    tray = new Tray(iconPath)
+    tray.setToolTip('DarkHub')
+    tray.setContextMenu(Menu.buildFromTemplate([
+      {
+        label: 'Abrir DarkHub',
+        click: () => showMainWindow()
+      },
+      {
+        label: 'Sair',
+        click: () => {
+          appIsQuitting = true
+          app.quit()
+        }
       }
-    }
-  ]))
-  tray.on('double-click', () => showMainWindow())
+    ]))
+    tray.on('double-click', () => showMainWindow())
+  } catch (err) {
+    tray = null
+    log.warn('[tray] unavailable on this platform/environment:', err?.message ?? String(err))
+  }
 }
 
 function hideWindowToBackground(win) {
@@ -741,7 +755,9 @@ ipcMain.handle('optimizer:listProfiles', async () => {
 })
 
 ipcMain.handle('optimizer:checkIsAdmin', async () => {
-  return await SystemOptimizerService.checkIsAdmin()
+  if (process.platform !== 'win32') return false
+  const isAdmin = await SystemOptimizerService.checkIsAdmin()
+  return typeof isAdmin === 'object' ? Boolean(isAdmin.isAdmin) : Boolean(isAdmin)
 })
 
 ipcMain.handle('optimizer:createRestorePoint', async () => {
@@ -790,6 +806,7 @@ async function measureLatency(host = '1.1.1.1', timeoutMs = 900) {
 }
 
 async function getActiveAdapterName() {
+  if (process.platform !== 'win32') return ''
   const ps = `
     $ErrorActionPreference='Stop'
     $a = Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | Sort-Object -Property LinkSpeed -Descending | Select-Object -First 1
@@ -835,7 +852,9 @@ ipcMain.handle('system:getInfo', async () => {
   return {
     os: {
       platform: os.platform(),
-      distro: `Windows ${os.release()}`,
+      distro: process.platform === 'win32'
+        ? `Windows ${os.release()}`
+        : (typeof os.version === 'function' && os.version() ? os.version() : `Linux ${os.release()}`),
       release: os.release(),
       build: typeof os.version === 'function' ? os.version() : os.release(),
       arch: os.arch()
@@ -1283,12 +1302,20 @@ async function scanDirectoryForBestExe(dir) {
         const fullPath = path.join(currentDir, file.name);
         if (file.isDirectory()) {
           await walk(fullPath, depth + 1);
-        } else if (file.name.toLowerCase().endsWith('.exe')) {
-          const score = await scoreExecutable(fullPath, names, dir);
-          if (score > bestScore && score > 0) {
-            bestScore = score;
-            bestExe = fullPath;
-          }
+          continue;
+        }
+        const lower = file.name.toLowerCase();
+        const isCandidate = process.platform === 'win32'
+          ? lower.endsWith('.exe')
+          : (lower.endsWith('.sh') || (!lower.includes('.') && !file.name.startsWith('.')));
+        if (!isCandidate) continue;
+        if (process.platform !== 'win32') {
+          try { await fs.access(fullPath, fsRaw.constants?.X_OK ?? 1); } catch { continue; }
+        }
+        const score = await scoreExecutable(fullPath, names, dir);
+        if (score > bestScore && score > 0) {
+          bestScore = score;
+          bestExe = fullPath;
         }
       }
     } catch(e) {}
@@ -1301,21 +1328,36 @@ ipcMain.handle('library:discover', async () => {
   const discovered = [];
 
   try {
-    const steamPaths = [
-      'C:\\Program Files (x86)\\Steam\\steamapps\\common',
-      'C:\\Program Files\\Steam\\steamapps\\common',
-      path.join(os.homedir(), 'Steam', 'steamapps', 'common'),
-    ];
-    const vdfPaths = [
-      'C:\\Program Files (x86)\\Steam\\steamapps\\libraryfolders.vdf',
-      'C:\\Program Files\\Steam\\steamapps\\libraryfolders.vdf',
-    ];
+    const home = os.homedir();
+    const steamPaths = process.platform === 'win32'
+      ? [
+          'C:\\Program Files (x86)\\Steam\\steamapps\\common',
+          'C:\\Program Files\\Steam\\steamapps\\common',
+          path.join(home, 'Steam', 'steamapps', 'common'),
+        ]
+      : [
+          path.join(home, '.steam', 'steam', 'steamapps', 'common'),
+          path.join(home, '.local', 'share', 'Steam', 'steamapps', 'common'),
+          path.join(home, '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam', 'steamapps', 'common'),
+          path.join(home, 'snap', 'steam', 'common', '.local', 'share', 'Steam', 'steamapps', 'common'),
+        ];
+    const vdfPaths = process.platform === 'win32'
+      ? [
+          'C:\\Program Files (x86)\\Steam\\steamapps\\libraryfolders.vdf',
+          'C:\\Program Files\\Steam\\steamapps\\libraryfolders.vdf',
+        ]
+      : [
+          path.join(home, '.steam', 'steam', 'steamapps', 'libraryfolders.vdf'),
+          path.join(home, '.local', 'share', 'Steam', 'steamapps', 'libraryfolders.vdf'),
+          path.join(home, '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam', 'steamapps', 'libraryfolders.vdf'),
+        ];
     for (const vdf of vdfPaths) {
       try {
         const content = await fs.readFile(vdf, 'utf8');
         const matches = [...content.matchAll(/"path"\s+"([^"]+)"/g)];
         for (const m of matches) {
-          steamPaths.push(path.join(m[1], 'steamapps', 'common'));
+          const p = String(m[1] || '').replace(/\\\\/g, '\\');
+          steamPaths.push(path.join(p, 'steamapps', 'common'));
         }
       } catch {}
     }
@@ -1338,57 +1380,108 @@ ipcMain.handle('library:discover', async () => {
     }
   } catch {}
 
-  // ── 2. Epic Games ─────────────────────────────────────────────────────────
-  try {
-    const epicManifestDir = path.join(process.env['ProgramData'] || 'C:\\ProgramData', 'Epic', 'EpicGamesLauncher', 'Data', 'Manifests');
-    const manifests = (await fs.readdir(epicManifestDir)).filter(f => f.endsWith('.item'));
-    for (const manifest of manifests) {
-      try {
-        const data = JSON.parse(await fs.readFile(path.join(epicManifestDir, manifest), 'utf8'));
-        if (data.InstallLocation && data.LaunchExecutable) {
-          discovered.push({ platform: 'Epic Games', name: data.DisplayName || data.AppName, exePath: path.join(data.InstallLocation, data.LaunchExecutable), workingDir: data.InstallLocation });
-        }
-      } catch {}
-    }
-  } catch {}
-
-  // ── 3. GOG Galaxy ─────────────────────────────────────────────────────────
-  try {
-    const gogDirs = ['C:\\Program Files (x86)\\GOG Galaxy\\Games', 'C:\\GOG Games'];
-    for (const dir of gogDirs) {
-      try {
-        const entries = await fs.readdir(dir, { withFileTypes: true });
-        for (const entry of entries) {
-          if (!entry.isDirectory()) continue;
-          const gameDir = path.join(dir, entry.name);
-          const bestExe = await scanDirectoryForBestExe(gameDir);
-          if (bestExe) {
-            discovered.push({ platform: 'GOG', name: entry.name, exePath: bestExe, workingDir: path.dirname(bestExe) });
+  // ── 2. Epic Games (Windows manifests) ──────────────────────────────────────
+  if (process.platform === 'win32') {
+    try {
+      const epicManifestDir = path.join(process.env['ProgramData'] || 'C:\\ProgramData', 'Epic', 'EpicGamesLauncher', 'Data', 'Manifests');
+      const manifests = (await fs.readdir(epicManifestDir)).filter(f => f.endsWith('.item'));
+      for (const manifest of manifests) {
+        try {
+          const data = JSON.parse(await fs.readFile(path.join(epicManifestDir, manifest), 'utf8'));
+          if (data.InstallLocation && data.LaunchExecutable) {
+            discovered.push({ platform: 'Epic Games', name: data.DisplayName || data.AppName, exePath: path.join(data.InstallLocation, data.LaunchExecutable), workingDir: data.InstallLocation });
           }
-        }
-      } catch {}
-    }
-  } catch {}
+        } catch {}
+      }
+    } catch {}
 
-  // ── 4. Xbox / Microsoft Store ─────────────────────────────────────────────
-  try {
-    const xboxDir = path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'WindowsApps');
-    const entries = await fs.readdir(xboxDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      try {
-        const gameDir = path.join(xboxDir, entry.name);
-        const lowerName = entry.name.toLowerCase();
-        const ignoredPrefixes = ['microsoft', 'windows', 'msteams', 'whatsapp', 'python', 'intel', 'nvidia', 'realtek', 'dolby', 'disney', 'spotify', 'netflix', 'appup', 'hewlettpackard', 'lenovo', 'dell'];
-        if (!ignoredPrefixes.some(p => lowerName.startsWith(p))) {
-          const bestExe = await scanDirectoryForBestExe(gameDir);
-          if (bestExe) {
-            discovered.push({ platform: 'Xbox', name: entry.name.split('_')[0], exePath: bestExe, workingDir: path.dirname(bestExe) });
+    // ── 3. GOG Galaxy ─────────────────────────────────────────────────────────
+    try {
+      const gogDirs = ['C:\\Program Files (x86)\\GOG Galaxy\\Games', 'C:\\GOG Games'];
+      for (const dir of gogDirs) {
+        try {
+          const entries = await fs.readdir(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (!entry.isDirectory()) continue;
+            const gameDir = path.join(dir, entry.name);
+            const bestExe = await scanDirectoryForBestExe(gameDir);
+            if (bestExe) {
+              discovered.push({ platform: 'GOG', name: entry.name, exePath: bestExe, workingDir: path.dirname(bestExe) });
+            }
           }
-        }
-      } catch {}
-    }
-  } catch {}
+        } catch {}
+      }
+    } catch {}
+
+    // ── 4. Xbox / Microsoft Store ─────────────────────────────────────────────
+    try {
+      const xboxDir = path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'WindowsApps');
+      const entries = await fs.readdir(xboxDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        try {
+          const gameDir = path.join(xboxDir, entry.name);
+          const lowerName = entry.name.toLowerCase();
+          const ignoredPrefixes = ['microsoft', 'windows', 'msteams', 'whatsapp', 'python', 'intel', 'nvidia', 'realtek', 'dolby', 'disney', 'spotify', 'netflix', 'appup', 'hewlettpackard', 'lenovo', 'dell'];
+          if (!ignoredPrefixes.some(p => lowerName.startsWith(p))) {
+            const bestExe = await scanDirectoryForBestExe(gameDir);
+            if (bestExe) {
+              discovered.push({ platform: 'Xbox', name: entry.name.split('_')[0], exePath: bestExe, workingDir: path.dirname(bestExe) });
+            }
+          }
+        } catch {}
+      }
+    } catch {}
+  } else {
+    // ── Linux: Heroic / Lutris / common game dirs (best-effort) ──────────────
+    const home = os.homedir();
+    try {
+      const heroicBase = path.join(home, '.config', 'heroic');
+      const heroicFiles = [
+        path.join(heroicBase, 'gog_store', 'installed.json'),
+        path.join(heroicBase, 'sideload_apps', 'library.json'),
+        path.join(heroicBase, 'legendaryConfig', 'legendary', 'installed.json'),
+      ];
+      for (const f of heroicFiles) {
+        try {
+          const raw = await fs.readFile(f, 'utf8');
+          const data = JSON.parse(raw);
+          const items = Array.isArray(data?.installed) ? data.installed : Array.isArray(data?.games) ? data.games : Array.isArray(data) ? data : [];
+          for (const g of items) {
+            const installPath = g?.install_path || g?.installPath || g?.folder_name || g?.app_install_path || '';
+            if (!installPath || typeof installPath !== 'string') continue;
+            try { await fs.access(installPath); } catch { continue; }
+            const title = g?.app_name || g?.appName || g?.title || g?.name || '';
+            let exePath = g?.executable || g?.launch_options?.executable || '';
+            let bestExe = '';
+            if (exePath && typeof exePath === 'string') bestExe = path.isAbsolute(exePath) ? exePath : path.join(installPath, exePath);
+            if (bestExe) { try { await fs.access(bestExe); } catch { bestExe = ''; } }
+            if (!bestExe) bestExe = await scanDirectoryForBestExe(installPath);
+            if (bestExe) discovered.push({ platform: 'Heroic', name: title || path.basename(installPath), exePath: bestExe, workingDir: path.dirname(bestExe) });
+          }
+        } catch {}
+      }
+    } catch {}
+
+    try {
+      const lutrisDirs = [
+        path.join(home, 'Games'),
+        path.join(home, '.local', 'share', 'lutris', 'runners', 'wine'),
+      ];
+      for (const dir of lutrisDirs) {
+        try {
+          const entries = await fs.readdir(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (!entry.isDirectory()) continue;
+            const gameDir = path.join(dir, entry.name);
+            if (/steam/i.test(gameDir)) continue;
+            const bestExe = await scanDirectoryForBestExe(gameDir);
+            if (bestExe) discovered.push({ platform: 'Lutris/Games', name: entry.name, exePath: bestExe, workingDir: path.dirname(bestExe) });
+          }
+        } catch {}
+      }
+    } catch {}
+  }
 
   return { ok: true, discovered };
 })
@@ -1462,7 +1555,7 @@ async function launchPgeBat(batPath) {
 }
 
 ipcMain.handle('pge:openPortable', async () => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
+  if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'PGE Portable é suportado apenas no Windows.' }
   const batPath = findPgeBat()
   if (!batPath) {
     return { ok: false, error: 'Pokeralho Games Launcher.bat não encontrado.' }
@@ -1508,6 +1601,8 @@ ipcMain.handle('app:getAbout', async () => {
     }
   }
 })
+
+ipcMain.handle('app:getCapabilities', async () => getCapabilities())
 
 const STARTUP_TASK_NAME = 'DarkHub Suite Autostart'
 
@@ -1831,7 +1926,7 @@ ipcMain.handle('optimizer:applyTweak', async (_event, id) => {
     switch (id) {
       case 'optimize-ram': return await MemoryEngine.optimizeRAM()
       case 'clean-temp': {
-        const r = await StorageEngine.cleanTempFiles({ recycleBin: true }) // Dashboard button: the user clicked
+        const r = await StorageEngine.cleanTempFiles({ recycleBin: process.platform === 'win32' }) // Dashboard button: the user clicked (Recycle Bin only on Windows)
         junkEstimateCache = { ts: 0, result: null, inFlight: null } // the next estimate must read the folders again
         return r
       }
@@ -1846,8 +1941,17 @@ ipcMain.handle('optimizer:deepTweaksStatus', async () => DeepTweaksEngine.checkT
 ipcMain.handle('optimizer:deepTweaksAnalyze', async (_event, payload) => {
   const ids = payload?.tweakIds || [];
   const selected = DeepTweaksEngine.listTweaks().filter((t) => ids.includes(t.id));
-  const changes = selected.flatMap((t) => t.changes.map((c) => ({ tweakId: t.id, ...c })));
-  return { ok: true, summary: { count: selected.length, requiresAdmin: selected.some(t => t.requiresAdmin) }, changes };
+  const changes = selected.flatMap((t) => (t.changes || []).map((c) => ({ tweakId: t.id, ...c })));
+  const unsupported = selected.filter((t) => t.supported === false).map((t) => t.id);
+  return {
+    ok: unsupported.length === 0,
+    unsupported: unsupported.length ? true : undefined,
+    platform: unsupported.length ? process.platform : undefined,
+    reason: unsupported.length ? 'platform-unsupported' : undefined,
+    unsupportedIds: unsupported,
+    summary: { count: selected.length, requiresAdmin: selected.some(t => t.requiresAdmin) },
+    changes
+  };
 });
 ipcMain.handle('optimizer:deepTweaksApply', async (event, payload) => DeepTweaksEngine.applyTweaks(payload?.tweakIds || [], (channel, msg) => event.sender.send(channel, msg)));
 ipcMain.handle('optimizer:deepTweaksRevert', async (event, payload) => DeepTweaksEngine.revertTweaks(payload?.tweakIds || [], (channel, msg) => event.sender.send(channel, msg)));
@@ -1969,7 +2073,14 @@ ipcMain.handle('optimizer:runRoutine', async (_event, routineId) => {
         default: throw new Error(`Unknown routine: ${routineId}`);
       }
     }
-    if (!res.ok) throw new Error(res.error || 'Operation failed');
+    if (!res || typeof res !== 'object') res = { ok: false, error: 'Invalid routine result' };
+    if (!res.ok) {
+      if (res.unsupported) {
+        sendEvent('complete', `Rotina indisponível: ${routineId} (${res.error || res.msg || 'unsupported'})`, { progress: 100, ok: false, unsupported: true, platform: res.platform || process.platform, reason: res.reason, elapsedMs: Date.now() - startedAt });
+        return res;
+      }
+      throw new Error(res.error || res.msg || 'Operation failed');
+    }
     sendEvent('complete', `Rotina encerrada: ${routineId} (${res.msg || 'Concluído'})`, { progress: 100, ok: true, elapsedMs: Date.now() - startedAt });
     return res;
   } catch (err) {
@@ -2050,10 +2161,12 @@ ipcMain.handle('youtube:getVideoInfo', async (_event, payload) => {
     }
 
     const toolsDir = path.join(app.getPath('userData'), 'tools')
+    const { platformBinaryName, fileExists } = await import('./services/binResolver.js')
     const ffmpegPath = await getFfmpegPath()
-    const ffmpegLocation = typeof ffmpegPath === 'string' && fsRaw.existsSync(ffmpegPath)
+    const ffBin = platformBinaryName('ffmpeg')
+    const ffmpegLocation = fileExists(ffmpegPath)
       ? path.dirname(ffmpegPath)
-      : (fsRaw.existsSync(path.join(toolsDir, 'ffmpeg.exe')) ? toolsDir : null)
+      : (fileExists(path.join(toolsDir, ffBin)) ? toolsDir : null)
     let ytDlpError = null
 
     try {
@@ -2167,10 +2280,12 @@ ipcMain.handle('youtube:download', async (event, payload) => {
     const toolsDir = path.join(app.getPath('userData'), 'tools')
     const { ensureYtDlp, runYtDlp } = await getYtDlpTools()
     const ytdlpPath = await ensureYtDlp(toolsDir, process.platform)
+    const { platformBinaryName, fileExists } = await import('./services/binResolver.js')
     const ffmpegPath = await getFfmpegPath()
-    const ffmpegLocation = typeof ffmpegPath === 'string' && fsRaw.existsSync(ffmpegPath)
+    const ffBin = platformBinaryName('ffmpeg')
+    const ffmpegLocation = fileExists(ffmpegPath)
       ? path.dirname(ffmpegPath)
-      : (fsRaw.existsSync(path.join(toolsDir, 'ffmpeg.exe')) ? toolsDir : null)
+      : (fileExists(path.join(toolsDir, ffBin)) ? toolsDir : null)
 
     const { buildExtraArgs } = await import('./services/ytdlpOptions.js')
     const extraOpts = { ...(extra && typeof extra === 'object' ? extra : {}) }
@@ -2761,12 +2876,15 @@ ipcMain.handle('security:scanMalware', async () => {
     const processes = await si.processes()
     const suspicious = []
 
-    const safeRegex = /c:\\windows\\|\/usr\/bin\/|\/bin\/|\/sbin\/|\/system\/library\/|\/usr\/sbin\//i
+    const safeRegex = process.platform === 'win32'
+      ? /c:\\windows\\|\\program files\\|\\program files \(x86\)\\|\\windowsapps\\/i
+      : /^(\/usr\/|\/bin\/|\/sbin\/|\/lib|\/lib64|\/opt\/|\/snap\/|\/nix\/|\/var\/lib\/flatpak\/|\/app\/)/i
 
     for (const p of processes.list) {
       if (!p.path) continue
 
-      const isSafeLoc = safeRegex.test(p.path)
+      const pathStr = String(p.path)
+      const isSafeLoc = safeRegex.test(process.platform === 'win32' ? pathStr.toLowerCase() : pathStr)
 
       let score = 0
       let reason = []
@@ -2797,14 +2915,31 @@ ipcMain.handle('security:scanMalware', async () => {
 })
 
 async function getSecurityScoreV2() {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
   const checks = []
   let score = 0
 
   const add = (id, title, ok, weight, details) => {
     const passed = Boolean(ok)
-    checks.push({ id, title, ok: passed, weight, details: details ?? null })
+    checks.push({ id, title, ok: passed, weight, details: details ?? null, unsupported: details?.unsupported === true })
     if (passed) score += weight
+  }
+
+  if (process.platform !== 'win32') {
+    // Cross-platform subset: hosts/tracking blocker is verifiable; Windows security center checks are not applicable.
+    try {
+      const hostsPath = '/etc/hosts'
+      const content = await fs.readFile(hostsPath, 'utf8')
+      const hasSection = content.includes('DarkHub Tracking Blocker - BEGIN') && content.includes('DarkHub Tracking Blocker - END')
+      add('trackingBlocker', 'Tracking Blocker (hosts)', hasSection, 5, { hostsPath, hasSection })
+    } catch (err) {
+      add('trackingBlocker', 'Tracking Blocker (hosts)', false, 5, err?.message ?? String(err))
+    }
+    add('firewall', 'Firewall (todos os perfis)', false, 25, { unsupported: true, platform: process.platform, reason: 'windows-only' })
+    add('antivirusProvider', 'Antivirus reconhecido pelo Windows', false, 30, { unsupported: true, platform: process.platform, reason: 'windows-only' })
+    add('realtimeProtection', 'Protecao em tempo real', false, 25, { unsupported: true, platform: process.platform, reason: 'windows-only' })
+    add('uac', 'UAC (EnableLUA)', false, 15, { unsupported: true, platform: process.platform, reason: 'windows-only' })
+    score = Math.max(0, Math.min(100, score))
+    return { ok: true, partial: true, platform: process.platform, score, ts: Date.now(), checks }
   }
 
   try {
@@ -2890,49 +3025,50 @@ ipcMain.handle('security:getSecurityScore', async () => {
 
 ipcMain.handle('security:auditTracking', async () => {
   try {
-    if (process.platform === 'win32') {
-      const domainsFile = path.join(app.getPath('userData'), 'tracking.domains.json')
-      let customDomains = []
-      try {
-        const raw = await fs.readFile(domainsFile, 'utf8')
-        const parsed = JSON.parse(raw)
-        if (Array.isArray(parsed?.custom)) customDomains = parsed.custom.map((d) => String(d).trim()).filter(Boolean)
-      } catch {}
+    const domainsFile = path.join(app.getPath('userData'), 'tracking.domains.json')
+    let customDomains = []
+    try {
+      const raw = await fs.readFile(domainsFile, 'utf8')
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed?.custom)) customDomains = parsed.custom.map((d) => String(d).trim()).filter(Boolean)
+    } catch {}
 
-      const hostsPath = path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
-      const content = await fs.readFile(hostsPath, 'utf8')
-      const lines = content.split(/\r?\n/g).map((l) => l.trim())
+    const hostsPath = process.platform === 'win32'
+      ? path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
+      : '/etc/hosts'
+    let content = ''
+    try { content = await fs.readFile(hostsPath, 'utf8') } catch { content = '' }
+    const lines = content.split(/\r?\n/g).map((l) => l.trim())
 
-      const allDomains = Array.from(new Set([...DEFAULT_TRACKING_DOMAINS, ...customDomains]))
+    const allDomains = Array.from(new Set([...DEFAULT_TRACKING_DOMAINS, ...customDomains]))
 
-      const present = new Set()
-      for (const line of lines) {
-        if (!line || line.startsWith('#')) continue
-        for (const domain of allDomains) {
-          if (line.includes(domain)) present.add(domain)
-        }
-      }
-
-      const hasDarkHubSection = lines.some((l) => l.includes('DarkHub Tracking Blocker - BEGIN'))
-
-      const trackers = Array.from(present).map((d) => ({
-        source: 'Hosts File',
-        details: d,
-        category: 'Analytics/Ads'
-      }))
-
-      return {
-        ok: true,
-        trackers,
-        summary: {
-          totalKnown: allDomains.length,
-          present: present.size,
-          missing: allDomains.length - present.size,
-          hasDarkHubSection
-        }
+    const present = new Set()
+    for (const line of lines) {
+      if (!line || line.startsWith('#')) continue
+      for (const domain of allDomains) {
+        if (line.includes(domain)) present.add(domain)
       }
     }
-    return { ok: true, trackers: [], summary: { totalKnown: 0, present: 0, missing: 0, hasDarkHubSection: false } }
+
+    const hasDarkHubSection = lines.some((l) => l.includes('DarkHub Tracking Blocker - BEGIN'))
+
+    const trackers = Array.from(present).map((d) => ({
+      source: 'Hosts File',
+      details: d,
+      category: 'Analytics/Ads'
+    }))
+
+    return {
+      ok: true,
+      trackers,
+      summary: {
+        totalKnown: allDomains.length,
+        present: present.size,
+        missing: allDomains.length - present.size,
+        hasDarkHubSection
+      },
+      hostsPath
+    }
   } catch (err) {
     return { ok: false, error: err.message }
   }
@@ -2996,7 +3132,6 @@ ipcMain.handle('security:setCustomTrackingDomains', async (_event, payload) => {
 })
 
 ipcMain.handle('security:blockTracking', async () => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
   try {
     const defaults = DEFAULT_TRACKING_DOMAINS
 
@@ -3010,13 +3145,16 @@ ipcMain.handle('security:blockTracking', async () => {
 
     const trackingDomains = Array.from(new Set([...defaults, ...customDomains]))
 
-    const hostsPath = path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
-    let content = await fs.readFile(hostsPath, 'utf8')
+    const hostsPath = process.platform === 'win32'
+      ? path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
+      : '/etc/hosts'
+    let content = ''
+    try { content = await fs.readFile(hostsPath, 'utf8') } catch { content = '' }
     const backupPath = path.join(app.getPath('userData'), 'hosts.backup')
     try {
       await fs.access(backupPath)
     } catch {
-      await fs.writeFile(backupPath, content, 'utf8')
+      if (content) await fs.writeFile(backupPath, content, 'utf8').catch(() => {})
     }
 
     const beginMarker = '# DarkHub Tracking Blocker - BEGIN'
@@ -3040,6 +3178,10 @@ ipcMain.handle('security:blockTracking', async () => {
     const section = [beginMarker, ...trackingDomains.map((d) => `127.0.0.1 ${d}`), endMarker].join(os.EOL)
     const nextContent = [...filtered, '', section, ''].join(os.EOL)
 
+    if (process.platform !== 'win32') {
+      return { ok: false, unsupported: true, platform: process.platform, reason: 'elevation-required', error: 'Bloquear trackers exige permissão para gravar em /etc/hosts (ação elevada) — ainda não automatizado no Linux.', hostsPath, count: trackingDomains.length }
+    }
+
     await fs.writeFile(hostsPath, nextContent, 'utf8')
     return { ok: true, msg: `Blocked ${trackingDomains.length} trackers via hosts file`, backupPath }
   } catch (err) {
@@ -3048,14 +3190,22 @@ ipcMain.handle('security:blockTracking', async () => {
 })
 
 ipcMain.handle('security:unblockTracking', async () => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
   try {
-    const hostsPath = path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
-    const content = await fs.readFile(hostsPath, 'utf8')
+    const hostsPath = process.platform === 'win32'
+      ? path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
+      : '/etc/hosts'
+    let content = ''
+    try { content = await fs.readFile(hostsPath, 'utf8') } catch { content = '' }
     const stripped = content
       .replace(/# DarkHub Tracking Blocker - BEGIN[\s\S]*?# DarkHub Tracking Blocker - END\r?\n?/g, '')
       .replace(/(\r?\n){3,}/g, os.EOL + os.EOL)
       .trimEnd() + os.EOL
+
+    if (process.platform !== 'win32') {
+      if (!content.includes('DarkHub Tracking Blocker - BEGIN')) return { ok: true, msg: 'Tracking blocker section not present in hosts' }
+      return { ok: false, unsupported: true, platform: process.platform, reason: 'elevation-required', error: 'Remover o bloqueio exige permissão para gravar em /etc/hosts (ação elevada) — ainda não automatizado no Linux.', hostsPath }
+    }
+
     await fs.writeFile(hostsPath, stripped, 'utf8')
     return { ok: true, msg: 'Tracking blocker section removed from hosts' }
   } catch (err) {
@@ -3064,7 +3214,7 @@ ipcMain.handle('security:unblockTracking', async () => {
 })
 
 ipcMain.handle('security:optimizeLatency', async () => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
+  if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Otimização de latência de áudio (audiodg/PowerShell) é suportada apenas no Windows.' }
   try {
 
     await runPowerShell("Get-Process -Name 'audiodg' -ErrorAction SilentlyContinue | ForEach-Object { $_.PriorityClass = 'RealTime' }", { timeoutMs: 10000 })
@@ -3139,7 +3289,7 @@ const autoClicker = new AutoClickerService({
   logger: log
 })
 const autoClickerCall = (fn) => async (_event, payload) => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
+  if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' }
   try { return await fn(payload) } catch (err) { return { ok: false, error: err?.message ?? String(err) } }
 }
 
@@ -3292,6 +3442,7 @@ async function installFromOfficialUrl(id, progress) {
 }
 
 ipcMain.handle('setup:installWinget', async (event, appIds) => {
+  if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Instalação via winget é suportada apenas no Windows (Linux: use apt/Flatpak/Snap conforme disponibilidade).' }
   if (!Array.isArray(appIds) || appIds.length === 0) return { ok: false, error: 'Lista vazia' };
   // The window may be closed mid-queue; a send on a destroyed webContents would reject the handler.
   const progress = (msg) => {
@@ -3401,6 +3552,13 @@ app.whenReady().then(async () => {
     const Elevation = (await import('./services/optimizer/ElevationHelper.js')).default
     if (!(await ensureElevated({ app, dialog, isElevated: () => Elevation.isElevated(), log }))) return
   }
+
+  // DarkHub is Windows-first: on Linux/other platforms the renderer/UI can run, but Windows-only subsystems
+  // (PowerShell/registry/drivers/native daemons) must degrade gracefully instead of crashing at boot.
+  if (process.platform !== 'win32') {
+    log.warn(`[startup] running on ${process.platform}: Windows-only capabilities will be reported as unsupported`)
+  }
+
   const runDeferredStartup = async () => {
     let liveServices = { latencyGuardian: true, overlay: true, autoClicker: true }
 
@@ -3427,11 +3585,14 @@ app.whenReady().then(async () => {
     }
 
     // Earlier versions kept a hidden hardware fingerprint; remove what they left behind.
-    fs.rm(path.join(process.env.ProgramData || 'C:\\ProgramData', 'DarkHub', 'm.dat'), { force: true }).catch(() => {})
-    runCommand('reg.exe', ['delete', 'HKCU\\Software\\DarkHub\\MM', '/f'], { timeoutMs: 8000 }).catch(() => {})
+    if (process.platform === 'win32') {
+      fs.rm(path.join(process.env.ProgramData || 'C:\\ProgramData', 'DarkHub', 'm.dat'), { force: true }).catch(() => {})
+      runCommand('reg.exe', ['delete', 'HKCU\\Software\\DarkHub\\MM', '/f'], { timeoutMs: 8000 }).catch(() => {})
+    }
 
+    if (process.platform !== 'win32') latencyServiceState = 'disabled'
     if (liveServices.latencyGuardian === false) latencyServiceState = 'disabled'
-    if (liveServices.latencyGuardian !== false) {
+    if (process.platform === 'win32' && liveServices.latencyGuardian !== false) {
       try {
         log.info('[startup-bg] registering latency guardian')
         const { registerLatencyGuardian } = await import('./latencyGuardian.js')
@@ -3454,12 +3615,18 @@ app.whenReady().then(async () => {
         latencyServiceState = 'failed'
         for (const ch of LATENCY_CHANNELS) {
           try { ipcMain.removeHandler(ch) } catch {}
-          ipcMain.handle(ch, async () => ({ ok: false, error: 'latency-service-failed' }))
+          ipcMain.handle(ch, async () => ({ ok: false, platform: process.platform, error: 'latency-service-failed' }))
         }
+      }
+    } else if (latencyServiceState === 'disabled') {
+      // Refresh placeholders so they carry the final unsupported/disabled contract (not "starting").
+      for (const ch of LATENCY_CHANNELS) {
+        try { ipcMain.removeHandler(ch) } catch {}
+        ipcMain.handle(ch, async () => latencyDisabledPayload())
       }
     }
 
-    if (liveServices.overlay !== false) {
+    if (process.platform === 'win32' && liveServices.overlay !== false) {
 
       // Ctrl+Shift+F is a common shortcut (search in editors and browsers): it belongs to DarkHub only while the
       // Frame Pacer runs, the only time its overlay is useful
@@ -3473,6 +3640,13 @@ app.whenReady().then(async () => {
         }
       })
 
+      FramePacerEngine.on('metrics', (metrics) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('framepacer:metrics', metrics)
+        }
+      })
+    } else if (process.platform !== 'win32') {
+      // Frame pacer/overlay are Win32-specific today; keep status events harmless but avoid registering hotkeys.
       FramePacerEngine.on('metrics', (metrics) => {
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('framepacer:metrics', metrics)
@@ -3554,7 +3728,10 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin' && appIsQuitting) app.quit()
+  if (process.platform === 'darwin') return
+  // On Windows the app can live in the tray; on Linux tray support is environment-dependent,
+  // so quit when the last window closes unless we are explicitly backgrounded by a working tray.
+  if (appIsQuitting || !tray) app.quit()
 })
 
 let latencyGuardianStopHandled = false

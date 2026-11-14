@@ -37,6 +37,7 @@ export default function UltraLowLatency() {
   const [dirty, setDirty] = useState(false)
   const dirtyRef = useRef(false)
   const hotkeyEditingRef = useRef(false)
+  const [unsupported, setUnsupported] = useState<string | null>(null)
   const [uiMode, setUiMode] = useState<'simple' | 'advanced'>(() => {
     try {
       const v = localStorage.getItem('darkhub.ullm.mode')
@@ -142,6 +143,9 @@ export default function UltraLowLatency() {
             res.config?.tweaks && typeof res.config.tweaks === 'object' ? { ...prev, ...res.config.tweaks } : prev
           )
         }
+      } else if (res?.unsupported) {
+        setUnsupported(res.error || 'Ultra Low Latency is only supported on Windows.')
+        return
       }
     } catch (e: any) {
       setError(e?.message ?? String(e))
@@ -149,9 +153,10 @@ export default function UltraLowLatency() {
   }
 
   useEffect(() => {
+    if (unsupported) return
     refresh()
     return visibleInterval(refresh, 1500)
-  }, [])
+  }, [unsupported])
 
   const pickExe = async () => {
     setError(null)
@@ -296,6 +301,19 @@ export default function UltraLowLatency() {
     (lastApplied?.processPriorityHigh?.status === 'skipped' || (!status?.game?.pid && Boolean(status?.ultraEnabled)))
 
   const bridgeMissing = !window.darkhub?.latency
+
+  if (unsupported) {
+    return (
+      <div className="dh-page flex flex-col pb-24">
+        <div className="dh-page-header">
+          <PageHeader title={t('nav.ultralatency', 'Ultra Low Latency')} subtitle={t('latency.unsupported.desc', 'Latency tuning, timer control and the guardian engine depend on Windows APIs and are not available on this platform.')} />
+        </div>
+        <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/60 px-4 py-3 text-[13px] text-zinc-300">
+          {unsupported}
+        </div>
+      </div>
+    )
+  }
   const waiting = !data && !bridgeMissing
   const ultraOn = Boolean(status?.ultraEnabled)
 
