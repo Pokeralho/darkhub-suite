@@ -3142,7 +3142,7 @@ ipcMain.handle('security:unblockTracking', async () => {
 })
 
 ipcMain.handle('security:optimizeLatency', async () => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
+  if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Otimização de latência de áudio (audiodg/PowerShell) é suportada apenas no Windows.' }
   try {
 
     await runPowerShell("Get-Process -Name 'audiodg' -ErrorAction SilentlyContinue | ForEach-Object { $_.PriorityClass = 'RealTime' }", { timeoutMs: 10000 })
