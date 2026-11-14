@@ -56,12 +56,29 @@ $ErrorActionPreference='Stop'
   async flushDns() {
     const started = Date.now();
     try {
-      const r = await runCommand('ipconfig.exe', ['/flushdns'], { timeoutMs: 15000 });
-      if (r.code !== 0) {
-        const detail = (r.stdout || r.stderr || '').replace(/\s+/g, ' ').trim();
-        return this._res('Error', `ipconfig /flushdns falhou (código ${r.code}). ${detail}${/admin|elev/i.test(detail) ? '' : ' Pode ser necessário executar como administrador.'}`, started);
+      if (process.platform === 'win32') {
+        const r = await runCommand('ipconfig.exe', ['/flushdns'], { timeoutMs: 15000 });
+        if (r.code !== 0) {
+          const detail = (r.stdout || r.stderr || '').replace(/\s+/g, ' ').trim();
+          return this._res('Error', `ipconfig /flushdns falhou (código ${r.code}). ${detail}${/admin|elev/i.test(detail) ? '' : ' Pode ser necessário executar como administrador.'}`, started);
+        }
+        return this._res('Success', 'Cache do resolvedor de DNS limpo (ipconfig /flushdns concluído). Apenas o cache local foi limpo; a conexão não foi reiniciada.', started);
       }
-      return this._res('Success', 'Cache do resolvedor de DNS limpo (ipconfig /flushdns concluído). Apenas o cache local foi limpo; a conexão não foi reiniciada.', started);
+      // Linux/other: best-effort (systemd-resolved). Not all distros run a local cache.
+      let r = await runCommand('resolvectl', ['flush-caches'], { timeoutMs: 15000 }).catch(() => null);
+      if (!r || r.code !== 0) r = await runCommand('systemd-resolve', ['--flush-caches'], { timeoutMs: 15000 }).catch(() => null);
+      if (r && r.code === 0) {
+        return this._res('Success', 'Cache de DNS do resolvedor do sistema limpo (resolvectl/systemd-resolve).', started);
+      }
+      const detail = r ? (r.stdout || r.stderr || '').replace(/\s+/g, ' ').trim() : '';
+      return {
+        ok: false, unsupported: !r || r.code === 127, partial: true, platform: process.platform,
+        status: 'Warning', durationMs: Date.now() - started,
+        affectedResources: ['DNS Cache'], processedItems: 0, savings: 0, savingsBytes: 0,
+        message: detail || 'Nenhum cache de DNS local conhecido para limpar (sem systemd-resolved?).',
+        msg: detail || 'Nenhum cache de DNS local conhecido para limpar (sem systemd-resolved?).',
+        error: detail || 'Flush DNS indisponível nesta plataforma/configuração.'
+      };
     } catch (e) {
       return this._res('Error', `Falha: ${e?.message ?? String(e)}`, started);
     }
