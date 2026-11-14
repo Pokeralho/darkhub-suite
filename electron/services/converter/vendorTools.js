@@ -13,9 +13,27 @@ export function vendorDir(name) {
 
 const existing = (p) => (p && fs.existsSync(p) ? p : null)
 
+function findFirst(candidates) {
+  for (const c of candidates) {
+    const p = existing(c)
+    if (p) return p
+  }
+  return null
+}
+
 /** DirectXTex texconv (MIT): DDS read/write with BC1-BC7, mipmaps. */
-export const texconvPath = () => existing(path.join(vendorDir('imagetools'), 'texconv.exe'))
+export const texconvPath = () => findFirst([
+  path.join(vendorDir('imagetools'), process.platform === 'win32' ? 'texconv.exe' : 'texconv'),
+  process.platform === 'linux' ? '/usr/bin/texconv' : null
+].filter(Boolean))
 /** LibRaw dcraw_emu (LGPL-2.1/CDDL): camera RAW development. */
-export const dcrawPath = () => existing(path.join(vendorDir('imagetools'), 'dcraw_emu.exe'))
+export const dcrawPath = () => findFirst([
+  path.join(vendorDir('imagetools'), process.platform === 'win32' ? 'dcraw_emu.exe' : 'dcraw_emu'),
+  process.platform === 'linux' ? '/usr/bin/dcraw_emu' : null
+].filter(Boolean))
 /** Trimmed portable LibreOffice (MPL-2.0), headless. */
-export const bundledSofficePath = () => existing(path.join(vendorDir('libreoffice'), 'program', 'soffice.com'))
+export const bundledSofficePath = () => findFirst([
+  path.join(vendorDir('libreoffice'), 'program', process.platform === 'win32' ? 'soffice.com' : 'soffice'),
+  process.platform === 'linux' ? '/usr/bin/soffice' : null,
+  process.platform === 'linux' ? '/usr/bin/libreoffice' : null
+].filter(Boolean))

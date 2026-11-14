@@ -184,32 +184,26 @@ async function getExiftool() {
 async function getFfmpegPath() {
   if (ffmpegStaticPromise) return ffmpegStaticPromise
   ffmpegStaticPromise = (async () => {
+    const { platformBinaryName, fileExists, findOnPath } = await import('./services/binResolver.js')
     try {
       const toolsDir = path.join(app.getPath ? app.getPath('userData') : '', 'tools')
       const { ensureFfmpeg } = await getYtDlpTools()
       if (typeof ensureFfmpeg === 'function') {
         const p = await ensureFfmpeg(toolsDir, process.platform)
-        if (p && fsRaw.existsSync(p)) return p
+        if (fileExists(p)) return p
       }
     } catch {}
 
-    try {
-      const finder = process.platform === 'win32' ? 'where.exe' : 'which'
-      const { code, stdout } = await runCommand(finder, ['ffmpeg'], { timeoutMs: 5000 })
-      const whereOut = code === 0 ? String(stdout ?? '').trim().split(/\r?\n/)[0] : ''
-      if (whereOut && fsRaw.existsSync(whereOut)) return whereOut
-    } catch {}
-
-    const localBin = path.join(app.getPath ? app.getPath('userData') : '', 'tools', process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg')
-    if (fsRaw.existsSync(localBin)) return localBin
+    const localBin = path.join(app.getPath ? app.getPath('userData') : '', 'tools', platformBinaryName('ffmpeg'))
+    if (fileExists(localBin)) return localBin
 
     try {
       const mod = await import('ffmpeg-static')
       const p = mod.default ?? mod
-      if (p && fsRaw.existsSync(p)) return p
+      if (fileExists(p)) return p
     } catch {}
 
-    return null
+    return await findOnPath('ffmpeg')
   })()
   return ffmpegStaticPromise
 }

@@ -9,10 +9,17 @@ import { run, uniqueOutputPath, extOf } from './processUtil.js'
 import { bundledSofficePath } from './vendorTools.js'
 import { routesFor, detectDelimiter, parseCsv, toCsv, jsonToXml } from './docRoutes.js'
 
-const SOFFICE_FALLBACKS = [
-  'C:\\Program Files\\LibreOffice\\program\\soffice.com',
-  'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.com'
-]
+const SOFFICE_FALLBACKS = process.platform === 'win32'
+  ? [
+      'C:\\Program Files\\LibreOffice\\program\\soffice.com',
+      'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.com'
+    ]
+  : [
+      '/usr/bin/soffice',
+      '/usr/bin/libreoffice',
+      '/usr/local/bin/soffice',
+      '/snap/bin/libreoffice'
+    ]
 
 /** The bundled LibreOffice, else an installed one (developer machines without `npm run build:libreoffice`). */
 export function findSoffice() {
