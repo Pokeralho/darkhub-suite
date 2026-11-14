@@ -289,12 +289,14 @@ describe('hub: install and uninstall', () => {
   })
 
   it('task lists walk one task as one item in real PowerShell (not flattened)', () => {
+    if (process.platform !== 'win32') return // requires Windows PowerShell
     const run = (tasks: any[]) => execFileSync('powershell.exe', ['-NoProfile', '-EncodedCommand', Buffer.from(`foreach ($t in ${psTaskList(tasks)}) { $t.p + '|' + $t.n + '|' + $t.on }`, 'utf16le').toString('base64')], { encoding: 'utf8' }).trim().split(/\r?\n/)
     expect(run([{ path: '\\A\\', name: 'One', state: 'disabled' }])).toEqual(['\\A\\|One|False'])
     expect(run([{ path: '\\A\\', name: 'One', state: 'disabled' }, { path: "\\B's\\", name: 'Two', state: 'enabled' }])).toEqual(['\\A\\|One|False', "\\B's\\|Two|True"])
   }, 30000)
 
   it('task script is ASCII and parses in PowerShell', () => {
+    if (process.platform !== 'win32') return // requires Windows PowerShell
     const s = taskApplyScript([{ path: "\\Microsoft\\Windows\\It's\\", name: 'A b', state: 'disabled' }, { path: '\\X\\', name: 'Y', state: 'enabled' }])
     expect(/^[\x00-\x7F]*$/.test(s)).toBe(true)
     const f = path.join(os.tmpdir(), `dh-task-${process.pid}.ps1`)

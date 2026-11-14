@@ -157,6 +157,7 @@ describe('DriverCenter camera', () => {
   });
 
   it('repair: reverts the DarkOS items first, runs the elevated script and reports the steps', async () => {
+    if (process.platform !== 'win32') return // requires Windows PowerShell/elevation flow
     const order: string[] = [];
     const svc = new D.DriverCenterService({
       runner: async () => ({ code: 0, stdout: JSON.stringify({ devices: [{ name: 'Logi C270', status: 'OK' }], services: [], consent: {} }) }),
@@ -170,6 +171,7 @@ describe('DriverCenter camera', () => {
   });
 
   it('repair: reports failure when elevation is refused (no DHDONE)', async () => {
+    if (process.platform !== 'win32') return // requires Windows PowerShell/elevation flow
     const svc = new D.DriverCenterService({ runner: async () => ({ code: 0, stdout: '{}' }), elevatedRunner: async () => ({ code: 1, stdout: '', stderr: '' }) });
     const r = await svc.repairCamera();
     expect(r.ok).toBe(false);
