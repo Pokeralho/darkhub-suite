@@ -2843,14 +2843,31 @@ ipcMain.handle('security:scanMalware', async () => {
 })
 
 async function getSecurityScoreV2() {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
   const checks = []
   let score = 0
 
   const add = (id, title, ok, weight, details) => {
     const passed = Boolean(ok)
-    checks.push({ id, title, ok: passed, weight, details: details ?? null })
+    checks.push({ id, title, ok: passed, weight, details: details ?? null, unsupported: details?.unsupported === true })
     if (passed) score += weight
+  }
+
+  if (process.platform !== 'win32') {
+    // Cross-platform subset: hosts/tracking blocker is verifiable; Windows security center checks are not applicable.
+    try {
+      const hostsPath = '/etc/hosts'
+      const content = await fs.readFile(hostsPath, 'utf8')
+      const hasSection = content.includes('DarkHub Tracking Blocker - BEGIN') && content.includes('DarkHub Tracking Blocker - END')
+      add('trackingBlocker', 'Tracking Blocker (hosts)', hasSection, 5, { hostsPath, hasSection })
+    } catch (err) {
+      add('trackingBlocker', 'Tracking Blocker (hosts)', false, 5, err?.message ?? String(err))
+    }
+    add('firewall', 'Firewall (todos os perfis)', false, 25, { unsupported: true, platform: process.platform, reason: 'windows-only' })
+    add('antivirusProvider', 'Antivirus reconhecido pelo Windows', false, 30, { unsupported: true, platform: process.platform, reason: 'windows-only' })
+    add('realtimeProtection', 'Protecao em tempo real', false, 25, { unsupported: true, platform: process.platform, reason: 'windows-only' })
+    add('uac', 'UAC (EnableLUA)', false, 15, { unsupported: true, platform: process.platform, reason: 'windows-only' })
+    score = Math.max(0, Math.min(100, score))
+    return { ok: true, partial: true, platform: process.platform, score, ts: Date.now(), checks }
   }
 
   try {
@@ -2916,9 +2933,7 @@ async function getSecurityScoreV2() {
         add('uac', 'UAC (EnableLUA)', code === 0 && Boolean(data?.enabled), 15, code === 0 ? data : stderr)
       })().catch((err) => add('uac', 'UAC (EnableLUA)', false, 15, err?.message ?? String(err))),
       (async () => {
-        const hostsPath = process.platform === 'win32'
-          ? path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
-          : '/etc/hosts'
+        const hostsPath = path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
         const content = await fs.readFile(hostsPath, 'utf8')
         const hasSection = content.includes('DarkHub Tracking Blocker - BEGIN') && content.includes('DarkHub Tracking Blocker - END')
         add('trackingBlocker', 'Tracking Blocker (hosts)', hasSection, 5, { hostsPath, hasSection })
