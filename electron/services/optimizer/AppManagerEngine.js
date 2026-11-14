@@ -674,8 +674,11 @@ if ($k) { $v = $k.GetValue(${psQuote(appPath)}, $null); if ($null -ne $v) { Writ
         const isDedicated = !isIntel && !isAmdApu && (c.vram > 1024 || vendorLower.includes('nvidia') || nameLower.includes('rtx') || nameLower.includes('gtx') || nameLower.includes('geforce') || nameLower.includes('rx '));
         return { model: c.model || 'Placa Gráfica', vendor: c.vendor || '', vram: c.vram || 0, bus: c.bus || '', isDedicated };
       });
-      return { ok: true, controllers, multiGpu: controllers.length > 1 };
+      return { ok: true, controllers, multiGpu: controllers.length > 1, partial: process.platform !== 'win32' };
     } catch (e) {
+      if (process.platform !== 'win32') {
+        return { ok: false, unsupported: true, platform: process.platform, reason: 'gpu-info-unavailable', error: e?.message, controllers: [], multiGpu: false };
+      }
       return { ok: false, error: e.message, controllers: [] };
     }
   }
