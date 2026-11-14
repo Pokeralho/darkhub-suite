@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="dh-row topbar">
+      <div>
+        <h1 id="title">Test Report</h1>
+        <p class="dh-help" id="subtitle"></p>
+      </div>
+      <div class="dh-row" id="live-readout">
+        <span class="dh-badge" id="live-cpu">CPU --</span>
+        <span class="dh-badge" id="live-gpu">GPU --</span>
+        <span class="dh-badge" id="live-ram">RAM --</span>
+      </div>
+    </header>
+
+    <section class="dh-card">
+      <h2 id="h-new"></h2>
+      <div class="sec-grid">
+        <div class="sec"><h3 id="h-plan"></h3>
+          <label class="field"><span id="l-name"></span><input id="s-name" class="dh-input" type="text" maxlength="80"></label>
+          <label class="field"><span id="l-workload"></span><input id="s-workload" class="dh-input" type="text" maxlength="120"></label>
+          <label class="field"><span id="l-duration"></span><input id="s-duration" class="dh-input" type="text" maxlength="60"></label>
+          <label class="field"><span id="l-goal"></span><input id="s-goal" class="dh-input" type="text" maxlength="160"></label>
+        </div>
+        <div class="sec"><h3 id="h-env"></h3>
+          <label class="field"><span id="l-ambient"></span><input id="s-ambient" class="dh-input" type="text" maxlength="60"></label>
+          <label class="field"><span id="l-cooling"></span><input id="s-cooling" class="dh-input" type="text" maxlength="140"></label>
+          <label class="field"><span id="l-airflow"></span><input id="s-airflow" class="dh-input" type="text" maxlength="120"></label>
+          <label class="field"><span id="l-case"></span><input id="s-case" class="dh-input" type="text" maxlength="120"></label>
+        </div>
+        <div class="sec"><h3 id="h-freq"></h3>
+          <label class="field"><span id="l-cpuclk"></span><input id="s-cpuclk" class="dh-input" type="text" maxlength="120"></label>
+          <label class="field"><span id="l-gpuclk"></span><input id="s-gpuclk" class="dh-input" type="text" maxlength="120"></label>
+          <label class="field"><span id="l-memclk"></span><input id="s-memclk" class="dh-input" type="text" maxlength="120"></label>
+          <label class="field"><span id="l-power"></span><input id="s-power" class="dh-input" type="text" maxlength="120"></label>
+        </div>
+        <div class="sec"><h3 id="h-sys"></h3>
+          <label class="field"><span id="l-drivers"></span><input id="s-drivers" class="dh-input" type="text" maxlength="140"></label>
+          <label class="field"><span id="l-profile"></span><input id="s-profile" class="dh-input" type="text" maxlength="120"></label>
+          <label class="field"><span id="l-notes"></span><textarea id="s-notes" class="dh-input" rows="3" maxlength="300"></textarea></label>
+        </div>
+      </div>
+      <p class="dh-help" id="clock-hint"></p>
+      <div class="dh-row actions">
+        <button id="btn-start" class="dh-btn dh-btn-accent" type="button"></button>
+        <button id="btn-stop" class="dh-btn" type="button" disabled></button>
+        <button id="btn-mark" class="dh-btn" type="button" disabled></button>
+        <input id="mark-note" class="dh-input mark-note" type="text" maxlength="80">
+      </div>
+      <p class="dh-help" id="capture-status"></p>
+    </section>
+
+    <section class="dh-card" id="active-card" hidden>
+      <div class="dh-row head"><h2 id="h-active"></h2><span class="dh-badge" id="active-elapsed"></span></div>
+      <div id="hw-snap" class="small mono"></div>
+      <div id="active-summary" class="dh-help"></div>
+      <div id="active-plan" class="small plan"></div>
+      <div id="active-markers" class="marker-list"></div>
+      <label class="field"><span id="l-result"></span><textarea id="active-result" class="dh-input" rows="3" maxlength="600"></textarea></label>
+      <div class="dh-row actions"><button id="btn-save-result" class="dh-btn dh-btn-primary" type="button"></button></div>
+    </section>
+
+    <section class="dh-card">
+      <div class="dh-row head"><h2 id="h-sessions"></h2><button id="btn-clear-all" class="dh-btn" type="button"></button></div>
+      <div id="sessions-list" class="list"></div>
+      <p class="dh-help" id="sessions-empty"></p>
+    </section>
+
+    <section class="dh-card">
+      <div class="dh-row head"><h2 id="h-compare"></h2><button id="btn-compare" class="dh-btn dh-btn-accent" type="button"></button></div>
+      <div class="dh-row compare-pickers">
+        <label class="field grow"><span id="l-a"></span><select id="cmp-a" class="dh-input"></select></label>
+        <label class="field grow"><span id="l-b"></span><select id="cmp-b" class="dh-input"></select></label>
+      </div>
+      <div id="compare-out"></div>
+      <div class="dh-row actions" id="compare-actions" hidden><button id="btn-copy-md" class="dh-btn dh-btn-primary" type="button"></button></div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

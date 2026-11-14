@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+<head>
+  <style>
+    body { padding: 2px; }
+    .top { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+    .title { font-weight: 600; font-size: 13px; }
+    .meta { color: var(--dh-muted); font-size: 12px; margin-top: 2px; }
+    .row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div>
+      <div class="title" id="name">Test Report</div>
+      <div class="meta" id="meta"></div>
+    </div>
+    <button class="dh-btn" id="open" type="button"></button>
+  </div>
+  <div class="row" id="badges"></div>
+  <script>
+    const t = darkhub.t
+    const $ = (id) => document.getElementById(id)
+    const fmt = (v, u) => v == null ? '--' : `${Math.round(v)}${u}`
+    $('open').textContent = t('Abrir', 'Open')
+    $('open').addEventListener('click', () => darkhub.app.navigate('ext__omurilomota_test_report__main'))
+    async function load() {
+      const active = await darkhub.storage.get('active')
+      const sessions = (await darkhub.storage.get('sessions')) || []
+      const badges = $('badges'); badges.textContent = ''
+      if (active && active.status === 'running') {
+        $('name').textContent = active.name || t('Sessão ativa', 'Active session')
+        const mins = Math.max(0, Math.round(((Date.now() - (active.startedAt || Date.now())) / 60000)))
+        $('meta').textContent = t(`Capturando · ${mins} min · ${active.samples || 0} amostras`, `Capturing · ${mins} min · ${active.samples || 0} samples`)
+        try {
+          const s = await darkhub.sensors.read()
+          ;[['CPU', fmt(s.cpu && s.cpu.temp, '°C')], ['GPU', fmt(s.gpu && s.gpu.temp, '°C')]].forEach(([k,v]) => {
+            const b = document.createElement('span'); b.className = 'dh-badge'; b.textContent = `${k} ${v}`; badges.appendChild(b)
+          })
+        } catch {}
+      } else if (sessions.length) {
+        const last = sessions[0]
+        $('name').textContent = last.name || t('Última sessão', 'Last session')
+        const sum = last.summary || {}
+        $('meta').textContent = t(`Concluída · CPU pico ${fmt(sum.cpuTempMax,'°C')} · GPU pico ${fmt(sum.gpuTempMax,'°C')}`,
+          `Completed · CPU peak ${fmt(sum.cpuTempMax,'°C')} · GPU peak ${fmt(sum.gpuTempMax,'°C')}`)
+      } else {
+        $('name').textContent = 'Test Report'
+        $('meta').textContent = t('Nenhuma sessão. Abra para criar um experimento.', 'No sessions yet. Open to create an experiment.')
+      }
+    }
+    load(); setInterval(load, 5000)
+  </script>
+</body>
+</html>
