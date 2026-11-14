@@ -804,6 +804,7 @@ async function measureLatency(host = '1.1.1.1', timeoutMs = 900) {
 }
 
 async function getActiveAdapterName() {
+  if (process.platform !== 'win32') return ''
   const ps = `
     $ErrorActionPreference='Stop'
     $a = Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | Sort-Object -Property LinkSpeed -Descending | Select-Object -First 1
@@ -849,7 +850,9 @@ ipcMain.handle('system:getInfo', async () => {
   return {
     os: {
       platform: os.platform(),
-      distro: `Windows ${os.release()}`,
+      distro: process.platform === 'win32'
+        ? `Windows ${os.release()}`
+        : (typeof os.version === 'function' && os.version() ? os.version() : `Linux ${os.release()}`),
       release: os.release(),
       build: typeof os.version === 'function' ? os.version() : os.release(),
       arch: os.arch()
