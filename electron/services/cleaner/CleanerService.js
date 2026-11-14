@@ -52,14 +52,14 @@ export class CleanerService {
     this.busy = null;
   }
 
-  available() { return fs.existsSync(this.exePath); }
+  available() { return process.platform === 'win32' && fs.existsSync(this.exePath); }
 
   get winapp2Path() { return path.join(this.dataDir, 'winapp2.ini'); }
   get metaPath() { return path.join(this.dataDir, 'winapp2.meta.json'); }
 
   /** %ProgramData%\DarkHub\Cleaner\backups (shared with the rest of DarkHub), or the user folder when it is not writable. */
   backupDir() {
-    const candidates = [this.backupDirPref, path.join(process.env.ProgramData || 'C:\\ProgramData', 'DarkHub', 'Cleaner', 'backups'), path.join(this.dataDir, 'backups')].filter(Boolean);
+    const candidates = [this.backupDirPref, path.join(process.env.ProgramData || (process.platform === 'win32' ? 'C:\\ProgramData' : '/var/lib'), 'DarkHub', 'Cleaner', 'backups'), path.join(this.dataDir, 'backups')].filter(Boolean);
     for (const dir of candidates) {
       try {
         fs.mkdirSync(dir, { recursive: true });
@@ -71,7 +71,8 @@ export class CleanerService {
   }
 
   run(args, { timeoutMs = 120000 } = {}) {
-    if (!this.available()) return Promise.resolve({ ok: false, code: 'missing_engine', error: 'DarkHub.Cleaner.exe não foi encontrado (rode npm run build:cleaner).' });
+    if (process.platform !== 'win32') return Promise.resolve({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'DarkHub Cleaner (motor nativo Windows) não é suportado nesta plataforma.' });
+    if (!fs.existsSync(this.exePath)) return Promise.resolve({ ok: false, code: 'missing_engine', error: 'DarkHub.Cleaner.exe não foi encontrado (rode npm run build:cleaner).' });
     return new Promise((resolve) => {
       this.execFile(this.exePath, [...args, ...this.extraArgs], { windowsHide: true, timeout: timeoutMs, maxBuffer: 256 << 20 }, (err, stdout, stderr) => {
         const line = String(stdout || '').trim().split(/\r?\n/).filter((l) => l.startsWith('{')).pop();
@@ -109,7 +110,8 @@ export class CleanerService {
   status() {
     let backupDir = null;
     try { backupDir = this.backupDir(); } catch { /* reported as null */ }
-    return { ok: true, engine: this.available(), busy: this.busy, backupDir, winapp2: this.definitions(), url: WINAPP2_URL };
+    const supported = process.platform === 'win32';
+    return { ok: true, supported, unsupported: !supported, platform: process.platform, reason: supported ? undefined : 'windows-only', engine: this.available(), busy: this.busy, backupDir, winapp2: this.definitions(), url: WINAPP2_URL };
   }
 
   /** User-initiated download of the community winapp2.ini (never automatic). Keeps the previous file on failure. */
@@ -199,6 +201,7 @@ export class CleanerService {
 
   /** `reg import` of one of our own backups (only a bare file name inside the backup folder is accepted). */
   restoreBackup({ name } = {}) {
+    if (process.platform !== 'win32') return Promise.resolve({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Restauração de backups de registro (.reg) é suportada apenas no Windows.' });
     const n = String(name || '');
     if (!/^[\w.-]+\.reg$/i.test(n) || n !== path.basename(n)) throw new Error('Backup inválido.');
     const file = path.join(this.backupDir(), n);
