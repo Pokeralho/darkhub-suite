@@ -128,6 +128,7 @@ class DnsEngine {
   }
 
   async getActiveAdapter() {
+    if (process.platform !== 'win32') return null;
     const ps = `
 $ErrorActionPreference='Stop'
 $a = Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | Sort-Object -Property LinkSpeed -Descending | Select-Object -First 1

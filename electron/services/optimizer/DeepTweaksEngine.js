@@ -756,7 +756,17 @@ class DeepTweaksEngine {
   listTweaks() {
     // IPC-safe copies: `commands.revert` is a function (tweak:disableHibernation) and Electron's structured clone
     // throws on functions, which made `optimizer:deepTweaksList` reject and the UI show no registry tweak at all.
-    return this.deepTweaks.map(({ commands, ...rest }) => (commands ? { ...rest, hasCommands: true } : rest));
+    const win32Only = process.platform !== 'win32';
+    return this.deepTweaks.map(({ commands, ...rest }) => {
+      const supportedPlatforms = Array.isArray(rest.supportedPlatforms) && rest.supportedPlatforms.length ? rest.supportedPlatforms : ['win32'];
+      const out = {
+        ...rest,
+        supportedPlatforms,
+        supported: supportedPlatforms.includes(process.platform),
+        ...(win32Only ? { unsupported: !supportedPlatforms.includes(process.platform) } : {})
+      };
+      return commands ? { ...out, hasCommands: true } : out;
+    });
   }
 
   /** Ids of the safe, low-risk, reversible tweaks that make up the "recommended" selection. */
