@@ -2066,10 +2066,12 @@ ipcMain.handle('youtube:getVideoInfo', async (_event, payload) => {
     }
 
     const toolsDir = path.join(app.getPath('userData'), 'tools')
+    const { platformBinaryName, fileExists } = await import('./services/binResolver.js')
     const ffmpegPath = await getFfmpegPath()
-    const ffmpegLocation = typeof ffmpegPath === 'string' && fsRaw.existsSync(ffmpegPath)
+    const ffBin = platformBinaryName('ffmpeg')
+    const ffmpegLocation = fileExists(ffmpegPath)
       ? path.dirname(ffmpegPath)
-      : (fsRaw.existsSync(path.join(toolsDir, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg')) ? toolsDir : null)
+      : (fileExists(path.join(toolsDir, ffBin)) ? toolsDir : null)
     let ytDlpError = null
 
     try {
@@ -2183,10 +2185,12 @@ ipcMain.handle('youtube:download', async (event, payload) => {
     const toolsDir = path.join(app.getPath('userData'), 'tools')
     const { ensureYtDlp, runYtDlp } = await getYtDlpTools()
     const ytdlpPath = await ensureYtDlp(toolsDir, process.platform)
+    const { platformBinaryName, fileExists } = await import('./services/binResolver.js')
     const ffmpegPath = await getFfmpegPath()
-    const ffmpegLocation = typeof ffmpegPath === 'string' && fsRaw.existsSync(ffmpegPath)
+    const ffBin = platformBinaryName('ffmpeg')
+    const ffmpegLocation = fileExists(ffmpegPath)
       ? path.dirname(ffmpegPath)
-      : (fsRaw.existsSync(path.join(toolsDir, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg')) ? toolsDir : null)
+      : (fileExists(path.join(toolsDir, ffBin)) ? toolsDir : null)
 
     const { buildExtraArgs } = await import('./services/ytdlpOptions.js')
     const extraOpts = { ...(extra && typeof extra === 'object' ? extra : {}) }
