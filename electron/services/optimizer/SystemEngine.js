@@ -19,7 +19,7 @@ import {
   parseMarkedOutput
 } from './OptimizerUtils.js';
 
-const NOT_WINDOWS = { ok: false, error: 'Only Windows supported' };
+const NOT_WINDOWS = { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
 const BCD_EXTRA = 'sys:bcd';
 const LASTACCESS_EXTRA = 'sys:lastaccess';
 const NETWORK_EXTRA = 'sys:networkExtreme';

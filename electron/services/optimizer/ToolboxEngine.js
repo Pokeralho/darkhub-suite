@@ -27,7 +27,7 @@ class ToolboxEngine {
    * It is NOT a full antivirus. It needs administrator rights, so Windows shows the UAC prompt itself.
    */
   async openAntivirus() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const mrtPath = path.join(process.env.windir || 'C:\\Windows', 'System32', 'mrt.exe');
     if (!fs.existsSync(mrtPath)) return { ok: false, error: 'mrt.exe não existe nesta versão do Windows (foi removido em versões recentes). Use a Segurança do Windows para escanear.' };
     const res = await launch(mrtPath);
@@ -36,7 +36,7 @@ class ToolboxEngine {
   }
 
   async openTaskManager() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const res = await launch('taskmgr.exe');
     if (!res.ok) return { ok: false, error: `Não foi possível abrir o Gerenciador de Tarefas: ${res.error}` };
     return { ok: true, msg: 'Gerenciador de Tarefas aberto.' };

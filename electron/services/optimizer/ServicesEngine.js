@@ -54,7 +54,7 @@ class ServicesEngine {
   }
 
   async applyServicesTweak() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
 
     const before = await this.readServices();
     if (!before) return { ok: false, error: 'Não foi possível ler a configuração atual dos serviços.' };
@@ -112,7 +112,7 @@ class ServicesEngine {
   }
 
   async revertServicesTweak() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const snap = DeepTweaksEngine.getExtra(SNAPSHOT_ID);
     const entries = snap?.services?.length
       ? snap.services

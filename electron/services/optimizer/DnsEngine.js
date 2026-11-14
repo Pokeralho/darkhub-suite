@@ -147,7 +147,7 @@ try { $static = (Get-ItemProperty -LiteralPath ('HKLM:\\SYSTEM\\CurrentControlSe
   }
 
   async getState() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     try {
       const adapter = await this.getActiveAdapter();
       if (!adapter) return { ok: false, error: 'Nenhum adaptador de rede físico ativo encontrado' };
@@ -160,7 +160,7 @@ try { $static = (Get-ItemProperty -LiteralPath ('HKLM:\\SYSTEM\\CurrentControlSe
 
   /** Applies DNS on the active adapter (needs administrator), reads it back and keeps a persistent undo. */
   async apply({ primary, secondary } = {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     if (!isUsableDnsServer(primary) || !isUsableDnsServer(secondary)) return { ok: false, error: 'IP de servidor DNS inválido' };
     try {
       const adapter = await this.getActiveAdapter();
@@ -201,7 +201,7 @@ try { $static = (Get-ItemProperty -LiteralPath ('HKLM:\\SYSTEM\\CurrentControlSe
   }
 
   async undo({ undoToken } = {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const entry = (undoToken && DeepTweaksEngine.getExtra(undoToken)) || DeepTweaksEngine.getExtra('dns:last');
     if (!entry) return { ok: false, error: 'Undo token inválido ou expirado' };
     try {

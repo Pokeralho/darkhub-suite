@@ -83,7 +83,7 @@ $ErrorActionPreference='Stop'
   }
 
   async cleanNetwork() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const script = `
 $ErrorActionPreference = 'Continue'
 & ipconfig.exe /flushdns | Out-Null
@@ -119,7 +119,7 @@ ConvertTo-Json -InputObject @($out) -Compress`;
    * All previous values are snapshotted and restored by advancedNetworkRevert().
    */
   async advancedNetworkApply() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const adapters = await this.getUpAdapters();
     if (adapters.length === 0) return { ok: false, error: 'Nenhum adaptador de rede físico ativo encontrado' };
 
@@ -157,7 +157,7 @@ ConvertTo-Json -InputObject @($out) -Compress`;
   }
 
   async advancedNetworkRevert() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const adapters = await this.getUpAdapters();
     const fallbackChanges = [
       { key: PSCHED, name: 'NonBestEffortLimit', deleteValue: true },

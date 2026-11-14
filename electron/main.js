@@ -3217,7 +3217,7 @@ const autoClicker = new AutoClickerService({
   logger: log
 })
 const autoClickerCall = (fn) => async (_event, payload) => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
+  if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' }
   try { return await fn(payload) } catch (err) { return { ok: false, error: err?.message ?? String(err) } }
 }
 
