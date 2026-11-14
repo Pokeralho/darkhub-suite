@@ -2807,12 +2807,15 @@ ipcMain.handle('security:scanMalware', async () => {
     const processes = await si.processes()
     const suspicious = []
 
-    const safeRegex = /c:\\windows\\|\/usr\/bin\/|\/bin\/|\/sbin\/|\/system\/library\/|\/usr\/sbin\//i
+    const safeRegex = process.platform === 'win32'
+      ? /c:\\windows\\|\\program files\\|\\program files \(x86\)\\|\\windowsapps\\/i
+      : /^(\/usr\/|\/bin\/|\/sbin\/|\/lib|\/lib64|\/opt\/|\/snap\/|\/nix\/|\/var\/lib\/flatpak\/|\/app\/)/i
 
     for (const p of processes.list) {
       if (!p.path) continue
 
-      const isSafeLoc = safeRegex.test(p.path)
+      const pathStr = String(p.path)
+      const isSafeLoc = safeRegex.test(process.platform === 'win32' ? pathStr.toLowerCase() : pathStr)
 
       let score = 0
       let reason = []
