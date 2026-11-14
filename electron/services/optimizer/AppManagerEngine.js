@@ -110,7 +110,7 @@ class AppManagerEngine {
    * StartupApproved flags that Task Manager / Settings > Startup apps use.
    */
   async getStartupItems() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const script = `
 $ErrorActionPreference = 'SilentlyContinue'
 $items = New-Object System.Collections.ArrayList
@@ -192,7 +192,7 @@ ConvertTo-Json -InputObject @($items) -Compress -Depth 3`;
    * backed up before being removed and restored on enable.
    */
   async disableStartupItem(payload = {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const { name, type, path } = payload || {};
     const enable = payload?.enable === true;
     const invalid = this._validateStartupPayload({ name, type, path });
@@ -240,7 +240,7 @@ ConvertTo-Json -InputObject ([pscustomobject]@{ value = [string]$v; kind = $kind
 
   // ------------------------------------------------------------------ services
   async getServices() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const script = `Get-CimInstance Win32_Service -Filter "State='Running'" | Select-Object Name, DisplayName, StartMode | ConvertTo-Json -Compress`;
     const { data } = await this.runPowerShellJson(script, []);
     const services = toArray(data).map((s) => ({ ...s, protected: isProtectedService(s.Name) }));
@@ -249,7 +249,7 @@ ConvertTo-Json -InputObject ([pscustomobject]@{ value = [string]$v; kind = $kind
 
   /** disableService('Name') | disableService({ name, restore: true }) - snapshot of the previous start mode is kept. */
   async disableService(payload) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const name = typeof payload === 'string' ? payload : payload?.name;
     const restore = typeof payload === 'object' && payload?.restore === true;
     if (!isValidServiceName(name)) return { ok: false, error: 'Nome de serviço inválido' };
@@ -317,7 +317,7 @@ if ($key) {
   }
 
   async uninstallProgram(arg) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const uninstallString = typeof arg === 'string' ? arg : arg?.uninstallString;
     if (typeof uninstallString !== 'string' || !uninstallString.trim()) return { ok: false, error: 'Comando de desinstalação inválido' };
 
@@ -358,7 +358,7 @@ if ($key) {
    * Leftovers can include the program's own settings/saved data in AppData: the UI warns about it.
    */
   async uninstallProgramWithLeftovers({ name, uninstallString } = {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     if (!name || !uninstallString) return { ok: false, error: 'Dados do programa inválidos' };
 
     const registered = await this.findRegisteredProgram({ name, uninstallString });
@@ -423,7 +423,7 @@ ${cleanup}`;
   }
 
   async getInstalledPrograms() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows', programs: [] };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.', programs: [] };
     const script = `
 $paths = @(
   'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
@@ -475,7 +475,7 @@ ConvertTo-Json -InputObject @($unique) -Compress`;
 
   /** payload: string[] | { appIds: string[] }. Only ids from BLOATWARE_LIST are accepted; names are matched exactly. */
   async removeSelectedBloatware(payload) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const raw = Array.isArray(payload) ? payload : Array.isArray(payload?.appIds) ? payload.appIds : [];
     const known = new Map(BLOATWARE_LIST.map((a) => [a.id.toLowerCase(), a]));
     const ids = [...new Set(raw.map((id) => String(id ?? '').trim()).filter((id) => isValidAppxName(id) && known.has(id.toLowerCase())))];
@@ -565,7 +565,7 @@ foreach ($id in $ids) {
    * System-critical processes are refused; RealTime needs payload.allowRealtime === true (it can freeze the PC).
    */
   async setProcessPriority({ pid, priority, allowRealtime = false } = {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const priorityName = normalizePriorityName(priority);
     if (!priorityName) return { ok: false, error: `Prioridade inválida: ${String(priority).slice(0, 30)}` };
     const safePid = Number(pid);
@@ -602,7 +602,7 @@ Write-Output ('DHPRIO|' + $p.PriorityClass)`;
 
   // ------------------------------------------------------------------ GPU preference per app
   async getGpuPreferences() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const script = `
 $path = 'HKCU:\\Software\\Microsoft\\DirectX\\UserGpuPreferences'
 $k = Get-Item -LiteralPath $path -ErrorAction SilentlyContinue
@@ -639,7 +639,7 @@ if ($k) { $v = $k.GetValue(${psQuote(appPath)}, $null); if ($null -ne $v) { Writ
   }
 
   async setGpuPreference({ appPath, preference = 'high_performance' } = {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const invalid = this._validateAppExe(appPath);
     if (invalid) return { ok: false, error: invalid };
     const value = preference === 'power_saving' ? 1 : preference === 'default' ? 0 : 2;
@@ -655,7 +655,7 @@ if ($k) { $v = $k.GetValue(${psQuote(appPath)}, $null); if ($null -ne $v) { Writ
   }
 
   async removeGpuPreference({ appPath } = {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     if (typeof appPath !== 'string' || !appPath.trim() || /[\r\n\0]/.test(appPath)) return { ok: false, error: 'Caminho do aplicativo inválido' };
     const [r] = await DeepTweaksEngine.runRegistryOps([{ key: GPU_KEY, name: appPath, deleteValue: true }]);
     if (!r?.ok) return { ok: false, error: `Falha ao remover a preferência: ${r?.message}` };

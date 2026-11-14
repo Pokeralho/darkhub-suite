@@ -1095,7 +1095,7 @@ class DeepTweaksEngine {
   }
 
   async applyTweaks(idsInput, eventSender = () => {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const ids = (Array.isArray(idsInput) ? idsInput : []).filter((i) => typeof i === 'string');
     let defs = ids.map((id) => this.getDefinition(id)).filter(Boolean);
     // Alternatives that write the same value (e.g. prefer IPv4 / disable IPv6): the last one selected wins, and one
@@ -1117,7 +1117,7 @@ class DeepTweaksEngine {
 
   /** Apply an ad-hoc change set (used by other engines) with snapshot + read-back verification. */
   async applyChangeSet({ id, title, changes, statusOnly, commands, explorerRestart, liveAction, requiresReboot }, eventSender = () => {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const clean = (changes || []).map((c) => (c.deleteKey ? { key: c.key, deleteKey: true }
       : c.deleteValue ? { key: c.key, name: c.name || '', deleteValue: true }
         : { key: c.key, name: c.name || '', type: c.type || 'REG_SZ', data: String(c.data ?? '') }));
@@ -1222,7 +1222,7 @@ class DeepTweaksEngine {
   }
 
   async revertTweaks(idsInput, eventSender = () => {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const ids = (Array.isArray(idsInput) ? idsInput : []).filter((i) => typeof i === 'string');
     const defs = ids.map((id) => this.getDefinition(id)).filter(Boolean);
     if (defs.length === 0) return { ok: false, error: 'Nenhum tweak válido selecionado' };
@@ -1234,7 +1234,7 @@ class DeepTweaksEngine {
 
   /** Restore strictly from the saved snapshot (the exact previous values). */
   async undoTweaks(idsInput, eventSender = () => {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const ids = (Array.isArray(idsInput) ? idsInput : [idsInput]).filter((i) => typeof i === 'string');
     const defs = ids.map((id) => this.getDefinition(id)).filter((d) => d && this.deepTweaksUndoStore.has(d.id));
     if (defs.length === 0) return { ok: false, error: 'Nenhum snapshot disponível para os ajustes selecionados' };
@@ -1244,7 +1244,7 @@ class DeepTweaksEngine {
 
   /** Restore an ad-hoc change set applied through applyChangeSet. */
   async restoreChangeSet({ id, title, fallbackChanges, explorerRestart, liveAction, commands, statusOnly, requiresReboot }, eventSender = () => {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const snap = this.deepTweaksUndoStore.get(id);
     const changes = snap?.applied || fallbackChanges || [];
     const def = {
