@@ -245,6 +245,26 @@ class SecurityService {
 
   async scanRunningProcesses() {
     return Logger.track('SecurityService', 'Process Reputation Scan', async () => {
+      if (process.platform !== 'win32') {
+        // On non-Windows platforms, fall back to a best-effort heuristic scan (no Authenticode/PowerShell).
+        try {
+          const si = await import('systeminformation').then((m) => m.default || m);
+          const processes = await si.processes();
+          const safeRegex = /^(\/usr\/|\/bin\/|\/sbin\/|\/lib|\/snap\/|\/opt\/|\/nix\/)/i;
+          const analyzed = (processes?.list || []).map((p) => {
+            let score = 0;
+            const flags = [];
+            const lowPath = String(p.path || '').toLowerCase();
+            const isSafeLoc = safeRegex.test(lowPath);
+            if (p.path && !isSafeLoc) { score += 20; flags.push('Execução fora de diretórios padrão do sistema'); }
+            if ((p.memRss || 0) > 4000000 && !isSafeLoc) { score += 20; flags.push('Alto uso de memória em local não padrão'); }
+            return { Id: p.pid, Name: p.name, Path: p.path || '', Company: '', IsSigned: null, Signer: '', MemoryMb: Math.round(((p.memRss || 0) / 1024) * 10) / 10, entropy: 0, score: Math.min(score, 100), risk: score >= 70 ? 'CRITICAL' : (score >= 40 ? 'WARNING' : 'SAFE'), flags, platform: process.platform };
+          });
+          return analyzed.filter((a) => a.score > 0).sort((a, b) => b.score - a.score);
+        } catch {
+          return [];
+        }
+      }
       const script = `
         $procs = Get-Process | Where-Object { $_.Path -ne $null } | Select-Object Id, ProcessName, Path, WorkingSet64
         $uniquePaths = $procs | Select-Object -ExpandProperty Path -Unique

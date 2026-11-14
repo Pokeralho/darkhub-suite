@@ -2916,7 +2916,9 @@ async function getSecurityScoreV2() {
         add('uac', 'UAC (EnableLUA)', code === 0 && Boolean(data?.enabled), 15, code === 0 ? data : stderr)
       })().catch((err) => add('uac', 'UAC (EnableLUA)', false, 15, err?.message ?? String(err))),
       (async () => {
-        const hostsPath = path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
+        const hostsPath = process.platform === 'win32'
+          ? path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
+          : '/etc/hosts'
         const content = await fs.readFile(hostsPath, 'utf8')
         const hasSection = content.includes('DarkHub Tracking Blocker - BEGIN') && content.includes('DarkHub Tracking Blocker - END')
         add('trackingBlocker', 'Tracking Blocker (hosts)', hasSection, 5, { hostsPath, hasSection })
