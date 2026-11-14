@@ -15,7 +15,12 @@ const CLAM_CHECK_MS = 6 * 3600 * 1000
 
 /** `realtime:*`: real-time optimizer and protection (both off by default, running in the main process). */
 export function registerRealtimeIPC({ app, ipcMain, dialog, BrowserWindow, Notification, logger } = {}) {
-
+  const handle = (channel, fn) => ipcMain.handle(channel, async (_e, payload) => {
+    try { return await fn(payload ?? {}) } catch (err) {
+      logger?.error?.('Realtime', `${channel}: ${err?.message ?? err}`)
+      return { ok: false, error: err?.message ?? String(err) }
+    }
+  })
 
   if (process.platform !== 'win32') {
     const unsupported = (extra = {}) => ({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Realtime optimizer/protection is only supported on Windows.', ...extra })
@@ -114,13 +119,6 @@ export function registerRealtimeIPC({ app, ipcMain, dialog, BrowserWindow, Notif
     defender = { at: Date.now(), running }
     return running
   }
-
-  const handle = (channel, fn) => ipcMain.handle(channel, async (_e, payload) => {
-    try { return await fn(payload ?? {}) } catch (err) {
-      logger?.error?.('Realtime', `${channel}: ${err?.message ?? err}`)
-      return { ok: false, error: err?.message ?? String(err) }
-    }
-  })
 
   const status = () => ({
     ok: true,
