@@ -92,6 +92,12 @@ export async function ensureYtDlp(toolsDir, platform) {
     return dest
   } catch {}
 
+  try {
+    const { findOnPath } = await import('./services/binResolver.js')
+    const onPath = await findOnPath('yt-dlp', platform)
+    if (onPath) return onPath
+  } catch {}
+
   await fs.mkdir(toolsDir, { recursive: true })
   const url = `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${asset}`
   const tmpDest = `${dest}.download`
@@ -183,11 +189,16 @@ export function cancelActiveYtDlp() {
   if (activeYtDlpChild) {
     try {
       const pid = activeYtDlpChild.pid
-      if (process.platform === 'win32' && pid) {
+      const isWin = process.platform === 'win32'
+      isCanceledByCancel = true
+      if (isWin && pid) {
         // non-blocking tree kill (yt-dlp spawns ffmpeg children)
         execFile('taskkill.exe', ['/F', '/T', '/PID', String(pid)], { windowsHide: true }, () => {})
+      } else if (!isWin && pid) {
+        try { process.kill(-pid, 'SIGKILL') } catch { activeYtDlpChild.kill('SIGKILL') }
+      } else {
+        activeYtDlpChild.kill('SIGKILL')
       }
-      activeYtDlpChild.kill('SIGKILL')
     } catch {}
     activeYtDlpChild = null
     return true
@@ -195,19 +206,31 @@ export function cancelActiveYtDlp() {
   return false
 }
 
+let isCanceledByCancel = false
+
 export function runYtDlp(ytdlpPath, args, { timeoutMs = 0, onProgress = null } = {}) {
   return new Promise((resolve, reject) => {
     const finalArgs = onProgress && !args.includes('--newline') ? ['--newline', ...args] : args
-    const child = spawn(ytdlpPath, finalArgs, { windowsHide: true })
+    const isWin = process.platform === 'win32'
+    const child = spawn(ytdlpPath, finalArgs, { windowsHide: true, detached: !isWin })
     activeYtDlpChild = child
     let stdout = ''
     let stderr = ''
     let isCanceled = false
+    isCanceledByCancel = false
+
+    const killActive = () => {
+      try {
+        if (!isWin && child.pid) process.kill(-child.pid, 'SIGKILL')
+        else if (isWin && child.pid) execFile('taskkill.exe', ['/F', '/T', '/PID', String(child.pid)], { windowsHide: true }, () => {})
+        else child.kill('SIGKILL')
+      } catch { try { child.kill('SIGKILL') } catch {} }
+    }
 
     const timer =
       typeof timeoutMs === 'number' && timeoutMs > 0
         ? setTimeout(() => {
-            child.kill()
+            killActive()
             reject(new Error(`yt-dlp timed out after ${timeoutMs}ms`))
           }, timeoutMs)
         : null
@@ -282,7 +305,7 @@ export function runYtDlp(ytdlpPath, args, { timeoutMs = 0, onProgress = null } =
     child.on('close', (code) => {
       if (activeYtDlpChild === child) activeYtDlpChild = null
       if (timer) clearTimeout(timer)
-      resolve({ code, stdout, stderr, canceled: isCanceled })
+      resolve({ code, stdout, stderr, canceled: isCanceled || isCanceledByCancel })
     })
   })
 }
