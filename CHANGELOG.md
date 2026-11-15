@@ -6,6 +6,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-14
+
+### Added
+- **DarkHub SSH** (Diagnostics & Hardware): SSH/SFTP client in the spirit of Termius, everything stored locally.
+  - Encrypted vault (AES-256-GCM, key protected by Windows DPAPI): hosts, groups, tags, `~/.ssh/config` import.
+  - Keychain: passwords, imported keys (OpenSSH, PEM, PPK), Ed25519/RSA-4096 generation, ssh-agent. Secrets never
+    leave the main process.
+  - Known hosts with trust-on-first-use and a clear warning when a server's key changes.
+  - Terminal: tabs, up to 4 split panes, broadcast typing to every pane, search, themes, per-pane zoom, terminal
+    settings (font, cursor, copy on select, right-click paste, bell), jump hosts (ProxyJump), two-factor
+    (keyboard-interactive) prompts, agent forwarding, plain-text session logs.
+  - SFTP: local and remote panes, file and whole-folder transfers with progress, cancel and a choice when the
+    destination exists, multi-select, drag from Windows Explorer, context menu, properties and permissions,
+    server-side copy, symbolic links, and a **root mode** that runs the server's sftp-server through sudo.
+  - Built-in text editor for remote and local files (syntax highlighting, find and replace, keeps line endings and
+    encoding, atomic save that warns when someone else changed the file) and "Edit in Windows app" that uploads
+    every save back.
+  - Snippets with `{{variables}}` (values quoted so they cannot inject commands), run on one or several sessions,
+    startup snippets.
+  - Port forwarding: local (-L), remote (-R) and dynamic SOCKS5 (-D), with a clear message when the port is busy.
+  - Serial console for COM ports (USB-serial, Bluetooth) with no extra driver or module.
+- Sidebar: drag items and categories to reorder the menu (or Alt+Up/Down on an item); the order is saved per user
+  and "Restore the default menu order" undoes it.
+
+### Removed
+- Outdated documents in `docs/` (old API/architecture/handoff pages, the finished optimizer audit and the per-version
+  release-note files; this changelog and the GitHub releases keep every version).
+
 ## [0.8.8] - 2026-11-12
 
 ### Changed
