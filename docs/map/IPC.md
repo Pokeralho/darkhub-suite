@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-14T21:44:44. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-14T22:30:40. NAO edite a mao: rode `npm run map`. -->
 
 # Canais IPC (585)
 

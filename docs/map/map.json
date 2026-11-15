@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-14T21:44:44",
+ "generated_at": "2026-11-14T22:30:40",
  "bridge": "darkhub",
  "preload": "electron/preload.js",
  "features": [

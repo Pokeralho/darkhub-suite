@@ -66,6 +66,9 @@ Obs.: no `preload.js` o namespace do FramePacer é `darkpacer`, com o apelido `f
 | `driver` | `src/pages/DriverCenter.tsx` | `electron/ipc/driverIpc.js` → `electron/services/DriverCenterService.js` |
 | `networktools` | `src/pages/NetworkTools.tsx` | `electron/networkIPC.js` |
 | `setuphub` | `src/pages/SetupHub.tsx` | `electron/main.js` (`setup:*`, winget) |
+| `ssh` | `src/pages/SshClient.tsx` + `src/components/ssh/*` | `electron/ipc/sshIpc.js` (`ssh:*`) → `electron/services/ssh/` (`SshVaultStore` cofre AES-GCM/DPAPI, `SshSessionManager` sessões/ProxyJump/TOFU/2FA, `SftpService` SFTP + modo root via `sudo sftp-server`, `PortForwardService` -L/-R/-D, `SerialService` porta COM via ponte PowerShell/C#) |
+
+Barra lateral: a ordem dos itens e categorias é do usuário (arrastar e soltar), em `src/lib/navLayout.ts`, guardada no `localStorage` (`darkhub.navLayout`). Toda categoria em `MainLayout.tsx` precisa de um `id` fixo.
 
 ### Utilitários
 | Rota | Tela | Backend principal |
