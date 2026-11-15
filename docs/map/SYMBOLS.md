@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-14T22:30:40. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-15T11:22:00. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -782,7 +782,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/ssh/SshVaultStore.js`
 
-`SshVaultError`:26 _class_, `fail`:33, `now`:34, `newId`:35, `str`:36, `req`:37, `optId`:42, `validPort`:43, `tags`:48, `hostname`:52, `emptyData`:59, `normalizeTerminalSettings`:68, `n`:69, `b`:70, `SshVaultStore`:87 _class_, `load`:101, `save`:121, `encrypt`:130, `decrypt`:135, `credentialSummary`:142, `getState`:151, `getSettings`:167, `saveSettings`:172, `saveGroup`:181, `deleteGroup`:215, `getHost`:226, `resolveJumpChain`:232, `saveHost`:248, `deleteHost`:303, `touchHost`:316, `saveCredential`:324, `generateKey`:378, `deleteCredential`:403, `getAuthMaterial`:413, `findKnownHost`:423, `checkHostKey`:433, `trustKnownHost`:444, `deleteKnownHost`:470, `getSnippet`:479, `savePackage`:484, `saveSnippet`:503, `deleteSnippet`:529, `getTunnel`:546, `saveTunnel`:551, `deleteTunnel`:591, `addSessionLog`:600, `updateSessionLog`:619
+`SshVaultError`:26 _class_, `fail`:33, `now`:34, `newId`:35, `str`:36, `req`:37, `optId`:42, `validPort`:43, `tags`:48, `hostname`:52, `emptyData`:59, `normalizeTerminalSettings`:75, `n`:76, `b`:77, `SshVaultStore`:97 _class_, `load`:111, `save`:131, `encrypt`:140, `decrypt`:145, `credentialSummary`:152, `getState`:161, `getSettings`:177, `saveSettings`:182, `saveGroup`:191, `deleteGroup`:225, `getHost`:236, `resolveJumpChain`:242, `saveHost`:258, `deleteHost`:313, `touchHost`:326, `saveCredential`:334, `generateKey`:388, `deleteCredential`:413, `getAuthMaterial`:423, `findKnownHost`:433, `checkHostKey`:443, `trustKnownHost`:454, `deleteKnownHost`:480, `getSnippet`:489, `savePackage`:494, `saveSnippet`:513, `deleteSnippet`:539, `getTunnel`:556, `saveTunnel`:561, `deleteTunnel`:601, `addSessionLog`:610, `updateSessionLog`:629
 
 ## `electron/services/ssh/snippetTemplate.js`
 
@@ -1290,11 +1290,11 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/components/ssh/SshExtras.tsx`
 
-`SerialDrawer`:12 _component_, `load`:19, `set`:27, `connect`:28, `TerminalSettingsDrawer`:69 _component_, `set`:73, `save`:74, `check`:79, `AuthPromptModal`:118 _component_, `send`:121
+`SerialDrawer`:12 _component_, `load`:19, `set`:27, `connect`:28, `TerminalSettingsDrawer`:69 _component_, `set`:73, `save`:74, `check`:79, `AuthPromptModal`:136 _component_, `send`:139
 
 ## `src/components/ssh/TerminalPane.tsx`
 
-`Props`:13 _type_, `beep`:27, `TerminalPane`:36 _component_, `mount`:59, `paste`:94, `onContext`:95, `toggleLog`:161
+`Props`:16 _type_, `beep`:30, `TermMenu`:42 _component_, `close`:50, `TerminalPane`:62 _component_, `ids`:89, `send`:90, `pasteText`:93, `pasteFromClipboard`:101, `copySelection`:102, `mount`:115, `onPaste`:149, `onContext`:155, `toggleLog`:239, `history`:251, `submitCmd`:252, `onCmdKey`:264, `menuItem`:304
 
 ## `src/components/ssh/TunnelsView.tsx`
 
@@ -1303,6 +1303,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `src/components/ssh/sshStore.ts`
 
 `PaneStatus`:7 _type_, `Pane`:8 _type_, `TermTab`:9 _type_, `SftpTab`:10 _type_, `EditorTab`:11 _type_, `Tab`:12 _type_, `State`:14 _type_, `set`:24, `subscribe`:28, `useSshStore`:29, `getSshState`:30, `rid`:32, `wire`:41, `attachOutput`:62, `ensureWired`:68, `updatePane`:71, `setActive`:79, `startSession`:86, `reconnectPane`:98, `openSerial`:109, `setPaneLogging`:113, `openTerminal`:115, `openSftpTab`:132, `patchTab`:138, `closePane`:142, `openEditor`:156, `setEditorDirty`:164, `dependentsOf`:169, `closeTab`:174, `rememberTransfer`:185, `clearFinishedTransfers`:189
+
+## `src/components/ssh/terminalKeys.ts`
+
+`KeyAction`:6 _type_, `KeyInfo`:14 _type_, `simpleKeyAction`:16, `pastedLines`:42, `commandBoxPayload`:47
 
 ## `src/components/ssh/terminalThemes.ts`
 
@@ -1590,7 +1594,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/SshClient.tsx`
 
-`Section`:20 _type_, `QuickConnect`:22 _component_, `TerminalTabView`:52 _component_, `themeOf`:58, `split`:59, `onKey`:66, `SshClient`:110 _component_, `onKey`:151, `requestClose`:165
+`Section`:20 _type_, `QuickConnect`:22 _component_, `hintSeen`:53, `TerminalTabView`:55 _component_, `closeHint`:59, `useSimple`:60, `themeOf`:69, `split`:70, `onKey`:77, `SshClient`:128 _component_, `onKey`:169, `requestClose`:183
 
 ## `src/pages/StartupManager.tsx`
 
@@ -1863,6 +1867,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/templateBackslash.test.ts`
 
 `lostEscapes`:10, `visit`:13, `walk`:36
+
+## `tests/terminalKeys.test.ts`
+
+`k`:7
 
 ## `tests/updateService.test.ts`
 

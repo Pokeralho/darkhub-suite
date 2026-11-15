@@ -83,6 +83,24 @@ export function TerminalSettingsDrawer({ settings, onClose, onSaved }: { setting
   return (
     <Drawer title={t('ssh.set.title', 'Configurações do terminal')} onClose={onClose}
       footer={<><button type="button" className="dh-btn" onClick={onClose}>{t('ssh.cancel', 'Cancelar')}</button><button type="button" className="dh-btn dh-btn-primary" onClick={save}>{t('ssh.save', 'Salvar')}</button></>}>
+      <div className="space-y-2">
+        <span className="dh-label">{t('ssh.set.mode', 'Jeito de usar o terminal')}</span>
+        <div className="grid grid-cols-2 gap-2">
+          {([
+            ['simple', t('ssh.set.modeSimple', 'Simples'), t('ssh.set.modeSimpleHelp', 'Como no Bloco de Notas e no VS Code: Ctrl+C copia o que está selecionado, Ctrl+V cola, Ctrl+A seleciona tudo, Ctrl+F busca, botão direito abre um menu. Sem nada selecionado, Ctrl+C para o comando.')],
+            ['classic', t('ssh.set.modeClassic', 'Clássico'), t('ssh.set.modeClassicHelp', 'Como no PuTTY e no Linux: todas as teclas vão para o servidor (Ctrl+C interrompe, Ctrl+A vai para o início da linha). Copiar e colar com Ctrl+Shift+C e Ctrl+Shift+V.')]
+          ] as const).map(([id, name, help]) => (
+            <button type="button" key={id} onClick={() => set({ keyMode: id })} aria-pressed={s.keyMode === id}
+              className={`dh-card p-3 text-left space-y-1 ${s.keyMode === id ? 'border-blue-500/60' : ''}`}>
+              <span className={`block text-[13px] font-medium ${s.keyMode === id ? 'text-blue-200' : 'text-zinc-200'}`}>{name}</span>
+              <span className="block text-[11.5px] leading-snug text-zinc-400">{help}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      {check('commandBox', t('ssh.set.commandBox', 'Caixa de comando sob o terminal'), t('ssh.set.commandBoxHelp', 'Escreva e corrija o comando como num editor de texto (setas, seleção com o mouse, Ctrl+Z) e aperte Enter para enviar. ↑ e ↓ trazem os comandos anteriores. Também dá para ligar só em um painel pelo botão de lápis.'))}
+      {check('confirmPaste', t('ssh.set.confirmPaste', 'Confirmar antes de colar várias linhas'), t('ssh.set.confirmPasteHelp', 'Cada linha colada vira um comando executado. Mostra o texto antes, para não rodar nada sem querer.'))}
+      <div className="h-px bg-zinc-800/80" />
       <div className="grid grid-cols-2 gap-3">
         <Field label={t('ssh.set.fontSize', 'Tamanho da fonte')}><input type="number" min={8} max={32} className="dh-input w-full font-mono" value={s.fontSize} onChange={(e) => set({ fontSize: Number(e.target.value) })} /></Field>
         <Field label={t('ssh.set.lineHeight', 'Altura da linha')}><input type="number" min={1} max={2} step={0.05} className="dh-input w-full font-mono" value={s.lineHeight} onChange={(e) => set({ lineHeight: Number(e.target.value) })} /></Field>
@@ -104,7 +122,7 @@ export function TerminalSettingsDrawer({ settings, onClose, onSaved }: { setting
       </Field>
       {check('cursorBlink', t('ssh.set.blink', 'Cursor piscando'))}
       {check('copyOnSelect', t('ssh.set.copyOnSelect', 'Copiar ao selecionar'), t('ssh.set.copyOnSelectHelp', 'Como no PuTTY: selecionar já copia.'))}
-      {check('rightClickPaste', t('ssh.set.rightClick', 'Botão direito copia a seleção ou cola'))}
+      {s.keyMode === 'classic' ? check('rightClickPaste', t('ssh.set.rightClick', 'Botão direito copia a seleção ou cola')) : null}
       {check('bell', t('ssh.set.bell', 'Som do sino (BEL)'))}
       {check('confirmClose', t('ssh.set.confirmClose', 'Confirmar antes de fechar abas com sessões ativas'))}
       {check('logByDefault', t('ssh.set.logDefault', 'Gravar log de todas as sessões'), t('ssh.set.logDefaultHelp', 'Os logs ficam em texto puro, sem cores, na pasta de logs do DarkHub.'))}

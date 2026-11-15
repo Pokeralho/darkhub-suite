@@ -62,7 +62,14 @@ function emptyData() {
 
 export const DEFAULT_TERMINAL_SETTINGS = {
   fontSize: 13, fontFamily: 'Geist Mono Variable', lineHeight: 1.15, cursorStyle: 'block', cursorBlink: true, scrollback: 10000,
-  copyOnSelect: false, rightClickPaste: true, bell: false, confirmClose: true, defaultThemeId: 'darkhub-midnight', logByDefault: false
+  copyOnSelect: false, rightClickPaste: true, bell: false, confirmClose: true, defaultThemeId: 'darkhub-midnight', logByDefault: false,
+  // 'classic': keys go to the server as in PuTTY/Linux (Ctrl+C = interrupt). 'simple': Notepad/VS Code habits
+  // (Ctrl+C copies when text is selected, Ctrl+V pastes, Ctrl+A selects all, right-click menu).
+  keyMode: 'classic',
+  // editor-style box under the terminal: write and fix the command with normal editing, Enter sends it
+  commandBox: false,
+  // ask before pasting several lines (each line runs as a command)
+  confirmPaste: true
 }
 
 export function normalizeTerminalSettings(input = {}, base = DEFAULT_TERMINAL_SETTINGS) {
@@ -80,7 +87,10 @@ export function normalizeTerminalSettings(input = {}, base = DEFAULT_TERMINAL_SE
     bell: b(input.bell, base.bell),
     confirmClose: b(input.confirmClose, base.confirmClose),
     defaultThemeId: typeof input.defaultThemeId === 'string' && /^[a-z0-9-]{1,48}$/.test(input.defaultThemeId) ? input.defaultThemeId : base.defaultThemeId,
-    logByDefault: b(input.logByDefault, base.logByDefault)
+    logByDefault: b(input.logByDefault, base.logByDefault),
+    keyMode: input.keyMode === 'simple' || input.keyMode === 'classic' ? input.keyMode : base.keyMode,
+    commandBox: b(input.commandBox, base.commandBox),
+    confirmPaste: b(input.confirmPaste, base.confirmPaste)
   }
 }
 

@@ -502,6 +502,8 @@ export interface SshSessionLog { id: string; hostId: string | null; hostSnapshot
 export interface SshTerminalSettings {
   fontSize: number; fontFamily: string; lineHeight: number; cursorStyle: 'block' | 'bar' | 'underline'; cursorBlink: boolean; scrollback: number;
   copyOnSelect: boolean; rightClickPaste: boolean; bell: boolean; confirmClose: boolean; defaultThemeId: string; logByDefault: boolean;
+  /** 'classic' = keys go to the server (Ctrl+C interrupts); 'simple' = Notepad/VS Code shortcuts. */
+  keyMode: 'classic' | 'simple'; commandBox: boolean; confirmPaste: boolean;
 }
 export interface SshAuthPrompt { requestId: string; ownerId: string; hostId: string; hostLabel: string; hostname: string; name: string; instructions: string; prompts: { prompt: string; echo: boolean }[] }
 export interface SshWatchEvent { watchId: string; sftpId: string; remotePath: string; localPath: string; status: 'watching' | 'uploading' | 'uploaded' | 'error' | 'stopped'; error?: string; at?: number; reason?: string }

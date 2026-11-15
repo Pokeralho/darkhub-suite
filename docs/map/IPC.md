@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-14T22:30:40. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-15T11:22:00. NAO edite a mao: rode `npm run map`. -->
 
 # Canais IPC (585)
 
@@ -485,7 +485,7 @@
 | `ssh.saveCredential` | `ssh:keychain:save` | `electron/ipc/sshIpc.js:142` | `store.saveCredential` | `src/components/ssh/KeychainView.tsx` |
 | `ssh.saveGroup` | `ssh:group:save` | `electron/ipc/sshIpc.js:107` | `store.saveGroup` | `src/components/ssh/HostsView.tsx` |
 | `ssh.saveHost` | `ssh:host:save` | `electron/ipc/sshIpc.js:109` | `store.saveHost` | `src/components/ssh/HostsView.tsx` |
-| `ssh.saveSettings` | `ssh:settings:save` | `electron/ipc/sshIpc.js:193` | `store.saveSettings` | `src/components/ssh/SshExtras.tsx` |
+| `ssh.saveSettings` | `ssh:settings:save` | `electron/ipc/sshIpc.js:193` | `store.saveSettings` | `src/components/ssh/SshExtras.tsx`<br>`src/pages/SshClient.tsx` |
 | `ssh.saveSnippet` | `ssh:snippet:save` | `electron/ipc/sshIpc.js:223` | `store.savePackage`<br>`store.saveSnippet` | `src/components/ssh/SnippetsView.tsx` |
 | `ssh.saveTunnel` | `ssh:tunnel:save` | `electron/ipc/sshIpc.js:235` | `tunnels.status`<br>`store.saveTunnel`<br>`tunnels.stop` | `src/components/ssh/TunnelsView.tsx` |
 | `ssh.serialBreak` | `ssh:serial:break` | `electron/ipc/sshIpc.js:190` | `serial.sendBreak` | `src/components/ssh/TerminalPane.tsx` |

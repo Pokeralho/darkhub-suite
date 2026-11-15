@@ -49,8 +49,19 @@ function QuickConnect({ vault, onPick, onClose, title }: { vault: SshVaultState;
   );
 }
 
-function TerminalTabView({ tab, vault, visible }: { tab: TermTab; vault: SshVaultState; visible: boolean }) {
+const MODE_HINT_KEY = 'darkhub.ssh.modeHintSeen';
+const hintSeen = () => { try { return localStorage.getItem(MODE_HINT_KEY) === '1'; } catch { return true; } };
+
+function TerminalTabView({ tab, vault, visible, reload }: { tab: TermTab; vault: SshVaultState; visible: boolean; reload: () => Promise<void> }) {
   const { t } = useI18n();
+  // one-time offer of the Notepad-style shortcuts for people new to terminals
+  const [modeHint, setModeHint] = useState(() => !hintSeen() && vault.settings.terminal.keyMode === 'classic');
+  const closeHint = () => { try { localStorage.setItem(MODE_HINT_KEY, '1'); } catch { /* storage off */ } setModeHint(false); };
+  const useSimple = async () => {
+    await window.darkhub.ssh.saveSettings({ terminal: { keyMode: 'simple', commandBox: true } });
+    closeHint();
+    await reload();
+  };
   const [runner, setRunner] = useState(false);
   const [splitPick, setSplitPick] = useState<'row' | 'col' | null>(null);
   const targets = tab.broadcast ? tab.panes.filter((p) => p.status === 'connected').map((p) => p.sessionId) : null;
@@ -82,6 +93,13 @@ function TerminalTabView({ tab, vault, visible }: { tab: TermTab; vault: SshVaul
         <span className="flex-1" />
         <button type="button" className={`dh-btn dh-btn-sm ${runner ? 'text-blue-200' : ''}`} onClick={() => setRunner((r) => !r)}><Code size={13} />{t('ssh.nav.snippets', 'Snippets')}</button>
       </div>
+      {modeHint ? (
+        <div className="flex flex-wrap items-center gap-2 mb-2 px-3 py-1.5 rounded-lg border border-blue-500/40 bg-blue-500/10 text-[12px] text-blue-100">
+          <span className="flex-1 min-w-[240px]">{t('ssh.hint.text', 'Novo no terminal? No modo Simples, Ctrl+C copia, Ctrl+V cola e você escreve o comando numa caixa como a de um editor de texto.')}</span>
+          <button type="button" className="dh-btn dh-btn-sm dh-btn-accent" onClick={() => void useSimple()}>{t('ssh.hint.use', 'Usar o modo Simples')}</button>
+          <button type="button" className="dh-btn dh-btn-sm dh-btn-ghost" onClick={closeHint}>{t('ssh.hint.keep', 'Manter o clássico')}</button>
+        </div>
+      ) : null}
       {tab.broadcast ? (
         <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-lg border border-amber-500/50 bg-amber-500/10 text-[12px] text-amber-200">
           <AlertTriangle size={13} />{t('ssh.term.broadcastBanner', 'Transmissão ativa: cada tecla vai para {n} servidores.').replace('{n}', String(targets?.length ?? 0))}
@@ -233,7 +251,7 @@ export default function SshClient() {
           </div>
         ) : null}
         {vault ? store.tabs.map((tb) => {
-          if (tb.kind === 'terminal') return <TerminalTabView key={tb.id} tab={tb} vault={vault} visible={tb.id === store.active} />;
+          if (tb.kind === 'terminal') return <TerminalTabView key={tb.id} tab={tb} vault={vault} visible={tb.id === store.active} reload={reload} />;
           if (tb.kind === 'sftp') return <div key={tb.id} className={tb.id === store.active ? 'h-full' : 'hidden'}><SftpView sftpId={tb.id} hostId={tb.hostId} vault={vault} visible={tb.id === store.active} /></div>;
           return (
             <Suspense key={tb.id} fallback={tb.id === store.active ? <div className="h-full rounded-xl bg-zinc-900 animate-pulse" /> : null}>

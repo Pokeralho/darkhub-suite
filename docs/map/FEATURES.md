@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-14T22:30:40. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-15T11:22:00. NAO edite a mao: rode `npm run map`. -->
 
 # Mapa de funcionalidades (tela -> IPC -> backend)
 Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/preload.js` -> canal IPC -> handler -> servico.
@@ -152,7 +152,7 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 ### DarkHub SSH  (rota `ssh`)
 - Tela: `src/pages/SshClient.tsx`
-- Componentes/hooks usados: `src/components/icons/index.tsx`, `src/components/ssh/HostsView.tsx`, `src/components/ssh/KeychainView.tsx`, `src/components/ssh/SftpView.tsx`, `src/components/ssh/SnippetsView.tsx`, `src/components/ssh/SshExtras.tsx`, `src/components/ssh/TerminalPane.tsx`, `src/components/ssh/TunnelsView.tsx`, `src/components/ssh/sshStore.ts`, `src/components/ssh/terminalThemes.ts`, `src/components/ssh/ui.tsx`, `src/components/ui/PageHeader.tsx`
+- Componentes/hooks usados: `src/components/icons/index.tsx`, `src/components/ssh/HostsView.tsx`, `src/components/ssh/KeychainView.tsx`, `src/components/ssh/SftpView.tsx`, `src/components/ssh/SnippetsView.tsx`, `src/components/ssh/SshExtras.tsx`, `src/components/ssh/TerminalPane.tsx`, `src/components/ssh/TunnelsView.tsx`, `src/components/ssh/sshStore.ts`, `src/components/ssh/terminalKeys.ts`, `src/components/ssh/terminalThemes.ts`, `src/components/ssh/ui.tsx`, `src/components/ui/PageHeader.tsx`
 - Arquivos de backend: `electron/ipc/sshIpc.js`, `electron/main.js`, `electron/services/ssh/snippetTemplate.js`, `electron/services/ssh/sshConfigParser.js`
 
 | API | canal | handler | chama |

@@ -47,7 +47,7 @@ function ContextMenu({ x, y, children }: { x: number; y: number; children: React
     setPos({ left: Math.max(4, Math.min(x, window.innerWidth - r.width - 8)), top: Math.max(4, Math.min(y, window.innerHeight - r.height - 8)) });
   }, [x, y]);
   return createPortal(
-    <div ref={ref} className="fixed z-[80] min-w-[220px] dh-card py-1 shadow-2xl" style={pos} onClick={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}>{children}</div>,
+    <div ref={ref} className="fixed z-[80] min-w-[220px] dh-card !bg-zinc-900 py-1 shadow-2xl ring-1 ring-black/40" style={pos} onClick={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}>{children}</div>,
     document.body
   );
 }

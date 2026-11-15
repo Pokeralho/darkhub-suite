@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-14T22:30:40",
+ "generated_at": "2026-11-15T11:22:00",
  "bridge": "darkhub",
  "preload": "electron/preload.js",
  "features": [
@@ -903,6 +903,7 @@
     "src/components/ssh/TerminalPane.tsx",
     "src/components/ssh/TunnelsView.tsx",
     "src/components/ssh/sshStore.ts",
+    "src/components/ssh/terminalKeys.ts",
     "src/components/ssh/terminalThemes.ts",
     "src/components/ssh/ui.tsx",
     "src/components/ui/PageHeader.tsx"
@@ -910,7 +911,7 @@
    "ipc": [
     {
      "api": "shell.openExternal",
-     "from": "src/components/ssh/TerminalPane.tsx:77",
+     "from": "src/components/ssh/TerminalPane.tsx:133",
      "channel": "shell:openExternal",
      "handler": "electron/main.js:1402",
      "calls": [
@@ -1013,7 +1014,7 @@
     },
     {
      "api": "ssh.getState",
-     "from": "src/pages/SshClient.tsx:125",
+     "from": "src/pages/SshClient.tsx:143",
      "channel": "ssh:vault:getState",
      "handler": "electron/ipc/sshIpc.js:104",
      "calls": []
@@ -1060,7 +1061,7 @@
     },
     {
      "api": "ssh.resize",
-     "from": "src/components/ssh/TerminalPane.tsx:126",
+     "from": "src/components/ssh/TerminalPane.tsx:202",
      "channel": "ssh:session:resize",
      "handler": "electron/ipc/sshIpc.js:176",
      "calls": [
@@ -1069,7 +1070,7 @@
     },
     {
      "api": "ssh.respondAuth",
-     "from": "src/components/ssh/SshExtras.tsx:122",
+     "from": "src/components/ssh/SshExtras.tsx:140",
      "channel": "ssh:auth:respond",
      "handler": "electron/ipc/sshIpc.js:185",
      "calls": [
@@ -1117,7 +1118,7 @@
     },
     {
      "api": "ssh.saveSettings",
-     "from": "src/components/ssh/SshExtras.tsx:75",
+     "from": "src/pages/SshClient.tsx:61",
      "channel": "ssh:settings:save",
      "handler": "electron/ipc/sshIpc.js:193",
      "calls": [
@@ -1148,7 +1149,7 @@
     },
     {
      "api": "ssh.serialBreak",
-     "from": "src/components/ssh/TerminalPane.tsx:188",
+     "from": "src/components/ssh/TerminalPane.tsx:322",
      "channel": "ssh:serial:break",
      "handler": "electron/ipc/sshIpc.js:190",
      "calls": [
@@ -1175,7 +1176,7 @@
     },
     {
      "api": "ssh.setLogging",
-     "from": "src/components/ssh/TerminalPane.tsx:162",
+     "from": "src/components/ssh/TerminalPane.tsx:240",
      "channel": "ssh:session:setLogging",
      "handler": "electron/ipc/sshIpc.js:181",
      "calls": [
@@ -13170,7 +13171,8 @@
     ]
    },
    "used_by": [
-    "src/components/ssh/SshExtras.tsx"
+    "src/components/ssh/SshExtras.tsx",
+    "src/pages/SshClient.tsx"
    ]
   },
   {
@@ -30189,182 +30191,182 @@
    {
     "name": "normalizeTerminalSettings",
     "kind": "function",
-    "line": 68
+    "line": 75
    },
    {
     "name": "n",
     "kind": "function",
-    "line": 69
+    "line": 76
    },
    {
     "name": "b",
     "kind": "function",
-    "line": 70
+    "line": 77
    },
    {
     "name": "SshVaultStore",
     "kind": "class",
-    "line": 87
+    "line": 97
    },
    {
     "name": "load",
     "kind": "method",
-    "line": 101
+    "line": 111
    },
    {
     "name": "save",
     "kind": "method",
-    "line": 121
+    "line": 131
    },
    {
     "name": "encrypt",
     "kind": "method",
-    "line": 130
+    "line": 140
    },
    {
     "name": "decrypt",
     "kind": "method",
-    "line": 135
+    "line": 145
    },
    {
     "name": "credentialSummary",
     "kind": "method",
-    "line": 142
+    "line": 152
    },
    {
     "name": "getState",
     "kind": "method",
-    "line": 151
+    "line": 161
    },
    {
     "name": "getSettings",
     "kind": "method",
-    "line": 167
+    "line": 177
    },
    {
     "name": "saveSettings",
     "kind": "method",
-    "line": 172
+    "line": 182
    },
    {
     "name": "saveGroup",
     "kind": "method",
-    "line": 181
+    "line": 191
    },
    {
     "name": "deleteGroup",
     "kind": "method",
-    "line": 215
+    "line": 225
    },
    {
     "name": "getHost",
     "kind": "method",
-    "line": 226
+    "line": 236
    },
    {
     "name": "resolveJumpChain",
     "kind": "method",
-    "line": 232
+    "line": 242
    },
    {
     "name": "saveHost",
     "kind": "method",
-    "line": 248
+    "line": 258
    },
    {
     "name": "deleteHost",
     "kind": "method",
-    "line": 303
+    "line": 313
    },
    {
     "name": "touchHost",
     "kind": "method",
-    "line": 316
+    "line": 326
    },
    {
     "name": "saveCredential",
     "kind": "method",
-    "line": 324
+    "line": 334
    },
    {
     "name": "generateKey",
     "kind": "method",
-    "line": 378
+    "line": 388
    },
    {
     "name": "deleteCredential",
     "kind": "method",
-    "line": 403
+    "line": 413
    },
    {
     "name": "getAuthMaterial",
     "kind": "method",
-    "line": 413
+    "line": 423
    },
    {
     "name": "findKnownHost",
     "kind": "method",
-    "line": 423
+    "line": 433
    },
    {
     "name": "checkHostKey",
     "kind": "method",
-    "line": 433
+    "line": 443
    },
    {
     "name": "trustKnownHost",
     "kind": "method",
-    "line": 444
+    "line": 454
    },
    {
     "name": "deleteKnownHost",
     "kind": "method",
-    "line": 470
+    "line": 480
    },
    {
     "name": "getSnippet",
     "kind": "method",
-    "line": 479
+    "line": 489
    },
    {
     "name": "savePackage",
     "kind": "method",
-    "line": 484
+    "line": 494
    },
    {
     "name": "saveSnippet",
     "kind": "method",
-    "line": 503
+    "line": 513
    },
    {
     "name": "deleteSnippet",
     "kind": "method",
-    "line": 529
+    "line": 539
    },
    {
     "name": "getTunnel",
     "kind": "method",
-    "line": 546
+    "line": 556
    },
    {
     "name": "saveTunnel",
     "kind": "method",
-    "line": 551
+    "line": 561
    },
    {
     "name": "deleteTunnel",
     "kind": "method",
-    "line": 591
+    "line": 601
    },
    {
     "name": "addSessionLog",
     "kind": "method",
-    "line": 600
+    "line": 610
    },
    {
     "name": "updateSessionLog",
     "kind": "method",
-    "line": 619
+    "line": 629
    }
   ],
   "electron/services/ssh/snippetTemplate.js": [
@@ -36713,49 +36715,104 @@
    {
     "name": "AuthPromptModal",
     "kind": "component",
-    "line": 118
+    "line": 136
    },
    {
     "name": "send",
     "kind": "function",
-    "line": 121
+    "line": 139
    }
   ],
   "src/components/ssh/TerminalPane.tsx": [
    {
     "name": "Props",
     "kind": "type",
-    "line": 13
+    "line": 16
    },
    {
     "name": "beep",
     "kind": "function",
-    "line": 27
+    "line": 30
+   },
+   {
+    "name": "TermMenu",
+    "kind": "component",
+    "line": 42
+   },
+   {
+    "name": "close",
+    "kind": "function",
+    "line": 50
    },
    {
     "name": "TerminalPane",
     "kind": "component",
-    "line": 36
+    "line": 62
+   },
+   {
+    "name": "ids",
+    "kind": "function",
+    "line": 89
+   },
+   {
+    "name": "send",
+    "kind": "function",
+    "line": 90
+   },
+   {
+    "name": "pasteText",
+    "kind": "function",
+    "line": 93
+   },
+   {
+    "name": "pasteFromClipboard",
+    "kind": "function",
+    "line": 101
+   },
+   {
+    "name": "copySelection",
+    "kind": "function",
+    "line": 102
    },
    {
     "name": "mount",
     "kind": "function",
-    "line": 59
+    "line": 115
    },
    {
-    "name": "paste",
+    "name": "onPaste",
     "kind": "function",
-    "line": 94
+    "line": 149
    },
    {
     "name": "onContext",
     "kind": "function",
-    "line": 95
+    "line": 155
    },
    {
     "name": "toggleLog",
     "kind": "function",
-    "line": 161
+    "line": 239
+   },
+   {
+    "name": "history",
+    "kind": "function",
+    "line": 251
+   },
+   {
+    "name": "submitCmd",
+    "kind": "function",
+    "line": 252
+   },
+   {
+    "name": "onCmdKey",
+    "kind": "function",
+    "line": 264
+   },
+   {
+    "name": "menuItem",
+    "kind": "function",
+    "line": 304
    }
   ],
   "src/components/ssh/TunnelsView.tsx": [
@@ -36950,6 +37007,33 @@
     "name": "clearFinishedTransfers",
     "kind": "function",
     "line": 189
+   }
+  ],
+  "src/components/ssh/terminalKeys.ts": [
+   {
+    "name": "KeyAction",
+    "kind": "type",
+    "line": 6
+   },
+   {
+    "name": "KeyInfo",
+    "kind": "type",
+    "line": 14
+   },
+   {
+    "name": "simpleKeyAction",
+    "kind": "function",
+    "line": 16
+   },
+   {
+    "name": "pastedLines",
+    "kind": "function",
+    "line": 42
+   },
+   {
+    "name": "commandBoxPayload",
+    "kind": "function",
+    "line": 47
    }
   ],
   "src/components/ssh/terminalThemes.ts": [
@@ -41021,39 +41105,54 @@
     "line": 22
    },
    {
+    "name": "hintSeen",
+    "kind": "function",
+    "line": 53
+   },
+   {
     "name": "TerminalTabView",
     "kind": "component",
-    "line": 52
+    "line": 55
    },
    {
-    "name": "themeOf",
-    "kind": "function",
-    "line": 58
-   },
-   {
-    "name": "split",
+    "name": "closeHint",
     "kind": "function",
     "line": 59
    },
    {
+    "name": "useSimple",
+    "kind": "function",
+    "line": 60
+   },
+   {
+    "name": "themeOf",
+    "kind": "function",
+    "line": 69
+   },
+   {
+    "name": "split",
+    "kind": "function",
+    "line": 70
+   },
+   {
     "name": "onKey",
     "kind": "function",
-    "line": 66
+    "line": 77
    },
    {
     "name": "SshClient",
     "kind": "component",
-    "line": 110
+    "line": 128
    },
    {
     "name": "onKey",
     "kind": "function",
-    "line": 151
+    "line": 169
    },
    {
     "name": "requestClose",
     "kind": "function",
-    "line": 165
+    "line": 183
    }
   ],
   "src/pages/StartupManager.tsx": [
@@ -42690,6 +42789,13 @@
     "name": "walk",
     "kind": "function",
     "line": 36
+   }
+  ],
+  "tests/terminalKeys.test.ts": [
+   {
+    "name": "k",
+    "kind": "function",
+    "line": 7
    }
   ],
   "tests/updateService.test.ts": [
