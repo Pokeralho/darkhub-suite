@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-15T14:12:05. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-15T14:53:51. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -246,7 +246,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:185, `listener`:196, `handler`:235, `handler`:298, `handler`:317, `handler`:327, `handler`:345, `handler`:357, `listener`:400, `handler`:452, `handler`:478, `handler`:484, `handler`:490, `handler`:496, `listener`:505, `listener`:516, `handler`:541, `listener`:554, `listener`:571, `handler`:640, `handler`:664, `handler`:679, `listener`:702, `listener`:731, `listener`:766, `listener`:793, `handler`:834
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:185, `listener`:196, `handler`:235, `handler`:298, `handler`:317, `handler`:327, `handler`:345, `handler`:357, `listener`:400, `handler`:452, `handler`:478, `handler`:484, `handler`:490, `handler`:496, `listener`:505, `listener`:516, `handler`:541, `listener`:554, `listener`:571, `handler`:640, `handler`:664, `handler`:679, `listener`:703, `listener`:732, `listener`:767, `listener`:794, `handler`:835
 
 ## `electron/services/CodeRunner.js`
 
@@ -438,7 +438,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/diskscan/DiskScanService.js`
 
-`defaultExe`:14, `csvCell`:19, `formatSize`:21, `RECYCLE_PROBE`:29, `recycleVerdict`:56, `DiskScanService`:65 _class_, `_filter`:77, `drives`:85, `status`:98, `emit`:131, `cancel`:162, `view`:173, `info`:194, `setTag`:199, `_pathOf`:204, `open`:210, `reveal`:217, `trash`:225, `recycleProbe`:241, `pathOf`:246, `exportTo`:249, `write`:254
+`defaultExe`:14, `csvCell`:19, `formatSize`:21, `RECYCLE_PROBE`:29, `recycleVerdict`:56, `clearReadOnly`:66, `DiskScanService`:74 _class_, `_filter`:86, `drives`:94, `status`:107, `emit`:140, `cancel`:171, `view`:182, `info`:203, `setTag`:208, `_pathOf`:213, `open`:219, `reveal`:226, `trash`:234, `deletePermanent`:253, `rm`:262, `recycleProbe`:279, `pathOf`:284, `exportTo`:287, `write`:292
 
 ## `electron/services/diskscan/ScanModel.js`
 
@@ -622,7 +622,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/optimizer/SystemEngine.js`
 
-`SystemEngine`:47 _class_, `_runMarked`:49, `createRestorePoint`:59, `cleanRegistryAndTemp`:91, `repairWindows`:140, `activateWindows`:159, `setPerformanceMode`:170, `_lowLevelReadBlock`:176, `_applyLowLevel`:194, `_revertLowLevel`:219, `_pieces`:256, `_markComposite`:261, `_revertComposite`:271, `applyTimerTuning`:297, `revertTimerTuning`:305, `applyHardcoreGamerMode`:313, `revertHardcoreGamerMode`:330, `applyExtremeKernelMod`:343, `revertExtremeKernelMod`:360, `applyExtremeNetworkMod`:373, `readBlock`:375, `revertExtremeNetworkMod`:402, `v`:406, `applyCpuUnpark`:421, `revertCpuUnpark`:459, `_displayPciIds`:490, `_msiKey`:500, `applyMsiMode`:508, `revertMsiMode`:522, `setPagefile`:537, `revertPagefile`:574, `toggleHibernation`:588, `setExecutionPolicy`:602, `toggleFeature`:616, `removeCapabilitiesAndRecall`:643, `restoreCapabilities`:677, `deepCleanOneDrive`:705, `stillInstalled`:714, `deleteRun`:716, `restartExplorer`:742
+`SystemEngine`:49 _class_, `_runMarked`:51, `createRestorePoint`:61, `cleanRegistryAndTemp`:93, `repairWindows`:142, `activateWindows`:161, `setPerformanceMode`:172, `_lowLevelReadBlock`:178, `_applyLowLevel`:196, `_revertLowLevel`:221, `_revertLowLevelPlan`:229, `finish`:247, `_pieces`:267, `_markComposite`:272, `_revertComposite`:282, `applyTimerTuning`:314, `revertTimerTuning`:322, `applyHardcoreGamerMode`:330, `revertHardcoreGamerMode`:347, `applyExtremeKernelMod`:360, `revertExtremeKernelMod`:377, `applyExtremeNetworkMod`:390, `readBlock`:392, `revertExtremeNetworkMod`:419, `v`:423, `applyCpuUnpark`:438, `revertCpuUnpark`:476, `_displayPciIds`:507, `_msiKey`:517, `applyMsiMode`:525, `revertMsiMode`:539, `setPagefile`:554, `revertPagefile`:591, `toggleHibernation`:605, `setExecutionPolicy`:619, `toggleFeature`:633, `removeCapabilitiesAndRecall`:660, `restoreCapabilities`:694, `deepCleanOneDrive`:722, `stillInstalled`:731, `deleteRun`:733, `restartExplorer`:759
 
 ## `electron/services/optimizer/SystemOptimizerService.js`
 
@@ -1602,7 +1602,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/SpaceSniffer/index.tsx`
 
-`api`:13, `fmtDate`:18, `fmtInt`:19, `fmtTime`:20, `ColorMode`:22 _type_, `readMode`:23, `DiskMap`:26 _component_, `start`:101, `pickFolder`:108, `setColorMode`:120, `act`:156, `setTag`:166, `trash`:173, `walk`:193, `walk`:209, `walk`:223, `onKey`:259
+`api`:13, `fmtDate`:18, `fmtInt`:19, `fmtTime`:20, `ColorMode`:22 _type_, `readMode`:23, `DiskMap`:26 _component_, `start`:106, `pickFolder`:113, `setColorMode`:125, `act`:161, `setTag`:171, `trash`:178, `deleteForGood`:190, `walk`:207, `walk`:223, `walk`:237, `onKey`:273
 
 ## `src/pages/SpaceSniffer/treemap.ts`
 
@@ -1814,7 +1814,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `tests/optimizerAuditOwners.test.ts`
 
-`memStore`:11, `engine`:43, `service`:178
+`memStore`:11, `engine`:45, `service`:188
 
 ## `tests/optiscaler.test.ts`
 

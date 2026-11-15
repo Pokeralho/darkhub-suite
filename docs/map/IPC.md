@@ -1,6 +1,6 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-15T14:12:05. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-15T14:53:51. NAO edite a mao: rode `npm run map`. -->
 
-# Canais IPC (585)
+# Canais IPC (586)
 
 | API (`window.darkhub.`) | canal | handler | chama | usado em |
 |---|---|---|---|---|
@@ -78,8 +78,9 @@
 | `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1840` |  | `src/pages/DllInjector.tsx`<br>`src/pages/FileConverter.tsx`<br>`src/pages/ImageTextExtractor.tsx`<br>`src/pages/Library.tsx`<br>`src/pages/MetaDataEditor.tsx`<br>`src/pages/OptiScalerManager.tsx`<br>`src/pages/Optimizer.tsx`<br>`src/pages/PasswordManager.tsx`<br>`src/pages/TextEditor.tsx`<br>`src/pages/TextSummarizer.tsx`<br>`src/pages/UltraLowLatency.tsx`<br>`src/pages/YoutubeDownloader.tsx` |
 | `dialog.selectFolder` | `dialog:selectFolder` | `electron/main.js:1851` |  | `src/components/setup/RestoreComponentsPanel.tsx`<br>`src/pages/FileConverter.tsx`<br>`src/pages/Library.tsx`<br>`src/pages/PasswordManager.tsx`<br>`src/pages/YoutubeDownloader.tsx` |
 | `diskscan.cancel` | `diskscan:cancel` | `electron/ipc/diskScanIpc.js:22` | `svc.cancel` | `src/pages/SpaceSniffer/index.tsx` |
+| `diskscan.deletePermanent` | `diskscan:deletePermanent` | `electron/ipc/diskScanIpc.js:30` | `svc.deletePermanent` | _nao usado_ |
 | `diskscan.drives` | `diskscan:drives` | `electron/ipc/diskScanIpc.js:14` | `svc.drives` | `src/pages/SpaceSniffer/index.tsx` |
-| `diskscan.exportReport` | `diskscan:export` | `electron/ipc/diskScanIpc.js:31` | `svc.pathOf`<br>`svc.exportTo` | _nao usado_ |
+| `diskscan.exportReport` | `diskscan:export` | `electron/ipc/diskScanIpc.js:32` | `svc.pathOf`<br>`svc.exportTo` | _nao usado_ |
 | `diskscan.info` | `diskscan:info` | `electron/ipc/diskScanIpc.js:25` | `svc.info` | `src/pages/SpaceSniffer/index.tsx` |
 | `diskscan.onProgress` | `diskscan:progress` | _evento main->tela_ |  | `src/pages/SpaceSniffer/index.tsx` |
 | `diskscan.open` | `diskscan:open` | `electron/ipc/diskScanIpc.js:27` | `svc.open` | _nao usado_ |

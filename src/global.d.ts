@@ -1218,6 +1218,7 @@ export interface DarkHubAPI {
     open: (payload: { id: string }) => Promise<{ ok: boolean; error?: string }>;
     reveal: (payload: { id: string }) => Promise<{ ok: boolean; error?: string }>;
     trash: (payload: { id: string }) => Promise<{ ok: boolean; error?: string; path?: string; partial?: boolean; noRecycle?: 'noBin' | 'disabled' | 'tooBig' | 'unknown' }>;
+    deletePermanent: (payload: { id: string; confirmName: string }) => Promise<{ ok: boolean; error?: string; path?: string; partial?: boolean }>;
     exportReport: (payload: { id?: string; format: 'txt' | 'csv'; filter?: string }) => Promise<{ ok: boolean; canceled?: boolean; error?: string; path?: string; rows?: number }>;
     onProgress: (callback: (status: DiskMapStatus) => void) => () => void;
   };

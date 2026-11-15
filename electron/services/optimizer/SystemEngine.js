@@ -28,6 +28,8 @@ const CPU_EXTRA = 'sys:cpuUnpark';
 const PAGEFILE_EXTRA = 'sys:pagefile';
 const CAPS_EXTRA = 'sys:capabilities';
 const MSI_SET_ID = 'msi:display';
+// DhCheck as the elevated runner defines it, for steps that ride inside another engine's batch
+const DH_CHECK_FN = "function DhCheck([string]$what) { if ($LASTEXITCODE -ne 0) { throw ($what + ' falhou (codigo ' + $LASTEXITCODE + ')') } }";
 const OP_TIMER = 'optimizer:timerTuning';
 const OP_KERNEL = 'optimizer:kernelExtreme';
 const OP_HARDCORE = 'optimizer:disableCoreIsolation';
@@ -217,6 +219,14 @@ if ($laM.Success) { Write-Output ('@TAG@|lastaccess|' + $laM.Groups[1].Value) } 
   }
 
   async _revertLowLevel({ timer = false, lastAccess = false }) {
+    const plan = this._revertLowLevelPlan({ timer, lastAccess });
+    const r = await this._runMarked(plan.script, 90000);
+    if (!r.ok) return { ok: false, error: r.error };
+    return plan.finish(r.out);
+  }
+
+  /** The restore script for the BCD / NTFS pieces and the check of its DHAFT read-back (snapshots cleared on success). */
+  _revertLowLevelPlan({ timer = false, lastAccess = false }) {
     const lines = [];
     const snapBcd = timer ? DeepTweaksEngine.getExtra(BCD_EXTRA) : null;
     const snapLa = lastAccess ? DeepTweaksEngine.getExtra(LASTACCESS_EXTRA) : null;
@@ -234,9 +244,8 @@ if ($laM.Success) { Write-Output ('@TAG@|lastaccess|' + $laM.Groups[1].Value) } 
       lines.push(`& fsutil.exe behavior set disablelastaccess ${v} | Out-Null\r\nDhCheck 'fsutil behavior set disablelastaccess'`);
     }
     lines.push(this._lowLevelReadBlock({ timer, lastAccess }).replace(/@TAG@/g, 'DHAFT'));
-    const r = await this._runMarked(lines.join('\r\n'), 90000);
-    if (!r.ok) return { ok: false, error: r.error };
-    const after = parseDhSnapLines(r.out, 'DHAFT');
+    const finish = (out) => {
+    const after = parseDhSnapLines(out, 'DHAFT');
     const bad = [];
     if (timer) {
       const want = snapBcd ? bcdValueToArg(snapBcd.disabledynamictick) : null;
@@ -251,6 +260,8 @@ if ($laM.Success) { Write-Output ('@TAG@|lastaccess|' + $laM.Groups[1].Value) } 
     if (timer) DeepTweaksEngine.clearExtra(BCD_EXTRA);
     if (lastAccess) DeepTweaksEngine.clearExtra(LASTACCESS_EXTRA);
     return { ok: true };
+    };
+    return { script: lines.join('\r\n'), finish };
   }
 
   _pieces({ tweaks = [], timer = false, lastAccess = false }) {
@@ -273,13 +284,19 @@ if ($laM.Success) { Write-Output ('@TAG@|lastaccess|' + $laM.Groups[1].Value) } 
     const { free, kept } = partitionShared(DeepTweaksEngine, opId, pieces);
     const problems = [];
     const freeTweaks = tweaks.filter((t) => free.includes(t));
-    if (freeTweaks.length) {
-      const reg = await DeepTweaksEngine.revertTweaks(freeTweaks);
-      if (!reg.ok) problems.push(reg.error);
-    }
     const t = timer && free.includes(BCD_EXTRA);
     const la = lastAccess && free.includes(LASTACCESS_EXTRA);
-    if (t || la) {
+    if (freeTweaks.length && (t || la)) {
+      // registry, BCD and NTFS restored in ONE elevated run: a single UAC prompt when the app is not elevated
+      const plan = this._revertLowLevelPlan({ timer: t, lastAccess: la });
+      const reg = await DeepTweaksEngine.revertTweaks(freeTweaks, undefined, { extraCommand: `${DH_CHECK_FN}\r\n${plan.script}` });
+      if (!reg.ok) problems.push(reg.error);
+      const low = plan.finish(reg.stdout || '');
+      if (!low.ok) problems.push(low.error);
+    } else if (freeTweaks.length) {
+      const reg = await DeepTweaksEngine.revertTweaks(freeTweaks);
+      if (!reg.ok) problems.push(reg.error);
+    } else if (t || la) {
       const low = await this._revertLowLevel({ timer: t, lastAccess: la });
       if (!low.ok) problems.push(low.error);
     }

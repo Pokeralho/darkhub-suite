@@ -158,4 +158,26 @@ describe('disk scan service (real helper)', () => {
     expect((await svc.exportTo({ id: 'd0', format: 'csv' }, csv)).rows).toBe(1);
     fs.rmSync(root, { recursive: true, force: true });
   }, 30000);
+
+  win32('deletes for good only without a usable Recycle Bin and only with the typed name', async () => {
+    if (!fs.existsSync(exe)) return;
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-diskmap-perm-'));
+    fs.mkdirSync(path.join(root, "pasta d'água"), { recursive: true });
+    fs.writeFileSync(path.join(root, "pasta d'água", 'a.bin'), Buffer.alloc(4000));
+    fs.writeFileSync(path.join(root, "pasta d'água", 'ro.txt'), 'x'); fs.chmodSync(path.join(root, "pasta d'água", 'ro.txt'), 0o444);
+    fs.writeFileSync(path.join(root, 'keep.bin'), Buffer.alloc(1000));
+    const svc = new DiskScanService({ exePath: exe, shell: { trashItem: async () => { throw new Error('must not be called'); } } });
+    await new Promise<void>((resolve) => { svc.start(root, (st: any) => { if (!st.running) resolve(); }); });
+    const dir = svc.view({ id: 'd0' }).tree.children.find((c: any) => c.kind === 'dir');
+    svc.recycleProbe = async () => ({ type: 'Fixed', total: 1e12, nuke: 0, max: 1000, noRecycle: false });
+    expect((await svc.deletePermanent(dir.id, "pasta d'água")).ok).toBe(false); // the Recycle Bin works: refused
+    svc.recycleProbe = async () => ({ type: 'Removable', total: 8e9, nuke: 0, max: -1, noRecycle: false });
+    expect((await svc.deletePermanent('d0', path.basename(root))).ok).toBe(false);
+    expect((await svc.deletePermanent(dir.id, 'pasta')).ok).toBe(false); // wrong name typed
+    expect(fs.existsSync(path.join(root, "pasta d'água"))).toBe(true);
+    expect(await svc.deletePermanent(dir.id, "pasta d'água")).toMatchObject({ ok: true });
+    expect(fs.existsSync(path.join(root, "pasta d'água"))).toBe(false);
+    expect(svc.view({ id: 'd0' }).tree.size).toBe(1000);
+    fs.rmSync(root, { recursive: true, force: true });
+  }, 30000);
 });

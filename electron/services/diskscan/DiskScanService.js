@@ -62,6 +62,15 @@ export function recycleVerdict(info, size) {
   return limit > 0 && size > limit ? 'tooBig' : null;
 }
 
+/** Makes every file under `p` writable, never following links or junctions (their targets are left alone). */
+function clearReadOnly(p) {
+  let st;
+  try { st = fs.lstatSync(p); } catch { return; }
+  if (st.isSymbolicLink()) return;
+  if (st.isDirectory()) { for (const n of fs.readdirSync(p)) clearReadOnly(path.join(p, n)); return; }
+  try { fs.chmodSync(p, 0o666); } catch { /* the retry reports it */ }
+}
+
 export class DiskScanService {
   constructor({ exePath = defaultExe(), shell = null, spawnImpl = spawn, recycleProbe = null } = {}) {
     if (recycleProbe) this.recycleProbe = recycleProbe;
@@ -233,6 +242,35 @@ export class DiskScanService {
     if (why) return { ok: false, noRecycle: why, error: RECYCLE_REFUSAL[why] };
     try { await this.shell.trashItem(p); } catch (e) { return { ok: false, error: `O Windows recusou: ${e?.message ?? e}` }; }
     if (fs.existsSync(p)) return { ok: false, partial: true, error: 'O item continua no disco (em uso ou sem permissão). Parte do conteúdo pode ter ido para a Lixeira: analise de novo para atualizar o mapa.' };
+    this.model.markRemoved(id);
+    return { ok: true, path: p };
+  }
+
+  /**
+   * Deletes for good, only where the Recycle Bin cannot take the item (USB stick, card, network, bin off or too small)
+   * and only when `confirmName` repeats the item's name (the second confirmation the user types).
+   */
+  async deletePermanent(id, confirmName) {
+    if (id === 'd0') return { ok: false, error: 'A pasta analisada não pode ser apagada daqui.' };
+    const p = this._pathOf(id);
+    if (!p) return { ok: false, error: 'Item não encontrado.' };
+    if (String(confirmName ?? '') !== path.basename(p)) return { ok: false, error: 'Digite o nome exato do item para confirmar.' };
+    const size = Number(this.model.info(id, this._filter(''))?.size) || 0;
+    const why = recycleVerdict(await this.recycleProbe(p), size);
+    if (!why || why === 'unknown') return { ok: false, error: 'Este item pode ir para a Lixeira: use "Mover para a Lixeira".' };
+    // fs.rm removes links/junctions themselves, never what they point to
+    const rm = () => fs.rmSync(p, { recursive: true, force: false, maxRetries: 2 });
+    try {
+      try { rm(); } catch (e0) {
+        // read-only files (a FAT32 stick refuses them with EPERM): clear the attribute without following links, retry once
+        if (e0?.code !== 'EPERM' && e0?.code !== 'EACCES') throw e0;
+        clearReadOnly(p);
+        rm();
+      }
+    } catch (e) {
+      if (fs.existsSync(p)) return { ok: false, partial: true, error: `O Windows recusou (${e?.code || e?.message}). Parte do conteúdo pode ter sido apagada: analise de novo para atualizar o mapa.` };
+    }
+    if (fs.existsSync(p)) return { ok: false, partial: true, error: 'O item continua no disco (em uso ou sem permissão).' };
     this.model.markRemoved(id);
     return { ok: true, path: p };
   }

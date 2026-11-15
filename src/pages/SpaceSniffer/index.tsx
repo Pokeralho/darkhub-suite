@@ -40,6 +40,9 @@ export default function DiskMap() {
   const [info, setInfo] = useState<DiskMapInfo | null>(null);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [confirmTrash, setConfirmTrash] = useState(false);
+  // Drives without a usable Recycle Bin: an explicit "delete for good", step 1 = offer, step 2 = type the name.
+  const [permanent, setPermanent] = useState<{ id: string; name: string; step: 1 | 2 } | null>(null);
+  const [typedName, setTypedName] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [version, setVersion] = useState(0);
@@ -89,6 +92,8 @@ export default function DiskMap() {
 
   useEffect(() => {
     setConfirmTrash(false);
+    setPermanent((p) => (p && p.id === selected?.id ? p : null));
+    setTypedName('');
     if (!selected || !['dir', 'file'].includes(selected.kind)) { setInfo(null); return; }
     api()?.info({ id: selected.id, filter }).then((r) => setInfo(r?.ok ? r.info || null : null)).catch(() => setInfo(null));
   }, [selected, filter, version]);
@@ -178,7 +183,16 @@ export default function DiskMap() {
       return res?.noRecycle ? { ...res, error: t(`diskmap.noRecycle.${res.noRecycle}`, res.error) } : res;
     }, `${labelFor(selected)}: ${t('diskmap.trashed', 'moved to the Recycle Bin')} (${formatBytes(freed)})`);
     if (r?.ok) { setSelected(null); setVersion((v) => v + 1); }
+    else if (r?.noRecycle && r.noRecycle !== 'unknown' && info) setPermanent({ id: selected.id, name: info.path.split(/[\\/]/).filter(Boolean).pop() || '', step: 1 });
     setConfirmTrash(false);
+  };
+
+  const deleteForGood = async () => {
+    if (!selected || !permanent || typedName !== permanent.name) return;
+    const freed = selected.size;
+    const r = await act(() => api()!.deletePermanent({ id: selected.id, confirmName: typedName }), `${labelFor(selected)}: ${t('diskmap.deleted', 'deleted for good')} (${formatBytes(freed)})`);
+    setPermanent(null); setTypedName('');
+    if (r?.ok) { setSelected(null); setVersion((v) => v + 1); }
   };
 
   const viewNode = tree;
@@ -534,7 +548,30 @@ export default function DiskMap() {
                 <button onClick={() => act(() => api()!.open({ id: info.id }))} className="dh-btn dh-btn-sm justify-start"><ExternalLink size={14} />{info.kind === 'dir' ? t('diskmap.openFolder', 'Open folder') : t('diskmap.openFile', 'Open file')}</button>
                 <button onClick={() => act(() => api()!.reveal({ id: info.id }))} className="dh-btn dh-btn-sm justify-start"><FolderOpen size={14} />{t('diskmap.reveal', 'Show in Explorer')}</button>
                 <button onClick={() => { navigator.clipboard?.writeText(info.path); setNotice({ ok: true, text: t('diskmap.copied', 'Path copied.') }); }} className="dh-btn dh-btn-sm justify-start"><Clipboard size={14} />{t('diskmap.copy', 'Copy path')}</button>
-                {!info.isRoot ? (
+                {!info.isRoot && permanent?.id === info.id ? (
+                  <div className="mt-1 space-y-2 border-l-2 border-red-500 pl-3 py-1">
+                    {permanent.step === 1 ? (
+                      <>
+                        <p className="text-[12px] text-red-200 inline-flex items-start gap-1.5"><AlertTriangle size={14} className="shrink-0 mt-px" />{t('diskmap.permanentOffer', 'This item cannot go to a Recycle Bin. You can delete it for good, with no way to undo.')}</p>
+                        <div className="flex gap-1.5">
+                          <button onClick={() => setPermanent({ ...permanent, step: 2 })} className="dh-btn dh-btn-sm dh-btn-danger">{t('diskmap.permanentNext', 'Delete for good...')}</button>
+                          <button onClick={() => setPermanent(null)} className="dh-btn dh-btn-sm dh-btn-ghost">{t('diskmap.cancel', 'Cancel')}</button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-[12px] text-red-200">{t('diskmap.permanentType', 'Last check: this cannot be undone. Type the name to confirm:')} <span className="font-mono select-all text-zinc-100">{permanent.name}</span> <span className="font-mono">({formatBytes(info.size)})</span></p>
+                        <input autoFocus className="dh-input w-full font-mono text-[12px]" value={typedName} onChange={(e) => setTypedName(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' && typedName === permanent.name) void deleteForGood(); }}
+                          aria-label={t('diskmap.permanentTypeLabel', 'Item name')} spellCheck={false} />
+                        <div className="flex gap-1.5">
+                          <button onClick={deleteForGood} disabled={busy || typedName !== permanent.name} className="dh-btn dh-btn-sm dh-btn-danger">{t('diskmap.permanentYes', 'Delete for good')}</button>
+                          <button onClick={() => { setPermanent(null); setTypedName(''); }} className="dh-btn dh-btn-sm dh-btn-ghost">{t('diskmap.cancel', 'Cancel')}</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : !info.isRoot ? (
                   confirmTrash ? (
                     <div className="mt-1 space-y-2 border-l-2 border-red-400 pl-3 py-1">
                       <p className="text-[12px] text-red-200 inline-flex items-start gap-1.5"><AlertTriangle size={14} className="shrink-0 mt-px" />{t('diskmap.trashConfirm', 'Move to the Recycle Bin?')} <span className="font-mono">{formatBytes(info.size)}</span></p>

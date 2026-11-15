@@ -189,6 +189,18 @@ export async function runAuditScenarios(call, step) {
       if (!exists && !bin) return 'PERMANENTLY DELETED while the UI promised the Recycle Bin'
       return safe({ r, exists, bin })
     })
+    // the explicit "delete for good": refused with a wrong name, done with the typed name (folder + read-only file)
+    await step(`audit diskmap: ${usb}: delete for good (typed name)`, async () => {
+      const n = items.find((x) => x.name === 'pasta com espaço')
+      const ro = items.find((x) => x.name === 'readonly.txt')
+      if (!n || !ro) return { ok: false, detail: 'nodes not found' }
+      const wrong = await call('diskscan:deletePermanent', { id: n.id, confirmName: 'pasta' })
+      const stillThere = fs.existsSync(n.path)
+      const a = await call('diskscan:deletePermanent', { id: n.id, confirmName: 'pasta com espaço' })
+      const b = await call('diskscan:deletePermanent', { id: ro.id, confirmName: 'readonly.txt' })
+      const ok = !wrong?.ok && stillThere && a?.ok && b?.ok && !fs.existsSync(n.path) && !fs.existsSync(ro.path)
+      return { ok, detail: `wrong:${wrong?.ok} kept:${stillThere} folder:${a?.ok}/${a?.error || ''} readonly:${b?.ok}/${b?.error || ''}` }
+    })
   } else {
     await step('audit diskmap: removable drive', async () => ({ ok: false, detail: 'no removable volume attached' }))
   }

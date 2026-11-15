@@ -1138,7 +1138,7 @@ class DeepTweaksEngine {
     return this._exclusive(() => this._restoreDefsUnlocked(defs, eventSender, opts));
   }
 
-  async _restoreDefsUnlocked(defs, eventSender, { requireSnapshot = false, runLabel = 'darkHubRevert', fallbackFor = null } = {}) {
+  async _restoreDefsUnlocked(defs, eventSender, { requireSnapshot = false, runLabel = 'darkHubRevert', fallbackFor = null, extraCommand = '' } = {}) {
     const runId = `${runLabel}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     eventSender('optimizer:runEvent', { runId, type: 'run-start', total: defs.length, concurrency: 1, startedAt: Date.now() });
     const results = defs.map((d) => ({ id: d.id, ok: false, error: '', verified: false, usedSnapshot: false }));
@@ -1184,6 +1184,8 @@ class DeepTweaksEngine {
       const script = typeof d.commands.revert === 'function' ? d.commands.revert(snap) : d.commands.revert;
       if (script) cmds.push({ di, script });
     });
+    // another engine's restore step riding in the same elevated run (one UAC prompt); its output comes back in stdout
+    if (extraCommand) cmds.push({ di: -1, script: extraCommand });
     const opResults = await this.runRegistryOps(ops, cmds);
     const errors = new Map();
     opResults.forEach((r, i) => { if (!r?.ok) errors.set(owner[i], r?.message || 'falha ao restaurar'); });
@@ -1223,12 +1225,13 @@ class DeepTweaksEngine {
     return this._finishRun(eventSender, runId, defs, results, notes, batchStdout);
   }
 
-  async revertTweaks(idsInput, eventSender = () => {}) {
+  /** opts.extraCommand: a PowerShell block run in the same elevated batch (its output is in the returned stdout). */
+  async revertTweaks(idsInput, eventSender = () => {}, { extraCommand = '' } = {}) {
     if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
     const ids = (Array.isArray(idsInput) ? idsInput : []).filter((i) => typeof i === 'string');
     const defs = ids.map((id) => this.getDefinition(id)).filter(Boolean);
     if (defs.length === 0) return { ok: false, error: 'Nenhum tweak válido selecionado' };
-    const run = await this._restoreDefs(defs, eventSender);
+    const run = await this._restoreDefs(defs, eventSender, { extraCommand });
     const out = this._summarize('revertido(s)', defs, run);
     Logger.auditOptimizer({ type: 'tweaks-revert', ids: defs.map((d) => d.id), ok: out.ok, error: out.error });
     return out;

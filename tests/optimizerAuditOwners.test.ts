@@ -38,14 +38,20 @@ describe('shared owners', () => {
 describe('SystemEngine composite operations', () => {
   let store: ReturnType<typeof memStore>
   let reverted: string[][]
-  beforeEach(() => { vi.resetModules(); store = memStore(); reverted = [] })
+  let extras: string[]
+  let revertOut = ''
+  beforeEach(() => { vi.resetModules(); store = memStore(); reverted = []; extras = []; revertOut = '' })
 
   async function engine() {
     vi.doMock('../electron/services/optimizer/DeepTweaksEngine.js', () => ({
       default: {
         ...store,
         applyTweaks: async () => ({ ok: true }),
-        revertTweaks: async (ids: string[]) => { reverted.push(ids); return { ok: true } }
+        revertTweaks: async (ids: string[], _ev?: unknown, opts?: { extraCommand?: string }) => {
+          reverted.push(ids)
+          if (opts?.extraCommand) extras.push(opts.extraCommand)
+          return { ok: true, stdout: opts?.extraCommand ? revertOut : '' }
+        }
       }
     }))
     // @ts-ignore - plain JS module
@@ -94,9 +100,13 @@ describe('SystemEngine composite operations', () => {
     expect(scripts).toEqual([])
     expect(store.getExtra('sys:applied:optimizer:timerTuning')).toBeNull()
     // now Kernel is the only owner: its revert restores everything
-    e._runMarked = async (s: string) => { scripts.push(s); return { ok: true, out: 'DHAFT|disabledynamictick|-\nDHAFT|lastaccess|2' } }
+    // registry + BCD + NTFS in ONE elevated run (the tweaks batch): no separate _runMarked call
+    revertOut = 'DHCMD|-1|ok\nDHAFT|disabledynamictick|-\nDHAFT|lastaccess|2'
     expect((await e.revertExtremeKernelMod()).ok).toBe(true)
-    expect(scripts.join('\n')).toMatch(/bcdedit\.exe \/deletevalue disabledynamictick/)
+    expect(scripts).toEqual([])
+    expect(extras.join('\n')).toMatch(/bcdedit\.exe \/deletevalue disabledynamictick/)
+    expect(extras.join('\n')).toMatch(/function DhCheck/)
+    expect(store.getExtra('sys:bcd')).toBeNull()
     expect(reverted).toEqual([['group:kernelCore', 'tweak:mmcssGames']])
   })
 
