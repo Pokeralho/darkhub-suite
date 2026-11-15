@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { ScanModel } from './ScanModel.js';
 import { parseFilter } from './filter.js';
 import { runPowerShell } from '../PowerShellRunner.js';
+import { psQuote } from '../optimizer/OptimizerUtils.js';
 
 const TAG_COLORS = new Set(['red', 'yellow', 'green', 'blue']);
 
@@ -24,8 +25,46 @@ export function formatSize(bytes) {
   return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${u[i]}`;
 }
 
+// Drive type, Recycle Bin switches and size limit for the volume holding a path. Read-only.
+const RECYCLE_PROBE = (p) => `
+$ErrorActionPreference = 'SilentlyContinue'
+$root = [IO.Path]::GetPathRoot(${psQuote(p)})
+$di = New-Object IO.DriveInfo $root
+$vol = Get-CimInstance Win32_Volume | Where-Object { $_.Name -eq $root } | Select-Object -First 1
+$bb = $null
+if ($vol) { $bb = Get-ChildItem 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\BitBucket\\Volume' | Where-Object { ([string]$vol.DeviceID).Contains($_.PSChildName) } | Select-Object -First 1 }
+$k = if ($bb) { Get-ItemProperty -LiteralPath $bb.PSPath } else { $null }
+$pol = @(foreach ($h in 'HKCU:', 'HKLM:') { (Get-ItemProperty ($h + '\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer')).NoRecycleFiles })
+[pscustomobject]@{
+  type = "$($di.DriveType)"; total = [int64]$di.TotalSize; known = [bool]$bb
+  nuke = [int]$k.NukeOnDelete; max = if ($k -and $null -ne $k.MaxCapacity) { [int64]$k.MaxCapacity } else { -1 }
+  noRecycle = [bool]($pol -contains 1)
+} | ConvertTo-Json -Compress
+`;
+
+export const RECYCLE_REFUSAL = Object.freeze({
+  noBin: 'Esta unidade não tem Lixeira (pendrive, cartão ou rede): o Windows apagaria o item para sempre. Apague pelo Explorador de Arquivos se tiver certeza.',
+  disabled: 'A Lixeira está desligada nesta unidade: o Windows apagaria o item para sempre. Apague pelo Explorador de Arquivos se tiver certeza.',
+  tooBig: 'O item é maior que o espaço da Lixeira desta unidade: o Windows o apagaria para sempre. Aumente a Lixeira (Propriedades da Lixeira) ou apague pelo Explorador de Arquivos.',
+  unknown: 'Não foi possível confirmar que a Lixeira desta unidade aceita o item; nada foi apagado.'
+});
+
+/**
+ * Why the Recycle Bin of the item's drive cannot take it ('noBin' | 'disabled' | 'tooBig' | 'unknown'), or null when it can.
+ * MaxCapacity is in MB; without the key Windows uses its default (about 5% of the volume, taken as the limit here).
+ */
+export function recycleVerdict(info, size) {
+  if (!info || typeof info !== 'object') return 'unknown';
+  if (info.type !== 'Fixed') return 'noBin';
+  if (info.noRecycle || Number(info.nuke) === 1) return 'disabled';
+  const max = Number(info.max);
+  const limit = max >= 0 ? max * 1024 * 1024 : (Number(info.total) || 0) * 0.05;
+  return limit > 0 && size > limit ? 'tooBig' : null;
+}
+
 export class DiskScanService {
-  constructor({ exePath = defaultExe(), shell = null, spawnImpl = spawn } = {}) {
+  constructor({ exePath = defaultExe(), shell = null, spawnImpl = spawn, recycleProbe = null } = {}) {
+    if (recycleProbe) this.recycleProbe = recycleProbe;
     this.exePath = exePath;
     this.shell = shell;
     this.spawn = spawnImpl;
@@ -187,10 +226,21 @@ export class DiskScanService {
     if (id === 'd0') return { ok: false, error: 'A pasta analisada não pode ser enviada para a Lixeira daqui.' };
     const p = this._pathOf(id);
     if (!p) return { ok: false, error: 'Item não encontrado.' };
+    // Electron's trashItem runs without Windows' dialog: where the Recycle Bin cannot take the item (no bin on the drive,
+    // bin turned off, item bigger than the bin) Windows deletes it for good instead of asking. Refuse those cases.
+    const size = Number(this.model.info(id, this._filter(''))?.size) || 0;
+    const why = recycleVerdict(await this.recycleProbe(p), size);
+    if (why) return { ok: false, noRecycle: why, error: RECYCLE_REFUSAL[why] };
     try { await this.shell.trashItem(p); } catch (e) { return { ok: false, error: `O Windows recusou: ${e?.message ?? e}` }; }
-    if (fs.existsSync(p)) return { ok: false, error: 'O item continua no disco (em uso ou sem permissão).' };
+    if (fs.existsSync(p)) return { ok: false, partial: true, error: 'O item continua no disco (em uso ou sem permissão). Parte do conteúdo pode ter ido para a Lixeira: analise de novo para atualizar o mapa.' };
     this.model.markRemoved(id);
     return { ok: true, path: p };
+  }
+
+  /** Recycle Bin facts for the drive holding `p` (see RECYCLE_PROBE). */
+  async recycleProbe(p) {
+    const r = await runPowerShell(RECYCLE_PROBE(p), { timeoutMs: 20000, trim: true });
+    try { return JSON.parse(r.stdout || 'null'); } catch { return null; }
   }
 
   pathOf(id) { return this._pathOf(id); }

@@ -1,5 +1,5 @@
 # DarkOS.Recovery.psm1 - DarkOS change catalog / manifest / recovery engine
-# ModuleVersion: 3   (bump on every behaviour change: DarkHub runs the newest of installed vs bundled)
+# ModuleVersion: 4   (bump on every behaviour change: DarkHub runs the newest of installed vs bundled)
 # Windows PowerShell 5.1, ASCII only. Shared by first-boot provisioning and DarkHub Suite.
 # Every system interaction goes through a backend table ($script:DK.Backend). The "Real" backend
 # touches the system; the "Fake" backend (DryRun) keeps an in-memory state persisted to
@@ -319,7 +319,7 @@ function New-DkFakeBackend {
         param($Hive, $Path, $Name)
         $s = Load-DkFakeState
         $key = "$Hive\$Path`::$Name"
-        if ($s.registry.Contains($key)) { return $s.registry[$key] }
+        if ($s.registry.Contains($key)) { $v = $s.registry[$key]; return @{ value = $v.value; kind = $v.type; raw = $v.value } }
         return $null
     }
     $b['RegSet'] = {
@@ -346,6 +346,14 @@ function New-DkFakeBackend {
         $cur = if ($s.services.Contains($Name)) { $s.services[$Name] } else { @{ startType = 'Automatic'; status = 'Running' } }
         $cur.startType = $StartType
         if ($Stop) { $cur.status = 'Stopped' }
+        $s.services[$Name] = $cur
+        Save-DkFakeState $s
+    }
+    $b['SvcStart'] = {
+        param($Name)
+        $s = Load-DkFakeState
+        $cur = if ($s.services.Contains($Name)) { $s.services[$Name] } else { @{ startType = 'Automatic'; status = 'Running' } }
+        $cur.status = 'Running'
         $s.services[$Name] = $cur
         Save-DkFakeState $s
     }
@@ -474,7 +482,15 @@ function New-DkRealBackend {
         if ($null -eq $item) { return $null }
         $prop = $item.PSObject.Properties[$Name]
         if (-not $prop) { return $null }
-        return @{ value = $prop.Value }
+        # kind = the value's real registry type, so a revert recreates it as it was (not with the catalog type);
+        # raw = the unexpanded text of an ExpandString (Get-ItemProperty returns it already expanded).
+        $kind = $null; $raw = $prop.Value
+        try {
+            $rk = Get-Item -LiteralPath $full -ErrorAction Stop
+            $kind = [string]$rk.GetValueKind($Name)
+            if ($kind -eq 'ExpandString') { $raw = $rk.GetValue($Name, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) }
+        } catch { $kind = $null; $raw = $prop.Value }
+        return @{ value = $prop.Value; kind = $kind; raw = $raw }
     }
     $b['RegSet'] = {
         param($Hive, $Path, $Name, $Type, $Value)
@@ -520,6 +536,11 @@ function New-DkRealBackend {
         }
     }
     # Bulk reads used only by the status cache (one enumeration instead of one query per catalog item).
+    $b['SvcStart'] = {
+        param($Name)
+        # best effort: the start type is what the revert guarantees; a service that refuses to start stays stopped
+        try { Start-Service -Name $Name -ErrorAction Stop } catch { }
+    }
     $b['SvcGetAll'] = {
         $map = @{}
         $wmi = @{}
@@ -752,8 +773,16 @@ function Invoke-DkRegistryCapture {
         $t = Resolve-DkRegTarget $Change.scope $e.path
         $cur = Invoke-Dk 'RegGet' @($t.HiveToken, $t.Sub, $e.name)
         $existed = ($null -ne $cur)
-        $val = $null; if ($existed) { $val = $cur.value }
-        $entries += @{ path = $e.path; name = $e.name; existed = $existed; value = $val; type = $e.type }
+        $val = $null; $type = $e.type
+        if ($existed) {
+            $val = $cur.value
+            # keep the ORIGINAL kind (e.g. a String the catalog writes as DWord) so the revert restores it exactly
+            if ($cur.kind -and (@('String', 'ExpandString', 'Binary', 'DWord', 'MultiString', 'QWord') -contains [string]$cur.kind)) {
+                $type = [string]$cur.kind
+                if ($null -ne $cur.raw) { $val = $cur.raw }
+            }
+        }
+        $entries += @{ path = $e.path; name = $e.name; existed = $existed; value = $val; type = $type }
     }
     return @{ entries = $entries }
 }
@@ -816,6 +845,8 @@ function Invoke-DkServiceRevert {
     param($Change, $Original)
     if (-not $Original -or $Original.missing) { return }
     Invoke-Dk 'SvcSet' @($Change.apply.name, $Original.startType, $false)
+    # the apply may have stopped it: a service that was running before is started again
+    if ([string]$Original.status -eq 'Running' -and [string]$Original.startType -ne 'Disabled') { Invoke-Dk 'SvcStart' @($Change.apply.name) }
 }
 
 function Invoke-DkTaskCapture {
@@ -1126,7 +1157,9 @@ function Test-DkOriginal {
                 $cur = Invoke-Dk 'RegGet' @($t.HiveToken, $t.Sub, $e.name)
                 if ($e.existed) {
                     if ($null -eq $cur) { return $false }
-                    if (-not (Test-DkRegValueEqual $e.type $cur.value $e.value)) { return $false }
+                    $curVal = $cur.value
+                    if ($e.type -eq 'ExpandString' -and $null -ne $cur.raw) { $curVal = $cur.raw }
+                    if (-not (Test-DkRegValueEqual $e.type $curVal $e.value)) { return $false }
                 } elseif ($null -ne $cur) { return $false }
             }
             return $true

@@ -76,6 +76,7 @@ function diskBlockers(disk, ctx) {
   if (parts.some((p) => p.role === 'dynamic' || p.role === 'spaces')) b.push('unsupported_disk')
   if (disk.isOffline) b.push('disk_offline')
   if (disk.isReadOnly) b.push('disk_readonly')
+  if (disk.partitionsUnread) b.push('partitions_unread')
   if (disk.isClustered) b.push('disk_clustered')
   if (!disk.name) b.push('disk_unnamed')
   return b

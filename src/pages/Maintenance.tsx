@@ -55,15 +55,22 @@ export default function Maintenance() {
     await load();
   };
 
+  const failedSuffix = (n: unknown) => (Number(n) > 0 ? `, ${t('maint.sum.failed', '{f} com falha').replace('{f}', String(n))}` : '');
   const summary = (h: MaintHistoryEntry) => {
-    if (!h.ok) return h.error ?? '';
+    // a failed run may still carry counts (e.g. 2 of 3 lists failed): show both
+    const text = summaryText(h);
+    if (!h.ok) return [h.error, text].filter(Boolean).join(' · ');
+    return text;
+  };
+  const summaryText = (h: MaintHistoryEntry) => {
     const s = h.summary || {};
+    if (!h.summary) return '';
     if (h.id === 'cleanTemp') return t('maint.sum.clean', '{mb} liberados, {n} arquivos').replace('{mb}', mb(s.freedBytes)).replace('{n}', String(s.files ?? 0));
-    if (h.id === 'securityLists') return s.note === 'no-lists' ? t('maint.sum.noLists', 'nenhuma lista ativada') : t('maint.sum.lists', '{n} listas atualizadas').replace('{n}', String(s.updated ?? 0));
-    if (h.id === 'saveBackups') return t('maint.sum.saves', '{s} jogos com backup novo, {u} sem mudanças').replace('{s}', String(s.saved ?? 0)).replace('{u}', String(s.unchanged ?? 0));
+    if (h.id === 'securityLists') return s.note === 'no-lists' ? t('maint.sum.noLists', 'nenhuma lista ativada') : t('maint.sum.lists', '{n} listas atualizadas').replace('{n}', String(s.updated ?? 0)) + failedSuffix(s.failed);
+    if (h.id === 'saveBackups') return t('maint.sum.saves', '{s} jogos com backup novo, {u} sem mudanças').replace('{s}', String(s.saved ?? 0)).replace('{u}', String(s.unchanged ?? 0)) + failedSuffix(s.failed);
     if (h.id === 'clamav') return s.note === 'not-installed' ? t('maint.sum.noClam', 'ClamAV não instalado') : t('maint.sum.clam', 'assinaturas atualizadas');
     if (h.id === 'wingetUpdates') return s.installed != null
-      ? t('maint.sum.wingetInstalled', '{i} de {n} atualizados').replace('{i}', String(s.installed)).replace('{n}', String(s.available))
+      ? t('maint.sum.wingetInstalled', '{i} de {n} atualizados').replace('{i}', String(s.installed)).replace('{n}', String(s.available)) + failedSuffix(s.remaining)
       : t('maint.sum.winget', '{n} atualizações disponíveis').replace('{n}', String(s.available ?? 0));
     return '';
   };

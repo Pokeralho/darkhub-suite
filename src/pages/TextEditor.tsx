@@ -20,6 +20,10 @@ const TextEditor = () => {
   const { t } = useI18n();
   const [content, setContent] = useState('');
   const [filePath, setFilePath] = useState<string | null>(null);
+  // what is on disk: the editor is dirty while content differs from it
+  const [savedContent, setSavedContent] = useState('');
+  // encoding/BOM the file was read with, written back unchanged on save
+  const [fileEncoding, setFileEncoding] = useState<{ encoding: string; bom: boolean }>({ encoding: 'utf-8', bom: false });
   const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [language, setLanguage] = useState<CodeLanguage | ''>('');
   const [runtimes, setRuntimes] = useState<Runtimes | null>(null);
@@ -34,8 +38,16 @@ const TextEditor = () => {
   const loadRuntimes = (refresh = false) => { void api()?.runtimes({ refresh }).then((r) => { if (r?.ok && r.runtimes) setRuntimes(r.runtimes); }).catch(() => {}); };
   useEffect(() => { loadRuntimes(); }, []);
 
+  const dirty = content !== savedContent;
+  const confirmDiscard = () => !dirty || window.confirm(t('textx.discardConfirm', 'Há alterações não salvas. Descartar e continuar?'));
+  const readError = (r: { code?: string; error?: string }) =>
+    r.code === 'not-text' ? t('textx.notText', 'Este arquivo não é texto (conteúdo binário).')
+      : r.code === 'unsupported-encoding' ? t('textx.badEncoding', 'Codificação não suportada: só arquivos UTF-8 e UTF-16 LE podem ser editados sem corromper o conteúdo.')
+        : String(r.error ?? '');
+
   const handleOpen = async () => {
     if (!window.darkhub) return;
+    if (!confirmDiscard()) return;
     try {
       const res = await window.darkhub.dialog.selectFiles({
         title: t('text.openTitle'),
@@ -49,12 +61,14 @@ const TextEditor = () => {
         const readRes = await window.darkhub.fs.readFile(file);
         if (readRes.ok) {
           setContent(readRes.content);
+          setSavedContent(readRes.content);
+          setFileEncoding({ encoding: readRes.encoding ?? 'utf-8', bom: Boolean(readRes.bom) });
           setFilePath(file);
           setLanguage(languageForFile(file) ?? '');
           setStatus(null);
           setResult(null);
         } else {
-          setStatus({ ok: false, msg: readRes.error });
+          setStatus({ ok: false, msg: readError(readRes) });
         }
       }
     } catch (err: any) {
@@ -73,8 +87,10 @@ const TextEditor = () => {
         targetPath = picked.filePath;
         setFilePath(targetPath);
       }
-      const res = await window.darkhub.fs.writeFile({ filePath: targetPath, content });
+      const saving = content;
+      const res = await window.darkhub.fs.writeFile({ filePath: targetPath, content: saving, ...fileEncoding });
       if (res.ok) {
+        setSavedContent(saving);
         setStatus({ ok: true, msg: t('text.saved') });
         setTimeout(() => setStatus(null), 3000);
       } else {
@@ -85,7 +101,10 @@ const TextEditor = () => {
     }
   };
 
-  const handleNew = () => { setContent(''); setFilePath(null); setStatus(null); setResult(null); };
+  const handleNew = () => {
+    if (!confirmDiscard()) return;
+    setContent(''); setSavedContent(''); setFileEncoding({ encoding: 'utf-8', bom: false }); setFilePath(null); setStatus(null); setResult(null);
+  };
 
   const loadExample = (id: ExampleId) => {
     if (!language) return;
@@ -213,7 +232,7 @@ const TextEditor = () => {
 
       <div className="flex-1 min-h-[300px] bg-zinc-950 border border-zinc-800/80 rounded-xl flex flex-col overflow-hidden">
         <div className="h-9 px-3 border-b border-zinc-800/80 flex items-center justify-between gap-3">
-          <span className={`font-mono text-[11.5px] truncate ${filePath ? 'text-zinc-400' : 'text-zinc-500'}`}>{filePath ? filePath : t('text.untitled')}</span>
+          <span className={`font-mono text-[11.5px] truncate ${filePath ? 'text-zinc-400' : 'text-zinc-500'}`}>{dirty ? '● ' : ''}{filePath ? filePath : t('text.untitled')}</span>
           <span className="font-mono text-[11px] text-zinc-400 shrink-0">
             {content ? lineCount : 0} <span className="text-zinc-600">{t('text.lines', 'linhas')}</span>
             <span className="mx-2 text-zinc-700">/</span>

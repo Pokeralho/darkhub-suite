@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RescueDrive, RescueInspect, RescuePlanResult, RescueSmart, RescueSurface, RescueVolumeHit } from '../global';
 import PageHeader from '../components/ui/PageHeader';
 import PartitionMapBar from '../components/recovery/PartitionMapBar';
@@ -7,7 +7,7 @@ import HeaderGuardModal from '../components/recovery/HeaderGuardModal';
 import CarvingManager from '../components/recovery/CarvingManager';
 import CloneWizard from '../components/recovery/CloneWizard';
 import PartitionManager from '../components/recovery/PartitionManager';
-import { api, ErrorLine, fmtBytes, JobProgress, type ProgressEv } from '../components/recovery/rescueUtils';
+import { api, ErrorLine, fmtBytes, JobProgress, rescueError, type ProgressEv } from '../components/recovery/rescueUtils';
 import { AlertTriangle, CheckCircle, FolderOpen, Gauge, HardDrive, Loader2, RefreshCw, Save, Search, ShieldCheck, Upload, Wrench } from '../components/icons';
 import { useI18n } from '../i18n/I18nProvider';
 
@@ -21,11 +21,15 @@ export default function DiskRescue() {
   const [drives, setDrives] = useState<RescueDrive[] | null>(null);
   const [drivesError, setDrivesError] = useState<string | null>(null);
   const [target, setTarget] = useState('');
-  const [tab, setTab] = useState<Tab>('health');
+  const [tab, setTabState] = useState<Tab>('health');
+  // Tabs stay mounted (hidden) once opened, so a running clone/carve/surface test keeps its progress and Cancel.
+  const [opened, setOpened] = useState<Tab[]>(['health']);
+  const setTab = (x: Tab) => { setTabState(x); setOpened((o) => (o.includes(x) ? o : [...o, x])); };
   const [info, setInfo] = useState<RescueInspect | null>(null);
   const [infoError, setInfoError] = useState<string | null>(null);
   const [loadingInfo, setLoadingInfo] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const infoSeq = useRef(0);
 
   const loadDrives = useCallback(async () => {
     setDrivesError(null);
@@ -37,20 +41,23 @@ export default function DiskRescue() {
   }, [t]);
 
   const loadInfo = useCallback(async () => {
+    // Only the latest request may set state: switching disks fast must not leave disk A's layout under disk B.
+    const seq = ++infoSeq.current;
     if (!target) return;
     setLoadingInfo(true); setInfoError(null);
     try {
       const r = await api()?.inspectDisk({ target });
+      if (seq !== infoSeq.current) return;
       if (r?.ok) setInfo(r);
       else {
         setInfo(null);
         setInfoError(r?.code === 'access_denied' ? t('rescue.needAdmin', 'Ler o disco direto exige administrador. Abra o DarkHub como administrador (o app instalado já abre assim).') : r?.error || t('rescue.inspectFail', 'Não foi possível ler o disco.'));
       }
-    } finally { setLoadingInfo(false); }
+    } finally { if (seq === infoSeq.current) setLoadingInfo(false); }
   }, [target, t]);
 
   useEffect(() => { void loadDrives(); }, [loadDrives]);
-  useEffect(() => { setInfo(null); void loadInfo(); }, [loadInfo]);
+  useEffect(() => { setInfo(null); setInfoError(null); void loadInfo(); }, [loadInfo]);
 
   const drive = drives?.find((d) => `disk:${d.index}` === target) ?? null;
   const isImage = !!target && !target.startsWith('disk:');
@@ -97,6 +104,7 @@ export default function DiskRescue() {
           {drive?.is_system ? <span className="text-[11.5px] text-amber-300">{t('rescue.systemDisk', 'Disco do Windows ou do boot: só leitura')}</span> : null}
         </div>
         <ErrorLine text={drivesError} />
+        <OrphanJob />
         <nav className="flex flex-wrap gap-1 -mb-5 border-b border-transparent" role="tablist">
           {tabs.map((x) => (
             <button key={x.id} type="button" role="tab" aria-selected={tab === x.id} onClick={() => setTab(x.id)}
@@ -109,15 +117,50 @@ export default function DiskRescue() {
 
       {!target ? <p className="dh-help">{t('rescue.noTarget', 'Escolha um disco ou abra uma imagem.')}</p> : (
         <>
-          {tab === 'health' ? <HealthTab target={target} drive={drive} info={info} loading={loadingInfo} error={infoError} /> : null}
-          {tab === 'partitions' ? <PartitionManager diskNumber={diskOf(target)} reloadKey={reloadKey} /> : null}
-          {tab === 'guard' ? <GuardTab target={target} info={info} readOnly={!!drive?.is_system} onChanged={loadInfo} /> : null}
-          {tab === 'editor' ? <SectorHexViewer key={target} target={target} /> : null}
-          {tab === 'carve' ? <CarvingManager key={target} target={target} diskNumber={diskOf(target)} /> : null}
-          {tab === 'clone' ? <CloneWizard drives={drives ?? []} /> : null}
-          {tab === 'boot' ? <BootTab target={target} info={info} readOnly={!!drive?.is_system} onChanged={loadInfo} /> : null}
+          {opened.includes('health') ? <div hidden={tab !== 'health'}><HealthTab target={target} drive={drive} info={info} loading={loadingInfo} error={infoError} /></div> : null}
+          {opened.includes('partitions') ? <div hidden={tab !== 'partitions'}><PartitionManager diskNumber={diskOf(target)} reloadKey={reloadKey} /></div> : null}
+          {opened.includes('guard') ? <div hidden={tab !== 'guard'}><GuardTab target={target} info={info} readOnly={!!drive?.is_system} onChanged={loadInfo} /></div> : null}
+          {opened.includes('editor') ? <div hidden={tab !== 'editor'}><SectorHexViewer key={target} target={target} /></div> : null}
+          {opened.includes('carve') ? <div hidden={tab !== 'carve'}><CarvingManager target={target} diskNumber={diskOf(target)} /></div> : null}
+          {opened.includes('clone') ? <div hidden={tab !== 'clone'}><CloneWizard drives={drives ?? []} /></div> : null}
+          {opened.includes('boot') ? <div hidden={tab !== 'boot'}><BootTab target={target} info={info} readOnly={!!drive?.is_system} onChanged={loadInfo} /></div> : null}
         </>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Operação em andamento
+
+/**
+ * A long job started before this page was (re)opened keeps running in the main process, but the tab that started
+ * it is gone. Shows its progress and a Cancel button until it ends, instead of a bare "busy" on the next Start.
+ */
+function OrphanJob() {
+  const { t } = useI18n();
+  const [kind, setKind] = useState<string | null>(null);
+  const [ev, setEv] = useState<ProgressEv | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void api()?.status().then((s) => { if (alive && s?.running) setKind(s.kind ?? 'job'); });
+    return () => { alive = false; };
+  }, []);
+  useEffect(() => {
+    if (!kind) return undefined;
+    const off = api()?.onProgress((e) => { if (e.kind === kind && e.event === 'progress') setEv(e); });
+    const timer = window.setInterval(() => {
+      void api()?.status().then((s) => { if (!s?.running || s.kind !== kind) { setKind(null); setEv(null); } });
+    }, 2000);
+    return () => { off?.(); window.clearInterval(timer); };
+  }, [kind]);
+
+  if (!kind) return null;
+  const label = `${t('rescue.job.running', 'Uma operação de disco ainda está em andamento')} (${t(`rescue.job.kind.${kind}`, kind)})`;
+  // Partitioning runs in PowerShell and cannot be interrupted midway.
+  return (
+    <div className="dh-card p-3">
+      <JobProgress ev={ev} label={label} onCancel={kind === 'partition' ? undefined : () => void api()?.cancel()} cancelLabel={t('rescue.cancel', 'Cancelar')} />
     </div>
   );
 }
@@ -264,7 +307,7 @@ function GuardTab({ target, info, readOnly, onChanged }: { target: string; info:
   const diskNumber = diskOf(target);
 
   useEffect(() => api()?.onProgress((e) => { if ((e.kind === 'scan' || e.kind === 'repair') && e.event === 'progress') setEv(e); }), []);
-  useEffect(() => { setHits(null); setMsg(null); setError(null); }, [target]);
+  useEffect(() => { setHits(null); setMsg(null); setError(null); setGuard(null); }, [target]);
 
   const wrap = async (key: string, fn: () => Promise<void>) => {
     setBusy(key); setError(null); setMsg(null);
@@ -302,7 +345,7 @@ function GuardTab({ target, info, readOnly, onChanged }: { target: string; info:
     if (!f?.ok || !f.path) return;
     const from = f.path;
     const r = await api()?.restoreBackup({ target, from });
-    if (!r?.ok) { setError(r?.error ?? null); return; }
+    if (!r?.ok) { setError(rescueError(t, r, t('rescue.inspectFail', 'Não foi possível ler o disco.'))); return; }
     setGuard({ title: t('rescue.guard.restoreTitle', 'Restaurar setores de um backup .dhbk'), plan: r.plan,
       apply: async (confirmDisk) => after(await api()?.restoreBackup({ target, from, apply: true, confirmDisk })) });
   });
@@ -369,6 +412,7 @@ function BootTab({ target, info, readOnly, onChanged }: { target: string; info: 
   const [error, setError] = useState<string | null>(null);
   const esp = useMemo(() => info?.layout.find((p) => p.type_name?.startsWith('EFI System')), [info]);
   const active = info?.mbr.entries.find((e) => e.boot);
+  useEffect(() => { setGuard(null); setError(null); }, [target]);
 
   const planActive = async (slot: number) => {
     setError(null);

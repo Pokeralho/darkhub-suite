@@ -173,8 +173,12 @@ export default function DiskMap() {
   const trash = async () => {
     if (!selected) return;
     const freed = selected.size;
-    const r = await act(() => api()!.trash({ id: selected.id }), `${labelFor(selected)}: ${t('diskmap.trashed', 'moved to the Recycle Bin')} (${formatBytes(freed)})`);
+    const r = await act(async () => {
+      const res = await api()!.trash({ id: selected.id });
+      return res?.noRecycle ? { ...res, error: t(`diskmap.noRecycle.${res.noRecycle}`, res.error) } : res;
+    }, `${labelFor(selected)}: ${t('diskmap.trashed', 'moved to the Recycle Bin')} (${formatBytes(freed)})`);
     if (r?.ok) { setSelected(null); setVersion((v) => v + 1); }
+    setConfirmTrash(false);
   };
 
   const viewNode = tree;

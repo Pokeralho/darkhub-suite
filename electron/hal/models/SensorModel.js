@@ -51,9 +51,6 @@ export function numOrNull(v) {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Loose GPU name match across providers (DXGI, nvidia-smi, WMI/systeminformation, LHM). */
-export function sameGpu(a, b) {
-  const n = (s) => String(s || '').toLowerCase().replace(/\(r\)|\(tm\)|graphics|corporation|nvidia|amd|ati|intel|radeon|geforce|[^a-z0-9]/g, '');
-  const x = n(a), y = n(b);
-  return Boolean(x && y && (x === y || x.includes(y) || y.includes(x)));
-}
+/** Loose GPU name match across providers (DXGI, nvidia-smi, WMI/systeminformation, LHM); never pairs 4060 with
+ *  4060 Ti. pairGpus() matches whole lists without reusing an entry. */
+export { sameGpu, pairGpus } from './gpuMatch.js';

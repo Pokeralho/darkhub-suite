@@ -389,8 +389,10 @@ export class DownloadManager extends EventEmitter {
     task.finished = this._run(rec, task).then(() => {
       // normal completion handled inside _run
     }).catch((err) => {
-      if (err?.aborted || ctrl.signal.aborted) {
-        // pause / cancel / schedule: status already set by the caller
+      if (task.userAbort) {
+        // pause / cancel / schedule / shutdown: status already set by the caller.
+        // (A failing piece worker also aborts the controller to stop its siblings,
+        // so signal.aborted alone does not mean the user stopped the download.)
       } else {
         rec.status = 'error'
         rec.error = err?.message ?? String(err)
@@ -406,7 +408,7 @@ export class DownloadManager extends EventEmitter {
 
   _abortTask(id) {
     const task = this.tasks.get(id)
-    if (task) task.ctrl.abort()
+    if (task) { task.userAbort = true; task.ctrl.abort() }
   }
 
   async _deletePart(rec) {
@@ -529,7 +531,7 @@ export class DownloadManager extends EventEmitter {
     }
 
     if (failure && !failure.aborted) throw failure
-    if (signal.aborted) throw new AbortedError()
+    if (signal.aborted) throw task.userAbort ? new AbortedError() : (failure ?? new Error('download-failed'))
 
     await task.fd.close()
     task.fd = null

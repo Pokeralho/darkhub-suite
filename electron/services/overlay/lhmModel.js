@@ -115,7 +115,9 @@ export function readLhm(payload) {
     out.cpu = cpu
   }
 
-  const gpuHw = list.find((h) => /^Gpu/.test(h.kind))
+  // hybrid / multi-GPU: the discrete NVIDIA card first, then AMD, then whatever GPU LHM lists
+  const gpuHw = list.find((h) => h.kind === 'GpuNvidia') || list.find((h) => h.kind === 'GpuAmd') || list.find((h) => /^Gpu/.test(h.kind))
+  const gpuIsNvidia = Boolean(gpuHw && gpuHw.kind === 'GpuNvidia')
   const nvidia = Boolean(gpuHw && gpuHw.kind === 'GpuNvidia') || (Array.isArray(payload?.nvml) && payload.nvml.length > 0)
   if (gpuHw) {
     const { find } = index(gpuHw)
@@ -180,7 +182,8 @@ export function readLhm(payload) {
 
   // direct NVML reads (NVIDIA): missing fields stay null, never zero
   const nvList = Array.isArray(payload?.nvml) ? payload.nvml : []
-  const nv = nvList.find((d) => out.gpu && d?.name && out.gpu.name && d.name === out.gpu.name) || (nvList.length === 1 ? nvList[0] : null)
+  // the single-device fallback only applies when the GPU shown is that NVIDIA card (never an iGPU next to it)
+  const nv = nvList.find((d) => out.gpu && d?.name && out.gpu.name && d.name === out.gpu.name) || (nvList.length === 1 && gpuIsNvidia ? nvList[0] : null)
   const NVML_FIELDS = ['energyJ', 'powerW', 'powerLimitW', 'enforcedLimitW', 'pcieGen', 'pcieWidth', 'pcieMaxGen', 'pcieMaxWidth', 'encoderPct', 'decoderPct', 'throttle', 'computeMemMb', 'computeProcs', 'graphicsMemMb']
   if (nv) {
     const n = finite
@@ -204,7 +207,7 @@ export function readLhm(payload) {
 
   // per-connector input power (NVIDIA, NVAPI power monitor): a rail the card does not sense has no entry
   const railList = Array.isArray(payload?.nvrails) ? payload.nvrails : []
-  const nr = railList.find((d) => out.gpu && d?.name && out.gpu.name && d.name === out.gpu.name) || (railList.length === 1 ? railList[0] : null)
+  const nr = railList.find((d) => out.gpu && d?.name && out.gpu.name && d.name === out.gpu.name) || (railList.length === 1 && gpuIsNvidia ? railList[0] : null)
   if (out.gpu) {
     out.gpu.rails = null
     out.gpu.pcieSlot = null

@@ -256,6 +256,19 @@ describe('hub: install and uninstall', () => {
     expect(svc.list().packages).toEqual([])
   })
 
+  it('keeps a partial record and reports the undo errors when the rollback itself fails', async () => {
+    const tweaks = fakeTweaks({}, true)
+    tweaks.undoTweaks = async (ids: string[]) => { tweaks.calls.push(['undoTweaks', ids]); return { ok: false, error: 'locked' } as any }
+    const svc = new HubService({ app: app(), tweaks, darkosRoot: dir })
+    const r = await svc.install(pkg('ana.partial', [{ use: 'darkhub:tweak:disableGameDvr' }, reg('HKCU\\Software\\DarkHubTest', 'A', 5)]))
+    expect(r.ok).toBe(false)
+    expect(r.partial).toBe(true)
+    expect(r.error).toMatch(/policy/)
+    expect(r.error).toMatch(/locked/)
+    expect(svc.list().packages.map((p: any) => p.id)).toEqual(['ana.partial'])
+    expect(svc.record('ana.partial')).toMatchObject({ status: 'partial', undoErrors: [expect.stringMatching(/locked/)] })
+  })
+
   it('runs operations: skips the ones already on, one-time actions just run, removal reverts in reverse', async () => {
     const tweaks = fakeTweaks()
     const opt = fakeOptimizer({ powerPlanUltimate: true })

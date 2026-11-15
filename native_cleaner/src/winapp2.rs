@@ -204,6 +204,7 @@ pub fn expand(env: &Env, raw: &str) -> Result<Vec<PathBuf>, String> {
 }
 
 /// Resolves wildcard folder segments against the disk (never through links). Capped to avoid explosions.
+/// Literal segments are joined as-is: `files::check_links` refuses the rule when one of them is a link.
 fn expand_wild(path: &str, out: &mut Vec<PathBuf>) {
     let segs: Vec<&str> = path.split('\\').filter(|s| !s.is_empty()).collect();
     if segs.is_empty() {
@@ -333,7 +334,7 @@ pub fn build(sec: &Section, env: &Env, source: &'static str, reg_exists: &dyn Fn
                         if !dir.is_dir() {
                             continue;
                         }
-                        if let Err(why) = env.check_rule(&dir, &patterns, recurse) {
+                        if let Err(why) = env.check_rule(&dir, &patterns, recurse).and_then(|_| crate::files::check_links(env, &dir)) {
                             t.rejected.push((format!("{} ({})", v, dir.to_string_lossy()), why));
                         } else {
                             t.rules.push(Rule { dir, patterns: patterns.clone(), recurse, remove_self });

@@ -109,14 +109,15 @@ function generateStrongPassword(length = 20, useLower = true, useUpper = true, u
 export default function PasswordManager() {
   const { t } = useI18n()
 
-  const [status, setStatus] = useState<{ initialized: boolean; locked: boolean; autoLockMinutes: number } | null>(null)
+  const [status, setStatus] = useState<{ initialized: boolean; locked: boolean; autoLockMinutes: number; unlockedVia?: 'master' | 'recovery' | null } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const [masterPassword, setMasterPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [recoveryWordsShown, setRecoveryWordsShown] = useState<string[] | null>(null)
-  const [recoveryPasswordShown, setRecoveryPasswordShown] = useState<string | null>(null)
+  const [newMaster, setNewMaster] = useState('')
+  const [newMasterConfirm, setNewMasterConfirm] = useState('')
   const [recoveryWordsInput, setRecoveryWordsInput] = useState('')
 
   const [entries, setEntries] = useState<VaultEntry[]>([])
@@ -205,7 +206,6 @@ export default function PasswordManager() {
         return
       }
       setRecoveryWordsShown(res.recoveryWords ?? [])
-      setRecoveryPasswordShown(res.recoveryPassword ?? null)
       await window.darkhub.vault.unlock({ masterPassword })
       setMasterPassword('')
       setConfirmPassword('')
@@ -251,6 +251,37 @@ export default function PasswordManager() {
       setRecoveryWordsInput('')
       await refreshStatus()
       await refreshEntries()
+    } catch (err: any) {
+      setError(err?.message ?? String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // After a recovery-word unlock: set a new master password (the old one is not needed).
+  const handleSetNewMaster = async () => {
+    setError(null)
+    if (!window.darkhub?.vault) return
+    if (newMaster.length < 8) {
+      setError(t('passwords.errInvalidMaster'))
+      return
+    }
+    if (newMaster !== newMasterConfirm) {
+      setError(t('passwords.errMismatch'))
+      return
+    }
+    setBusy(true)
+    try {
+      const res = await window.darkhub.vault.changeMasterPassword({ newMasterPassword: newMaster })
+      if (!res?.ok) {
+        setError(res?.error ?? t('passwords.errSave'))
+        return
+      }
+      setNewMaster('')
+      setNewMasterConfirm('')
+      // the data key was rotated, so the old recovery words no longer work
+      if (Array.isArray(res.recoveryWords)) setRecoveryWordsShown(res.recoveryWords)
+      await refreshStatus()
     } catch (err: any) {
       setError(err?.message ?? String(err))
     } finally {
@@ -488,17 +519,9 @@ export default function PasswordManager() {
               </li>
             ))}
           </ol>
-          {recoveryPasswordShown ? (
-            <div className="text-[12px] text-zinc-500">
-              {t('passwords.recoveryPasswordLabel')}: <span className="font-mono text-zinc-200 select-all">{recoveryPasswordShown}</span>
-            </div>
-          ) : null}
           <div className="flex gap-2">
             <button
-              onClick={() => {
-                setRecoveryWordsShown(null)
-                setRecoveryPasswordShown(null)
-              }}
+              onClick={() => setRecoveryWordsShown(null)}
               className="dh-btn dh-btn-primary"
             >
               <Check size={14} />
@@ -642,6 +665,45 @@ export default function PasswordManager() {
               </button>
             </div>
           </details>
+        </section>
+      ) : null}
+
+      {showUnlocked && status?.unlockedVia === 'recovery' ? (
+        <section className="mx-auto max-w-sm mb-10 dh-card p-6" aria-label={t('passwords.newMasterTitle')}>
+          <h2 className="dh-section-title">{t('passwords.newMasterTitle')}</h2>
+          <p className="dh-help mt-1">{t('passwords.newMasterHint')}</p>
+          <form
+            className="mt-4 space-y-3"
+            onSubmit={(e) => { e.preventDefault(); if (!busy) void handleSetNewMaster() }}
+          >
+            <div>
+              <label htmlFor="vault-master-reset" className="dh-label block mb-1.5">{t('passwords.masterPassword')}</label>
+              <input
+                id="vault-master-reset"
+                type="password"
+                autoComplete="new-password"
+                value={newMaster}
+                onChange={(e) => setNewMaster(e.target.value)}
+                className="dh-input w-full font-mono"
+              />
+              {newMaster ? <StrengthMeter value={newMaster} /> : null}
+            </div>
+            <div>
+              <label htmlFor="vault-master-reset-confirm" className="dh-label block mb-1.5">{t('passwords.confirmPassword')}</label>
+              <input
+                id="vault-master-reset-confirm"
+                type="password"
+                autoComplete="new-password"
+                value={newMasterConfirm}
+                onChange={(e) => setNewMasterConfirm(e.target.value)}
+                className="dh-input w-full font-mono"
+              />
+            </div>
+            <button type="submit" disabled={busy || !newMaster} className="dh-btn dh-btn-primary w-full">
+              <KeyRound size={14} />
+              <span>{t('passwords.newMasterSave')}</span>
+            </button>
+          </form>
         </section>
       ) : null}
 

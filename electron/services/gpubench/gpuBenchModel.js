@@ -1,5 +1,6 @@
 // Scores and frame statistics of the GPU benchmark. Pure. The ranked score is always computed by the server from the
 // same formula: this one only shows local runs. See docs/GPU_BENCHMARK.md.
+import { pickPrimaryGpu } from '../../hal/models/gpuMatch.js'
 
 export const RASTER_SCALE = 10
 export const RT_SCALE = 10
@@ -51,9 +52,10 @@ export function sensorSummary(samples) {
   }
 }
 
-/** One sensor sample from a hardware snapshot. An unavailable sensor is null, never 0: AMD and Intel have no temperature here. */
-export function sampleGpu(snapshot, t = Date.now()) {
-  const gpu = snapshot?.gpu?.values?.gpus?.[0]
+/** One sensor sample from a hardware snapshot. An unavailable sensor is null, never 0: AMD and Intel have no temperature here.
+ *  adapter: name of the adapter the bench runs on (its sensors, not the iGPU's); unknown yet = the primary GPU. */
+export function sampleGpu(snapshot, t = Date.now(), adapter = null) {
+  const gpu = pickPrimaryGpu(snapshot?.gpu?.values?.gpus, { preferName: adapter })
   const val = (x) => {
     const v = x && typeof x === 'object' && 'value' in x ? x.value : x
     return v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v)

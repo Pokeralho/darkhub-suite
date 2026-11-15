@@ -9,6 +9,7 @@ import VisualsEngine from './VisualsEngine.js';
 import SystemEngine from './SystemEngine.js';
 import ElevationHelper from './ElevationHelper.js';
 import { POWER_GUIDS } from './OptimizerUtils.js';
+import { partitionShared, claimShared, releaseShared } from './sharedOwners.js';
 
 const RISK_FROM_TWEAK = { low: 'safe', medium: 'moderate', high: 'advanced' };
 const RISK_ORDER = { safe: 0, moderate: 1, advanced: 2 };
@@ -62,9 +63,20 @@ class SystemOptimizerService {
       description: def.description || defs.map((d) => d.description).join(' '),
       // the tweak definitions' own warnings must reach the UI (it asks for confirmation only when a warning exists)
       warning: def.warning || defs.map((d) => d.warning).filter(Boolean).join(' ') || undefined,
-      revert: async () => adaptResult(await DeepTweaksEngine.revertTweaks(def.tweakIds), { resources: def.resources })
+      // tweaks also used by a still-applied composite operation (e.g. hibernation by the Hardcore mode) are kept
+      revert: async () => {
+        const { free, kept } = partitionShared(DeepTweaksEngine, def.id, def.tweakIds);
+        const res = free.length ? await DeepTweaksEngine.revertTweaks(free) : { ok: true, msg: '' };
+        if (res.ok) releaseShared(DeepTweaksEngine, def.id, def.tweakIds);
+        const note = kept.length ? ` Mantido porque outra otimização aplicada ainda usa: ${kept.join(', ')}.` : '';
+        return adaptResult(res.ok ? { ...res, msg: `${res.msg || 'Revertido.'}${note}` } : res, { resources: def.resources });
+      }
     };
-    op.execute = async () => adaptResult(await DeepTweaksEngine.applyTweaks(def.tweakIds, () => {}), { resources: def.resources, processed: defs.length });
+    op.execute = async () => {
+      const res = await DeepTweaksEngine.applyTweaks(def.tweakIds, () => {});
+      if (res?.ok) claimShared(DeepTweaksEngine, def.id, def.tweakIds);
+      return adaptResult(res, { resources: def.resources, processed: defs.length });
+    };
     this.operations.set(op.id, op);
   }
 
@@ -133,7 +145,7 @@ class SystemOptimizerService {
       revert: async () => adaptResult(await PowerEngine.restorePrevious(), { resources: ['Powercfg'] }),
       statusFn: async (ctx) => {
         const g = await ctx.activeScheme();
-        return g === POWER_GUIDS.high || g === POWER_GUIDS.ultimate;
+        return g === POWER_GUIDS.high || PowerEngine.isUltimateGuid(g);
       }
     });
 
@@ -151,7 +163,7 @@ class SystemOptimizerService {
       revert: async () => adaptResult(await PowerEngine.restorePrevious(), { resources: ['Powercfg'] }),
       statusFn: async (ctx) => {
         const g = await ctx.activeScheme();
-        return g === POWER_GUIDS.ultimate;
+        return PowerEngine.isUltimateGuid(g);
       }
     });
 
@@ -464,7 +476,7 @@ class SystemOptimizerService {
       requiresReboot: true,
       isReversible: true,
       estimatedTimeMs: 2500,
-      statusExtra: 'sys:bcd',
+      statusExtra: 'sys:applied:optimizer:timerTuning', // marker written only after a verified apply
       execute: async () => adaptResult(await SystemEngine.applyTimerTuning(), { resources: ['BCD'] }),
       revert: async () => adaptResult(await SystemEngine.revertTimerTuning(), { resources: ['BCD'] })
     });
@@ -479,7 +491,7 @@ class SystemOptimizerService {
       requiresAdmin: true,
       isReversible: true,
       estimatedTimeMs: 2500,
-      statusExtra: 'sys:networkExtreme',
+      statusExtra: 'sys:applied:optimizer:networkExtreme',
       execute: async () => adaptResult(await SystemEngine.applyExtremeNetworkMod(), { resources: ['TCP global settings'] }),
       revert: async () => adaptResult(await SystemEngine.revertExtremeNetworkMod(), { resources: ['TCP global settings'] })
     });
@@ -509,7 +521,7 @@ class SystemOptimizerService {
       requiresAdmin: true,
       isReversible: true,
       estimatedTimeMs: 2000,
-      statusExtra: 'sys:cpuUnpark',
+      statusExtra: 'sys:applied:optimizer:cpuUnpark',
       execute: async () => adaptResult(await SystemEngine.applyCpuUnpark(), { resources: ['Powercfg (processador)'] }),
       revert: async () => adaptResult(await SystemEngine.revertCpuUnpark(), { resources: ['Powercfg (processador)'] })
     });

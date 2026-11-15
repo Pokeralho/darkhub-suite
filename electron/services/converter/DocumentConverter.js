@@ -4,10 +4,31 @@
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import fsRaw from 'node:fs'
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 import { run, uniqueOutputPath, extOf } from './processUtil.js'
 import { bundledSofficePath } from './vendorTools.js'
 import { routesFor, detectDelimiter, parseCsv, toCsv, jsonToXml } from './docRoutes.js'
+
+/**
+ * Request filter for the offline HTML -> PDF page: no frames at all, and file: URLs only for the page itself and
+ * files under the allowed folders (source folder, job temp folder). Anything else (another local file pulled in by
+ * an <iframe>/<img>, network URLs) is cancelled.
+ */
+export function isAllowedPdfRequest(url, resourceType, { htmlFile, roots = [] } = {}) {
+  if (resourceType === 'subFrame') return false
+  const u = String(url || '')
+  if (/^(data|blob|about|devtools):/i.test(u)) return true
+  if (!/^file:/i.test(u)) return false
+  let target
+  try { target = path.resolve(fileURLToPath(u.replace(/[?#].*$/, ''))) } catch { return false }
+  const norm = (x) => (process.platform === 'win32' ? x.toLowerCase() : x)
+  if (htmlFile && norm(target) === norm(path.resolve(htmlFile))) return true
+  return roots.some((root) => {
+    if (!root) return false
+    const rel = path.relative(norm(path.resolve(root)), norm(target))
+    return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel)
+  })
+}
 
 const SOFFICE_FALLBACKS = [
   'C:\\Program Files\\LibreOffice\\program\\soffice.com',
@@ -108,9 +129,9 @@ export function createDocumentConverter({ app, htmlToPdf, logger } = {}) {
     return task
   }
 
-  async function chromiumPdf(htmlFile, outFile) {
+  async function chromiumPdf(htmlFile, outFile, allow) {
     if (typeof htmlToPdf !== 'function') throw new Error('PDF renderer not available')
-    await htmlToPdf(htmlFile, outFile)
+    await htmlToPdf(htmlFile, outFile, allow)
   }
 
   async function markdownHtml(file) {
@@ -203,7 +224,8 @@ export function createDocumentConverter({ app, htmlToPdf, logger } = {}) {
       const t = await fs.readFile(file, 'utf8')
       await fs.writeFile(htmlFile, wrapHtml(path.basename(file), `<pre style="background:none;font-size:10.5pt">${htmlEsc(t.replace(/^\uFEFF/, ''))}</pre>`), 'utf8')
     }
-    await chromiumPdf(htmlFile, outputFile)
+    // Local files the page may load: the page itself, the source folder (relative images) and the job temp folder.
+    await chromiumPdf(htmlFile, outputFile, { htmlFile, roots: [path.dirname(file), tmp] })
   }
 
   /**
@@ -312,7 +334,11 @@ export function createDocumentConverter({ app, htmlToPdf, logger } = {}) {
             await fs.rename(path.join(outDir, main), p.outputFile).catch(async () => { await fs.copyFile(path.join(outDir, main), p.outputFile) })
             // HTML export writes its images beside the page.
             const extras = produced.filter((f) => f !== main && f.toLowerCase().startsWith(`${base.toLowerCase()}_`))
-            for (const f of extras) await fs.rename(path.join(outDir, f), path.join(path.dirname(p.outputFile), f)).catch(() => {})
+            // Never over an existing file: COPYFILE_EXCL fails when the name is taken (the temp copy is removed with tmpRoot).
+            for (const f of extras) {
+              await fs.copyFile(path.join(outDir, f), path.join(path.dirname(p.outputFile), f), fsRaw.constants.COPYFILE_EXCL)
+                .catch((e) => logger?.warn?.('Converter', `kept existing ${f}: ${e?.code || e?.message}`))
+            }
             ok(p)
           }
         }

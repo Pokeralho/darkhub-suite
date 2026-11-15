@@ -53,6 +53,14 @@ export function JobProgress({ ev, label, onCancel, cancelLabel }: { ev: Progress
   );
 }
 
+/** Engine error codes with a translated message (`rescue.err.<code>`); other codes show the engine's own text. */
+const TRANSLATED_CODES = new Set(['disk_mismatch', 'same_disk', 'same_disk_unknown']);
+
+export function rescueError(t: (key: string, fallback?: string) => string, r: { code?: string; error?: string } | null | undefined, fallback: string): string {
+  if (r?.code && TRANSLATED_CODES.has(r.code)) return t(`rescue.err.${r.code}`, r.error || fallback);
+  return r?.error || fallback;
+}
+
 export function ErrorLine({ text }: { text: string | null | undefined }) {
   return text ? <p role="alert" className="text-[12.5px] text-red-400">{text}</p> : null;
 }

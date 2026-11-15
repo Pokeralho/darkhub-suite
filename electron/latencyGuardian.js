@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process'
 import os from 'node:os'
 import net from 'node:net'
 import ElevationHelper from './services/optimizer/ElevationHelper.js'
+import { PS_SELECT_PRIMARY_ADAPTER } from './services/optimizer/activeAdapterPs.js'
 import { CpuLoadTracker } from './services/CpuLoadTracker.js'
 import ManagedProcessRegistry from './services/ManagedProcessRegistry.js'
 import { encodePowerShellScript, powerShellArgsForEncodedScript } from './services/PowerShellRunner.js'
@@ -521,7 +522,7 @@ public static class NtTimer {
 
     const psRead = `
       $ErrorActionPreference='Stop'
-      $a = Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | Sort-Object -Property LinkSpeed -Descending | Select-Object -First 1
+      ${PS_SELECT_PRIMARY_ADAPTER}
       if ($null -eq $a) { throw 'Active network adapter not found' }
       $guid = (Get-NetAdapter -Name $a.Name).InterfaceGuid.ToString()
       $k = "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{$guid}"

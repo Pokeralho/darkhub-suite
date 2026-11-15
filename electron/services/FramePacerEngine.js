@@ -9,6 +9,7 @@ import Logger from './LoggerService.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const PACING_MODES = ['flatline', 'reflex', 'uncapped']
 
 class FramePacerEngine extends EventEmitter {
   constructor() {
@@ -44,15 +45,19 @@ class FramePacerEngine extends EventEmitter {
     }
 
     this.isRunning = true
-    this.targetFps = Number(targetFps) || 144
-    this.pacingMode = pacingMode || 'flatline'
+    // 0 means unlimited: only a missing/invalid value falls back to 144
+    const fps = Number(targetFps)
+    this.targetFps = Number.isFinite(fps) && fps >= 0 ? fps : 144
+    this.pacingMode = PACING_MODES.includes(pacingMode) ? pacingMode : 'flatline'
     this._crashTimes = []
+    this.lastError = null
     const luid = normalizeAdapterLuid(adapterLuid)
     if (luid !== null) this.adapterLuid = luid
 
     Logger.info('FramePacerEngine', `Iniciando motor nativo C# - Alvo: ${this.targetFps} FPS, Modo: ${this.pacingMode}`)
 
     this._spawnNativeProcess()
+    if (!this.isRunning) return { ok: false, isRunning: false, error: this.lastError }
 
     this.emit('status', {
       isRunning: true,
@@ -79,7 +84,7 @@ class FramePacerEngine extends EventEmitter {
     if (typeof targetFps === 'number' && targetFps >= 0) {
       this.targetFps = targetFps
     }
-    if (pacingMode && ['flatline', 'reflex', 'uncapped'].includes(pacingMode)) {
+    if (pacingMode && PACING_MODES.includes(pacingMode)) {
       this.pacingMode = pacingMode
     }
     // Optional: pace only swap chains rendered by this adapter (DXGI LUID as up to 16 hex digits,
@@ -110,8 +115,18 @@ class FramePacerEngine extends EventEmitter {
       ...this._latestMetrics,
       isRunning: this.isRunning,
       targetFps: this.targetFps,
-      pacingMode: this.pacingMode
+      pacingMode: this.pacingMode,
+      error: this.lastError || null
     }
+  }
+
+  /** The limiter cannot run (spawn failed, crash loop): stop reporting it as running and say why. */
+  _failStop(message) {
+    this.isRunning = false
+    this.lastError = message
+    this._latestMetrics.isRunning = false
+    Logger.error('FramePacerEngine', message)
+    this.emit('status', { isRunning: false, error: message })
   }
 
   _getExePath() {
@@ -195,7 +210,7 @@ class FramePacerEngine extends EventEmitter {
           this._crashTimes = (this._crashTimes || []).filter((t) => nowTs - t < 60_000)
           this._crashTimes.push(nowTs)
           if (this._crashTimes.length > 5) {
-            Logger.error('FramePacerEngine', 'Processo nativo caiu repetidamente; respawn suspenso.')
+            this._failStop(`Processo nativo caiu repetidamente (code ${code}); limitador parado.`)
             return
           }
           setTimeout(() => {
@@ -205,11 +220,13 @@ class FramePacerEngine extends EventEmitter {
       })
 
       proc.on('error', (err) => {
-        Logger.error('FramePacerEngine', `Falha ao iniciar processo nativo: ${err.message}`)
         if (this._nativeProcess === proc) this._nativeProcess = null
+        // spawn failure (missing exe, blocked by AV): no respawn from the 'exit' handler, report it stopped
+        proc._intentionalStop = true
+        if (this.isRunning) this._failStop(`Falha ao iniciar processo nativo: ${err.message}`)
       })
     } catch (err) {
-      Logger.error('FramePacerEngine', `Exceção ao spawnar processo nativo: ${err.message}`)
+      if (this.isRunning) this._failStop(`Exceção ao spawnar processo nativo: ${err.message}`)
     }
   }
 

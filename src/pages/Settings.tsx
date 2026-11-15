@@ -69,9 +69,9 @@ export default function SettingsPage() {
       const res = await window.darkhub?.settings?.updateLiveServices?.(liveServices)
       if (res?.ok) {
         setLiveServices(res.liveServices)
-        setLiveServicesStatus({ ok: true, msg: 'Serviços atualizados com sucesso.' })
+        setLiveServicesStatus({ ok: true, msg: res.restartRequired ? t('settings.servicesRestart', 'Salvo. A mudança no Latency Guardian só vale depois de reiniciar o DarkHub.') : t('settings.servicesSaved', 'Serviços atualizados e aplicados.') })
       } else {
-        setLiveServicesStatus({ ok: false, msg: res?.error ?? 'Falha ao salvar serviços.' })
+        setLiveServicesStatus({ ok: false, msg: res?.error ?? t('settings.servicesSaveFailed', 'Falha ao salvar serviços.') })
       }
     } catch (err: any) {
       setLiveServicesStatus({ ok: false, msg: err?.message ?? String(err) })
@@ -88,10 +88,10 @@ export default function SettingsPage() {
       const res = await window.darkhub?.settings?.updateWindowBehavior?.({ closeToTray: nextValue })
       if (res?.ok) {
         setCloseToTray(res.app?.closeToTray !== false)
-        setWindowBehaviorStatus({ ok: true, msg: 'Preferência salva.' })
+        setWindowBehaviorStatus({ ok: true, msg: t('settings.prefSaved', 'Preferência salva.') })
       } else {
         setCloseToTray(!nextValue)
-        setWindowBehaviorStatus({ ok: false, msg: res?.error ?? 'Falha ao salvar preferência.' })
+        setWindowBehaviorStatus({ ok: false, msg: res?.error ?? t('settings.prefSaveFailed', 'Falha ao salvar preferência.') })
       }
     } catch (err: any) {
       setCloseToTray(!nextValue)
@@ -109,10 +109,10 @@ export default function SettingsPage() {
       const res = await window.darkhub?.settings?.updateStartupBehavior?.({ openAtLogin: nextValue, openAsHidden: true })
       if (res?.ok) {
         setOpenAtLogin(Boolean(res.openAtLogin))
-        setStartupStatus({ ok: true, msg: nextValue ? 'DarkHub configurado para iniciar com o Windows.' : 'Inicialização com o Windows desativada.' })
+        setStartupStatus({ ok: true, msg: nextValue ? t('settings.startupOn', 'DarkHub configurado para iniciar com o Windows.') : t('settings.startupOff', 'Inicialização com o Windows desativada.') })
       } else {
         setOpenAtLogin(!nextValue)
-        setStartupStatus({ ok: false, msg: res?.error ?? 'Falha ao atualizar inicialização com o Windows.' })
+        setStartupStatus({ ok: false, msg: res?.error ?? t('settings.startupFailed', 'Falha ao atualizar inicialização com o Windows.') })
       }
     } catch (err: any) {
       setOpenAtLogin(!nextValue)
@@ -242,7 +242,7 @@ export default function SettingsPage() {
                   type="button"
                   onClick={() => {
                     if (!customLangCode.trim() || !customLangJson.trim()) {
-                      setTranslateMsg({ ok: false, msg: 'Informe o código do idioma e o JSON de tradução.' });
+                      setTranslateMsg({ ok: false, msg: t('settings.translateMissing', 'Informe o código do idioma e o JSON de tradução.') });
                       return;
                     }
                     try {
@@ -250,13 +250,13 @@ export default function SettingsPage() {
                       const label = customLangLabel.trim() || customLangCode.trim();
                       const ok = importCustomTranslation(customLangCode.trim(), label, dict);
                       if (ok) {
-                        setTranslateMsg({ ok: true, msg: `Tradução "${label}" carregada e ativada.` });
+                        setTranslateMsg({ ok: true, msg: t('settings.translateLoaded', 'Tradução "{label}" carregada e ativada.').replace('{label}', label) });
                         setCustomLangJson('');
                       } else {
-                        setTranslateMsg({ ok: false, msg: 'Falha ao salvar tradução local.' });
+                        setTranslateMsg({ ok: false, msg: t('settings.translateSaveFailed', 'Falha ao salvar tradução local.') });
                       }
                     } catch (e: any) {
-                      setTranslateMsg({ ok: false, msg: 'JSON inválido: ' + e.message });
+                      setTranslateMsg({ ok: false, msg: t('settings.translateBadJson', 'JSON inválido: {error}').replace('{error}', String(e?.message ?? e)) });
                     }
                   }}
                   className="dh-btn dh-btn-accent"
@@ -310,7 +310,7 @@ export default function SettingsPage() {
         {([
           ['latencyGuardian', 'Latency Guardian'],
           ['autoClicker', 'Auto Clicker'],
-          ['overlay', 'Gaming Overlay HUD'],
+          ['overlay', t('settings.svc.overlay', 'Atalho e métricas do Frame Pacer (Ctrl+Shift+F)')],
         ] as const).map(([key, label]) => (
           <SettingRow
             key={key}
@@ -486,15 +486,15 @@ function UpdateManagerSection() {
         if (evt.type === 'checking') setChecking(true)
         else if (evt.type === 'available') {
           setChecking(false)
-          setFeedback({ ok: true, msg: `Nova versão disponível: v${evt.info?.version}` })
+          setFeedback({ ok: true, msg: t('settings.updateAvailable', 'Nova versão disponível: v{version}').replace('{version}', String(evt.info?.version ?? '')) })
           loadStatus()
         } else if (evt.type === 'not-available') {
           setChecking(false)
-          setFeedback({ ok: true, msg: `Você está na versão mais recente (${evt.currentVersion || status?.currentVersion || APP_VERSION_LABEL}).` })
+          setFeedback({ ok: true, msg: t('settings.upToDate', 'Você está na versão mais recente ({version}).').replace('{version}', String(evt.currentVersion || status?.currentVersion || APP_VERSION_LABEL)) })
           loadStatus()
         } else if (evt.type === 'error') {
           setChecking(false)
-          setFeedback({ ok: false, msg: `Erro ao verificar: ${evt.message}` })
+          setFeedback({ ok: false, msg: t('settings.updateCheckError', 'Erro ao verificar: {error}').replace('{error}', String(evt.message ?? '')) })
         }
       })
       return () => unsub()
@@ -511,7 +511,7 @@ function UpdateManagerSection() {
           setFeedback({ ok: false, msg: res.error })
         }
       } else {
-        setFeedback({ ok: false, msg: 'Serviço de updater indisponível.' })
+        setFeedback({ ok: false, msg: t('settings.updaterUnavailable', 'Serviço de updater indisponível.') })
       }
     } catch (e: any) {
       setFeedback({ ok: false, msg: e.message })
@@ -523,7 +523,7 @@ function UpdateManagerSection() {
   return (
     <SettingsGroup title={t('settings.updates', 'Atualizações do DarkHub')}>
       <SettingRow
-        label="Versão em execução"
+        label={t('settings.runningVersion', 'Versão em execução')}
         description={<span className="font-mono text-zinc-300">{status?.currentVersion || APP_VERSION_LABEL}</span>}
         status={feedback}
         control={

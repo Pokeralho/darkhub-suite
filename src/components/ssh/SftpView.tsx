@@ -325,7 +325,10 @@ export default function SftpView({ sftpId, hostId, vault, visible }: { sftpId: s
         if (choice.action === 'overwrite' || it.isDir) r = await run(choice.action);
         else continue;
       }
-      if (!r.ok && r.code !== 'CANCELLED') setNote(`${it.name}: ${errText(r)}`);
+      if (!r.ok && r.code === 'UNSAFE_NAME') setNote(t('ssh.sftp.unsafeName', 'Não baixado: "{n}" não é um nome de arquivo válido no Windows.').replace('{n}', it.name));
+      else if (!r.ok && r.code === 'PROTECTED') setNote(t('ssh.sftp.protected', 'Pastas do Windows, de programas e do DarkHub não podem ser alteradas por aqui.'));
+      else if (!r.ok && r.code !== 'CANCELLED') setNote(`${it.name}: ${errText(r)}`);
+      else if (r.ok && r.unsafeNames?.length) setNote(t('ssh.sftp.unsafeSkipped', 'Pulados (nome inválido no Windows): {n}').replace('{n}', r.unsafeNames.join(', ')));
     }
     void refresh(direction === 'upload' ? 'remote' : 'local');
   };
@@ -337,7 +340,7 @@ export default function SftpView({ sftpId, hostId, vault, visible }: { sftpId: s
 
   const fsOp = async (side: Side, op: 'mkdir' | 'rename' | 'delete' | 'chmod' | 'touch' | 'copy' | 'symlink', path: string, extra: { targetPath?: string; mode?: string } = {}) => {
     const r = await window.darkhub.ssh.sftpFsOp({ sftpId, side, op, path, ...extra });
-    if (!r.ok) setNote(r.code === 'EXISTS' ? t('ssh.sftp.exists', 'Já existe um item com esse nome.') : errText(r)); else setNote('');
+    if (!r.ok) setNote(r.code === 'EXISTS' ? t('ssh.sftp.exists', 'Já existe um item com esse nome.') : r.code === 'PROTECTED' ? t('ssh.sftp.protected', 'Pastas do Windows, de programas e do DarkHub não podem ser alteradas por aqui.') : errText(r)); else setNote('');
     return r.ok;
   };
 

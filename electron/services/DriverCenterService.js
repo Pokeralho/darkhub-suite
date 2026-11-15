@@ -105,12 +105,16 @@ export function normalizeAdapter(raw = {}) {
   const provider = String(raw.provider ?? '').trim();
   const byPci = vendorFromPnpId(pnpId);
   const vendor = byPci || classifyVendor(model); // the PCI id is authoritative; the name is only a fallback
-  const genericDriver = Boolean(VENDOR_LABEL[vendor]) && isGenericDisplayDriver(model, provider);
+  const noDriver = raw.noDriver === true;
+  const genericDriver = Boolean(VENDOR_LABEL[vendor]) && (noDriver || isGenericDisplayDriver(model, provider));
   const vramMb = Number(raw.vramMb ?? 0) || 0;
   const devId = /VEN_[0-9A-F]{4}&DEV_[0-9A-F]{4}/i.exec(pnpId)?.[0]?.toUpperCase() || '';
   return {
     // The generic driver hides the real model: name the vendor so the user knows which driver to get.
-    model: genericDriver ? `Placa ${VENDOR_LABEL[vendor]} (driver genérico da Microsoft)` : (model || 'Adaptador desconhecido'),
+    model: noDriver
+      ? (VENDOR_LABEL[vendor] ? `Placa ${VENDOR_LABEL[vendor]} (sem driver instalado)` : `${model || 'Placa de vídeo'} (sem driver instalado)`)
+      : genericDriver ? `Placa ${VENDOR_LABEL[vendor]} (driver genérico da Microsoft)` : (model || 'Adaptador desconhecido'),
+    noDriver,
     vendor,
     genericDriver,
     deviceId: devId,
@@ -157,6 +161,16 @@ $adapters = foreach ($g in (Get-CimInstance Win32_VideoController -ErrorAction S
     problem = if ($p) { $p.problem } else { '' }
   }
 }
+# A GPU Windows has not identified yet has no driver and no setup class, so Win32_VideoController misses it: list it
+# from its PCI class code (03 = display) so the user still sees which card needs a driver.
+$known = @{}
+foreach ($a in @($adapters)) { $known["$($a.pnpId)"] = $true }
+$undriven = foreach ($d in @(Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue | Where-Object { $_.ConfigManagerErrorCode -ne 0 -and -not $_.PNPClass })) {
+  if ($known["$($d.PNPDeviceID)"]) { continue }
+  if (-not (@($d.CompatibleID) + @($d.HardwareID) | Where-Object { "$_" -match '^PCI\\\\(VEN_[0-9A-F]{4}&(DEV_[0-9A-F]{4}&)?)?CC_03' })) { continue }
+  [pscustomobject]@{ name = "$($d.Name)"; driverVersion = ''; driverDate = ''; provider = ''; videoProcessor = ''; pnpId = "$($d.PNPDeviceID)"; vramMb = 0; status = 'Error'; problem = "code $($d.ConfigManagerErrorCode)"; noDriver = $true }
+}
+$adapters = @($adapters) + @($undriven)
 $cbs = Test-Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Component Based Servicing\\RebootPending'
 $wu = Test-Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\Auto Update\\RebootRequired'
 [pscustomobject]@{ adapters = @($adapters); rebootPending = [bool]($cbs -or $wu) } | ConvertTo-Json -Depth 4 -Compress

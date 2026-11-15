@@ -145,7 +145,8 @@ export class PortForwardService {
         })
       })
       else if (rule.kind === 'dynamic') rt.server = await this.listen(rule, (sock) => this.handleSocks(rt, id, client, sock))
-      else {
+      if (this.active.get(id) !== rt) throw new TunnelError('CANCELLED', 'stopped while starting') // catch closes rt.server
+      if (rule.kind === 'remote') {
         rt.boundPort = await new Promise((resolve, reject) => client.forwardIn(rule.bindAddress, rule.bindPort, (err, port) => (err ? reject(new TunnelError('REMOTE_BIND_FAILED', `server refused ${rule.bindAddress}:${rule.bindPort}: ${err.message}`)) : resolve(port || rule.bindPort))))
         client.on('tcp connection', (info, accept, reject) => {
           if (info.destPort !== rt.boundPort) return reject()
@@ -154,12 +155,19 @@ export class PortForwardService {
           this.track(rt, id, stream, sock)
         })
       }
+      if (this.active.get(id) !== rt) throw new TunnelError('CANCELLED', 'stopped while starting')
       if (rule.kind !== 'remote') rt.boundPort = rule.bindPort
       rt.status = 'active'
       this.onStatus(this.status(id))
       return this.status(id)
     } catch (err) {
-      this.teardown(id, String(err?.message ?? err).slice(0, 300))
+      // only tear down our own run: after a stop + restart, active.get(id) is a newer run that must survive
+      if (this.active.get(id) === rt) this.teardown(id, String(err?.message ?? err).slice(0, 300))
+      else {
+        try { rt.server?.close() } catch { /* closed */ }
+        for (const s of rt.sockets) { try { s.destroy?.() ?? s.end?.() } catch { /* gone */ } }
+        try { rt.conn?.close() } catch { /* closed */ }
+      }
       if (err instanceof TunnelError) throw err
       throw new TunnelError(err?.code === 'HOSTKEY_REJECTED' ? 'HOSTKEY_REJECTED' : 'CONNECT_FAILED', String(err?.message ?? err).slice(0, 300))
     }
@@ -235,7 +243,7 @@ export class PortForwardService {
   /** Starts rules marked auto_start whose host key is already trusted (no prompt at app start). */
   async autoStart() {
     for (const t of this.store.getState().tunnels.filter((x) => x.autoStart)) {
-      try { await this.start(t.id, { interactive: false }) } catch (err) { this.logger?.warn?.(`[ssh] auto-start tunnel ${t.id} failed: ${err?.code ?? 'error'}`) }
+      try { await this.start(t.id, { interactive: false }) } catch (err) { this.logger?.warn?.('SSH', `auto-start tunnel ${t.id} failed: ${err?.code ?? 'error'}`) }
     }
   }
 }

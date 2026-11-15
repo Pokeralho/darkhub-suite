@@ -67,6 +67,13 @@ class PowerEngine {
     return { ok: false, error: dup.stderr || dup.stdout || 'Plano de energia indisponível neste PC' };
   }
 
+  /** True for the built-in Ultimate GUID or the copy created on a PC where the built-in one cannot be activated. */
+  isUltimateGuid(g) {
+    if (!g) return false;
+    if (g === POWER_GUIDS.ultimate) return true;
+    try { return JSON.parse(fs.readFileSync(this._statePath().replace(/previous\.json$/, 'ultimate.json'), 'utf8'))?.guid === g; } catch { return false; }
+  }
+
   _rememberPrevious(guid) {
     try {
       fs.writeFileSync(this._statePath(), JSON.stringify({ guid, savedAt: Date.now() }), 'utf8');
@@ -99,7 +106,23 @@ class PowerEngine {
   async _activate(guid, label) {
     const ensured = await this._ensurePlan(guid);
     if (!ensured.ok) return this._result('Error', `Plano "${label}" indisponível: ${ensured.error}`);
-    const set = await this._powercfg(['/setactive', guid]);
+    let set = await this._powercfg(['/setactive', guid]);
+    // Some PCs keep only a hidden, non-activatable template under the built-in GUID ("unsupported configuration"):
+    // a copy under a new GUID is the documented way to get the plan there.
+    if (set.code !== 0 && guid === POWER_GUIDS.ultimate) {
+      // reuse the copy made by an earlier apply instead of piling up duplicates
+      const known = (await this._fetchPowerPlans()).find((p) => p.guid !== guid && this.isUltimateGuid(p.guid))?.guid;
+      const copy = known ? { code: 0, stdout: known } : await this._powercfg(['/duplicatescheme', guid]);
+      const fresh = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i.exec(copy.stdout)?.[1]?.toLowerCase();
+      if (copy.code === 0 && fresh && fresh !== guid) {
+        set = await this._powercfg(['/setactive', fresh]);
+        if (set.code === 0 && (await this._getActiveSchemeGuid()) === fresh) {
+          try { fs.writeFileSync(this._statePath().replace(/previous\.json$/, 'ultimate.json'), JSON.stringify({ guid: fresh }), 'utf8'); } catch { /* status falls back to the built-in GUID */ }
+          return this._result('Success', `Plano de energia ativo (verificado): ${label} (cópia criada neste PC).`);
+        }
+      }
+      return this._result('Error', `Este PC não permite ativar o plano "${label}" (${(set.stderr || set.stdout).trim()}). Use "Alto Desempenho".`);
+    }
     if (set.code !== 0) return this._result('Error', `Falha ao ativar o plano "${label}": ${set.stderr || set.stdout}`);
     const active = await this._getActiveSchemeGuid();
     if (active !== guid) {
@@ -114,14 +137,14 @@ class PowerEngine {
    */
   async setHighPerformance() {
     const before = await this._getActiveSchemeGuid();
-    if (before && before !== POWER_GUIDS.high && before !== POWER_GUIDS.ultimate) this._rememberPrevious(before);
+    if (before && before !== POWER_GUIDS.high && !this.isUltimateGuid(before)) this._rememberPrevious(before);
     return this._activate(POWER_GUIDS.high, 'Alto Desempenho');
   }
 
   /** Ultimate Performance (hidden plan, created on demand). Desktop-oriented: no power-saving at all. */
   async setUltimate() {
     const before = await this._getActiveSchemeGuid();
-    if (before && before !== POWER_GUIDS.high && before !== POWER_GUIDS.ultimate) this._rememberPrevious(before);
+    if (before && before !== POWER_GUIDS.high && !this.isUltimateGuid(before)) this._rememberPrevious(before);
     return this._activate(POWER_GUIDS.ultimate, 'Desempenho Máximo');
   }
 

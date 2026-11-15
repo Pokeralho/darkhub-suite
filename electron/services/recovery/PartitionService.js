@@ -96,6 +96,7 @@ export function shapeListing(raw) {
   const pagefiles = new Set(asList(raw.pagefiles).map((p) => String(p).toUpperCase()))
   const systemLetter = letterOf(raw.systemDrive)
   const parts = asList(raw.partitions)
+  const unread = new Set(asList(raw.partitionsFailed).map(Number))
 
   const disks = asList(raw.disks).map((d) => {
     const style = String(d.style || 'Unknown')
@@ -141,8 +142,10 @@ export function shapeListing(raw) {
       isOffline: !!d.isOffline,
       isReadOnly: !!d.isReadOnly,
       isClustered: !!d.isClustered,
+      // the partition list of this disk could not be read: show it, but never offer free space or changes
+      partitionsUnread: unread.has(d.number),
       partitions,
-      free: freeGaps(partitions, d.size, style)
+      free: unread.has(d.number) ? [] : freeGaps(partitions, d.size, style)
     }
   }).sort((a, b) => a.number - b.number)
   return { elevated: !!raw.elevated, usedLetters: asList(raw.usedLetters).map(letterOf).filter(Boolean), disks }
@@ -164,6 +167,15 @@ try { $pf = @(Get-CimInstance Win32_PageFileUsage | ForEach-Object { ([string]$_
 # letters of the session plus persistent network drives, which an elevated process does not see as mounted
 $used = @([IO.DriveInfo]::GetDrives() | ForEach-Object { $_.Name.Substring(0, 1) })
 try { $used += @(Get-ChildItem 'HKCU:\\Network' -ErrorAction Stop | ForEach-Object { $_.PSChildName }) } catch { }
+# Get-Disk must work (Stop). One disk whose partitions cannot be read (card reader without media, virtual disk)
+# must not hide the others: it is reported in partitionsFailed and blocked from changes instead.
+$disks = @(Get-Disk)
+$partFailed = @()
+$parts = @(foreach ($d in $disks) {
+  try { Get-Partition -DiskNumber $d.Number -ErrorAction Stop }
+  catch { if ($_.CategoryInfo.Category -ne 'ObjectNotFound') { $partFailed += [int]$d.Number } }
+})
+$vols = @(Get-Volume -ErrorAction SilentlyContinue)
 [pscustomobject]@{
   usedLetters = $used
   elevated = $id.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -171,7 +183,8 @@ try { $used += @(Get-ChildItem 'HKCU:\\Network' -ErrorAction Stop | ForEach-Obje
   encryptionRead = $encRead
   encryption = $enc
   pagefiles = $pf
-  disks = @(Get-Disk | ForEach-Object {
+  partitionsFailed = $partFailed
+  disks = @($disks | ForEach-Object {
     [pscustomobject]@{
       number = [int]$_.Number; name = $_.FriendlyName; serial = $_.SerialNumber; uniqueId = $_.UniqueId; guid = $_.Guid; bus = [string]$_.BusType
       style = [string]$_.PartitionStyle; size = [double]$_.Size; sectorSize = [int]$_.LogicalSectorSize
@@ -179,7 +192,7 @@ try { $used += @(Get-ChildItem 'HKCU:\\Network' -ErrorAction Stop | ForEach-Obje
       isReadOnly = [bool]$_.IsReadOnly; isClustered = [bool]$_.IsClustered
     }
   })
-  partitions = @(Get-Partition | ForEach-Object {
+  partitions = @($parts | ForEach-Object {
     [pscustomobject]@{
       disk = [int]$_.DiskNumber; number = [int]$_.PartitionNumber; offset = [double]$_.Offset; size = [double]$_.Size
       letter = [string]$_.DriveLetter; gptType = $_.GptType; mbrType = $_.MbrType; accessPaths = @($_.AccessPaths)
@@ -187,7 +200,7 @@ try { $used += @(Get-ChildItem 'HKCU:\\Network' -ErrorAction Stop | ForEach-Obje
       isBoot = [bool]$_.IsBoot; isSystem = [bool]$_.IsSystem; isActive = [bool]$_.IsActive; isHidden = [bool]$_.IsHidden
     }
   })
-  volumes = @(Get-Volume | ForEach-Object {
+  volumes = @($vols | ForEach-Object {
     [pscustomobject]@{ path = $_.Path; fs = [string]$_.FileSystemType; label = $_.FileSystemLabel; free = [double]$_.SizeRemaining }
   })
 } | ConvertTo-Json -Compress -Depth 4`

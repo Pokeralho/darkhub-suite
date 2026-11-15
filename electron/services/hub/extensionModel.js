@@ -1,6 +1,7 @@
 // DarkHub extensions: new screens and widgets for the app, written in HTML/CSS/JS and shipped as a package of type
 // "extension". They run in a sandboxed frame with no Node, no disk, no direct network and no access to the app's page;
 // everything goes through a bridge that only answers the permissions the user approved. Pure, no IO.
+import { pickPrimaryGpu } from '../../hal/models/gpuMatch.js'
 
 export const MAX_EXTENSION_BYTES = 2 * 1024 * 1024
 /** Extension pages: inline code only, no network, no remote anything. Sent as a header and repeated as a <meta>. */
@@ -123,7 +124,7 @@ export function buildExtensionDoc(pkg, entry, { bridgeJs, baseCss, lang = 'pt-BR
  */
 export function sensorsForExtensions(s = {}) {
   const num = (v) => { const x = v && typeof v === 'object' ? v.value : v; return typeof x === 'number' && Number.isFinite(x) ? Math.round(x * 10) / 10 : null }
-  const gpu = s.gpu?.values?.gpus?.[0] || {}
+  const gpu = pickPrimaryGpu(s.gpu?.values?.gpus || []) || {}
   const gpuProbe = (s.temps?.values?.probes || []).find((p) => p?.category === 'gpu')?.temperature
   return {
     at: Date.now(),

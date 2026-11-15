@@ -69,7 +69,10 @@ namespace DarkHub.Injector
                 if (!File.Exists(dllPath))
                     return "ERROR: DLL não encontrada no caminho especificado.";
 
-                Process[] processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(processName));
+                // strip only a trailing ".exe": GetFileNameWithoutExtension cut "Game.v2" down to "Game"
+                string procName = Path.GetFileName(processName);
+                if (procName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) procName = procName.Substring(0, procName.Length - 4);
+                Process[] processes = Process.GetProcessesByName(procName);
                 if (processes.Length == 0)
                     return "ERROR: Processo alvo (" + processName + ") não está em execução.";
 

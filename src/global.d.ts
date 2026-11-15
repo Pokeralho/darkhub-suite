@@ -859,7 +859,7 @@ export interface DarkHubAPI {
     cancel: () => Promise<{ ok: boolean }>;
   };
   vault: {
-    status: () => Promise<{ initialized: boolean; locked: boolean; autoLockMinutes: number }>;
+    status: () => Promise<{ initialized: boolean; locked: boolean; autoLockMinutes: number; unlockedVia?: 'master' | 'recovery' | null }>;
     setAutoLockMinutes: (minutes: number) => Promise<{ ok: boolean }>;
     init: (payload: { masterPassword: string }) => Promise<any>;
     unlock: (payload: { masterPassword: string }) => Promise<any>;
@@ -871,7 +871,8 @@ export interface DarkHubAPI {
     remove: (payload: { id: string }) => Promise<any>;
     reveal: (payload: { id: string }) => Promise<any>;
     copyPassword: (payload: { id: string }) => Promise<any>;
-    changeMasterPassword: (payload: { currentMasterPassword: string; newMasterPassword: string }) => Promise<any>;
+    /** currentMasterPassword may be omitted only when the vault was unlocked with the recovery words. Returns new recoveryWords. */
+    changeMasterPassword: (payload: { currentMasterPassword?: string; newMasterPassword: string }) => Promise<any>;
     regenerateRecoveryWords: () => Promise<any>;
     export: (payload: { targetPath: string }) => Promise<any>;
     import: (payload: { sourcePath: string }) => Promise<any>;
@@ -1048,7 +1049,7 @@ export interface DarkHubAPI {
     onLog: (callback: (msg: { dir: string; line: string }) => void) => () => void;
   };
   dlss5: {
-    detectGpu: () => Promise<{ ok: boolean; error?: string; vendor: 'nvidia' | 'amd' | 'intel' | 'other' | 'unknown'; model: string; driverVersion: string; isRtx: boolean; isAmd: boolean; isIntel: boolean; defaultProfile: 'nvidia' | 'amd' }>;
+    detectGpu: () => Promise<{ ok: boolean; error?: string; vendor: 'nvidia' | 'amd' | 'intel' | 'other' | 'unknown'; model: string; driverVersion: string; isRtx: boolean; isAmd: boolean; isIntel: boolean; defaultProfile: 'nvidia' | 'amd' | null }>;
     scanGame: (payload: string | { path: string }) => Promise<{
       ok: boolean;
       gameName?: string;
@@ -1138,7 +1139,7 @@ export interface DarkHubAPI {
     sftpOpen: (p: { sftpId: string; hostId: string; password?: string; root?: boolean; sudoPassword?: string }) => Promise<SshResult<{ remoteCwd: string; localCwd: string; root: boolean }>>;
     sftpListLocal: (dirPath: string) => Promise<SshResult<SshDirListing>>;
     sftpListRemote: (sftpId: string, remotePath: string) => Promise<SshResult<SshDirListing>>;
-    sftpTransfer: (p: { transferId: string; sftpId: string; direction: 'upload' | 'download'; localPath: string; remotePath: string; overwrite?: boolean; conflict?: 'fail' | 'overwrite' | 'skip' }) => Promise<SshResult<{ transferId: string; filesDone: number; filesSkipped: number; totalBytes: number }>>;
+    sftpTransfer: (p: { transferId: string; sftpId: string; direction: 'upload' | 'download'; localPath: string; remotePath: string; overwrite?: boolean; conflict?: 'fail' | 'overwrite' | 'skip' }) => Promise<SshResult<{ transferId: string; filesDone: number; filesSkipped: number; totalBytes: number; unsafeNames?: string[] }>>;
     sftpCancelTransfer: (transferId: string) => Promise<SshResult<{ cancelled: boolean }>>;
     sftpFsOp: (p: { sftpId: string; side: 'local' | 'remote'; op: 'mkdir' | 'rename' | 'delete' | 'chmod' | 'touch' | 'symlink' | 'copy'; path: string; targetPath?: string; mode?: string }) => Promise<SshResult>;
     sftpReadText: (p: { sftpId: string; side: 'local' | 'remote'; path: string; force?: boolean }) => Promise<SshResult<SshTextFile>>;
@@ -1216,7 +1217,7 @@ export interface DarkHubAPI {
     tag: (payload: { id: string; color: DiskMapTag | null }) => Promise<{ ok: boolean; error?: string }>;
     open: (payload: { id: string }) => Promise<{ ok: boolean; error?: string }>;
     reveal: (payload: { id: string }) => Promise<{ ok: boolean; error?: string }>;
-    trash: (payload: { id: string }) => Promise<{ ok: boolean; error?: string; path?: string }>;
+    trash: (payload: { id: string }) => Promise<{ ok: boolean; error?: string; path?: string; partial?: boolean; noRecycle?: 'noBin' | 'disabled' | 'tooBig' | 'unknown' }>;
     exportReport: (payload: { id?: string; format: 'txt' | 'csv'; filter?: string }) => Promise<{ ok: boolean; canceled?: boolean; error?: string; path?: string; rows?: number }>;
     onProgress: (callback: (status: DiskMapStatus) => void) => () => void;
   };
@@ -1285,6 +1286,7 @@ export interface DarkHubAPI {
         problem: string;
         isDedicated: boolean;
         genericDriver?: boolean;
+        noDriver?: boolean;
         deviceId?: string;
         boardPartner?: string | null;
         officialSources: { manual: string; autoDetect: string; app: string } | null;

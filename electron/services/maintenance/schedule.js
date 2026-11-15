@@ -33,8 +33,8 @@ export function nextRun(task, from) {
  */
 export function isDue(task, lastRunAt, now) {
   if (!task?.enabled) return false
-  // never run: anchor to when the task was enabled, so enabling it does not run it immediately
-  const anchor = lastRunAt || task.enabledAt || now
+  // anchor to the later of the last run and the (re)enable time: enabling a task never runs it immediately
+  const anchor = Math.max(lastRunAt || 0, task.enabledAt || 0) || now
   return nextRun(task, anchor) <= now
 }
 

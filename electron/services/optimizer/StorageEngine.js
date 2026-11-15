@@ -10,8 +10,16 @@ class StorageEngine {
 
   _getStandardizedTempDirs() {
     const dirs = new Map();
-    const add = (p) => {
-      if (!p) return;
+    // A TEMP/TMP pointed at a drive root or at a folder that holds the profile or Windows (bad guide, broken installer)
+    // would turn "clean temp" into deleting that whole tree.
+    const unsafeTemp = (p) => {
+      const n = path.resolve(p).toLowerCase().replace(/[\\/]+$/, '');
+      if (/^[a-z]:$/.test(n) || n === '') return true;
+      return [os.homedir(), process.env.LOCALAPPDATA, process.env.APPDATA, process.env.ProgramData, process.env.WINDIR, process.env.ProgramFiles]
+        .filter(Boolean).some((k) => { const kk = path.resolve(k).toLowerCase(); return kk === n || kk.startsWith(n + path.sep); });
+    };
+    const add = (p, checked = false) => {
+      if (!p || (checked && unsafeTemp(p))) return;
       const norm = path.normalize(p);
       const key = process.platform === 'win32' ? norm.toLowerCase() : norm;
       if (!dirs.has(key)) dirs.set(key, norm);
@@ -19,8 +27,8 @@ class StorageEngine {
     if (process.platform === 'win32') {
       const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
       const winDir = process.env.WINDIR || 'C:\\Windows';
-      add(process.env.TEMP);
-      add(process.env.TMP);
+      add(process.env.TEMP, true);
+      add(process.env.TMP, true);
       add(path.join(winDir, 'Temp'));
       add(path.join(winDir, 'SoftwareDistribution', 'Download'));
       add(path.join(winDir, 'Minidump'));

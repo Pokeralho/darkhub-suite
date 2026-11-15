@@ -7,7 +7,7 @@ import { parseFilter, matchFile, classOf } from '../electron/services/diskscan/f
 // @ts-ignore plain JS module
 import { ScanModel } from '../electron/services/diskscan/ScanModel.js';
 // @ts-ignore plain JS module
-import { DiskScanService } from '../electron/services/diskscan/DiskScanService.js';
+import { DiskScanService, recycleVerdict } from '../electron/services/diskscan/DiskScanService.js';
 import { squarify, layoutTree, hitTest } from '../src/pages/SpaceSniffer/treemap';
 
 const win32 = process.platform === 'win32' ? it : it.skip;
@@ -107,6 +107,20 @@ describe('treemap layout', () => {
   });
 });
 
+describe('recycle bin verdict', () => {
+  it('refuses drives without a bin, a disabled bin and items bigger than the bin', () => {
+    const fixed = { type: 'Fixed', total: 1e12, nuke: 0, max: 100, noRecycle: false };
+    expect(recycleVerdict(fixed, 50 * 1024 * 1024)).toBeNull();
+    expect(recycleVerdict(fixed, 200 * 1024 * 1024)).toBe('tooBig');
+    expect(recycleVerdict({ ...fixed, max: -1 }, 40e9)).toBeNull(); // no key: ~5% of the volume
+    expect(recycleVerdict({ ...fixed, max: -1 }, 60e9)).toBe('tooBig');
+    for (const type of ['Removable', 'Network', 'CDRom', '']) expect(recycleVerdict({ ...fixed, type }, 1)).toBe('noBin');
+    expect(recycleVerdict({ ...fixed, nuke: 1 }, 1)).toBe('disabled');
+    expect(recycleVerdict({ ...fixed, noRecycle: true }, 1)).toBe('disabled');
+    expect(recycleVerdict(null, 1)).toBe('unknown');
+  });
+});
+
 describe('disk scan service (real helper)', () => {
   const exe = path.resolve('electron/services/DarkHub.DiskScan.exe');
   win32('scans a folder, serves the view and trashes through the shell', async () => {
@@ -130,6 +144,11 @@ describe('disk scan service (real helper)', () => {
     expect(unicode.name).toBe('ção 名字.bin');
     expect(svc.info(unicode.id).info.path).toBe(path.join(root, 'sub', 'deep', 'ção 名字.bin'));
     expect((await svc.trash('d0')).ok).toBe(false);
+    // a drive whose Recycle Bin cannot take the item: refused before the shell is asked (it would delete for good)
+    svc.recycleProbe = async () => ({ type: 'Removable', total: 8e9, nuke: 0, max: -1, noRecycle: false });
+    expect(await svc.trash(sub.id)).toMatchObject({ ok: false, noRecycle: 'noBin' });
+    expect(trashed).toEqual([]);
+    svc.recycleProbe = async () => ({ type: 'Fixed', total: 1e12, nuke: 0, max: 100, noRecycle: false });
     const r = await svc.trash(sub.id);
     expect(r.ok).toBe(true);
     expect(svc.view({ id: 'd0' }).tree.size).toBe(300000);

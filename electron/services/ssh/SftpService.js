@@ -48,6 +48,54 @@ export function normalizeLocal(p) {
   return path.resolve(s)
 }
 
+// ---------- local (Windows) safety ----------
+const WIN_RESERVED = /^(con|prn|aux|nul|conin\$|conout\$|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3])$/i
+/**
+ * Whether a remote file name can be used as ONE local path segment on Windows: no separators, drive/stream colons,
+ * wildcard or control characters, no "." / "..", no trailing dot/space (Windows strips them) and no device names.
+ */
+export function isSafeLocalName(name) {
+  const n = String(name ?? '')
+  if (!n || n.length > 255 || n === '.' || n === '..') return false
+  if (/[\\/:*?"<>|\u0000-\u001f]/.test(n)) return false
+  if (/[. ]$/.test(n)) return false
+  return !WIN_RESERVED.test(n.split('.')[0].trimEnd())
+}
+
+/** A safe local name derived from any remote name (used for temp copies). */
+export function sanitizeLocalName(name) {
+  let n = String(name ?? '').slice(0, 200).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').replace(/[. ]+$/, '')
+  if (!n || n === '.' || n === '..') n = 'file'
+  if (WIN_RESERVED.test(n.split('.')[0].trimEnd())) n = `_${n}`
+  return n
+}
+
+/** target is root itself or below it (Windows paths compare case-insensitively). */
+export function isInsideLocal(root, target) {
+  const rel = path.relative(path.resolve(root), path.resolve(target))
+  return rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel)
+}
+
+// extensions that open in a viewer/editor and never execute: everything else gets ".txt" appended before opening
+const VIEW_SAFE_EXT = new Set(['.txt', '.log', '.md', '.markdown', '.json', '.jsonc', '.yaml', '.yml', '.toml', '.ini', '.conf', '.cfg', '.cnf', '.properties'])
+/** Local file name for "edit locally": shell.openPath must never run a script or program (.bat, .js, .vbs, .lnk...). */
+export function editLocalName(remoteName, pathext = process.env.PATHEXT) {
+  const n = sanitizeLocalName(remoteName)
+  const ext = path.extname(n).toLowerCase()
+  const exec = String(pathext ?? '').toLowerCase().split(';').map((e) => e.trim()).filter(Boolean)
+  return VIEW_SAFE_EXT.has(ext) && !exec.includes(ext) ? n : `${n}.txt`
+}
+
+/**
+ * Local folders the SFTP panel never writes to, renames or deletes in (the app runs elevated: a slip, or a hostile
+ * file name, must not land in Windows or Program Files).
+ */
+export function protectedLocalRoots(extra = [], env = process.env) {
+  const out = [env.WINDIR, env.SystemRoot, env.ProgramFiles, env['ProgramFiles(x86)'], env.ProgramW6432,
+    env.ProgramData ? path.join(env.ProgramData, 'Microsoft') : null, ...extra]
+  return [...new Set(out.filter((d) => typeof d === 'string' && d.trim()).map((d) => path.resolve(d)))]
+}
+
 export function parseMode(mode) {
   const s = String(mode ?? '').trim()
   if (!/^[0-7]{3,4}$/.test(s)) throw new SftpError('VALIDATION', 'mode must be octal like 755')
@@ -188,8 +236,9 @@ const notFound = (err) => err?.code === 2 || err?.code === 'ENOENT'
  * detection) and "edit locally" (download to a temp file, open it, re-upload on every save).
  */
 export class SftpService {
-  constructor({ manager, trashItem, openPath, onProgress, onWatch, tempDir } = {}) {
+  constructor({ manager, trashItem, openPath, onProgress, onWatch, tempDir, protectedDirs = [] } = {}) {
     this.manager = manager
+    this.protectedRoots = protectedLocalRoots(protectedDirs)
     this.trashItem = trashItem
     this.openPath = openPath
     this.onProgress = onProgress ?? (() => {})
@@ -232,6 +281,19 @@ export class SftpService {
     try { home = await p((cb) => sftp.realpath('.', cb)) } catch { /* keep "/" */ }
     this.handles.set(sftpId, { conn, sftp, hostId, home, root: Boolean(root), sudo })
     return { remoteCwd: home, localCwd: os.homedir(), root: Boolean(root) }
+  }
+
+  /** Throws PROTECTED when a local write/rename/delete would touch a system or app folder (symlinks resolved). */
+  async assertLocalWritable(file) {
+    const candidates = [path.resolve(file)]
+    try { candidates.push(await fs.promises.realpath(file)) } catch {
+      try { candidates.push(path.join(await fs.promises.realpath(path.dirname(file)), path.basename(file))) } catch { /* parent missing */ }
+    }
+    for (const c of candidates) {
+      for (const root of this.protectedRoots) {
+        if (isInsideLocal(root, c)) throw new SftpError('PROTECTED', `${file}: writing inside ${root} is not allowed`)
+      }
+    }
   }
 
   dropped(sftpId) {
@@ -339,6 +401,41 @@ export class SftpService {
     }
   }
 
+  /**
+   * Replaces a remote file atomically (temp file in the same folder + rename) without breaking it: a symlink is
+   * followed and its target rewritten, the temp file gets the original mode and owner/group, and when the owner
+   * cannot be restored (not root) the file is overwritten in place instead, keeping owner, links and ACLs.
+   * writeTo(dest) writes the new content to dest. Returns the path actually written.
+   */
+  async remoteReplace(sftp, file, writeTo) {
+    let target = file
+    try {
+      const l = await p((cb) => sftp.lstat(file, cb))
+      if ((l.mode & S_IFMT) === S_IFLNK) target = await p((cb) => sftp.realpath(file, cb))
+    } catch { /* new file */ }
+    let st = null
+    try { st = await p((cb) => sftp.stat(target, cb)) } catch { /* new file */ }
+    const tmp = path.posix.join(path.posix.dirname(target), `.${path.posix.basename(target)}.darkhub-${crypto.randomBytes(4).toString('hex')}.tmp`)
+    try {
+      await writeTo(tmp)
+      if (st) {
+        if (st.mode & 0o7777) { try { await p((cb) => sftp.chmod(tmp, st.mode & 0o7777, cb)) } catch { /* unsupported */ } }
+        if (typeof st.uid === 'number' && typeof st.gid === 'number') {
+          try { await p((cb) => sftp.chown(tmp, st.uid, st.gid, cb)) } catch {
+            try { await p((cb) => sftp.unlink(tmp, cb)) } catch { /* gone */ }
+            await writeTo(target)
+            return target
+          }
+        }
+      }
+      await this.remoteRename(sftp, tmp, target, true)
+    } catch (err) {
+      try { await p((cb) => sftp.unlink(tmp, cb)) } catch { /* nothing written */ }
+      throw err
+    }
+    return target
+  }
+
   /** Walks a source tree: [{ rel, isDir, size }] (directories first, so they are created before their files). */
   async walk(src, root, budget = { left: MAX_TREE }) {
     const out = []
@@ -373,6 +470,15 @@ export class SftpService {
     const dst = this.side(direction === 'upload' ? 'remote' : 'local', sftp)
     const srcRoot = direction === 'upload' ? local : remote
     const dstRoot = direction === 'upload' ? remote : local
+    if (direction === 'download') {
+      // the local target is "<folder>\\<remote name>": a server-chosen name like "..\\..\\x.bat", "C:x" or "CON" must
+      // not steer the write outside that folder
+      const rawName = String(remotePath ?? '').split('/').filter(Boolean).pop() ?? ''
+      if (!isSafeLocalName(rawName) || String(localPath ?? '').split(/[\\/]/).some((seg) => seg === '.' || seg === '..')) {
+        throw new SftpError('UNSAFE_NAME', `"${rawName}" is not a valid file name on Windows`, { names: [rawName] })
+      }
+      await this.assertLocalWritable(local)
+    }
 
     let rootStat
     try { rootStat = await src.stat(srcRoot) } catch (err) { throw new SftpError(notFound(err) ? 'NOT_FOUND' : 'TRANSFER_FAILED', `${srcRoot}: ${err?.message ?? err}`) }
@@ -382,7 +488,7 @@ export class SftpService {
     const items = rootStat.isDir ? await this.walk(src, srcRoot) : [{ rel: '', isDir: false, size: rootStat.size }]
     const total = items.reduce((a, i) => a + i.size, 0)
     const files = items.filter((i) => !i.isDir).length
-    const state = { cancelled: false, transferred: 0, done: 0, skipped: 0, current: null, active: null }
+    const state = { cancelled: false, transferred: 0, done: 0, skipped: 0, current: null, active: null, unsafe: [] }
     const started = Date.now()
     let lastEmit = 0
     const emit = (status, extra = {}) => {
@@ -444,6 +550,16 @@ export class SftpService {
           const relDst = dst.kind === 'remote' ? it.rel.split(path.sep).join('/') : it.rel.split('/').join(path.sep)
           const from = src.join(srcRoot, it.rel)
           const to = dst.join(dstRoot, relDst)
+          if (dst.kind === 'local') {
+            // every remote name segment must be a plain Windows name, and the result must stay in the folder
+            const bad = it.rel.split('/').find((seg) => !isSafeLocalName(seg))
+            if (bad !== undefined || !isInsideLocal(dstRoot, to) || path.resolve(to) === path.resolve(dstRoot)) {
+              const shown = bad ?? it.rel
+              if (!state.unsafe.includes(shown) && state.unsafe.length < 20) state.unsafe.push(shown)
+              if (!it.isDir) { state.skipped += 1; state.transferred += it.size }
+              continue
+            }
+          }
           if (it.isDir) { await dst.mkdir(to); continue }
           state.current = it.rel
           if (policy !== 'overwrite' && await dst.exists(to)) { state.skipped += 1; state.transferred += it.size; continue }
@@ -451,8 +567,8 @@ export class SftpService {
           state.done += 1
         }
       }
-      emit('done')
-      return { ok: true, transferId, filesDone: state.done, filesSkipped: state.skipped, totalBytes: total }
+      emit('done', state.unsafe.length ? { unsafeNames: state.unsafe } : {})
+      return { ok: true, transferId, filesDone: state.done, filesSkipped: state.skipped, totalBytes: total, ...(state.unsafe.length ? { unsafeNames: state.unsafe } : {}) }
     } catch (err) {
       const cancelled = state.cancelled
       const code = cancelled ? 'CANCELLED' : permErr(err) ? 'PERMISSION' : err?.code === 'TOO_MANY' ? 'TOO_MANY' : 'TRANSFER_FAILED'
@@ -506,7 +622,13 @@ export class SftpService {
    */
   async writeText({ sftpId, side, path: target, content, encoding, eol, bom, expectedMtimeMs, expectedSize, force = false, create = false } = {}) {
     const isLocal = side === 'local'
-    const file = isLocal ? normalizeLocal(target) : normalizeRemote(target)
+    let file = isLocal ? normalizeLocal(target) : normalizeRemote(target)
+    const requested = file
+    if (isLocal) {
+      await this.assertLocalWritable(file)
+      // a symlink is saved through to its target (renaming over it would replace the link with a plain file)
+      try { if ((await fs.promises.lstat(file)).isSymbolicLink()) file = await fs.promises.realpath(file) } catch { /* new file */ }
+    }
     const sftp = isLocal ? null : this.handle(sftpId).sftp
     const io = this.side(isLocal ? 'local' : 'remote', sftp)
     const buf = encodeText(content, { encoding, eol, bom })
@@ -520,27 +642,30 @@ export class SftpService {
       const changed = Math.abs(current.mtimeMs - Number(expectedMtimeMs)) >= 1000 || (expectedSize != null && current.size !== Number(expectedSize))
       if (changed) throw new SftpError('CONFLICT', 'the file changed on disk since it was opened', { mtimeMs: current.mtimeMs, size: current.size })
     }
-    const dir = isLocal ? path.dirname(file) : path.posix.dirname(file)
-    const tmp = io.join(dir, `.${isLocal ? path.basename(file) : path.posix.basename(file)}.darkhub-${crypto.randomBytes(4).toString('hex')}.tmp`)
-    try {
-      await new Promise((resolve, reject) => {
-        const ws = io.writeStream(tmp)
-        ws.on('error', reject)
-        ws.on('close', resolve)
-        ws.on('finish', resolve)
-        ws.end(buf)
-      })
-      if (current?.mode) {
-        if (isLocal) { try { await fs.promises.chmod(tmp, current.mode) } catch { /* windows */ } } else { try { await p((cb) => sftp.chmod(tmp, current.mode, cb)) } catch { /* unsupported */ } }
+    const writeBuf = (dest) => new Promise((resolve, reject) => {
+      const ws = io.writeStream(dest)
+      ws.on('error', reject)
+      ws.on('close', resolve)
+      ws.on('finish', resolve)
+      ws.end(buf)
+    })
+    if (!isLocal) {
+      try { await this.remoteReplace(sftp, file, writeBuf) } catch (err) {
+        throw new SftpError(permErr(err) ? 'PERMISSION' : 'WRITE_FAILED', `${file}: ${err?.message ?? err}`)
       }
-      if (isLocal) await fs.promises.rename(tmp, file)
-      else await this.remoteRename(sftp, tmp, file, true)
-    } catch (err) {
-      try { await io.unlink(tmp) } catch { /* nothing written */ }
-      throw new SftpError(permErr(err) ? 'PERMISSION' : 'WRITE_FAILED', `${file}: ${err?.message ?? err}`)
+    } else {
+      const tmp = path.join(path.dirname(file), `.${path.basename(file)}.darkhub-${crypto.randomBytes(4).toString('hex')}.tmp`)
+      try {
+        await writeBuf(tmp)
+        if (current?.mode) { try { await fs.promises.chmod(tmp, current.mode) } catch { /* windows */ } }
+        await fs.promises.rename(tmp, file)
+      } catch (err) {
+        try { await io.unlink(tmp) } catch { /* nothing written */ }
+        throw new SftpError(permErr(err) ? 'PERMISSION' : 'WRITE_FAILED', `${file}: ${err?.message ?? err}`)
+      }
     }
     const st = await io.stat(file)
-    return { path: file, size: st.size, mtimeMs: st.mtimeMs }
+    return { path: requested, size: st.size, mtimeMs: st.mtimeMs }
   }
 
   async stat({ sftpId, side, path: target } = {}) {
@@ -575,7 +700,7 @@ export class SftpService {
     const watchId = `w${crypto.randomBytes(5).toString('hex')}`
     const dir = path.join(this.tempDir, watchId)
     await fs.promises.mkdir(dir, { recursive: true })
-    const local = path.join(dir, path.posix.basename(file).replace(/[<>:"|?*]/g, '_'))
+    const local = path.join(dir, editLocalName(path.posix.basename(file)))
     await new Promise((resolve, reject) => {
       const rs = sftp.createReadStream(file)
       const ws = fs.createWriteStream(local)
@@ -595,15 +720,12 @@ export class SftpService {
       try {
         const h = this.handles.get(sftpId)
         if (!h) throw new SftpError('NOT_OPEN', 'SFTP session closed')
-        const tmp = `${file}.darkhub-${crypto.randomBytes(4).toString('hex')}.tmp`
-        await new Promise((resolve, reject) => {
+        await this.remoteReplace(h.sftp, file, (dest) => new Promise((resolve, reject) => {
           const rs = fs.createReadStream(local)
-          const ws = h.sftp.createWriteStream(tmp)
+          const ws = h.sftp.createWriteStream(dest)
           rs.on('error', reject); ws.on('error', reject); ws.on('close', resolve); ws.on('finish', resolve)
           rs.pipe(ws)
-        })
-        if (st.mode) { try { await p((cb) => h.sftp.chmod(tmp, st.mode, cb)) } catch { /* unsupported */ } }
-        await this.remoteRename(h.sftp, tmp, file, true)
+        }))
         this.onWatch({ watchId, sftpId, remotePath: file, localPath: local, status: 'uploaded', at: Date.now() })
       } catch (err) {
         this.onWatch({ watchId, sftpId, remotePath: file, localPath: local, status: 'error', error: String(err?.message ?? err).slice(0, 300) })
@@ -656,6 +778,8 @@ export class SftpService {
     if (side === 'local') {
       const file = normalizeLocal(target)
       if (path.parse(file).root === file) throw new SftpError('VALIDATION', 'refusing to touch a drive root')
+      await this.assertLocalWritable(file)
+      if ((op === 'rename' || op === 'copy') && targetPath != null) await this.assertLocalWritable(normalizeLocal(targetPath))
       try {
         if (op === 'mkdir') await fs.promises.mkdir(file, { recursive: false })
         else if (op === 'rename') await fs.promises.rename(file, normalizeLocal(targetPath))

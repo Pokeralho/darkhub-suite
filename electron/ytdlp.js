@@ -1,7 +1,5 @@
 import fsRaw from 'node:fs'
-import https from 'node:https'
 import path from 'node:path'
-import crypto from 'node:crypto'
 import { spawn, execFile } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
@@ -16,103 +14,56 @@ function platformAssetName(platform) {
   return 'yt-dlp_linux'
 }
 
-function downloadWithRedirects(url, destPath, { maxRedirects = 5 } = {}) {
-  return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers: { 'User-Agent': 'DarkHub' } }, (res) => {
-      const code = res.statusCode || 0
-      if (code >= 300 && code < 400 && res.headers.location && maxRedirects > 0) {
-        res.resume()
-        return resolve(downloadWithRedirects(res.headers.location, destPath, { maxRedirects: maxRedirects - 1 }))
-      }
-      if (code !== 200) {
-        res.resume()
-        return reject(new Error(`Download failed (${code})`))
-      }
-      const file = fsRaw.createWriteStream(destPath)
-      res.pipe(file)
-      file.on('finish', () => file.close(() => resolve()))
-      file.on('error', (err) => reject(err))
-    })
-    req.on('error', (err) => reject(err))
-  })
-}
+const YTDLP_RELEASE_BASE = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download'
+const YTDLP_CHECKSUMS_URL = `${YTDLP_RELEASE_BASE}/SHA2-256SUMS`
+// yt-dlp.exe is ~17 MB: anything far smaller left in the tools folder is a broken older download.
+const MIN_YTDLP_BYTES = 1024 * 1024
 
-function downloadTextWithRedirects(url, { maxRedirects = 5 } = {}) {
-  return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers: { 'User-Agent': 'DarkHub' } }, (res) => {
-      const code = res.statusCode || 0
-      if (code >= 300 && code < 400 && res.headers.location && maxRedirects > 0) {
-        res.resume()
-        return resolve(downloadTextWithRedirects(res.headers.location, { maxRedirects: maxRedirects - 1 }))
-      }
-      if (code !== 200) {
-        res.resume()
-        return reject(new Error(`Download failed (${code})`))
-      }
-      let data = ''
-      res.setEncoding('utf8')
-      res.on('data', (chunk) => { data += chunk })
-      res.on('end', () => resolve(data))
-    })
-    req.on('error', (err) => reject(err))
-  })
-}
-
-async function sha256File(filePath) {
-  return new Promise((resolve, reject) => {
-    const hash = crypto.createHash('sha256')
-    const stream = fsRaw.createReadStream(filePath)
-    stream.on('data', (chunk) => hash.update(chunk))
-    stream.on('error', reject)
-    stream.on('end', () => resolve(hash.digest('hex')))
-  })
-}
-
-const YTDLP_CHECKSUMS_URL = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/SHA2-256SUMS'
-
-async function fetchExpectedChecksum(assetName) {
-  const text = await downloadTextWithRedirects(YTDLP_CHECKSUMS_URL)
-  for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim()
-    if (!trimmed) continue
-
-    const match = trimmed.match(/^([a-fA-F0-9]{64})\s+\*?(.+)$/)
-    if (match && match[2].trim() === assetName) {
-      return match[1].toLowerCase()
-    }
+/** Finds the SHA-256 for `assetName` in a SHA2-256SUMS listing, or null. */
+export function parseChecksumList(text, assetName) {
+  for (const line of String(text ?? '').split(/\r?\n/)) {
+    const match = line.trim().match(/^([a-fA-F0-9]{64})\s+\*?(.+)$/)
+    if (match && match[2].trim() === assetName) return match[1].toLowerCase()
   }
   return null
 }
 
-export async function ensureYtDlp(toolsDir, platform) {
+async function fetchExpectedChecksum(assetName, tmpPath, downloadToFile) {
+  try {
+    await downloadToFile(YTDLP_CHECKSUMS_URL, tmpPath, { maxBytes: 1024 * 1024, timeoutMs: 30000 })
+    return parseChecksumList(await fs.readFile(tmpPath, 'utf8'), assetName)
+  } finally {
+    await fs.unlink(tmpPath).catch(() => {})
+  }
+}
+
+/**
+ * Installs yt-dlp from the official GitHub release. Fails closed: the binary is only put in
+ * place after its SHA-256 matches the published SHA2-256SUMS (host allow-list, timeout,
+ * size cap and length check come from SecureDownload.downloadToFile).
+ */
+export async function ensureYtDlp(toolsDir, platform, { downloadToFile = null } = {}) {
   const asset = platformAssetName(platform)
   const dest = path.join(toolsDir, asset)
   try {
-    await fs.access(dest)
-    return dest
+    const st = await fs.stat(dest)
+    if (st.isFile() && st.size >= MIN_YTDLP_BYTES) return dest
+    await fs.unlink(dest).catch(() => {})
   } catch {}
 
+  const download = downloadToFile ?? (await import('./services/SecureDownload.js')).downloadToFile
   await fs.mkdir(toolsDir, { recursive: true })
-  const url = `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${asset}`
   const tmpDest = `${dest}.download`
-  await downloadWithRedirects(url, tmpDest)
-
+  const expected = await fetchExpectedChecksum(asset, `${dest}.sums`, download)
+  if (!expected) {
+    throw new Error('yt-dlp integrity check unavailable (no published SHA-256 for this file). Download aborted for safety.')
+  }
   try {
-    const expected = await fetchExpectedChecksum(asset)
-    if (expected) {
-      const actual = await sha256File(tmpDest)
-      if (actual.toLowerCase() !== expected) {
-        await fs.unlink(tmpDest).catch(() => {})
-        throw new Error(`Verificação de integridade do yt-dlp falhou (checksum não corresponde). Download abortado por segurança.`)
-      }
-    } else {
-
-    }
+    // downloadToFile removes the partial file itself on any failure (timeout, size, hash).
+    await download(`${YTDLP_RELEASE_BASE}/${asset}`, tmpDest, { expectedSha256: expected, timeoutMs: 60000, maxBytes: 200 * 1024 * 1024 })
   } catch (err) {
-
-    if (/checksum não corresponde/i.test(err?.message ?? '')) {
-      throw err
-    }
+    await fs.unlink(tmpDest).catch(() => {})
+    throw new Error(`yt-dlp download failed: ${err?.message ?? err}`)
   }
 
   await fs.rename(tmpDest, dest)
@@ -184,37 +135,43 @@ export async function ensureFfmpeg(toolsDir, platform) {
   return dest
 }
 
+// Only the long-running download is tracked: info probes run alongside and must not
+// replace it, or Cancel would stop the probe instead of the download.
 let activeYtDlpChild = null
 
-export function cancelActiveYtDlp() {
-  if (activeYtDlpChild) {
-    try {
-      const pid = activeYtDlpChild.pid
-      if (process.platform === 'win32' && pid) {
-        // non-blocking tree kill (yt-dlp spawns ffmpeg children)
-        execFile('taskkill.exe', ['/F', '/T', '/PID', String(pid)], { windowsHide: true }, () => {})
-      }
-      activeYtDlpChild.kill('SIGKILL')
-    } catch {}
-    activeYtDlpChild = null
-    return true
-  }
-  return false
+/** Kills a yt-dlp process and its ffmpeg children (Windows: taskkill /T /F). */
+function killTree(child) {
+  try {
+    const pid = child?.pid
+    if (process.platform === 'win32' && pid) {
+      execFile('taskkill.exe', ['/F', '/T', '/PID', String(pid)], { windowsHide: true }, () => {})
+    }
+    child.kill('SIGKILL')
+  } catch {}
 }
 
-export function runYtDlp(ytdlpPath, args, { timeoutMs = 0, onProgress = null } = {}) {
+export function cancelActiveYtDlp() {
+  const child = activeYtDlpChild
+  if (!child) return false
+  child.dhCanceled = true
+  activeYtDlpChild = null
+  killTree(child)
+  return true
+}
+
+export function runYtDlp(ytdlpPath, args, { timeoutMs = 0, onProgress = null, track = false, spawnImpl = spawn } = {}) {
   return new Promise((resolve, reject) => {
     const finalArgs = onProgress && !args.includes('--newline') ? ['--newline', ...args] : args
-    const child = spawn(ytdlpPath, finalArgs, { windowsHide: true })
-    activeYtDlpChild = child
+    const child = spawnImpl(ytdlpPath, finalArgs, { windowsHide: true })
+    if (track) activeYtDlpChild = child
     let stdout = ''
     let stderr = ''
-    let isCanceled = false
 
     const timer =
       typeof timeoutMs === 'number' && timeoutMs > 0
         ? setTimeout(() => {
-            child.kill()
+            if (activeYtDlpChild === child) activeYtDlpChild = null
+            killTree(child)
             reject(new Error(`yt-dlp timed out after ${timeoutMs}ms`))
           }, timeoutMs)
         : null
@@ -289,7 +246,7 @@ export function runYtDlp(ytdlpPath, args, { timeoutMs = 0, onProgress = null } =
     child.on('close', (code) => {
       if (activeYtDlpChild === child) activeYtDlpChild = null
       if (timer) clearTimeout(timer)
-      resolve({ code, stdout, stderr, canceled: isCanceled })
+      resolve({ code, stdout, stderr, canceled: Boolean(child.dhCanceled) })
     })
   })
 }

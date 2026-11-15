@@ -67,6 +67,9 @@ export function attachOutput(sessionId: string, onData: (data: string) => void) 
 
 export function ensureWired() { wire(); }
 
+/** Test hook: whether a pane still holds its one-off password. */
+export const hasOneOffPassword = (sessionId: string) => oneOffPasswords.has(sessionId);
+
 // ---------- tabs and panes ----------
 function updatePane(sessionId: string, patch: Partial<Pane>) {
   set((s) => ({
@@ -78,7 +81,8 @@ function updatePane(sessionId: string, patch: Partial<Pane>) {
 
 export function setActive(id: string) { set({ active: id }); }
 
-// one-off passwords typed for hosts without a saved credential: used once by startSession, never stored
+// one-off passwords typed for hosts without a saved credential: kept in memory only (never stored) for as long as the
+// pane lives, so "reconnect" works; dropped when the pane or its tab closes
 const oneOffPasswords = new Map<string, string>();
 const started = new Set<string>();
 
@@ -87,7 +91,6 @@ export async function startSession(pane: Pane, cols: number, rows: number) {
   if (started.has(pane.sessionId)) return;
   started.add(pane.sessionId);
   const password = oneOffPasswords.get(pane.sessionId);
-  oneOffPasswords.delete(pane.sessionId);
   const r = pane.kind === 'serial' && pane.serial
     ? await window.darkhub.ssh.serialConnect({ ...pane.serial, sessionId: pane.sessionId })
     : await window.darkhub.ssh.connect({ sessionId: pane.sessionId, hostId: pane.hostId, cols, rows, password });
@@ -99,6 +102,9 @@ export function reconnectPane(tabId: string, sessionId: string) {
   replay.delete(sessionId);
   started.delete(sessionId);
   const next = rid('s');
+  const password = oneOffPasswords.get(sessionId);
+  oneOffPasswords.delete(sessionId);
+  if (password) oneOffPasswords.set(next, password);
   set((s) => ({
     tabs: s.tabs.map((t) => (t.id === tabId && t.kind === 'terminal'
       ? { ...t, activePane: t.activePane === sessionId ? next : t.activePane, panes: t.panes.map((p) => (p.sessionId === sessionId ? { ...p, sessionId: next, status: 'connecting' as const, error: undefined } : p)) }
@@ -142,6 +148,7 @@ export function patchTab(id: string, patch: Partial<TermTab>) {
 export function closePane(tabId: string, sessionId: string) {
   void window.darkhub?.ssh?.disconnect(sessionId);
   replay.delete(sessionId);
+  oneOffPasswords.delete(sessionId);
   set((s) => {
     const tabs: Tab[] = [];
     for (const t of s.tabs) {
@@ -173,7 +180,7 @@ export function dependentsOf(id: string) {
 
 export function closeTab(id: string) {
   const tab = state.tabs.find((t) => t.id === id);
-  if (tab?.kind === 'terminal') for (const p of tab.panes) { void window.darkhub?.ssh?.disconnect(p.sessionId); replay.delete(p.sessionId); }
+  if (tab?.kind === 'terminal') for (const p of tab.panes) { void window.darkhub?.ssh?.disconnect(p.sessionId); replay.delete(p.sessionId); oneOffPasswords.delete(p.sessionId); }
   if (tab?.kind === 'sftp') void window.darkhub?.ssh?.sftpClose(tab.id);
   const drop = new Set([id, ...dependentsOf(id).map((t) => t.id)]);
   set((s) => {

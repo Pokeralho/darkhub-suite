@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 // @ts-ignore - plain JS module
-import { SaveBackupService } from '../electron/services/saves/SaveBackupService.js'
+import { SaveBackupService, templatePrefix } from '../electron/services/saves/SaveBackupService.js'
 
 // A fake game whose saves live in a temp "Documents" folder; the manifest index is written directly (no download).
 function setup() {
@@ -73,6 +73,41 @@ describe('SaveBackupService', () => {
     await svc.backup('Test Game')
     const regular = svc.versions('Test Game').filter((v: any) => v.label !== 'before-restore')
     expect(regular.length).toBe(2)
+    fs.rmSync(root, { recursive: true, force: true })
+  }, 30000)
+  it('restores Steam userdata saves (<root>/userdata/<storeUserId>) without writing to a "*" path', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-saves-steam-'))
+    const steam = path.join(root, 'Steam')
+    const saveDir = path.join(steam, 'userdata', '777', '42', 'remote')
+    fs.mkdirSync(saveDir, { recursive: true })
+    fs.writeFileSync(path.join(saveDir, 'slot.sav'), 'v1')
+    const userData = path.join(root, 'userData')
+    fs.mkdirSync(path.join(userData, 'saves'), { recursive: true })
+    fs.writeFileSync(path.join(userData, 'saves', 'manifest-index.json'), JSON.stringify([
+      { name: 'Steam Game', steamId: 42, installDirs: ['SteamGame'], files: [{ path: '<root>/userdata/<storeUserId>/<storeGameId>/remote', tags: ['save'] }], registry: [] }
+    ]))
+    fs.writeFileSync(path.join(userData, 'saves', 'manifest-meta.json'), JSON.stringify({ checkedAt: Date.now() }))
+    const app = { getPath: (k: string) => (k === 'documents' ? path.join(root, 'Documents') : userData) }
+    const svc = new SaveBackupService({ app, getInstalledGames: async () => [{ name: 'Steam Game', appId: '42', installDir: path.join(root, 'NoGameHere'), libraryRoot: steam }] })
+    svc.setSettings({ backupRoot: path.join(root, 'Backups') })
+    expect(templatePrefix('<root>/userdata/<storeUserId>/<storeGameId>/remote')).toBe('<root>\\userdata')
+    const b = await svc.backup('Steam Game')
+    expect(b).toMatchObject({ ok: true, files: 1 })
+    fs.writeFileSync(path.join(saveDir, 'slot.sav'), 'v2')
+    const preview = await svc.previewRestore('Steam Game', b.id)
+    expect(preview.targets[0].dest).toBe(path.join(saveDir, 'slot.sav'))
+    const r = await svc.restore('Steam Game', b.id)
+    expect(r).toMatchObject({ ok: true, restored: 1, skipped: [] })
+    expect(fs.readFileSync(path.join(saveDir, 'slot.sav'), 'utf8')).toBe('v1')
+
+    // a backup made before the fix kept "<storeUserId>" in the prefix: it is skipped, never written to a "*" path
+    const vdir = path.join(root, 'Backups', 'Steam Game', b.id)
+    const info = JSON.parse(fs.readFileSync(path.join(vdir, 'backup.json'), 'utf8'))
+    info.groups = ['<root>\\userdata\\<storeUserId>\\<storeGameId>\\remote']
+    info.files = info.files.map((f: any) => ({ ...f, prefixTemplate: info.groups[0] }))
+    fs.writeFileSync(path.join(vdir, 'backup.json'), JSON.stringify(info))
+    const old = await svc.previewRestore('Steam Game', b.id)
+    expect(old.targets[0].dest).toBeNull()
     fs.rmSync(root, { recursive: true, force: true })
   }, 30000)
 })

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { RescueCloneResult, RescueDrive, RescueInspect } from '../../global';
 import { AlertTriangle, CheckCircle, Copy, FolderOpen, Loader2, XCircle } from '../icons';
 import { useI18n } from '../../i18n/I18nProvider';
-import { api, ErrorLine, fmtBytes, JobProgress, type ProgressEv } from './rescueUtils';
+import { api, ErrorLine, fmtBytes, JobProgress, rescueError, type ProgressEv } from './rescueUtils';
 
 type Mode = 'disk' | 'part' | 'image' | 'restore';
 
@@ -57,14 +57,14 @@ export default function CloneWizard({ drives }: { drives: RescueDrive[] }) {
   const dryRun = async () => {
     setError(null); setCheck(null);
     const r = await api()?.clone({ ...payload, apply: false, overwrite: mode === 'image' });
-    if (r?.ok) setCheck(r); else setError(r?.error || t('rescue.clone.fail', 'Não foi possível validar a cópia.'));
+    if (r?.ok) setCheck(r); else setError(rescueError(t, r, t('rescue.clone.fail', 'Não foi possível validar a cópia.')));
   };
 
   const run = async () => {
     setRunning(true); setError(null); setResult(null); setEv(null);
     try {
       const r = await api()?.clone({ ...payload, apply: true, overwrite: mode === 'image', confirmDisk: targetDiskNum ?? undefined });
-      if (r?.ok) setResult(r); else setError(r?.error || t('rescue.clone.fail', 'Não foi possível validar a cópia.'));
+      if (r?.ok) setResult(r); else setError(rescueError(t, r, t('rescue.clone.fail', 'Não foi possível validar a cópia.')));
     } finally { setRunning(false); }
   };
 
@@ -184,7 +184,9 @@ export default function CloneWizard({ drives }: { drives: RescueDrive[] }) {
 
       {result ? (
         <div className="space-y-1 text-[12.5px]" role="status">
-          {result.cancelled ? <p className="text-amber-300">{t('rescue.clone.cancelled', 'Cópia cancelada. O destino ficou com uma cópia parcial.')}</p> : (
+          {result.cancelled ? <p className="text-amber-300">{t('rescue.clone.cancelled', 'Cópia cancelada. O destino ficou com uma cópia parcial.')}</p> : result.verified === false ? (
+            <p className="flex items-center gap-2 text-red-400"><XCircle size={14} />{t('rescue.clone.verifyFailed', 'A cópia terminou, mas a verificação falhou: o destino não é idêntico à origem. Não confie no destino.')}</p>
+          ) : (
             <p className="flex items-center gap-2 text-emerald-300"><CheckCircle size={14} />{t('rescue.clone.done', 'Cópia concluída')} · <span className="font-mono">{fmtBytes(result.bytes)}</span>{result.seconds ? <span className="font-mono text-zinc-400">· {Math.round(result.seconds)} s</span> : null}</p>
           )}
           {result.verified === true ? <p className="text-emerald-300">{t('rescue.clone.verified', 'Verificação SHA-256: idêntico')}</p> : null}

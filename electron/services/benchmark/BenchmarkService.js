@@ -53,8 +53,11 @@ export class BenchmarkService {
   _save(list) { fs.writeFileSync(this.file, JSON.stringify(list.slice(0, MAX_RUNS), null, 1)) }
 
   async run({ label = '', quick = false, skipDisk = false, diskDir = '' } = {}) {
-    if (this.child) return { ok: false, error: 'Um benchmark já está rodando' }
-    const ctx = await context()
+    // `starting` covers the await below: a double click must not spawn two workers
+    if (this.child || this.starting) return { ok: false, error: 'Um benchmark já está rodando' }
+    this.starting = true
+    let ctx
+    try { ctx = await context() } finally { this.starting = false }
     // the service owns the temp file: a killed worker cannot clean up after itself
     const tempFile = path.join(diskDir && fs.existsSync(diskDir) ? diskDir : os.tmpdir(), `darkhub-bench-${process.pid}-${Date.now()}.tmp`)
     const args = JSON.stringify({ runs: quick ? 3 : 5, quick, skipDisk, diskDir, tempFile })

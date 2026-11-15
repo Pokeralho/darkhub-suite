@@ -103,8 +103,14 @@ impl Env {
                 r.push(Root { path: norm(&p), whole_ok });
             }
         };
+        // A TEMP/TMP pointed at a drive root or at a folder holding the profile or Windows would make "clean temp"
+        // delete that whole tree: such a value is ignored (LOCALAPPDATA\Temp below still covers the real temp).
+        let guarded: Vec<String> = ["userprofile", "localappdata", "appdata", "windir", "programdata", "programfiles"]
+            .iter().filter_map(|k| self.one(k)).map(|p| norm(p)).collect();
         for k in ["temp", "tmp"] {
             for p in self.vars.get(k).into_iter().flatten() {
+                let n = norm(p);
+                if n.len() <= 3 || guarded.iter().any(|g| depth_under(g, &n).is_some()) { continue; }
                 add(Some(p.clone()), true);
             }
         }
@@ -162,6 +168,12 @@ impl Env {
             }
         }
         Ok(())
+    }
+
+    /// The most specific allowed root that contains `dir` (normalized), as `check_rule` picks it.
+    pub fn matched_root(&self, dir: &Path) -> Option<String> {
+        let d = norm(dir);
+        self.roots().into_iter().filter_map(|r| depth_under(&d, &r.path).map(|depth| (depth, r.path))).min_by_key(|(depth, _)| *depth).map(|(_, p)| p)
     }
 
     fn denied_programdata(&self, d: &str) -> bool {

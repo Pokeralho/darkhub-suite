@@ -18,31 +18,45 @@ export function makeVaultKeyProvider(file, safeStorage) {
   let key = null
   let protection = 'none'
   const can = () => { try { return Boolean(safeStorage?.isEncryptionAvailable?.()) } catch { return false } }
+  const locked = (why) => Object.assign(new Error(`SSH vault key could not be unlocked (${why})`), { code: 'VAULT_LOCKED' })
   const load = () => {
     if (key) return key
-    try {
-      const raw = JSON.parse(fs.readFileSync(file, 'utf8'))
-      if (raw.protection === 'dpapi' && can()) {
-        key = Buffer.from(safeStorage.decryptString(Buffer.from(raw.wrappedB64, 'base64')), 'base64')
-        protection = 'dpapi'
-      } else if (raw.protection === 'none' && raw.keyB64) {
-        key = Buffer.from(raw.keyB64, 'base64')
-        protection = 'none'
-      }
-    } catch (err) {
-      if (err?.code !== 'ENOENT') throw Object.assign(new Error('SSH vault key could not be unlocked'), { code: 'VAULT_LOCKED' })
+    // A key file that exists but cannot be unwrapped right now (DPAPI not ready before app 'ready', a corrupt file,
+    // a wrong length) must never be replaced: a fresh key would make every stored secret unreadable for good.
+    // Only a missing file creates a new key; the caller gets VAULT_LOCKED and can retry later.
+    let text = null
+    try { text = fs.readFileSync(file, 'utf8') } catch (err) {
+      if (err?.code !== 'ENOENT') throw locked(err?.code ?? 'read error')
     }
-    if (key && key.length === 32) return key
-    key = crypto.randomBytes(32)
-    const b64 = key.toString('base64')
+    if (text !== null) {
+      let raw
+      try { raw = JSON.parse(text) } catch { throw locked('corrupt key file') }
+      let k = null
+      if (raw?.protection === 'dpapi' && typeof raw.wrappedB64 === 'string') {
+        if (!can()) throw locked('DPAPI unavailable')
+        try { k = Buffer.from(safeStorage.decryptString(Buffer.from(raw.wrappedB64, 'base64')), 'base64') } catch { throw locked('DPAPI decrypt failed') }
+      } else if (raw?.protection === 'none' && typeof raw.keyB64 === 'string') {
+        k = Buffer.from(raw.keyB64, 'base64')
+      } else throw locked('unknown key format')
+      if (k.length !== 32) throw locked('bad key length')
+      key = k
+      protection = raw.protection
+      return key
+    }
+    const fresh = crypto.randomBytes(32)
+    const b64 = fresh.toString('base64')
     fs.mkdirSync(path.dirname(file), { recursive: true })
-    if (can()) {
-      fs.writeFileSync(file, JSON.stringify({ protection: 'dpapi', wrappedB64: safeStorage.encryptString(b64).toString('base64') }))
-      protection = 'dpapi'
-    } else {
-      fs.writeFileSync(file, JSON.stringify({ protection: 'none', keyB64: b64 }))
-      protection = 'none'
+    const wrapped = can()
+    const body = wrapped
+      ? { protection: 'dpapi', wrappedB64: safeStorage.encryptString(b64).toString('base64') }
+      : { protection: 'none', keyB64: b64 }
+    // 'wx': never clobber a key file written in the meantime; if one appeared, use it instead
+    try { fs.writeFileSync(file, JSON.stringify(body), { flag: 'wx' }) } catch (err) {
+      if (err?.code === 'EEXIST') return load()
+      throw err
     }
+    key = fresh
+    protection = body.protection
     return key
   }
   return { getKey: load, protection: () => protection }
@@ -73,7 +87,9 @@ export function registerSshIPC({ app, ipcMain, BrowserWindow, safeStorage, shell
     openPath: (p) => shell.openPath(p),
     onProgress: (e) => broadcast('ssh:sftp:progress', e),
     onWatch: (e) => broadcast('ssh:sftp:watch', e),
-    tempDir: path.join(app.getPath('temp'), 'darkhub-sftp-edit')
+    tempDir: path.join(app.getPath('temp'), 'darkhub-sftp-edit'),
+    // the app's own install folder joins Windows / Program Files / ProgramData\Microsoft as off limits for local writes
+    protectedDirs: [path.dirname(app.getPath('exe')), process.env.PORTABLE_EXECUTABLE_DIR].filter(Boolean)
   })
   const tunnels = new PortForwardService({ store, manager, logger, onStatus: (e) => broadcast('ssh:tunnel:status', e) })
   manager.on('hostkey', (prompt) => broadcast('ssh:hostkey:prompt', prompt))
@@ -85,7 +101,7 @@ export function registerSshIPC({ app, ipcMain, BrowserWindow, safeStorage, shell
   // passwords or private keys.
   const handle = (channel, fn) => ipcMain.handle(channel, async (event, payload) => {
     try { return await fn(payload ?? {}, event) } catch (err) {
-      logger?.warn?.(`[ssh] ${channel} failed: ${err?.code ?? 'ERROR'}`)
+      logger?.warn?.('SSH', `${channel} failed: ${err?.code ?? 'ERROR'}`)
       return failOf(err)
     }
   })
@@ -246,7 +262,8 @@ export function registerSshIPC({ app, ipcMain, BrowserWindow, safeStorage, shell
   })
   handle('ssh:tunnel:stop', (p) => { tunnels.stop(idOf(p)); return ok({ status: 'stopped' }) })
 
-  setTimeout(() => { void tunnels.autoStart() }, 4000).unref?.()
+  // tunnels need the vault key, which needs DPAPI (safeStorage), which is only usable after 'ready'
+  void app.whenReady().then(() => { setTimeout(() => { void tunnels.autoStart().catch(() => {}) }, 4000).unref?.() })
 
   const dispose = () => {
     try { tunnels.stopAll() } catch { /* closing */ }

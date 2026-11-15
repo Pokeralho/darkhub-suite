@@ -197,8 +197,10 @@ fn clone_cmd(a: &Args, prog: &mut Progress) -> R<Value> {
     let create = a.flag("create");
     #[cfg(windows)]
     if let (Target::Disk(n), Target::Image(p)) = (&st, &dt) {
-        if win::disk_of_path(p) == Some(*n) {
-            return Err(Fail::new("same_disk", "a imagem não pode ser salva no mesmo disco que está sendo copiado"));
+        match win::disks_of_path(p) {
+            Some(d) if d.contains(n) => return Err(Fail::new("same_disk", "a imagem não pode ser salva no mesmo disco que está sendo copiado")),
+            Some(_) => {}
+            None => return Err(Fail::new("same_disk_unknown", "não foi possível confirmar em qual disco a imagem seria salva; escolha uma pasta numa unidade local")),
         }
     }
     if create {
@@ -335,10 +337,13 @@ fn run(a: &Args, prog: &mut Progress) -> R<Value> {
         "restore-backup" => {
             let t = a.target("target")?;
             let mut dev = open_target(&t, false, a.sector()?)?;
-            let (ss, writes) = repair::load_backup(a.need("from")?)?;
+            let bk = repair::load_backup(a.need("from")?)?;
+            let ss = bk.sector_size;
             if ss != dev.sector_size() {
                 return Err(Fail::new("sector_mismatch", "o backup foi feito com outro tamanho de setor"));
             }
+            bk.check_target(dev.as_mut())?;
+            let writes = bk.writes;
             if let Some(w) = writes.iter().find(|w| (w.lba * ss as u64) + w.data.len() as u64 > dev.size()) {
                 return Err(Fail::new("layout", format!("o backup grava no LBA {}, fora deste disco", w.lba)));
             }
@@ -377,8 +382,10 @@ fn run(a: &Args, prog: &mut Progress) -> R<Value> {
             let out = a.need("out")?.to_string();
             #[cfg(windows)]
             if let Target::Disk(n) = &t {
-                if win::disk_of_path(&out) == Some(*n) {
-                    return Err(Fail::new("same_disk", "salve os arquivos recuperados em OUTRO disco, nunca no que está sendo varrido"));
+                match win::disks_of_path(&out) {
+                    Some(d) if d.contains(n) => return Err(Fail::new("same_disk", "salve os arquivos recuperados em OUTRO disco, nunca no que está sendo varrido")),
+                    Some(_) => {}
+                    None => return Err(Fail::new("same_disk_unknown", "não foi possível confirmar em qual disco os arquivos seriam salvos; escolha uma pasta numa unidade local")),
                 }
             }
             let ss = open_target(&t, false, a.sector()?)?.sector_size() as u64;

@@ -377,9 +377,10 @@ function buildPublicTweaks() {
       title: 'Desativar túnel Teredo',
       description: 'Desliga o Teredo (túnel IPv6 sobre IPv4) pela política oficial do Windows, sem mexer no resto do IPv6. Remove uma interface de rede extra que alguns jogos usam por engano. O chat em grupo do Xbox/Game Bar usa Teredo: se ele parar, desfaça.',
       rows: [['HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\TCPIP\\v6Transition', 'Teredo_State', SZ, 'Disabled', null]],
+      // netsh reports failure only through its exit code: without the check a refused change still counted as done
       commands: {
-        apply: "& netsh.exe interface teredo set state disabled | Out-Null",
-        revert: "& netsh.exe interface teredo set state default | Out-Null"
+        apply: "& netsh.exe interface teredo set state disabled | Out-Null\r\nif ($LASTEXITCODE -ne 0) { throw ('netsh teredo set state disabled falhou (codigo ' + $LASTEXITCODE + ')') }",
+        revert: "& netsh.exe interface teredo set state default | Out-Null\r\nif ($LASTEXITCODE -ne 0) { throw ('netsh teredo set state default falhou (codigo ' + $LASTEXITCODE + ')') }"
       }
     }),
 
@@ -630,11 +631,12 @@ Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks' -Name LegacyBootMen
       id: 'tweak:numLockOnStartup', category: 'customization',
       title: 'Num Lock ligado ao iniciar',
       description: 'Liga o Num Lock no seu usuário e também na tela de login, para digitar PIN numérico pelo teclado numérico. Em alguns PCs a BIOS também precisa estar com Num Lock ligado.',
-      rows: [['HKCU\\Control Panel\\Keyboard', 'InitialKeyboardIndicators', SZ, '2', '0']],
-      commands: {
-        apply: "Set-ItemProperty -LiteralPath 'Registry::HKEY_USERS\\.DEFAULT\\Control Panel\\Keyboard' -Name InitialKeyboardIndicators -Value '2' -Type String -ErrorAction Stop",
-        revert: "Set-ItemProperty -LiteralPath 'Registry::HKEY_USERS\\.DEFAULT\\Control Panel\\Keyboard' -Name InitialKeyboardIndicators -Value '2147483648' -Type String -ErrorAction Stop"
-      }
+      // the login screen (.DEFAULT) is a normal snapshotted row, so the revert restores what it really had (it was
+      // hard-coded to 2147483648); that value is now only the fallback when there is no snapshot
+      rows: [
+        ['HKCU\\Control Panel\\Keyboard', 'InitialKeyboardIndicators', SZ, '2', '0'],
+        ['HKU\\.DEFAULT\\Control Panel\\Keyboard', 'InitialKeyboardIndicators', SZ, '2', '2147483648']
+      ]
     }),
     defineTweak({
       id: 'tweak:rdpUnsignedNoWarning', category: 'system', risk: 'medium', securityRelated: true,

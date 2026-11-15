@@ -169,7 +169,8 @@ export class GpuBenchService {
   // ------------------------------------------------------------------ runs
   cancel() { this.stopReason ||= 'cancelled'; this.engine?.kill(); return { ok: true } }
 
-  _sensorSample() { return sampleGpu(this.hardware?.snapshot?.()) }
+  // sensors of the adapter the engine reported in `ready` (null until then: the primary GPU)
+  _sensorSample() { return sampleGpu(this.hardware?.snapshot?.(), Date.now(), this._benchAdapter || null) }
 
   async run({ ranked = false, quick = false, label = '', parent = null } = {}) {
     if (this.engine) return { ok: false, error: 'already_running' }
@@ -179,11 +180,13 @@ export class GpuBenchService {
     this.stopReason = null
 
     const engine = this._startEngine(parent)
+    this._benchAdapter = null
     const samples = []
     const sampler = setInterval(() => samples.push(this._sensorSample()), 1000)
     this.hardware?.holdSensors?.('gpubench')
     try {
       const ready = await engine.next()
+      this._benchAdapter = ready.adapter || null
       if (this.rect) engine.send({ cmd: 'rect', ...this.rect })
       const stats = {}
       const us = { raster: [], rt: [] }
@@ -243,6 +246,7 @@ export class GpuBenchService {
     const opts = normalizeStress(options)
     const engine = this._startEngine(parent)
     this.stopReason = null
+    this._benchAdapter = null
     const samples = []
     const sampler = setInterval(() => {
       const s = this._sensorSample()
@@ -256,6 +260,7 @@ export class GpuBenchService {
     let gpu = null
     try {
       const ready = await engine.next()
+      this._benchAdapter = ready.adapter || null
       if (this.rect) engine.send({ cmd: 'rect', ...this.rect })
       gpu = { name: ready.adapter, driver: ready.driver, dxr: ready.dxr }
       plan = stressPlan({ minutes: opts.minutes, load: opts.load, dxr: ready.dxr, loopMs })

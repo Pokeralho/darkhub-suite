@@ -18,6 +18,7 @@ import {
   wrapMarkedScript,
   parseMarkedOutput
 } from './OptimizerUtils.js';
+import { partitionShared, claimShared, releaseShared, markApplied, clearApplied } from './sharedOwners.js';
 
 const NOT_WINDOWS = { ok: false, error: 'Only Windows supported' };
 const BCD_EXTRA = 'sys:bcd';
@@ -27,6 +28,19 @@ const CPU_EXTRA = 'sys:cpuUnpark';
 const PAGEFILE_EXTRA = 'sys:pagefile';
 const CAPS_EXTRA = 'sys:capabilities';
 const MSI_SET_ID = 'msi:display';
+const OP_TIMER = 'optimizer:timerTuning';
+const OP_KERNEL = 'optimizer:kernelExtreme';
+const OP_HARDCORE = 'optimizer:disableCoreIsolation';
+const OP_NETWORK = 'optimizer:networkExtreme';
+const OP_CPU = 'optimizer:cpuUnpark';
+const HARDCORE_TWEAKS = ['tweak:disableVBS', 'tweak:disableHibernation'];
+const KERNEL_TWEAKS = ['group:kernelCore', 'tweak:mmcssGames'];
+const PIECE_LABEL = {
+  [BCD_EXTRA]: 'dynamic tick (BCD)',
+  [LASTACCESS_EXTRA]: 'último acesso do NTFS',
+  'tweak:mmcssGames': 'perfil MMCSS de jogos',
+  'tweak:disableHibernation': 'hibernação desativada'
+};
 
 export { wrapMarkedScript, parseMarkedOutput };
 
@@ -239,6 +253,43 @@ if ($laM.Success) { Write-Output ('@TAG@|lastaccess|' + $laM.Groups[1].Value) } 
     return { ok: true };
   }
 
+  _pieces({ tweaks = [], timer = false, lastAccess = false }) {
+    return [...tweaks, ...(timer ? [BCD_EXTRA] : []), ...(lastAccess ? [LASTACCESS_EXTRA] : [])];
+  }
+
+  /** After a VERIFIED apply: claim the shared pieces and record the ":applied" marker the status reads. */
+  _markComposite(opId, spec) {
+    claimShared(DeepTweaksEngine, opId, this._pieces(spec));
+    markApplied(DeepTweaksEngine, opId);
+  }
+
+  /**
+   * Reverts only the pieces no other still-applied operation claims (Hardcore and Kernel share the NTFS last-access
+   * value; Kernel and Timer share the BCD dynamic tick; Kernel and the MMCSS operation share tweak:mmcssGames...).
+   * On success releases this operation's claims and clears its ":applied" marker.
+   */
+  async _revertComposite(opId, { tweaks = [], timer = false, lastAccess = false }) {
+    const pieces = this._pieces({ tweaks, timer, lastAccess });
+    const { free, kept } = partitionShared(DeepTweaksEngine, opId, pieces);
+    const problems = [];
+    const freeTweaks = tweaks.filter((t) => free.includes(t));
+    if (freeTweaks.length) {
+      const reg = await DeepTweaksEngine.revertTweaks(freeTweaks);
+      if (!reg.ok) problems.push(reg.error);
+    }
+    const t = timer && free.includes(BCD_EXTRA);
+    const la = lastAccess && free.includes(LASTACCESS_EXTRA);
+    if (t || la) {
+      const low = await this._revertLowLevel({ timer: t, lastAccess: la });
+      if (!low.ok) problems.push(low.error);
+    }
+    if (problems.length) return { ok: false, error: problems.join(' | ') };
+    releaseShared(DeepTweaksEngine, opId, pieces);
+    clearApplied(DeepTweaksEngine, opId);
+    const keptNote = kept.length ? ` Mantido(s) porque outra otimização aplicada ainda usa: ${kept.map((p) => PIECE_LABEL[p] || p).join(', ')}.` : '';
+    return { ok: true, keptNote, kept };
+  }
+
   /**
    * Timer tuning: bcdedit /set disabledynamictick yes. Needs a reboot, and the benefit (steadier timer ticks)
    * is small and hardware dependent; it can raise idle power use. The previous value is snapshotted.
@@ -247,25 +298,27 @@ if ($laM.Success) { Write-Output ('@TAG@|lastaccess|' + $laM.Groups[1].Value) } 
     if (process.platform !== 'win32') return NOT_WINDOWS;
     const r = await this._applyLowLevel({ timer: true });
     if (!r.ok) return { ok: false, error: `Falha ao ajustar o timer: ${r.error}` };
+    this._markComposite(OP_TIMER, { timer: true });
     return { ok: true, verified: true, requiresReboot: true, msg: 'disabledynamictick=Yes gravado e verificado no BCD. REINICIE o Windows para valer. Ganho pequeno e dependente do hardware; pode aumentar o consumo em repouso. Isto NÃO altera a resolução do timer por si só.' };
   }
 
   async revertTimerTuning() {
     if (process.platform !== 'win32') return NOT_WINDOWS;
-    const r = await this._revertLowLevel({ timer: true });
+    const r = await this._revertComposite(OP_TIMER, { timer: true });
     if (!r.ok) return { ok: false, error: r.error };
-    return { ok: true, requiresReboot: true, msg: 'Configuração de timer do BCD restaurada. Reinicie o Windows.' };
+    return { ok: true, requiresReboot: true, msg: `Configuração de timer do BCD restaurada. Reinicie o Windows.${r.keptNote}` };
   }
 
   // ------------------------------------------------------------------ hardcore (VBS off) / kernel
   async applyHardcoreGamerMode() {
     if (process.platform !== 'win32') return NOT_WINDOWS;
-    const reg = await DeepTweaksEngine.applyTweaks(['tweak:disableVBS', 'tweak:disableHibernation']);
+    const reg = await DeepTweaksEngine.applyTweaks(HARDCORE_TWEAKS);
     const low = await this._applyLowLevel({ lastAccess: true });
     const problems = [];
     if (!reg.ok) problems.push(reg.error);
     if (!low.ok) problems.push(low.error);
     if (problems.length) return { ok: false, error: problems.join(' | '), requiresReboot: true };
+    this._markComposite(OP_HARDCORE, { tweaks: HARDCORE_TWEAKS, lastAccess: true });
     return {
       ok: true,
       verified: true,
@@ -276,13 +329,9 @@ if ($laM.Success) { Write-Output ('@TAG@|lastaccess|' + $laM.Groups[1].Value) } 
 
   async revertHardcoreGamerMode() {
     if (process.platform !== 'win32') return NOT_WINDOWS;
-    const reg = await DeepTweaksEngine.revertTweaks(['tweak:disableVBS', 'tweak:disableHibernation']);
-    const low = await this._revertLowLevel({ lastAccess: true });
-    const problems = [];
-    if (!reg.ok) problems.push(reg.error);
-    if (!low.ok) problems.push(low.error);
-    if (problems.length) return { ok: false, error: problems.join(' | ') };
-    return { ok: true, requiresReboot: true, msg: 'Modo Hardcore revertido aos valores salvos antes da aplicação. Reinicie o computador.' };
+    const r = await this._revertComposite(OP_HARDCORE, { tweaks: HARDCORE_TWEAKS, lastAccess: true });
+    if (!r.ok) return { ok: false, error: r.error };
+    return { ok: true, requiresReboot: true, msg: `Modo Hardcore revertido aos valores salvos antes da aplicação. Reinicie o computador.${r.keptNote}` };
   }
 
   /**
@@ -293,12 +342,13 @@ if ($laM.Success) { Write-Output ('@TAG@|lastaccess|' + $laM.Groups[1].Value) } 
    */
   async applyExtremeKernelMod() {
     if (process.platform !== 'win32') return NOT_WINDOWS;
-    const reg = await DeepTweaksEngine.applyTweaks(['group:kernelCore', 'tweak:mmcssGames']);
+    const reg = await DeepTweaksEngine.applyTweaks(KERNEL_TWEAKS);
     const low = await this._applyLowLevel({ timer: true, lastAccess: true });
     const problems = [];
     if (!reg.ok) problems.push(reg.error);
     if (!low.ok) problems.push(low.error);
     if (problems.length) return { ok: false, error: problems.join(' | '), requiresReboot: true };
+    this._markComposite(OP_KERNEL, { tweaks: KERNEL_TWEAKS, timer: true, lastAccess: true });
     return {
       ok: true,
       verified: true,
@@ -309,13 +359,9 @@ if ($laM.Success) { Write-Output ('@TAG@|lastaccess|' + $laM.Groups[1].Value) } 
 
   async revertExtremeKernelMod() {
     if (process.platform !== 'win32') return NOT_WINDOWS;
-    const reg = await DeepTweaksEngine.revertTweaks(['group:kernelCore', 'tweak:mmcssGames']);
-    const low = await this._revertLowLevel({ timer: true, lastAccess: true });
-    const problems = [];
-    if (!reg.ok) problems.push(reg.error);
-    if (!low.ok) problems.push(low.error);
-    if (problems.length) return { ok: false, error: problems.join(' | ') };
-    return { ok: true, requiresReboot: true, msg: 'Kernel, agendador multimídia, NTFS e timer restaurados aos valores anteriores (snapshot). Reinicie o Windows.' };
+    const r = await this._revertComposite(OP_KERNEL, { tweaks: KERNEL_TWEAKS, timer: true, lastAccess: true });
+    if (!r.ok) return { ok: false, error: r.error };
+    return { ok: true, requiresReboot: true, msg: `Kernel, agendador multimídia, NTFS e timer restaurados aos valores anteriores (snapshot). Reinicie o Windows.${r.keptNote}` };
   }
 
   // ------------------------------------------------------------------ network (extreme)
@@ -349,6 +395,7 @@ ${readBlock('DHAFT')}`;
     if (!/^disabled$/i.test(after.timestamps || '')) bad.push('Timestamps');
     if (!/^normal$/i.test(after.autotuning || '')) bad.push('AutoTuning');
     if (bad.length) return { ok: false, error: `O Windows não confirmou: ${bad.join(', ')}` };
+    markApplied(DeepTweaksEngine, OP_NETWORK);
     return { ok: true, verified: true, msg: 'Pilha TCP ajustada e verificada: RSC desligado (menos latência por pacote, um pouco mais de CPU), RSS ligado, timestamps desligados, autotuning normal. NÃO aumenta a velocidade da internet; o efeito em ping é pequeno.' };
   }
 
@@ -366,6 +413,7 @@ Write-Output ('DHAFT|rsc|' + $o.ReceiveSegmentCoalescing)`;
     const after = parseDhSnapLines(r.out, 'DHAFT');
     if (after.rsc && after.rsc.toLowerCase() !== v('rsc', 'Enabled').toLowerCase()) return { ok: false, error: 'O Windows não confirmou a restauração do RSC.' };
     DeepTweaksEngine.clearExtra(NETWORK_EXTRA);
+    clearApplied(DeepTweaksEngine, OP_NETWORK);
     return { ok: true, msg: snap ? 'Pilha TCP restaurada exatamente como estava.' : 'Pilha TCP restaurada aos padrões do Windows (sem snapshot anterior).' };
   }
 
@@ -404,6 +452,7 @@ foreach ($a in 'CPMINCORES','CPMAXCORES') { Write-Output ('DHAFT|' + $a + '|' + 
     if (before.scheme && (!DeepTweaksEngine.getExtra(CPU_EXTRA) || before.CPMINCORES !== '100')) DeepTweaksEngine.saveExtra(CPU_EXTRA, before);
     if (!r.ok) return { ok: false, error: `Falha ao ajustar o estacionamento de núcleos: ${r.error}` };
     if (after.CPMINCORES !== '100') return { ok: false, error: 'O Windows não confirmou o valor (CPMINCORES) no plano ativo.' };
+    markApplied(DeepTweaksEngine, OP_CPU);
     return { ok: true, verified: true, msg: 'Núcleos mantidos ativos (mínimo 100%) no plano de energia ativo, quando ligado na tomada. Só vale para o plano atual; aumenta consumo e calor. Em CPUs híbridas/Windows 11 o ganho costuma ser mínimo.' };
   }
 
@@ -423,10 +472,17 @@ foreach ($a in 'CPMINCORES','CPMAXCORES') { Write-Output ('DHAFT|' + $a + '|' + 
       else if (snap[a] === '-') lines.push(`Remove-ItemProperty -LiteralPath 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Power\\User\\PowerSchemes\\${snap.scheme}\\54533251-82be-4824-96c1-47b60b740d00\\${ids[a]}' -Name ACSettingIndex -ErrorAction SilentlyContinue`);
     }
     if (!lines.length) return { ok: false, error: 'Snapshot sem valores utilizáveis.' };
-    lines.push(`& powercfg.exe /setactive ${snap.scheme} | Out-Null\r\nDhCheck 'powercfg /setactive'`);
+    // Re-activate only when the snapshotted plan is still the active one (that reloads its values). If the user has
+    // switched plans since, a /setactive here would silently switch them back.
+    lines.push(`$dhAct = (& powercfg.exe /getactivescheme) | Out-String
+if ($dhAct -match '${snap.scheme}') {
+  & powercfg.exe /setactive ${snap.scheme} | Out-Null
+  DhCheck 'powercfg /setactive'
+}`);
     const r = await this._runMarked(lines.join('\r\n'), 60000);
     if (!r.ok) return { ok: false, error: `Falha ao restaurar: ${r.error}` };
     DeepTweaksEngine.clearExtra(CPU_EXTRA);
+    clearApplied(DeepTweaksEngine, OP_CPU);
     return { ok: true, msg: 'Estacionamento de núcleos restaurado aos valores anteriores do plano.' };
   }
 

@@ -5,7 +5,7 @@ import fs from 'node:fs/promises'
 import { createJob } from '../services/converter/processUtil.js'
 import { convertMedia, detectHwEncoders } from '../services/converter/MediaConverter.js'
 import { createImageConverter, IMAGE_INPUT, IMAGE_OUTPUT, DDS_FORMATS } from '../services/converter/ImageConverter.js'
-import { createDocumentConverter, findSoffice } from '../services/converter/DocumentConverter.js'
+import { createDocumentConverter, findSoffice, isAllowedPdfRequest } from '../services/converter/DocumentConverter.js'
 import { DOC_INPUTS, commonOutputs } from '../services/converter/docRoutes.js'
 import { MEDIA_OUTPUTS } from '../services/converter/mediaPlan.js'
 import { texconvPath, dcrawPath } from '../services/converter/vendorTools.js'
@@ -22,10 +22,15 @@ export function registerConverterIPC({ app, ipcMain, BrowserWindow, session, get
   // HTML -> PDF in an isolated, script-less, offline Chromium page.
   const PDF_PARTITION = 'darkhub-converter-pdf'
   let pdfSessionReady = false
-  async function htmlToPdf(htmlFile, outFile) {
+  // webContents id -> { htmlFile, roots }: which local files each PDF page may load
+  const pdfAllow = new Map()
+  async function htmlToPdf(htmlFile, outFile, allow = { htmlFile, roots: [] }) {
     const ses = session.fromPartition(PDF_PARTITION)
     if (!pdfSessionReady) {
-      ses.webRequest.onBeforeRequest((d, cb) => cb({ cancel: !/^(file|data|blob|about|devtools):/i.test(d.url) }))
+      ses.webRequest.onBeforeRequest((d, cb) => {
+        const rules = pdfAllow.get(d.webContentsId)
+        cb({ cancel: !rules || !isAllowedPdfRequest(d.url, d.resourceType, rules) })
+      })
       ses.setPermissionRequestHandler((_wc, _p, cb) => cb(false))
       pdfSessionReady = true
     }
@@ -33,6 +38,8 @@ export function registerConverterIPC({ app, ipcMain, BrowserWindow, session, get
       show: false, width: 1000, height: 1400,
       webPreferences: { partition: PDF_PARTITION, javascript: false, sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true, spellcheck: false }
     })
+    const wcId = win.webContents.id
+    pdfAllow.set(wcId, { htmlFile, roots: allow?.roots ?? [] })
     try {
       win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
       win.webContents.on('will-navigate', (e) => e.preventDefault())
@@ -40,6 +47,7 @@ export function registerConverterIPC({ app, ipcMain, BrowserWindow, session, get
       const pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4', margins: { marginType: 'default' }, generateDocumentOutline: true })
       await fs.writeFile(outFile, pdf)
     } finally {
+      pdfAllow.delete(wcId)
       if (!win.isDestroyed()) win.destroy()
     }
   }

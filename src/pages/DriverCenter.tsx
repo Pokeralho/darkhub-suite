@@ -187,7 +187,7 @@ export default function DriverCenter() {
                       {a.isDedicated ? t('driver.dedicated', 'Dedicated') : t('driver.integrated', 'Integrated')}
                     </span>
                     {warn ? (
-                      <span className="text-[11.5px] inline-flex items-center gap-1 text-amber-300"><AlertTriangle size={12} />{a.status}</span>
+                      <span className="text-[11.5px] inline-flex items-center gap-1 text-amber-300"><AlertTriangle size={12} />{a.noDriver ? t('driver.status.noDriver', 'Sem driver') : /^error$/i.test(a.status) ? t('driver.status.error', 'Com erro') : a.status}</span>
                     ) : null}
                     {a.genericDriver ? (
                       <span className="text-[11.5px] inline-flex items-center gap-1 text-amber-300"><AlertTriangle size={12} />{t('driver.generic.tag', 'driver genérico')}</span>

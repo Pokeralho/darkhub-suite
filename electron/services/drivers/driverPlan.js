@@ -49,7 +49,8 @@ export function normalizeDevice(raw = {}) {
   const code = Number(raw.code) || 0
   const name = str(raw.name)
   const service = str(raw.service)
-  const isDisplay = /^display$/i.test(cls)
+  // A GPU with no driver at all has no setup class yet ("Other devices"): its PCI class code 03 still says display.
+  const isDisplay = /^display$/i.test(cls) || (!cls && [...hardwareIds, ...compatibleIds].some((id) => /^PCI\\(VEN_[0-9A-F]{4}&(DEV_[0-9A-F]{4}&)?)?CC_03/i.test(id)))
   const pci = parsePciIds(hardwareIds[0] || instanceId)
   const vendor = pci ? vendorFromPnpId(`VEN_${pci.ven}`) : null
   // BasicDisplay is the service of "Microsoft Basic Display Adapter": the GPU has no vendor driver.

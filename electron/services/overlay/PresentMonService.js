@@ -21,6 +21,8 @@ export class PresentMonService extends EventEmitter {
     super()
     this.exe = path.join(toolsDir, PRESENTMON.file)
     this.child = null
+    this._terminating = null
+    this._startSeq = 0
   }
 
   installed() { return fs.existsSync(this.exe) }
@@ -54,7 +56,12 @@ export class PresentMonService extends EventEmitter {
   /** Starts capturing one process. Emits 'frame' per presented frame and 'exit' when PresentMon stops. */
   async start({ pid }) {
     this.stop()
+    const seq = ++this._startSeq
+    // the session name is fixed (so a crashed run's ETW session is reclaimed): the previous terminate must finish
+    // first, or it ends the session this start just opened
+    await this._terminating
     const exe = await this.ensure()
+    if (seq !== this._startSeq) return // a newer start (or stop) superseded this one while it waited
     const args = ['--output_stdout', '--no_console_stats', '--session_name', SESSION, '--stop_existing_session', '--process_id', String(Number(pid)), '--terminate_on_proc_exit']
     const child = spawn(exe, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
     this.child = child
@@ -71,18 +78,30 @@ export class PresentMonService extends EventEmitter {
       }
     })
     child.stderr.on('data', (d) => { err = (err + d).slice(-2000) })
-    child.on('close', (code) => {
+    let done = false
+    const finish = (code, error) => {
+      if (done) return
+      done = true
       if (this.child === child) this.child = null
-      this.emit('exit', { code, error: code ? err.trim().split(/\r?\n/).filter(Boolean).pop() : null })
-    })
+      this.emit('exit', { code, error })
+    }
+    // spawn failure (exe quarantined by the antivirus, access denied): without a listener it would crash main
+    child.on('error', (e) => finish(-1, e?.message ?? String(e)))
+    child.on('close', (code) => finish(code, code ? err.trim().split(/\r?\n/).filter(Boolean).pop() : null))
   }
 
   stop() {
+    this._startSeq++ // a start still waiting must not spawn after this stop
     const c = this.child
     this.child = null
-    if (!c) return
+    if (!c) return this._terminating || Promise.resolve()
     try { c.kill() } catch { /* gone */ }
-    // the ETW session outlives a killed PresentMon: end it so the next start is clean
-    execFile(this.exe, ['--terminate_existing_session', '--session_name', SESSION], { windowsHide: true, timeout: 10000 }, () => {})
+    // the ETW session outlives a killed PresentMon: end it so the next start is clean (start() waits for this)
+    this._terminating = new Promise((resolve) => {
+      try {
+        execFile(this.exe, ['--terminate_existing_session', '--session_name', SESSION], { windowsHide: true, timeout: 10000 }, () => resolve())
+      } catch { resolve() }
+    })
+    return this._terminating
   }
 }

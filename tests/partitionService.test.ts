@@ -73,6 +73,17 @@ describe('partition listing', () => {
     expect(disks[0].partitions).toEqual([])
   })
 
+  it('a disk whose partitions could not be read is listed without free space', () => {
+    const { disks } = shapeListing(raw({ partitionsFailed: 2 }))
+    const usb = disks.find((d: { number: number }) => d.number === 2)
+    expect(usb.partitionsUnread).toBe(true)
+    expect(usb.free).toEqual([])
+    expect(disks.find((d: { number: number }) => d.number === 1).partitionsUnread).toBe(false)
+    // per-disk partition reads and a tolerant volume read: one bad device does not hide the rest
+    expect(LIST_SCRIPT).toMatch(/Get-Partition -DiskNumber \$d\.Number -ErrorAction Stop/)
+    expect(LIST_SCRIPT).toMatch(/Get-Volume -ErrorAction SilentlyContinue/)
+  })
+
   it('only reads: the listing script has no Storage verb that changes a disk', () => {
     expect(LIST_SCRIPT).not.toMatch(/\b(New|Remove|Resize|Format|Set|Clear|Initialize|Update|Add)-(Partition|Volume|Disk)\b/i)
   })

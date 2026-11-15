@@ -1,9 +1,13 @@
 // Pure helpers shared by the optimizer engines. No Electron / no OS access here,
 // so everything in this file is unit-testable on any platform.
 
-/** PowerShell single-quoted literal (safe for any string). */
+/**
+ * PowerShell single-quoted literal (safe for any string). PowerShell also treats the
+ * typographic quotes U+2018-U+201B as single-quote delimiters, so each of them is
+ * doubled too (a doubled quote of any variant is a literal quote inside the string).
+ */
 export function psQuote(value) {
-  return `'${String(value ?? '').replace(/'/g, "''")}'`;
+  return `'${String(value ?? '').replace(/['\u2018\u2019\u201A\u201B]/g, '$&$&')}'`;
 }
 
 export const HIVES = {
