@@ -587,6 +587,61 @@ const darkhubApi = {
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url)
   },
+  ssh: {
+    getState: () => ipcRenderer.invoke('ssh:vault:getState'),
+    saveGroup: (payload) => ipcRenderer.invoke('ssh:group:save', payload),
+    deleteGroup: (id) => ipcRenderer.invoke('ssh:group:delete', { id }),
+    saveHost: (payload) => ipcRenderer.invoke('ssh:host:save', payload),
+    deleteHost: (id) => ipcRenderer.invoke('ssh:host:delete', { id }),
+    importSshConfig: (payload) => ipcRenderer.invoke('ssh:host:importSshConfig', payload),
+    saveCredential: (payload) => ipcRenderer.invoke('ssh:keychain:save', payload),
+    generateKey: (payload) => ipcRenderer.invoke('ssh:keychain:generateKey', payload),
+    deleteCredential: (id) => ipcRenderer.invoke('ssh:keychain:delete', { id }),
+    trustHostKey: (payload) => ipcRenderer.invoke('ssh:knownHosts:trust', payload),
+    rejectHostKey: (requestId) => ipcRenderer.invoke('ssh:knownHosts:reject', { requestId }),
+    deleteKnownHost: (id) => ipcRenderer.invoke('ssh:knownHosts:delete', { id }),
+    connect: (payload) => ipcRenderer.invoke('ssh:session:connect', payload),
+    write: (sessionIds, data) => ipcRenderer.invoke('ssh:session:write', { sessionIds, data }),
+    resize: (sessionId, cols, rows) => ipcRenderer.invoke('ssh:session:resize', { sessionId, cols, rows }),
+    disconnect: (sessionId) => ipcRenderer.invoke('ssh:session:disconnect', { sessionId }),
+    sftpOpen: (payload) => ipcRenderer.invoke('ssh:sftp:open', payload),
+    sftpListLocal: (dirPath) => ipcRenderer.invoke('ssh:sftp:listLocal', { dirPath }),
+    sftpListRemote: (sftpId, remotePath) => ipcRenderer.invoke('ssh:sftp:listRemote', { sftpId, remotePath }),
+    sftpTransfer: (payload) => ipcRenderer.invoke('ssh:sftp:transfer', payload),
+    sftpCancelTransfer: (transferId) => ipcRenderer.invoke('ssh:sftp:cancelTransfer', { transferId }),
+    sftpFsOp: (payload) => ipcRenderer.invoke('ssh:sftp:fsOp', payload),
+    sftpClose: (sftpId) => ipcRenderer.invoke('ssh:sftp:close', { sftpId }),
+    saveSnippet: (payload) => ipcRenderer.invoke('ssh:snippet:save', payload),
+    deleteSnippet: (id, kind = 'snippet') => ipcRenderer.invoke('ssh:snippet:delete', { id, kind }),
+    runSnippet: (payload) => ipcRenderer.invoke('ssh:snippet:run', payload),
+    saveTunnel: (payload) => ipcRenderer.invoke('ssh:tunnel:save', payload),
+    deleteTunnel: (id) => ipcRenderer.invoke('ssh:tunnel:delete', { id }),
+    startTunnel: (id) => ipcRenderer.invoke('ssh:tunnel:start', { id }),
+    stopTunnel: (id) => ipcRenderer.invoke('ssh:tunnel:stop', { id }),
+    setLogging: (sessionId, on) => ipcRenderer.invoke('ssh:session:setLogging', { sessionId, on }),
+    respondAuth: (requestId, answers) => ipcRenderer.invoke('ssh:auth:respond', { requestId, answers }),
+    serialPorts: () => ipcRenderer.invoke('ssh:serial:listPorts'),
+    serialConnect: (payload) => ipcRenderer.invoke('ssh:serial:connect', payload),
+    serialBreak: (sessionId) => ipcRenderer.invoke('ssh:serial:break', { sessionId }),
+    saveSettings: (payload) => ipcRenderer.invoke('ssh:settings:save', payload),
+    openLog: (id) => ipcRenderer.invoke('ssh:logs:open', { id }),
+    openLogsFolder: () => ipcRenderer.invoke('ssh:logs:openFolder'),
+    sftpReadText: (payload) => ipcRenderer.invoke('ssh:sftp:readText', payload),
+    sftpWriteText: (payload) => ipcRenderer.invoke('ssh:sftp:writeText', payload),
+    sftpStat: (payload) => ipcRenderer.invoke('ssh:sftp:stat', payload),
+    sftpDu: (payload) => ipcRenderer.invoke('ssh:sftp:du', payload),
+    sftpEditExternal: (payload) => ipcRenderer.invoke('ssh:sftp:editExternal', payload),
+    sftpStopWatch: (watchId) => ipcRenderer.invoke('ssh:sftp:stopWatch', { watchId }),
+    // files/folders dropped from Windows Explorer: real paths from File objects only
+    pathsOf: (files) => pathsOf(files),
+    on: (channel, callback) => {
+      const allowed = ['ssh:session:data', 'ssh:session:status', 'ssh:sftp:progress', 'ssh:tunnel:status', 'ssh:hostkey:prompt', 'ssh:hostkey:resolved', 'ssh:auth:prompt', 'ssh:auth:resolved', 'ssh:sftp:watch']
+      if (!allowed.includes(channel)) return () => {}
+      const handler = (_e, msg) => callback(msg)
+      ipcRenderer.on(channel, handler)
+      return () => ipcRenderer.removeListener(channel, handler)
+    }
+  },
   share: {
     state: () => ipcRenderer.invoke('share:state'),
     setConfig: (patch) => ipcRenderer.invoke('share:setConfig', patch),

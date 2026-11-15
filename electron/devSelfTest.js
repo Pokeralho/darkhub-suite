@@ -149,6 +149,12 @@ export async function run(listeners) {
     if (!process.env.SELFTEST_SCENARIOS_ONLY) routes = [...new Set(['home', ...map.features.map((f) => f.id), 'settings'])]
   } catch {}
   if (process.env.SELFTEST_ROUTES) routes = process.env.SELFTEST_ROUTES.split(',').map((r) => r.trim()).filter(Boolean)
+  // SELFTEST_STEPS_FILE=<json>: [{ name, route?, js?, wait? }] scripted flows (dev only). js runs in the page as the body of
+  // an async function, then the screen is captured as <name>.png. Lets a check drive real dialogs, terminals and editors.
+  let steps = routes.map((r) => ({ name: r, route: r.split('@')[0], clicks: r.split('@').slice(1) }))
+  if (process.env.SELFTEST_STEPS_FILE) {
+    try { steps = JSON.parse(fs.readFileSync(process.env.SELFTEST_STEPS_FILE, 'utf8')) } catch (e) { console.log(`[selftest] steps file unreadable: ${e.message}`); steps = [] }
+  }
 
   // SELFTEST_OVERLAY=<process name>: shows the in-game overlay on that running game, lets PresentMon measure for a
   // while and saves a picture of the game's monitor with the overlay on it (overlay-ingame.png). Read-only for the
@@ -180,17 +186,21 @@ export async function run(listeners) {
   let crashed = null
   win.webContents.on('render-process-gone', (_e, d) => { crashed = d?.reason || 'gone' })
   const screens = []
-  for (const r of routes) {
+  for (const step of steps) {
+    const r = step.name
     consoleBuf = []
     const since = Date.now()
     // "route@Button text[@Another button]" opens the route, then clicks those buttons in order (inner tabs)
-    const [route, ...clicks] = r.split('@')
-    await win.webContents.executeJavaScript(`location.hash = '#${route}'`).catch(() => {})
-    for (const click of clicks) {
+    if (step.route) await win.webContents.executeJavaScript(`location.hash = '#${step.route}'`).catch(() => {})
+    for (const click of step.clicks || []) {
       await sleep(2500)
       await win.webContents.executeJavaScript(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === ${JSON.stringify(click)})?.click()`).catch(() => {})
     }
-    await sleep(Number(process.env.SELFTEST_DELAY || 4000))
+    if (step.js) {
+      const out = await win.webContents.executeJavaScript(`(async () => { ${step.js} })()`).catch((e) => `ERR ${e?.message ?? e}`)
+      console.log(`[selftest] step ${r}: ${JSON.stringify(out ?? null).slice(0, 300)}`)
+    }
+    await sleep(Number(step.wait ?? process.env.SELFTEST_DELAY ?? 4000))
     let shot = null
     try {
       shot = path.join(outDir, `${r.replace(/[^\w-]+/g, '_')}.png`)

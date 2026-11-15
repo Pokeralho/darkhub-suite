@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-12T22:06:46",
+ "generated_at": "2026-11-14T21:44:44",
  "bridge": "darkhub",
  "preload": "electron/preload.js",
  "features": [
@@ -221,7 +221,7 @@
      "api": "shell.openExternal",
      "from": "src/pages/Share.tsx:37",
      "channel": "shell:openExternal",
-     "handler": "electron/main.js:1400",
+     "handler": "electron/main.js:1402",
      "calls": [
       "RENDERER_SYSTEM_URIS.has",
       "raw.toLowerCase",
@@ -427,7 +427,7 @@
      "api": "app.getResourceUsage",
      "from": "src/pages/SystemMonitor.tsx:205",
      "channel": "app:getResourceUsage",
-     "handler": "electron/main.js:1473",
+     "handler": "electron/main.js:1475",
      "calls": [
       "metrics.map",
       "processes.reduce"
@@ -571,14 +571,14 @@
      "api": "system.enableProcessTracking",
      "from": "src/pages/SystemMonitor.tsx:191",
      "channel": "system:enableProcessTracking",
-     "handler": "electron/main.js:874",
+     "handler": "electron/main.js:876",
      "calls": []
     },
     {
      "api": "system.runBenchmark",
      "from": "src/pages/SystemMonitor.tsx:238",
      "channel": "system:runBenchmark",
-     "handler": "electron/main.js:981",
+     "handler": "electron/main.js:983",
      "calls": [
       "hrtime.bigint",
       "parentPort.postMessage",
@@ -762,7 +762,7 @@
      "api": "optimizer.applyDns",
      "from": "src/components/network/LatencyLab.tsx:363",
      "channel": "optimizer:applyDns",
-     "handler": "electron/main.js:1873",
+     "handler": "electron/main.js:1875",
      "calls": [
       "DnsEngine.apply (electron/services/optimizer/DnsEngine.js)"
      ]
@@ -771,7 +771,7 @@
      "api": "optimizer.dnsBenchmark",
      "from": "src/components/network/LatencyLab.tsx:356",
      "channel": "optimizer:dnsBenchmark",
-     "handler": "electron/main.js:1883",
+     "handler": "electron/main.js:1885",
      "calls": [
       "DnsEngine.benchmark (electron/services/optimizer/DnsEngine.js)"
      ]
@@ -780,7 +780,7 @@
      "api": "optimizer.getDnsState",
      "from": "src/components/network/LatencyLab.tsx:349",
      "channel": "optimizer:getDnsState",
-     "handler": "electron/main.js:1864",
+     "handler": "electron/main.js:1866",
      "calls": [
       "DnsEngine.getState (electron/services/optimizer/DnsEngine.js)"
      ]
@@ -789,7 +789,7 @@
      "api": "optimizer.undoDns",
      "from": "src/components/network/LatencyLab.tsx:371",
      "channel": "optimizer:undoDns",
-     "handler": "electron/main.js:1878",
+     "handler": "electron/main.js:1880",
      "calls": [
       "DnsEngine.undo (electron/services/optimizer/DnsEngine.js)"
      ]
@@ -819,7 +819,7 @@
      "api": "dialog.selectFolder",
      "from": "src/components/setup/RestoreComponentsPanel.tsx:64",
      "channel": "dialog:selectFolder",
-     "handler": "electron/main.js:1786",
+     "handler": "electron/main.js:1788",
      "calls": []
     },
     {
@@ -844,7 +844,7 @@
      "api": "setup.detectHardware",
      "from": "src/pages/SetupHub.tsx:373",
      "channel": "setup:detectHardware",
-     "handler": "electron/main.js:3367",
+     "handler": "electron/main.js:3369",
      "calls": [
       "si.cpu",
       "si.graphics",
@@ -860,7 +860,7 @@
      "api": "setup.installWinget",
      "from": "src/pages/SetupHub.tsx:347",
      "channel": "setup:installWinget",
-     "handler": "electron/main.js:3294",
+     "handler": "electron/main.js:3296",
      "calls": [
       "sender.isDestroyed",
       "sender.send",
@@ -885,6 +885,451 @@
     "electron/main.js",
     "electron/services/PowerShellRunner.js",
     "electron/services/setup/wingetFallback.js"
+   ]
+  },
+  {
+   "id": "ssh",
+   "component": "SshClient",
+   "file": "src/pages/SshClient.tsx",
+   "label": "DarkHub SSH",
+   "group": "Diagnostics & Hardware",
+   "frontend_deps": [
+    "src/components/icons/index.tsx",
+    "src/components/ssh/HostsView.tsx",
+    "src/components/ssh/KeychainView.tsx",
+    "src/components/ssh/SftpView.tsx",
+    "src/components/ssh/SnippetsView.tsx",
+    "src/components/ssh/SshExtras.tsx",
+    "src/components/ssh/TerminalPane.tsx",
+    "src/components/ssh/TunnelsView.tsx",
+    "src/components/ssh/sshStore.ts",
+    "src/components/ssh/terminalThemes.ts",
+    "src/components/ssh/ui.tsx",
+    "src/components/ui/PageHeader.tsx"
+   ],
+   "ipc": [
+    {
+     "api": "shell.openExternal",
+     "from": "src/components/ssh/TerminalPane.tsx:77",
+     "channel": "shell:openExternal",
+     "handler": "electron/main.js:1402",
+     "calls": [
+      "RENDERER_SYSTEM_URIS.has",
+      "raw.toLowerCase",
+      "parsed.toString",
+      "cp.spawn",
+      "child.unref"
+     ]
+    },
+    {
+     "api": "ssh.connect",
+     "from": "src/components/ssh/sshStore.ts:93",
+     "channel": "ssh:session:connect",
+     "handler": "electron/ipc/sshIpc.js:174",
+     "calls": [
+      "manager.openSession"
+     ]
+    },
+    {
+     "api": "ssh.deleteCredential",
+     "from": "src/components/ssh/KeychainView.tsx:104",
+     "channel": "ssh:keychain:delete",
+     "handler": "electron/ipc/sshIpc.js:144",
+     "calls": [
+      "store.deleteCredential"
+     ]
+    },
+    {
+     "api": "ssh.deleteGroup",
+     "from": "src/components/ssh/HostsView.tsx:138",
+     "channel": "ssh:group:delete",
+     "handler": "electron/ipc/sshIpc.js:108",
+     "calls": [
+      "store.deleteGroup"
+     ]
+    },
+    {
+     "api": "ssh.deleteHost",
+     "from": "src/components/ssh/HostsView.tsx:125",
+     "channel": "ssh:host:delete",
+     "handler": "electron/ipc/sshIpc.js:110",
+     "calls": [
+      "store.deleteHost",
+      "tunnels.stop"
+     ]
+    },
+    {
+     "api": "ssh.deleteKnownHost",
+     "from": "src/components/ssh/KeychainView.tsx:143",
+     "channel": "ssh:knownHosts:delete",
+     "handler": "electron/ipc/sshIpc.js:157",
+     "calls": [
+      "store.deleteKnownHost",
+      "senders.has",
+      "senders.add",
+      "manager.disconnectBySender",
+      "serial.closeBySender",
+      "wc.once"
+     ]
+    },
+    {
+     "api": "ssh.deleteSnippet",
+     "from": "src/components/ssh/SnippetsView.tsx:139",
+     "channel": "ssh:snippet:delete",
+     "handler": "electron/ipc/sshIpc.js:224",
+     "calls": [
+      "store.deleteSnippet"
+     ]
+    },
+    {
+     "api": "ssh.deleteTunnel",
+     "from": "src/components/ssh/TunnelsView.tsx:87",
+     "channel": "ssh:tunnel:delete",
+     "handler": "electron/ipc/sshIpc.js:242",
+     "calls": [
+      "tunnels.stop",
+      "store.deleteTunnel"
+     ]
+    },
+    {
+     "api": "ssh.disconnect",
+     "from": "src/components/ssh/sshStore.ts:143",
+     "channel": "ssh:session:disconnect",
+     "handler": "electron/ipc/sshIpc.js:177",
+     "calls": [
+      "serial.has",
+      "serial.close",
+      "manager.disconnect"
+     ]
+    },
+    {
+     "api": "ssh.generateKey",
+     "from": "src/components/ssh/KeychainView.tsx:64",
+     "channel": "ssh:keychain:generateKey",
+     "handler": "electron/ipc/sshIpc.js:143",
+     "calls": [
+      "store.generateKey"
+     ]
+    },
+    {
+     "api": "ssh.getState",
+     "from": "src/pages/SshClient.tsx:125",
+     "channel": "ssh:vault:getState",
+     "handler": "electron/ipc/sshIpc.js:104",
+     "calls": []
+    },
+    {
+     "api": "ssh.importSshConfig",
+     "from": "src/components/ssh/HostsView.tsx:144",
+     "channel": "ssh:host:importSshConfig",
+     "handler": "electron/ipc/sshIpc.js:115",
+     "calls": [
+      "store.getState",
+      "parsed.filter",
+      "existing.some",
+      "hostname.toLowerCase",
+      "store.saveHost",
+      "imported.push",
+      "parseSshConfig() (electron/services/ssh/sshConfigParser.js)"
+     ]
+    },
+    {
+     "api": "ssh.openLog",
+     "from": "src/components/ssh/KeychainView.tsx:178",
+     "channel": "ssh:logs:open",
+     "handler": "electron/ipc/sshIpc.js:195",
+     "calls": [
+      "sessionLogs.find"
+     ]
+    },
+    {
+     "api": "ssh.openLogsFolder",
+     "from": "src/components/ssh/KeychainView.tsx:169",
+     "channel": "ssh:logs:openFolder",
+     "handler": "electron/ipc/sshIpc.js:201",
+     "calls": []
+    },
+    {
+     "api": "ssh.rejectHostKey",
+     "from": "src/components/ssh/KeychainView.tsx:195",
+     "channel": "ssh:knownHosts:reject",
+     "handler": "electron/ipc/sshIpc.js:156",
+     "calls": [
+      "manager.resolveHostKey"
+     ]
+    },
+    {
+     "api": "ssh.resize",
+     "from": "src/components/ssh/TerminalPane.tsx:126",
+     "channel": "ssh:session:resize",
+     "handler": "electron/ipc/sshIpc.js:176",
+     "calls": [
+      "manager.resize"
+     ]
+    },
+    {
+     "api": "ssh.respondAuth",
+     "from": "src/components/ssh/SshExtras.tsx:122",
+     "channel": "ssh:auth:respond",
+     "handler": "electron/ipc/sshIpc.js:185",
+     "calls": [
+      "manager.resolveAuthPrompt"
+     ]
+    },
+    {
+     "api": "ssh.runSnippet",
+     "from": "src/components/ssh/SnippetsView.tsx:63",
+     "channel": "ssh:snippet:run",
+     "handler": "electron/ipc/sshIpc.js:225",
+     "calls": [
+      "store.getSnippet",
+      "ids.filter",
+      "manager.write",
+      "renderSnippet() (electron/services/ssh/snippetTemplate.js)"
+     ]
+    },
+    {
+     "api": "ssh.saveCredential",
+     "from": "src/components/ssh/KeychainView.tsx:15",
+     "channel": "ssh:keychain:save",
+     "handler": "electron/ipc/sshIpc.js:142",
+     "calls": [
+      "store.saveCredential"
+     ]
+    },
+    {
+     "api": "ssh.saveGroup",
+     "from": "src/components/ssh/HostsView.tsx:131",
+     "channel": "ssh:group:save",
+     "handler": "electron/ipc/sshIpc.js:107",
+     "calls": [
+      "store.saveGroup"
+     ]
+    },
+    {
+     "api": "ssh.saveHost",
+     "from": "src/components/ssh/HostsView.tsx:21",
+     "channel": "ssh:host:save",
+     "handler": "electron/ipc/sshIpc.js:109",
+     "calls": [
+      "store.saveHost"
+     ]
+    },
+    {
+     "api": "ssh.saveSettings",
+     "from": "src/components/ssh/SshExtras.tsx:75",
+     "channel": "ssh:settings:save",
+     "handler": "electron/ipc/sshIpc.js:193",
+     "calls": [
+      "store.saveSettings"
+     ]
+    },
+    {
+     "api": "ssh.saveSnippet",
+     "from": "src/components/ssh/SnippetsView.tsx:20",
+     "channel": "ssh:snippet:save",
+     "handler": "electron/ipc/sshIpc.js:223",
+     "calls": [
+      "store.savePackage",
+      "store.saveSnippet"
+     ]
+    },
+    {
+     "api": "ssh.saveTunnel",
+     "from": "src/components/ssh/TunnelsView.tsx:25",
+     "channel": "ssh:tunnel:save",
+     "handler": "electron/ipc/sshIpc.js:235",
+     "calls": [
+      "tunnels.status",
+      "store.saveTunnel",
+      "tunnels.stop",
+      "tunnels.start"
+     ]
+    },
+    {
+     "api": "ssh.serialBreak",
+     "from": "src/components/ssh/TerminalPane.tsx:188",
+     "channel": "ssh:serial:break",
+     "handler": "electron/ipc/sshIpc.js:190",
+     "calls": [
+      "serial.sendBreak"
+     ]
+    },
+    {
+     "api": "ssh.serialConnect",
+     "from": "src/components/ssh/sshStore.ts:92",
+     "channel": "ssh:serial:connect",
+     "handler": "electron/ipc/sshIpc.js:189",
+     "calls": [
+      "serial.open"
+     ]
+    },
+    {
+     "api": "ssh.serialPorts",
+     "from": "src/components/ssh/SshExtras.tsx:21",
+     "channel": "ssh:serial:listPorts",
+     "handler": "electron/ipc/sshIpc.js:188",
+     "calls": [
+      "serial.listPorts"
+     ]
+    },
+    {
+     "api": "ssh.setLogging",
+     "from": "src/components/ssh/TerminalPane.tsx:162",
+     "channel": "ssh:session:setLogging",
+     "handler": "electron/ipc/sshIpc.js:181",
+     "calls": [
+      "manager.setLogging"
+     ]
+    },
+    {
+     "api": "ssh.sftpCancelTransfer",
+     "from": "src/components/ssh/SftpView.tsx:510",
+     "channel": "ssh:sftp:cancelTransfer",
+     "handler": "electron/ipc/sshIpc.js:212",
+     "calls": [
+      "sftp.cancelTransfer"
+     ]
+    },
+    {
+     "api": "ssh.sftpClose",
+     "from": "src/components/ssh/sshStore.ts:177",
+     "channel": "ssh:sftp:close",
+     "handler": "electron/ipc/sshIpc.js:214",
+     "calls": [
+      "sftp.close"
+     ]
+    },
+    {
+     "api": "ssh.sftpDu",
+     "from": "src/components/ssh/SftpView.tsx:79",
+     "channel": "ssh:sftp:du",
+     "handler": "electron/ipc/sshIpc.js:218",
+     "calls": [
+      "sftp.du"
+     ]
+    },
+    {
+     "api": "ssh.sftpEditExternal",
+     "from": "src/components/ssh/SftpView.tsx:380",
+     "channel": "ssh:sftp:editExternal",
+     "handler": "electron/ipc/sshIpc.js:219",
+     "calls": [
+      "sftp.editExternal"
+     ]
+    },
+    {
+     "api": "ssh.sftpFsOp",
+     "from": "src/components/ssh/SftpView.tsx:81",
+     "channel": "ssh:sftp:fsOp",
+     "handler": "electron/ipc/sshIpc.js:213",
+     "calls": [
+      "sftp.fsOp"
+     ]
+    },
+    {
+     "api": "ssh.sftpListLocal",
+     "from": "src/components/ssh/SftpView.tsx:253",
+     "channel": "ssh:sftp:listLocal",
+     "handler": "electron/ipc/sshIpc.js:209",
+     "calls": [
+      "sftp.listLocal"
+     ]
+    },
+    {
+     "api": "ssh.sftpListRemote",
+     "from": "src/components/ssh/SftpView.tsx:253",
+     "channel": "ssh:sftp:listRemote",
+     "handler": "electron/ipc/sshIpc.js:210",
+     "calls": [
+      "sftp.listRemote"
+     ]
+    },
+    {
+     "api": "ssh.sftpOpen",
+     "from": "src/components/ssh/SftpView.tsx:276",
+     "channel": "ssh:sftp:open",
+     "handler": "electron/ipc/sshIpc.js:208",
+     "calls": [
+      "sftp.open"
+     ]
+    },
+    {
+     "api": "ssh.sftpStat",
+     "from": "src/components/ssh/SftpView.tsx:78",
+     "channel": "ssh:sftp:stat",
+     "handler": "electron/ipc/sshIpc.js:217",
+     "calls": [
+      "sftp.stat"
+     ]
+    },
+    {
+     "api": "ssh.sftpStopWatch",
+     "from": "src/components/ssh/SftpView.tsx:491",
+     "channel": "ssh:sftp:stopWatch",
+     "handler": "electron/ipc/sshIpc.js:220",
+     "calls": [
+      "sftp.stopWatch"
+     ]
+    },
+    {
+     "api": "ssh.sftpTransfer",
+     "from": "src/components/ssh/SftpView.tsx:316",
+     "channel": "ssh:sftp:transfer",
+     "handler": "electron/ipc/sshIpc.js:211",
+     "calls": [
+      "sftp.transfer"
+     ]
+    },
+    {
+     "api": "ssh.startTunnel",
+     "from": "src/components/ssh/TunnelsView.tsx:80",
+     "channel": "ssh:tunnel:start",
+     "handler": "electron/ipc/sshIpc.js:243",
+     "calls": [
+      "tunnels.start"
+     ]
+    },
+    {
+     "api": "ssh.stopTunnel",
+     "from": "src/components/ssh/TunnelsView.tsx:80",
+     "channel": "ssh:tunnel:stop",
+     "handler": "electron/ipc/sshIpc.js:247",
+     "calls": [
+      "tunnels.stop",
+      "tunnels.autoStart",
+      "tunnels.stopAll",
+      "sftp.closeAll",
+      "manager.disposeAll",
+      "serial.closeAll"
+     ]
+    },
+    {
+     "api": "ssh.trustHostKey",
+     "from": "src/components/ssh/KeychainView.tsx:194",
+     "channel": "ssh:knownHosts:trust",
+     "handler": "electron/ipc/sshIpc.js:147",
+     "calls": [
+      "manager.resolveHostKey",
+      "store.trustKnownHost"
+     ]
+    },
+    {
+     "api": "ssh.write",
+     "from": "src/components/ssh/TerminalPane.tsx:90",
+     "channel": "ssh:session:write",
+     "handler": "electron/ipc/sshIpc.js:175",
+     "calls": [
+      "manager.write",
+      "sessionIds.slice"
+     ]
+    }
+   ],
+   "backend_files": [
+    "electron/ipc/sshIpc.js",
+    "electron/main.js",
+    "electron/services/ssh/snippetTemplate.js",
+    "electron/services/ssh/sshConfigParser.js"
    ]
   },
   {
@@ -997,7 +1442,7 @@
      "api": "framepacer.getMetrics",
      "from": "src/pages/FramePacer.tsx:53",
      "channel": "framepacer:getMetrics",
-     "handler": "electron/main.js:1725",
+     "handler": "electron/main.js:1727",
      "calls": [
       "FramePacerEngine.getMetrics (electron/services/FramePacerEngine.js)"
      ]
@@ -1006,7 +1451,7 @@
      "api": "framepacer.getOverlayStatus",
      "from": "src/pages/FramePacer.tsx:61",
      "channel": "framepacer:getOverlayStatus",
-     "handler": "electron/main.js:1751",
+     "handler": "electron/main.js:1753",
      "calls": [
       "getOverlayStatus() (electron/services/FramePacerOverlay.js)"
      ]
@@ -1022,7 +1467,7 @@
      "api": "framepacer.setOverlayClickThrough",
      "from": "src/pages/FramePacer.tsx:196",
      "channel": "framepacer:setOverlayClickThrough",
-     "handler": "electron/main.js:1743",
+     "handler": "electron/main.js:1745",
      "calls": [
       "setOverlayClickThrough() (electron/services/FramePacerOverlay.js)"
      ]
@@ -1031,7 +1476,7 @@
      "api": "framepacer.start",
      "from": "src/pages/FramePacer.tsx:161",
      "channel": "framepacer:start",
-     "handler": "electron/main.js:1713",
+     "handler": "electron/main.js:1715",
      "calls": [
       "FramePacerEngine.start (electron/services/FramePacerEngine.js)"
      ]
@@ -1040,7 +1485,7 @@
      "api": "framepacer.stop",
      "from": "src/pages/FramePacer.tsx:158",
      "channel": "framepacer:stop",
-     "handler": "electron/main.js:1717",
+     "handler": "electron/main.js:1719",
      "calls": [
       "FramePacerEngine.stop (electron/services/FramePacerEngine.js)"
      ]
@@ -1049,7 +1494,7 @@
      "api": "framepacer.toggleOverlay",
      "from": "src/pages/FramePacer.tsx:187",
      "channel": "framepacer:toggleOverlay",
-     "handler": "electron/main.js:1739",
+     "handler": "electron/main.js:1741",
      "calls": [
       "toggleFramePacerOverlay() (electron/services/FramePacerOverlay.js)"
      ]
@@ -1058,7 +1503,7 @@
      "api": "framepacer.updateConfig",
      "from": "src/pages/FramePacer.tsx:174",
      "channel": "framepacer:updateConfig",
-     "handler": "electron/main.js:1721",
+     "handler": "electron/main.js:1723",
      "calls": [
       "FramePacerEngine.updateConfig (electron/services/FramePacerEngine.js)"
      ]
@@ -1085,14 +1530,14 @@
      "api": "dialog.selectFiles",
      "from": "src/pages/DllInjector.tsx:16",
      "channel": "dialog:selectFiles",
-     "handler": "electron/main.js:1775",
+     "handler": "electron/main.js:1777",
      "calls": []
     },
     {
      "api": "injector.inject",
      "from": "src/pages/DllInjector.tsx:44",
      "channel": "injector:inject",
-     "handler": "electron/main.js:1677",
+     "handler": "electron/main.js:1679",
      "calls": [
       "i.test",
       "dllPath.trim",
@@ -1147,7 +1592,7 @@
      "api": "shell.openExternal",
      "from": "src/pages/Dlss5Manager.tsx:137",
      "channel": "shell:openExternal",
-     "handler": "electron/main.js:1400",
+     "handler": "electron/main.js:1402",
      "calls": [
       "RENDERER_SYSTEM_URIS.has",
       "raw.toLowerCase",
@@ -1335,14 +1780,14 @@
      "api": "dialog.selectFiles",
      "from": "src/pages/Optimizer.tsx:925",
      "channel": "dialog:selectFiles",
-     "handler": "electron/main.js:1775",
+     "handler": "electron/main.js:1777",
      "calls": []
     },
     {
      "api": "optimizer.advancedNetworkApply",
      "from": "src/pages/Optimizer.tsx:474",
      "channel": "optimizer:advancedNetworkApply",
-     "handler": "electron/main.js:1825",
+     "handler": "electron/main.js:1827",
      "calls": [
       "NetworkEngine.advancedNetworkApply (electron/services/optimizer/NetworkEngine.js)"
      ]
@@ -1351,7 +1796,7 @@
      "api": "optimizer.advancedNetworkRevert",
      "from": "src/pages/Optimizer.tsx:483",
      "channel": "optimizer:advancedNetworkRevert",
-     "handler": "electron/main.js:1826",
+     "handler": "electron/main.js:1828",
      "calls": [
       "NetworkEngine.advancedNetworkRevert (electron/services/optimizer/NetworkEngine.js)"
      ]
@@ -1360,7 +1805,7 @@
      "api": "optimizer.applyDefenderControl",
      "from": "src/pages/Optimizer.tsx:845",
      "channel": "optimizer:applyDefenderControl",
-     "handler": "electron/main.js:1984",
+     "handler": "electron/main.js:1986",
      "calls": [
       "DefenderControlEngine.runNativeDefenderControl (electron/services/optimizer/DefenderControlEngine.js)"
      ]
@@ -1369,7 +1814,7 @@
      "api": "optimizer.applyDns",
      "from": "src/pages/Optimizer.tsx:1156",
      "channel": "optimizer:applyDns",
-     "handler": "electron/main.js:1873",
+     "handler": "electron/main.js:1875",
      "calls": [
       "DnsEngine.apply (electron/services/optimizer/DnsEngine.js)"
      ]
@@ -1378,7 +1823,7 @@
      "api": "optimizer.checkIsAdmin",
      "from": "src/pages/Optimizer.tsx:264",
      "channel": "optimizer:checkIsAdmin",
-     "handler": "electron/main.js:743",
+     "handler": "electron/main.js:745",
      "calls": [
       "SystemOptimizerService.checkIsAdmin (electron/services/optimizer/SystemOptimizerService.js)"
      ]
@@ -1387,7 +1832,7 @@
      "api": "optimizer.checkOperationsStatus",
      "from": "src/pages/Optimizer.tsx:299",
      "channel": "optimizer:checkOperationsStatus",
-     "handler": "electron/main.js:724",
+     "handler": "electron/main.js:726",
      "calls": [
       "SystemOptimizerService.checkOperationsStatus (electron/services/optimizer/SystemOptimizerService.js)"
      ]
@@ -1396,7 +1841,7 @@
      "api": "optimizer.createRestorePoint",
      "from": "src/pages/Optimizer.tsx:456",
      "channel": "optimizer:createRestorePoint",
-     "handler": "electron/main.js:747",
+     "handler": "electron/main.js:749",
      "calls": [
       "SystemEngine.createRestorePoint (electron/services/optimizer/SystemEngine.js)"
      ]
@@ -1405,7 +1850,7 @@
      "api": "optimizer.deepTweaksApply",
      "from": "src/pages/Optimizer.tsx:686",
      "channel": "optimizer:deepTweaksApply",
-     "handler": "electron/main.js:1852",
+     "handler": "electron/main.js:1854",
      "calls": [
       "DeepTweaksEngine.applyTweaks (electron/services/optimizer/DeepTweaksEngine.js)",
       "sender.send"
@@ -1415,7 +1860,7 @@
      "api": "optimizer.deepTweaksList",
      "from": "src/pages/Optimizer.tsx:263",
      "channel": "optimizer:deepTweaksList",
-     "handler": "electron/main.js:1828",
+     "handler": "electron/main.js:1830",
      "calls": [
       "DeepTweaksEngine.listTweaks (electron/services/optimizer/DeepTweaksEngine.js)"
      ]
@@ -1424,7 +1869,7 @@
      "api": "optimizer.deepTweaksRevert",
      "from": "src/pages/Optimizer.tsx:701",
      "channel": "optimizer:deepTweaksRevert",
-     "handler": "electron/main.js:1853",
+     "handler": "electron/main.js:1855",
      "calls": [
       "DeepTweaksEngine.revertTweaks (electron/services/optimizer/DeepTweaksEngine.js)",
       "sender.send"
@@ -1434,7 +1879,7 @@
      "api": "optimizer.deepTweaksStatus",
      "from": "src/pages/Optimizer.tsx:301",
      "channel": "optimizer:deepTweaksStatus",
-     "handler": "electron/main.js:1845",
+     "handler": "electron/main.js:1847",
      "calls": [
       "DeepTweaksEngine.checkTweaksStatus (electron/services/optimizer/DeepTweaksEngine.js)"
      ]
@@ -1443,7 +1888,7 @@
      "api": "optimizer.deepTweaksUndo",
      "from": "src/pages/Optimizer.tsx:839",
      "channel": "optimizer:deepTweaksUndo",
-     "handler": "electron/main.js:1854",
+     "handler": "electron/main.js:1856",
      "calls": [
       "DeepTweaksEngine.undoTweaks (electron/services/optimizer/DeepTweaksEngine.js)"
      ]
@@ -1452,7 +1897,7 @@
      "api": "optimizer.disableStartupItem",
      "from": "src/pages/Optimizer.tsx:1047",
      "channel": "optimizer:disableStartupItem",
-     "handler": "electron/main.js:1807",
+     "handler": "electron/main.js:1809",
      "calls": [
       "AppManagerEngine.disableStartupItem (electron/services/optimizer/AppManagerEngine.js)"
      ]
@@ -1461,7 +1906,7 @@
      "api": "optimizer.dnsBenchmark",
      "from": "src/pages/Optimizer.tsx:1121",
      "channel": "optimizer:dnsBenchmark",
-     "handler": "electron/main.js:1883",
+     "handler": "electron/main.js:1885",
      "calls": [
       "DnsEngine.benchmark (electron/services/optimizer/DnsEngine.js)"
      ]
@@ -1470,7 +1915,7 @@
      "api": "optimizer.getDefenderControlStatus",
      "from": "src/pages/Optimizer.tsx:1054",
      "channel": "optimizer:getDefenderControlStatus",
-     "handler": "electron/main.js:1981",
+     "handler": "electron/main.js:1983",
      "calls": [
       "DefenderControlEngine.getStatus (electron/services/optimizer/DefenderControlEngine.js)"
      ]
@@ -1479,7 +1924,7 @@
      "api": "optimizer.getDnsState",
      "from": "src/pages/Optimizer.tsx:1113",
      "channel": "optimizer:getDnsState",
-     "handler": "electron/main.js:1864",
+     "handler": "electron/main.js:1866",
      "calls": [
       "DnsEngine.getState (electron/services/optimizer/DnsEngine.js)"
      ]
@@ -1488,7 +1933,7 @@
      "api": "optimizer.getGpuInfo",
      "from": "src/pages/Optimizer.tsx:916",
      "channel": "optimizer:getGpuInfo",
-     "handler": "electron/main.js:1819",
+     "handler": "electron/main.js:1821",
      "calls": [
       "AppManagerEngine.getGpuInfo (electron/services/optimizer/AppManagerEngine.js)"
      ]
@@ -1497,7 +1942,7 @@
      "api": "optimizer.getGpuPreferences",
      "from": "src/pages/Optimizer.tsx:915",
      "channel": "optimizer:getGpuPreferences",
-     "handler": "electron/main.js:1816",
+     "handler": "electron/main.js:1818",
      "calls": [
       "AppManagerEngine.getGpuPreferences (electron/services/optimizer/AppManagerEngine.js)"
      ]
@@ -1506,7 +1951,7 @@
      "api": "optimizer.getHagsStatus",
      "from": "src/pages/Optimizer.tsx:880",
      "channel": "optimizer:getHagsStatus",
-     "handler": "electron/main.js:1820",
+     "handler": "electron/main.js:1822",
      "calls": [
       "AppManagerEngine.getHagsStatus (electron/services/optimizer/AppManagerEngine.js)"
      ]
@@ -1515,7 +1960,7 @@
      "api": "optimizer.getInstalledPrograms",
      "from": "src/pages/Optimizer.tsx:490",
      "channel": "optimizer:getInstalledPrograms",
-     "handler": "electron/main.js:1810",
+     "handler": "electron/main.js:1812",
      "calls": [
       "AppManagerEngine.getInstalledPrograms (electron/services/optimizer/AppManagerEngine.js)"
      ]
@@ -1524,7 +1969,7 @@
      "api": "optimizer.getRunningProcesses",
      "from": "src/pages/Optimizer.tsx:953",
      "channel": "optimizer:getRunningProcesses",
-     "handler": "electron/main.js:1814",
+     "handler": "electron/main.js:1816",
      "calls": [
       "AppManagerEngine.getRunningProcesses (electron/services/optimizer/AppManagerEngine.js)"
      ]
@@ -1533,7 +1978,7 @@
      "api": "optimizer.getStartupItems",
      "from": "src/pages/Optimizer.tsx:1031",
      "channel": "optimizer:getStartupItems",
-     "handler": "electron/main.js:1806",
+     "handler": "electron/main.js:1808",
      "calls": [
       "AppManagerEngine.getStartupItems (electron/services/optimizer/AppManagerEngine.js)"
      ]
@@ -1542,7 +1987,7 @@
      "api": "optimizer.listBloatware",
      "from": "src/pages/Optimizer.tsx:992",
      "channel": "optimizer:listBloatware",
-     "handler": "electron/main.js:1812",
+     "handler": "electron/main.js:1814",
      "calls": [
       "AppManagerEngine.listBloatware (electron/services/optimizer/AppManagerEngine.js)"
      ]
@@ -1551,7 +1996,7 @@
      "api": "optimizer.listOperations",
      "from": "src/pages/Optimizer.tsx:262",
      "channel": "optimizer:listOperations",
-     "handler": "electron/main.js:720",
+     "handler": "electron/main.js:722",
      "calls": [
       "SystemOptimizerService.listOperations (electron/services/optimizer/SystemOptimizerService.js)"
      ]
@@ -1560,7 +2005,7 @@
      "api": "optimizer.listProfiles",
      "from": "src/pages/Optimizer.tsx:265",
      "channel": "optimizer:listProfiles",
-     "handler": "electron/main.js:739",
+     "handler": "electron/main.js:741",
      "calls": [
       "SystemOptimizerService.listProfiles (electron/services/optimizer/SystemOptimizerService.js)"
      ]
@@ -1576,7 +2021,7 @@
      "api": "optimizer.openTamperSettings",
      "from": "src/pages/Optimizer.tsx:1103",
      "channel": "optimizer:openTamperSettings",
-     "handler": "electron/main.js:1990",
+     "handler": "electron/main.js:1992",
      "calls": [
       "DefenderControlEngine.openTamperSettings (electron/services/optimizer/DefenderControlEngine.js)"
      ]
@@ -1585,7 +2030,7 @@
      "api": "optimizer.removeGpuPreference",
      "from": "src/pages/Optimizer.tsx:947",
      "channel": "optimizer:removeGpuPreference",
-     "handler": "electron/main.js:1818",
+     "handler": "electron/main.js:1820",
      "calls": [
       "AppManagerEngine.removeGpuPreference (electron/services/optimizer/AppManagerEngine.js)"
      ]
@@ -1594,7 +2039,7 @@
      "api": "optimizer.removeSelectedBloatware",
      "from": "src/pages/Optimizer.tsx:1019",
      "channel": "optimizer:removeSelectedBloatware",
-     "handler": "electron/main.js:1813",
+     "handler": "electron/main.js:1815",
      "calls": [
       "AppManagerEngine.removeSelectedBloatware (electron/services/optimizer/AppManagerEngine.js)"
      ]
@@ -1603,7 +2048,7 @@
      "api": "optimizer.restoreImageDefender",
      "from": "src/pages/Optimizer.tsx:1095",
      "channel": "optimizer:restoreImageDefender",
-     "handler": "electron/main.js:1987",
+     "handler": "electron/main.js:1989",
      "calls": [
       "DefenderControlEngine.restoreImageDefender (electron/services/optimizer/DefenderControlEngine.js)"
      ]
@@ -1612,7 +2057,7 @@
      "api": "optimizer.revertHags",
      "from": "src/pages/Optimizer.tsx:872",
      "channel": "optimizer:revertHags",
-     "handler": "electron/main.js:1822",
+     "handler": "electron/main.js:1824",
      "calls": [
       "AppManagerEngine.revertHags (electron/services/optimizer/AppManagerEngine.js)"
      ]
@@ -1621,7 +2066,7 @@
      "api": "optimizer.run",
      "from": "src/pages/Optimizer.tsx:366",
      "channel": "optimizer:run",
-     "handler": "electron/main.js:732",
+     "handler": "electron/main.js:734",
      "calls": [
       "sender.send",
       "SystemOptimizerService.runTasks (electron/services/optimizer/SystemOptimizerService.js)"
@@ -1631,7 +2076,7 @@
      "api": "optimizer.setGpuPreference",
      "from": "src/pages/Optimizer.tsx:938",
      "channel": "optimizer:setGpuPreference",
-     "handler": "electron/main.js:1817",
+     "handler": "electron/main.js:1819",
      "calls": [
       "AppManagerEngine.setGpuPreference (electron/services/optimizer/AppManagerEngine.js)"
      ]
@@ -1640,7 +2085,7 @@
      "api": "optimizer.setHagsStatus",
      "from": "src/pages/Optimizer.tsx:898",
      "channel": "optimizer:setHagsStatus",
-     "handler": "electron/main.js:1821",
+     "handler": "electron/main.js:1823",
      "calls": [
       "AppManagerEngine.setHagsStatus (electron/services/optimizer/AppManagerEngine.js)"
      ]
@@ -1649,7 +2094,7 @@
      "api": "optimizer.setProcessPriority",
      "from": "src/pages/Optimizer.tsx:985",
      "channel": "optimizer:setProcessPriority",
-     "handler": "electron/main.js:1815",
+     "handler": "electron/main.js:1817",
      "calls": [
       "AppManagerEngine.setProcessPriority (electron/services/optimizer/AppManagerEngine.js)"
      ]
@@ -1658,7 +2103,7 @@
      "api": "optimizer.undoDns",
      "from": "src/pages/Optimizer.tsx:850",
      "channel": "optimizer:undoDns",
-     "handler": "electron/main.js:1878",
+     "handler": "electron/main.js:1880",
      "calls": [
       "DnsEngine.undo (electron/services/optimizer/DnsEngine.js)"
      ]
@@ -1667,7 +2112,7 @@
      "api": "optimizer.uninstallProgramWithLeftovers",
      "from": "src/pages/Optimizer.tsx:504",
      "channel": "optimizer:uninstallProgramWithLeftovers",
-     "handler": "electron/main.js:1824",
+     "handler": "electron/main.js:1826",
      "calls": [
       "AppManagerEngine.uninstallProgramWithLeftovers (electron/services/optimizer/AppManagerEngine.js)"
      ]
@@ -1730,7 +2175,7 @@
      "api": "dialog.selectFiles",
      "from": "src/pages/OptiScalerManager.tsx:347",
      "channel": "dialog:selectFiles",
-     "handler": "electron/main.js:1775",
+     "handler": "electron/main.js:1777",
      "calls": []
     },
     {
@@ -1755,7 +2200,7 @@
      "api": "library.list",
      "from": "src/pages/OptiScalerManager.tsx:186",
      "channel": "library:list",
-     "handler": "electron/main.js:1166",
+     "handler": "electron/main.js:1168",
      "calls": [
       "webContents.send"
      ]
@@ -1764,14 +2209,14 @@
      "api": "library.remove",
      "from": "src/pages/OptiScalerManager.tsx:390",
      "channel": "library:remove",
-     "handler": "electron/main.js:1214",
+     "handler": "electron/main.js:1216",
      "calls": []
     },
     {
      "api": "library.upsert",
      "from": "src/pages/OptiScalerManager.tsx:358",
      "channel": "library:upsert",
-     "handler": "electron/main.js:1178",
+     "handler": "electron/main.js:1180",
      "calls": []
     },
     {
@@ -2054,7 +2499,7 @@
      "api": "dialog.selectFiles",
      "from": "src/pages/UltraLowLatency.tsx:159",
      "channel": "dialog:selectFiles",
-     "handler": "electron/main.js:1775",
+     "handler": "electron/main.js:1777",
      "calls": []
     },
     {
@@ -2231,7 +2676,7 @@
      "api": "optimizer.applyTweak",
      "from": "src/pages/Dashboard.tsx:250",
      "channel": "optimizer:applyTweak",
-     "handler": "electron/main.js:1829",
+     "handler": "electron/main.js:1831",
      "calls": [
       "MemoryEngine.optimizeRAM (electron/services/optimizer/MemoryEngine.js)",
       "StorageEngine.cleanTempFiles (electron/services/optimizer/StorageEngine.js)",
@@ -2242,7 +2687,7 @@
      "api": "optimizer.createRestorePoint",
      "from": "src/pages/Dashboard.tsx:312",
      "channel": "optimizer:createRestorePoint",
-     "handler": "electron/main.js:747",
+     "handler": "electron/main.js:749",
      "calls": [
       "SystemEngine.createRestorePoint (electron/services/optimizer/SystemEngine.js)"
      ]
@@ -2251,14 +2696,14 @@
      "api": "security.getSecurityScore",
      "from": "src/hooks/useSecurityScore.ts:25",
      "channel": "security:getSecurityScore",
-     "handler": "electron/main.js:2887",
+     "handler": "electron/main.js:2889",
      "calls": []
     },
     {
      "api": "shell.openExternal",
      "from": "src/pages/Dashboard.tsx:365",
      "channel": "shell:openExternal",
-     "handler": "electron/main.js:1400",
+     "handler": "electron/main.js:1402",
      "calls": [
       "RENDERER_SYSTEM_URIS.has",
       "raw.toLowerCase",
@@ -2271,7 +2716,7 @@
      "api": "system.getJunkEstimate",
      "from": "src/hooks/useJunkScanner.ts:63",
      "channel": "system:getJunkEstimate",
-     "handler": "electron/main.js:1158",
+     "handler": "electron/main.js:1160",
      "calls": []
     }
    ],
@@ -2309,14 +2754,14 @@
      "api": "pge.openPortable",
      "from": "src/pages/Home.tsx:75",
      "channel": "pge:openPortable",
-     "handler": "electron/main.js:1464",
+     "handler": "electron/main.js:1466",
      "calls": []
     },
     {
      "api": "system.getInfo",
      "from": "src/pages/Home.tsx:29",
      "channel": "system:getInfo",
-     "handler": "electron/main.js:805",
+     "handler": "electron/main.js:807",
      "calls": [
       "cpuModel.includes",
       "si.cpu",
@@ -2327,7 +2772,7 @@
      "api": "system.getMemory",
      "from": "src/pages/Home.tsx:93",
      "channel": "system:getMemory",
-     "handler": "electron/main.js:1647",
+     "handler": "electron/main.js:1649",
      "calls": []
     }
    ],
@@ -2547,7 +2992,7 @@
      "api": "shell.openExternal",
      "from": "src/pages/Presets.tsx:180",
      "channel": "shell:openExternal",
-     "handler": "electron/main.js:1400",
+     "handler": "electron/main.js:1402",
      "calls": [
       "RENDERER_SYSTEM_URIS.has",
       "raw.toLowerCase",
@@ -2648,7 +3093,7 @@
      "api": "autoclicker.setHotkey",
      "from": "src/pages/AutoClicker.tsx:128",
      "channel": "autoclicker:setHotkey",
-     "handler": "electron/main.js:3151",
+     "handler": "electron/main.js:3153",
      "calls": [
       "autoClicker.setHotkey"
      ]
@@ -2657,14 +3102,14 @@
      "api": "autoclicker.setTabActive",
      "from": "src/pages/AutoClicker.tsx:72",
      "channel": "autoclicker:setTabActive",
-     "handler": "electron/main.js:3152",
+     "handler": "electron/main.js:3154",
      "calls": []
     },
     {
      "api": "autoclicker.start",
      "from": "src/pages/AutoClicker.tsx:99",
      "channel": "autoclicker:start",
-     "handler": "electron/main.js:3147",
+     "handler": "electron/main.js:3149",
      "calls": [
       "autoClicker.start"
      ]
@@ -2673,7 +3118,7 @@
      "api": "autoclicker.status",
      "from": "src/pages/AutoClicker.tsx:42",
      "channel": "autoclicker:status",
-     "handler": "electron/main.js:3146",
+     "handler": "electron/main.js:3148",
      "calls": [
       "autoClicker.state"
      ]
@@ -2682,7 +3127,7 @@
      "api": "autoclicker.stop",
      "from": "src/pages/AutoClicker.tsx:115",
      "channel": "autoclicker:stop",
-     "handler": "electron/main.js:3148",
+     "handler": "electron/main.js:3150",
      "calls": [
       "autoClicker.stop"
      ]
@@ -2833,7 +3278,7 @@
      "api": "dialog.grantDroppedFiles",
      "from": "src/pages/FileConverter.tsx:324",
      "channel": "dialog:grantDroppedFiles",
-     "handler": "electron/main.js:1761",
+     "handler": "electron/main.js:1763",
      "calls": [
       "filePaths.slice",
       "granted.push"
@@ -2843,21 +3288,21 @@
      "api": "dialog.selectFiles",
      "from": "src/pages/FileConverter.tsx:139",
      "channel": "dialog:selectFiles",
-     "handler": "electron/main.js:1775",
+     "handler": "electron/main.js:1777",
      "calls": []
     },
     {
      "api": "dialog.selectFolder",
      "from": "src/pages/FileConverter.tsx:148",
      "channel": "dialog:selectFolder",
-     "handler": "electron/main.js:1786",
+     "handler": "electron/main.js:1788",
      "calls": []
     },
     {
      "api": "files.archiveOperation",
      "from": "src/pages/FileConverter.tsx:180",
      "channel": "files:archiveOperation",
-     "handler": "electron/main.js:2015",
+     "handler": "electron/main.js:2017",
      "calls": [
       "inputFiles.map",
       "runCommand() (electron/services/PowerShellRunner.js)"
@@ -3152,14 +3597,14 @@
      "api": "dialog.selectFiles",
      "from": "src/pages/Library.tsx:209",
      "channel": "dialog:selectFiles",
-     "handler": "electron/main.js:1775",
+     "handler": "electron/main.js:1777",
      "calls": []
     },
     {
      "api": "dialog.selectFolder",
      "from": "src/pages/Library.tsx:222",
      "channel": "dialog:selectFolder",
-     "handler": "electron/main.js:1786",
+     "handler": "electron/main.js:1788",
      "calls": []
     },
     {
@@ -3179,7 +3624,7 @@
      "api": "library.discover",
      "from": "src/pages/Library.tsx:69",
      "channel": "library:discover",
-     "handler": "electron/main.js:1300",
+     "handler": "electron/main.js:1302",
      "calls": [
       "content.matchAll",
       "steamPaths.push",
@@ -3193,7 +3638,7 @@
      "api": "library.fetchCover",
      "from": "src/components/library/GameCard.tsx:39",
      "channel": "library:fetchCover",
-     "handler": "electron/main.js:1229",
+     "handler": "electron/main.js:1231",
      "calls": [
       "service.fetchCover",
       "i.test",
@@ -3207,7 +3652,7 @@
      "api": "library.list",
      "from": "src/pages/Library.tsx:39",
      "channel": "library:list",
-     "handler": "electron/main.js:1166",
+     "handler": "electron/main.js:1168",
      "calls": [
       "webContents.send"
      ]
@@ -3223,21 +3668,21 @@
      "api": "library.remove",
      "from": "src/pages/Library.tsx:148",
      "channel": "library:remove",
-     "handler": "electron/main.js:1214",
+     "handler": "electron/main.js:1216",
      "calls": []
     },
     {
      "api": "library.upsert",
      "from": "src/pages/Library.tsx:99",
      "channel": "library:upsert",
-     "handler": "electron/main.js:1178",
+     "handler": "electron/main.js:1180",
      "calls": []
     },
     {
      "api": "library.upsertBulk",
      "from": "src/pages/Library.tsx:94",
      "channel": "library:upsertBulk",
-     "handler": "electron/main.js:1196",
+     "handler": "electron/main.js:1198",
      "calls": []
     },
     {
@@ -3270,7 +3715,7 @@
      "api": "dialog.grantDroppedFiles",
      "from": "src/pages/MetaDataEditor.tsx:85",
      "channel": "dialog:grantDroppedFiles",
-     "handler": "electron/main.js:1761",
+     "handler": "electron/main.js:1763",
      "calls": [
       "filePaths.slice",
       "granted.push"
@@ -3280,14 +3725,14 @@
      "api": "dialog.saveFile",
      "from": "src/pages/MetaDataEditor.tsx:113",
      "channel": "dialog:saveFile",
-     "handler": "electron/main.js:1796",
+     "handler": "electron/main.js:1798",
      "calls": []
     },
     {
      "api": "dialog.selectFiles",
      "from": "src/pages/MetaDataEditor.tsx:78",
      "channel": "dialog:selectFiles",
-     "handler": "electron/main.js:1775",
+     "handler": "electron/main.js:1777",
      "calls": []
     },
     {
@@ -3347,14 +3792,14 @@
      "api": "dialog.selectFiles",
      "from": "src/pages/ImageTextExtractor.tsx:53",
      "channel": "dialog:selectFiles",
-     "handler": "electron/main.js:1775",
+     "handler": "electron/main.js:1777",
      "calls": []
     },
     {
      "api": "ocr.extractText",
      "from": "src/pages/ImageTextExtractor.tsx:117",
      "channel": "ocr:extractText",
-     "handler": "electron/main.js:2285",
+     "handler": "electron/main.js:2287",
      "calls": [
       "base64Data.replace",
       "img.resize",
@@ -3400,14 +3845,14 @@
      "api": "dialog.selectFiles",
      "from": "src/pages/PasswordManager.tsx:383",
      "channel": "dialog:selectFiles",
-     "handler": "electron/main.js:1775",
+     "handler": "electron/main.js:1777",
      "calls": []
     },
     {
      "api": "dialog.selectFolder",
      "from": "src/pages/PasswordManager.tsx:366",
      "channel": "dialog:selectFolder",
-     "handler": "electron/main.js:1786",
+     "handler": "electron/main.js:1788",
      "calls": []
     },
     {
@@ -3424,7 +3869,7 @@
      "api": "vault.add",
      "from": "src/pages/PasswordManager.tsx:284",
      "channel": "vault:add",
-     "handler": "electron/main.js:2531",
+     "handler": "electron/main.js:2533",
      "calls": [
       "crypto.randomUUID"
      ]
@@ -3440,7 +3885,7 @@
      "api": "vault.copyPassword",
      "from": "src/pages/PasswordManager.tsx:352",
      "channel": "vault:copyPassword",
-     "handler": "electron/main.js:2594",
+     "handler": "electron/main.js:2596",
      "calls": [
       "clipboard.writeText",
       "clipboard.readText",
@@ -3451,14 +3896,14 @@
      "api": "vault.export",
      "from": "src/pages/PasswordManager.tsx:369",
      "channel": "vault:export",
-     "handler": "electron/main.js:2651",
+     "handler": "electron/main.js:2653",
      "calls": []
     },
     {
      "api": "vault.import",
      "from": "src/pages/PasswordManager.tsx:389",
      "channel": "vault:import",
-     "handler": "electron/main.js:2660",
+     "handler": "electron/main.js:2662",
      "calls": [
       "backupVaultFile() (electron/services/vaultBridge/vaultHardening.js)"
      ]
@@ -3467,7 +3912,7 @@
      "api": "vault.init",
      "from": "src/pages/PasswordManager.tsx:202",
      "channel": "vault:init",
-     "handler": "electron/main.js:2451",
+     "handler": "electron/main.js:2453",
      "calls": [
       "crypto.randomBytes",
       "recoveryWords.join",
@@ -3482,14 +3927,14 @@
      "api": "vault.list",
      "from": "src/pages/PasswordManager.tsx:159",
      "channel": "vault:list",
-     "handler": "electron/main.js:2516",
+     "handler": "electron/main.js:2518",
      "calls": []
     },
     {
      "api": "vault.lock",
      "from": "src/pages/PasswordManager.tsx:266",
      "channel": "vault:lock",
-     "handler": "electron/main.js:2511",
+     "handler": "electron/main.js:2513",
      "calls": []
     },
     {
@@ -3520,14 +3965,14 @@
      "api": "vault.remove",
      "from": "src/pages/PasswordManager.tsx:306",
      "channel": "vault:remove",
-     "handler": "electron/main.js:2577",
+     "handler": "electron/main.js:2579",
      "calls": []
     },
     {
      "api": "vault.reveal",
      "from": "src/pages/PasswordManager.tsx:333",
      "channel": "vault:reveal",
-     "handler": "electron/main.js:2586",
+     "handler": "electron/main.js:2588",
      "calls": []
     },
     {
@@ -3553,21 +3998,21 @@
      "api": "vault.status",
      "from": "src/pages/PasswordManager.tsx:149",
      "channel": "vault:status",
-     "handler": "electron/main.js:2441",
+     "handler": "electron/main.js:2443",
      "calls": []
     },
     {
      "api": "vault.unlock",
      "from": "src/pages/PasswordManager.tsx:209",
      "channel": "vault:unlock",
-     "handler": "electron/main.js:2486",
+     "handler": "electron/main.js:2488",
      "calls": []
     },
     {
      "api": "vault.unlockWithRecoveryWords",
      "from": "src/pages/PasswordManager.tsx:246",
      "channel": "vault:unlockWithRecoveryWords",
-     "handler": "electron/main.js:2498",
+     "handler": "electron/main.js:2500",
      "calls": [
       "words.trim",
       "derivePasswordFromRecoveryWords() (electron/vaultCrypto.js)"
@@ -3852,7 +4297,7 @@
      "api": "optimizer.applyDns",
      "from": "src/components/security/ProtectiveDnsPanel.tsx:36",
      "channel": "optimizer:applyDns",
-     "handler": "electron/main.js:1873",
+     "handler": "electron/main.js:1875",
      "calls": [
       "DnsEngine.apply (electron/services/optimizer/DnsEngine.js)"
      ]
@@ -3861,7 +4306,7 @@
      "api": "optimizer.getDnsState",
      "from": "src/components/security/ProtectiveDnsPanel.tsx:22",
      "channel": "optimizer:getDnsState",
-     "handler": "electron/main.js:1864",
+     "handler": "electron/main.js:1866",
      "calls": [
       "DnsEngine.getState (electron/services/optimizer/DnsEngine.js)"
      ]
@@ -3870,7 +4315,7 @@
      "api": "optimizer.undoDns",
      "from": "src/components/security/ProtectiveDnsPanel.tsx:44",
      "channel": "optimizer:undoDns",
-     "handler": "electron/main.js:1878",
+     "handler": "electron/main.js:1880",
      "calls": [
       "DnsEngine.undo (electron/services/optimizer/DnsEngine.js)"
      ]
@@ -3980,7 +4425,7 @@
      "api": "security.auditTracking",
      "from": "src/pages/AdvancedSecurity.tsx:197",
      "channel": "security:auditTracking",
-     "handler": "electron/main.js:2891",
+     "handler": "electron/main.js:2893",
      "calls": [
       "custom.map",
       "content.split",
@@ -3994,7 +4439,7 @@
      "api": "security.blockTracking",
      "from": "src/pages/AdvancedSecurity.tsx:578",
      "channel": "security:blockTracking",
-     "handler": "electron/main.js:2998",
+     "handler": "electron/main.js:3000",
      "calls": [
       "custom.map",
       "d.toLowerCase",
@@ -4036,7 +4481,7 @@
      "api": "security.getTrackingDomains",
      "from": "src/pages/AdvancedSecurity.tsx:222",
      "channel": "security:getTrackingDomains",
-     "handler": "electron/main.js:2941",
+     "handler": "electron/main.js:2943",
      "calls": [
       "custom.map",
       "HOSTNAME_RE.test"
@@ -4053,7 +4498,7 @@
      "api": "security.killProcess",
      "from": "src/pages/AdvancedSecurity.tsx:91",
      "channel": "security:killProcess",
-     "handler": "electron/main.js:3077",
+     "handler": "electron/main.js:3079",
      "calls": []
     },
     {
@@ -4089,14 +4534,14 @@
      "api": "security.setCustomTrackingDomains",
      "from": "src/pages/AdvancedSecurity.tsx:231",
      "channel": "security:setCustomTrackingDomains",
-     "handler": "electron/main.js:2985",
+     "handler": "electron/main.js:2987",
      "calls": []
     },
     {
      "api": "security.unblockTracking",
      "from": "src/pages/AdvancedSecurity.tsx:579",
      "channel": "security:unblockTracking",
-     "handler": "electron/main.js:3050",
+     "handler": "electron/main.js:3052",
      "calls": []
     }
    ],
@@ -4200,14 +4645,14 @@
      "api": "dialog.selectFiles",
      "from": "src/pages/TextSummarizer.tsx:121",
      "channel": "dialog:selectFiles",
-     "handler": "electron/main.js:1775",
+     "handler": "electron/main.js:1777",
      "calls": []
     },
     {
      "api": "fs.readFile",
      "from": "src/pages/TextSummarizer.tsx:131",
      "channel": "fs:readFile",
-     "handler": "electron/main.js:3090",
+     "handler": "electron/main.js:3092",
      "calls": []
     }
    ],
@@ -4259,28 +4704,28 @@
      "api": "dialog.saveFile",
      "from": "src/pages/TextEditor.tsx:71",
      "channel": "dialog:saveFile",
-     "handler": "electron/main.js:1796",
+     "handler": "electron/main.js:1798",
      "calls": []
     },
     {
      "api": "dialog.selectFiles",
      "from": "src/pages/TextEditor.tsx:40",
      "channel": "dialog:selectFiles",
-     "handler": "electron/main.js:1775",
+     "handler": "electron/main.js:1777",
      "calls": []
     },
     {
      "api": "fs.readFile",
      "from": "src/pages/TextEditor.tsx:49",
      "channel": "fs:readFile",
-     "handler": "electron/main.js:3090",
+     "handler": "electron/main.js:3092",
      "calls": []
     },
     {
      "api": "fs.writeFile",
      "from": "src/pages/TextEditor.tsx:76",
      "channel": "fs:writeFile",
-     "handler": "electron/main.js:3102",
+     "handler": "electron/main.js:3104",
      "calls": [
       "devPath.includes"
      ]
@@ -4308,21 +4753,21 @@
      "api": "dialog.selectFiles",
      "from": "src/pages/YoutubeDownloader.tsx:122",
      "channel": "dialog:selectFiles",
-     "handler": "electron/main.js:1775",
+     "handler": "electron/main.js:1777",
      "calls": []
     },
     {
      "api": "dialog.selectFolder",
      "from": "src/pages/YoutubeDownloader.tsx:216",
      "channel": "dialog:selectFolder",
-     "handler": "electron/main.js:1786",
+     "handler": "electron/main.js:1788",
      "calls": []
     },
     {
      "api": "youtube.cancel",
      "from": "src/pages/YoutubeDownloader.tsx:191",
      "channel": "youtube:cancel",
-     "handler": "electron/main.js:2275",
+     "handler": "electron/main.js:2277",
      "calls": [
       "cancelActiveYtDlp() (electron/ytdlp.js)"
      ]
@@ -4331,7 +4776,7 @@
      "api": "youtube.download",
      "from": "src/pages/YoutubeDownloader.tsx:225",
      "channel": "youtube:download",
-     "handler": "electron/main.js:2144",
+     "handler": "electron/main.js:2146",
      "calls": [
       "cookiesPath.trim",
       "cookiesFromBrowser.trim",
@@ -4344,7 +4789,7 @@
      "api": "youtube.getVideoInfo",
      "from": "src/pages/YoutubeDownloader.tsx:173",
      "channel": "youtube:getVideoInfo",
-     "handler": "electron/main.js:2039",
+     "handler": "electron/main.js:2041",
      "calls": [
       "cookiesPath.trim",
       "cookiesFromBrowserRaw.trim",
@@ -4482,7 +4927,7 @@
      "api": "optimizer.getGpuInfo",
      "from": "src/components/darkos/DarkOSSystemPanel.tsx:181",
      "channel": "optimizer:getGpuInfo",
-     "handler": "electron/main.js:1819",
+     "handler": "electron/main.js:1821",
      "calls": [
       "AppManagerEngine.getGpuInfo (electron/services/optimizer/AppManagerEngine.js)"
      ]
@@ -4491,7 +4936,7 @@
      "api": "optimizer.run",
      "from": "src/components/darkos/DarkOSSystemPanel.tsx:191",
      "channel": "optimizer:run",
-     "handler": "electron/main.js:732",
+     "handler": "electron/main.js:734",
      "calls": [
       "sender.send",
       "SystemOptimizerService.runTasks (electron/services/optimizer/SystemOptimizerService.js)"
@@ -4501,7 +4946,7 @@
      "api": "settings.getConfig",
      "from": "src/components/darkos/DarkOSSystemPanel.tsx:157",
      "channel": "settings:getConfig",
-     "handler": "electron/main.js:1540",
+     "handler": "electron/main.js:1542",
      "calls": [
       "loadPersistedConfig() (electron/configManager.js)"
      ]
@@ -4510,7 +4955,7 @@
      "api": "settings.updateStartupBehavior",
      "from": "src/components/darkos/DarkOSSystemPanel.tsx:166",
      "channel": "settings:updateStartupBehavior",
-     "handler": "electron/main.js:1607",
+     "handler": "electron/main.js:1609",
      "calls": [
       "runPowerShell() (electron/services/PowerShellRunner.js)",
       "stripBom() (electron/services/PowerShellRunner.js)",
@@ -4522,7 +4967,7 @@
      "api": "shell.openExternal",
      "from": "src/components/darkos/DarkOSReleaseCard.tsx:53",
      "channel": "shell:openExternal",
-     "handler": "electron/main.js:1400",
+     "handler": "electron/main.js:1402",
      "calls": [
       "RENDERER_SYSTEM_URIS.has",
       "raw.toLowerCase",
@@ -4535,7 +4980,7 @@
      "api": "system.getLiveStats",
      "from": "src/components/darkos/DarkOSSystemPanel.tsx:61",
      "channel": "system:getLiveStats",
-     "handler": "electron/main.js:1652",
+     "handler": "electron/main.js:1654",
      "calls": [
       "liveCpu.sample"
      ]
@@ -4614,14 +5059,14 @@
      "api": "pge.openPortable",
      "from": "src/pages/Home.tsx:75",
      "channel": "pge:openPortable",
-     "handler": "electron/main.js:1464",
+     "handler": "electron/main.js:1466",
      "calls": []
     },
     {
      "api": "system.getInfo",
      "from": "src/pages/Home.tsx:29",
      "channel": "system:getInfo",
-     "handler": "electron/main.js:805",
+     "handler": "electron/main.js:807",
      "calls": [
       "cpuModel.includes",
       "si.cpu",
@@ -4632,7 +5077,7 @@
      "api": "system.getMemory",
      "from": "src/pages/Home.tsx:93",
      "channel": "system:getMemory",
-     "handler": "electron/main.js:1647",
+     "handler": "electron/main.js:1649",
      "calls": []
     }
    ],
@@ -4657,7 +5102,7 @@
      "api": "framepacer.getMetrics",
      "from": "src/pages/FramePacer.tsx:53",
      "channel": "framepacer:getMetrics",
-     "handler": "electron/main.js:1725",
+     "handler": "electron/main.js:1727",
      "calls": [
       "FramePacerEngine.getMetrics (electron/services/FramePacerEngine.js)"
      ]
@@ -4666,7 +5111,7 @@
      "api": "framepacer.getOverlayStatus",
      "from": "src/pages/FramePacer.tsx:61",
      "channel": "framepacer:getOverlayStatus",
-     "handler": "electron/main.js:1751",
+     "handler": "electron/main.js:1753",
      "calls": [
       "getOverlayStatus() (electron/services/FramePacerOverlay.js)"
      ]
@@ -4682,7 +5127,7 @@
      "api": "framepacer.setOverlayClickThrough",
      "from": "src/pages/FramePacer.tsx:196",
      "channel": "framepacer:setOverlayClickThrough",
-     "handler": "electron/main.js:1743",
+     "handler": "electron/main.js:1745",
      "calls": [
       "setOverlayClickThrough() (electron/services/FramePacerOverlay.js)"
      ]
@@ -4691,7 +5136,7 @@
      "api": "framepacer.start",
      "from": "src/pages/FramePacer.tsx:161",
      "channel": "framepacer:start",
-     "handler": "electron/main.js:1713",
+     "handler": "electron/main.js:1715",
      "calls": [
       "FramePacerEngine.start (electron/services/FramePacerEngine.js)"
      ]
@@ -4700,7 +5145,7 @@
      "api": "framepacer.stop",
      "from": "src/pages/FramePacer.tsx:158",
      "channel": "framepacer:stop",
-     "handler": "electron/main.js:1717",
+     "handler": "electron/main.js:1719",
      "calls": [
       "FramePacerEngine.stop (electron/services/FramePacerEngine.js)"
      ]
@@ -4709,7 +5154,7 @@
      "api": "framepacer.toggleOverlay",
      "from": "src/pages/FramePacer.tsx:187",
      "channel": "framepacer:toggleOverlay",
-     "handler": "electron/main.js:1739",
+     "handler": "electron/main.js:1741",
      "calls": [
       "toggleFramePacerOverlay() (electron/services/FramePacerOverlay.js)"
      ]
@@ -4718,7 +5163,7 @@
      "api": "framepacer.updateConfig",
      "from": "src/pages/FramePacer.tsx:174",
      "channel": "framepacer:updateConfig",
-     "handler": "electron/main.js:1721",
+     "handler": "electron/main.js:1723",
      "calls": [
       "FramePacerEngine.updateConfig (electron/services/FramePacerEngine.js)"
      ]
@@ -4813,7 +5258,7 @@
      "api": "app.getResourceUsage",
      "from": "src/pages/Settings.tsx:416",
      "channel": "app:getResourceUsage",
-     "handler": "electron/main.js:1473",
+     "handler": "electron/main.js:1475",
      "calls": [
       "metrics.map",
       "processes.reduce"
@@ -4823,7 +5268,7 @@
      "api": "settings.getConfig",
      "from": "src/pages/Settings.tsx:40",
      "channel": "settings:getConfig",
-     "handler": "electron/main.js:1540",
+     "handler": "electron/main.js:1542",
      "calls": [
       "loadPersistedConfig() (electron/configManager.js)"
      ]
@@ -4832,7 +5277,7 @@
      "api": "settings.updateLiveServices",
      "from": "src/pages/Settings.tsx:69",
      "channel": "settings:updateLiveServices",
-     "handler": "electron/main.js:1564",
+     "handler": "electron/main.js:1566",
      "calls": [
       "loadPersistedConfig() (electron/configManager.js)",
       "saveConfig() (electron/configManager.js)"
@@ -4842,7 +5287,7 @@
      "api": "settings.updateStartupBehavior",
      "from": "src/pages/Settings.tsx:109",
      "channel": "settings:updateStartupBehavior",
-     "handler": "electron/main.js:1607",
+     "handler": "electron/main.js:1609",
      "calls": [
       "runPowerShell() (electron/services/PowerShellRunner.js)",
       "stripBom() (electron/services/PowerShellRunner.js)",
@@ -4854,7 +5299,7 @@
      "api": "settings.updateWindowBehavior",
      "from": "src/pages/Settings.tsx:88",
      "channel": "settings:updateWindowBehavior",
-     "handler": "electron/main.js:1588",
+     "handler": "electron/main.js:1590",
      "calls": [
       "loadPersistedConfig() (electron/configManager.js)",
       "saveConfig() (electron/configManager.js)"
@@ -4885,7 +5330,7 @@
      "api": "vault.setAutoLockMinutes",
      "from": "src/pages/Settings.tsx:59",
      "channel": "vault:setAutoLockMinutes",
-     "handler": "electron/main.js:2446",
+     "handler": "electron/main.js:2448",
      "calls": []
     }
    ],
@@ -4906,7 +5351,7 @@
    "handler": {
     "channel": "app:getAbout",
     "file": "electron/main.js",
-    "line": 1494,
+    "line": 1496,
     "calls": [
      "runCommand() (electron/services/PowerShellRunner.js)"
     ]
@@ -4921,7 +5366,7 @@
    "handler": {
     "channel": "app:getResourceUsage",
     "file": "electron/main.js",
-    "line": 1473,
+    "line": 1475,
     "calls": [
      "metrics.map",
      "processes.reduce"
@@ -4940,7 +5385,7 @@
    "handler": {
     "channel": "autoclicker:getHotkey",
     "file": "electron/main.js",
-    "line": 3150,
+    "line": 3152,
     "calls": []
    },
    "used_by": []
@@ -4963,7 +5408,7 @@
    "handler": {
     "channel": "autoclicker:setHotkey",
     "file": "electron/main.js",
-    "line": 3151,
+    "line": 3153,
     "calls": [
      "autoClicker.setHotkey"
     ]
@@ -4980,7 +5425,7 @@
    "handler": {
     "channel": "autoclicker:setTabActive",
     "file": "electron/main.js",
-    "line": 3152,
+    "line": 3154,
     "calls": []
    },
    "used_by": [
@@ -4995,7 +5440,7 @@
    "handler": {
     "channel": "autoclicker:start",
     "file": "electron/main.js",
-    "line": 3147,
+    "line": 3149,
     "calls": [
      "autoClicker.start"
     ]
@@ -5012,7 +5457,7 @@
    "handler": {
     "channel": "autoclicker:status",
     "file": "electron/main.js",
-    "line": 3146,
+    "line": 3148,
     "calls": [
      "autoClicker.state"
     ]
@@ -5029,7 +5474,7 @@
    "handler": {
     "channel": "autoclicker:stop",
     "file": "electron/main.js",
-    "line": 3148,
+    "line": 3150,
     "calls": [
      "autoClicker.stop"
     ]
@@ -5046,7 +5491,7 @@
    "handler": {
     "channel": "autoclicker:toggle",
     "file": "electron/main.js",
-    "line": 3149,
+    "line": 3151,
     "calls": [
      "autoClicker.toggle"
     ]
@@ -5147,7 +5592,7 @@
    "method": "cleaner.browsers",
    "channel": "cleaner:browsers",
    "kind": "invoke",
-   "line": 688,
+   "line": 743,
    "handler": {
     "channel": "cleaner:browsers",
     "file": "electron/ipc/cleanerIpc.js",
@@ -5164,7 +5609,7 @@
    "method": "cleaner.clean",
    "channel": "cleaner:clean",
    "kind": "invoke",
-   "line": 687,
+   "line": 742,
    "handler": {
     "channel": "cleaner:clean",
     "file": "electron/ipc/cleanerIpc.js",
@@ -5181,7 +5626,7 @@
    "method": "cleaner.listBackups",
    "channel": "cleaner:list-backups",
    "kind": "invoke",
-   "line": 691,
+   "line": 746,
    "handler": {
     "channel": "cleaner:list-backups",
     "file": "electron/ipc/cleanerIpc.js",
@@ -5198,7 +5643,7 @@
    "method": "cleaner.listTargets",
    "channel": "cleaner:list-targets",
    "kind": "invoke",
-   "line": 685,
+   "line": 740,
    "handler": {
     "channel": "cleaner:list-targets",
     "file": "electron/ipc/cleanerIpc.js",
@@ -5215,7 +5660,7 @@
    "method": "cleaner.openBackups",
    "channel": "cleaner:open-backups",
    "kind": "invoke",
-   "line": 693,
+   "line": 748,
    "handler": {
     "channel": "cleaner:open-backups",
     "file": "electron/ipc/cleanerIpc.js",
@@ -5232,7 +5677,7 @@
    "method": "cleaner.regClean",
    "channel": "cleaner:reg-clean",
    "kind": "invoke",
-   "line": 690,
+   "line": 745,
    "handler": {
     "channel": "cleaner:reg-clean",
     "file": "electron/ipc/cleanerIpc.js",
@@ -5249,7 +5694,7 @@
    "method": "cleaner.regScan",
    "channel": "cleaner:reg-scan",
    "kind": "invoke",
-   "line": 689,
+   "line": 744,
    "handler": {
     "channel": "cleaner:reg-scan",
     "file": "electron/ipc/cleanerIpc.js",
@@ -5266,7 +5711,7 @@
    "method": "cleaner.removeDefinitions",
    "channel": "cleaner:remove-definitions",
    "kind": "invoke",
-   "line": 684,
+   "line": 739,
    "handler": {
     "channel": "cleaner:remove-definitions",
     "file": "electron/ipc/cleanerIpc.js",
@@ -5283,7 +5728,7 @@
    "method": "cleaner.restoreBackup",
    "channel": "cleaner:restore-backup",
    "kind": "invoke",
-   "line": 692,
+   "line": 747,
    "handler": {
     "channel": "cleaner:restore-backup",
     "file": "electron/ipc/cleanerIpc.js",
@@ -5300,7 +5745,7 @@
    "method": "cleaner.scan",
    "channel": "cleaner:scan",
    "kind": "invoke",
-   "line": 686,
+   "line": 741,
    "handler": {
     "channel": "cleaner:scan",
     "file": "electron/ipc/cleanerIpc.js",
@@ -5317,7 +5762,7 @@
    "method": "cleaner.status",
    "channel": "cleaner:status",
    "kind": "invoke",
-   "line": 682,
+   "line": 737,
    "handler": {
     "channel": "cleaner:status",
     "file": "electron/ipc/cleanerIpc.js",
@@ -5334,7 +5779,7 @@
    "method": "cleaner.updateDefinitions",
    "channel": "cleaner:update-definitions",
    "kind": "invoke",
-   "line": 683,
+   "line": 738,
    "handler": {
     "channel": "cleaner:update-definitions",
     "file": "electron/ipc/cleanerIpc.js",
@@ -5351,7 +5796,7 @@
    "method": "clearTrace",
    "channel": "dev:clearTrace",
    "kind": "invoke",
-   "line": 777,
+   "line": 832,
    "handler": null,
    "used_by": []
   },
@@ -5787,7 +6232,7 @@
    "handler": {
     "channel": "framepacer:closeOverlay",
     "file": "electron/main.js",
-    "line": 1734,
+    "line": 1736,
     "calls": [
      "closeFramePacerOverlay() (electron/services/FramePacerOverlay.js)"
     ]
@@ -5802,7 +6247,7 @@
    "handler": {
     "channel": "framepacer:createOverlay",
     "file": "electron/main.js",
-    "line": 1729,
+    "line": 1731,
     "calls": [
      "createFramePacerOverlay() (electron/services/FramePacerOverlay.js)"
     ]
@@ -5817,7 +6262,7 @@
    "handler": {
     "channel": "framepacer:getMetrics",
     "file": "electron/main.js",
-    "line": 1725,
+    "line": 1727,
     "calls": [
      "FramePacerEngine.getMetrics (electron/services/FramePacerEngine.js)"
     ]
@@ -5832,7 +6277,7 @@
    "handler": {
     "channel": "framepacer:getOverlayStatus",
     "file": "electron/main.js",
-    "line": 1751,
+    "line": 1753,
     "calls": [
      "getOverlayStatus() (electron/services/FramePacerOverlay.js)"
     ]
@@ -5855,7 +6300,7 @@
    "handler": {
     "channel": "framepacer:setOverlayClickThrough",
     "file": "electron/main.js",
-    "line": 1743,
+    "line": 1745,
     "calls": [
      "setOverlayClickThrough() (electron/services/FramePacerOverlay.js)"
     ]
@@ -5870,7 +6315,7 @@
    "handler": {
     "channel": "framepacer:setOverlayConfig",
     "file": "electron/main.js",
-    "line": 1747,
+    "line": 1749,
     "calls": [
      "setOverlayConfig() (electron/services/FramePacerOverlay.js)"
     ]
@@ -5885,7 +6330,7 @@
    "handler": {
     "channel": "framepacer:start",
     "file": "electron/main.js",
-    "line": 1713,
+    "line": 1715,
     "calls": [
      "FramePacerEngine.start (electron/services/FramePacerEngine.js)"
     ]
@@ -5900,7 +6345,7 @@
    "handler": {
     "channel": "framepacer:stop",
     "file": "electron/main.js",
-    "line": 1717,
+    "line": 1719,
     "calls": [
      "FramePacerEngine.stop (electron/services/FramePacerEngine.js)"
     ]
@@ -5915,7 +6360,7 @@
    "handler": {
     "channel": "framepacer:toggleOverlay",
     "file": "electron/main.js",
-    "line": 1739,
+    "line": 1741,
     "calls": [
      "toggleFramePacerOverlay() (electron/services/FramePacerOverlay.js)"
     ]
@@ -5930,7 +6375,7 @@
    "handler": {
     "channel": "framepacer:updateConfig",
     "file": "electron/main.js",
-    "line": 1721,
+    "line": 1723,
     "calls": [
      "FramePacerEngine.updateConfig (electron/services/FramePacerEngine.js)"
     ]
@@ -5945,7 +6390,7 @@
    "handler": {
     "channel": "dialog:grantDroppedFiles",
     "file": "electron/main.js",
-    "line": 1761,
+    "line": 1763,
     "calls": [
      "filePaths.slice",
      "granted.push"
@@ -5964,7 +6409,7 @@
    "handler": {
     "channel": "dialog:saveFile",
     "file": "electron/main.js",
-    "line": 1796,
+    "line": 1798,
     "calls": []
    },
    "used_by": [
@@ -5980,7 +6425,7 @@
    "handler": {
     "channel": "dialog:selectFiles",
     "file": "electron/main.js",
-    "line": 1775,
+    "line": 1777,
     "calls": []
    },
    "used_by": [
@@ -6006,7 +6451,7 @@
    "handler": {
     "channel": "dialog:selectFolder",
     "file": "electron/main.js",
-    "line": 1786,
+    "line": 1788,
     "calls": []
    },
    "used_by": [
@@ -6021,7 +6466,7 @@
    "method": "diskscan.cancel",
    "channel": "diskscan:cancel",
    "kind": "invoke",
-   "line": 637,
+   "line": 692,
    "handler": {
     "channel": "diskscan:cancel",
     "file": "electron/ipc/diskScanIpc.js",
@@ -6038,7 +6483,7 @@
    "method": "diskscan.drives",
    "channel": "diskscan:drives",
    "kind": "invoke",
-   "line": 634,
+   "line": 689,
    "handler": {
     "channel": "diskscan:drives",
     "file": "electron/ipc/diskScanIpc.js",
@@ -6055,7 +6500,7 @@
    "method": "diskscan.exportReport",
    "channel": "diskscan:export",
    "kind": "invoke",
-   "line": 645,
+   "line": 700,
    "handler": {
     "channel": "diskscan:export",
     "file": "electron/ipc/diskScanIpc.js",
@@ -6071,7 +6516,7 @@
    "method": "diskscan.info",
    "channel": "diskscan:info",
    "kind": "invoke",
-   "line": 640,
+   "line": 695,
    "handler": {
     "channel": "diskscan:info",
     "file": "electron/ipc/diskScanIpc.js",
@@ -6088,7 +6533,7 @@
    "method": "diskscan.onProgress",
    "channel": "diskscan:progress",
    "kind": "on",
-   "line": 646,
+   "line": 701,
    "handler": null,
    "used_by": [
     "src/pages/SpaceSniffer/index.tsx"
@@ -6098,7 +6543,7 @@
    "method": "diskscan.open",
    "channel": "diskscan:open",
    "kind": "invoke",
-   "line": 642,
+   "line": 697,
    "handler": {
     "channel": "diskscan:open",
     "file": "electron/ipc/diskScanIpc.js",
@@ -6113,7 +6558,7 @@
    "method": "diskscan.pickFolder",
    "channel": "diskscan:pickFolder",
    "kind": "invoke",
-   "line": 635,
+   "line": 690,
    "handler": {
     "channel": "diskscan:pickFolder",
     "file": "electron/ipc/diskScanIpc.js",
@@ -6130,7 +6575,7 @@
    "method": "diskscan.reveal",
    "channel": "diskscan:reveal",
    "kind": "invoke",
-   "line": 643,
+   "line": 698,
    "handler": {
     "channel": "diskscan:reveal",
     "file": "electron/ipc/diskScanIpc.js",
@@ -6145,7 +6590,7 @@
    "method": "diskscan.start",
    "channel": "diskscan:start",
    "kind": "invoke",
-   "line": 636,
+   "line": 691,
    "handler": {
     "channel": "diskscan:start",
     "file": "electron/ipc/diskScanIpc.js",
@@ -6164,7 +6609,7 @@
    "method": "diskscan.status",
    "channel": "diskscan:status",
    "kind": "invoke",
-   "line": 638,
+   "line": 693,
    "handler": {
     "channel": "diskscan:status",
     "file": "electron/ipc/diskScanIpc.js",
@@ -6181,7 +6626,7 @@
    "method": "diskscan.tag",
    "channel": "diskscan:tag",
    "kind": "invoke",
-   "line": 641,
+   "line": 696,
    "handler": {
     "channel": "diskscan:tag",
     "file": "electron/ipc/diskScanIpc.js",
@@ -6196,7 +6641,7 @@
    "method": "diskscan.trash",
    "channel": "diskscan:trash",
    "kind": "invoke",
-   "line": 644,
+   "line": 699,
    "handler": {
     "channel": "diskscan:trash",
     "file": "electron/ipc/diskScanIpc.js",
@@ -6211,7 +6656,7 @@
    "method": "diskscan.view",
    "channel": "diskscan:view",
    "kind": "invoke",
-   "line": 639,
+   "line": 694,
    "handler": {
     "channel": "diskscan:view",
     "file": "electron/ipc/diskScanIpc.js",
@@ -6561,7 +7006,7 @@
    "method": "driver.cameraStatus",
    "channel": "driver:cameraStatus",
    "kind": "invoke",
-   "line": 705,
+   "line": 760,
    "handler": {
     "channel": "driver:cameraStatus",
     "file": "electron/ipc/driverIpc.js",
@@ -6578,7 +7023,7 @@
    "method": "driver.detect",
    "channel": "driver:detect",
    "kind": "invoke",
-   "line": 703,
+   "line": 758,
    "handler": {
     "channel": "driver:detect",
     "file": "electron/ipc/driverIpc.js",
@@ -6596,7 +7041,7 @@
    "method": "driver.findDrivers",
    "channel": "driver:findDrivers",
    "kind": "invoke",
-   "line": 708,
+   "line": 763,
    "handler": {
     "channel": "driver:findDrivers",
     "file": "electron/ipc/driverIpc.js",
@@ -6613,7 +7058,7 @@
    "method": "driver.install",
    "channel": "driver:install",
    "kind": "invoke",
-   "line": 709,
+   "line": 764,
    "handler": {
     "channel": "driver:install",
     "file": "electron/ipc/driverIpc.js",
@@ -6632,7 +7077,7 @@
    "method": "driver.onInstallEvent",
    "channel": "driver:installEvent",
    "kind": "on",
-   "line": 710,
+   "line": 765,
    "handler": null,
    "used_by": [
     "src/components/drivers/MissingDrivers.tsx"
@@ -6642,7 +7087,7 @@
    "method": "driver.openOfficial",
    "channel": "driver:openOfficial",
    "kind": "invoke",
-   "line": 704,
+   "line": 759,
    "handler": {
     "channel": "driver:openOfficial",
     "file": "electron/ipc/driverIpc.js",
@@ -6659,7 +7104,7 @@
    "method": "driver.repairCamera",
    "channel": "driver:repairCamera",
    "kind": "invoke",
-   "line": 706,
+   "line": 761,
    "handler": {
     "channel": "driver:repairCamera",
     "file": "electron/ipc/driverIpc.js",
@@ -6677,7 +7122,7 @@
    "method": "driver.scanMissing",
    "channel": "driver:scanMissing",
    "kind": "invoke",
-   "line": 707,
+   "line": 762,
    "handler": {
     "channel": "driver:scanMissing",
     "file": "electron/ipc/driverIpc.js",
@@ -6812,7 +7257,7 @@
    "handler": {
     "channel": "files:archiveOperation",
     "file": "electron/main.js",
-    "line": 2015,
+    "line": 2017,
     "calls": [
      "inputFiles.map",
      "runCommand() (electron/services/PowerShellRunner.js)"
@@ -6966,7 +7411,7 @@
    "handler": {
     "channel": "framepacer:closeOverlay",
     "file": "electron/main.js",
-    "line": 1734,
+    "line": 1736,
     "calls": [
      "closeFramePacerOverlay() (electron/services/FramePacerOverlay.js)"
     ]
@@ -6982,7 +7427,7 @@
    "handler": {
     "channel": "framepacer:createOverlay",
     "file": "electron/main.js",
-    "line": 1729,
+    "line": 1731,
     "calls": [
      "createFramePacerOverlay() (electron/services/FramePacerOverlay.js)"
     ]
@@ -6998,7 +7443,7 @@
    "handler": {
     "channel": "framepacer:getMetrics",
     "file": "electron/main.js",
-    "line": 1725,
+    "line": 1727,
     "calls": [
      "FramePacerEngine.getMetrics (electron/services/FramePacerEngine.js)"
     ]
@@ -7016,7 +7461,7 @@
    "handler": {
     "channel": "framepacer:getOverlayStatus",
     "file": "electron/main.js",
-    "line": 1751,
+    "line": 1753,
     "calls": [
      "getOverlayStatus() (electron/services/FramePacerOverlay.js)"
     ]
@@ -7045,7 +7490,7 @@
    "handler": {
     "channel": "framepacer:setOverlayClickThrough",
     "file": "electron/main.js",
-    "line": 1743,
+    "line": 1745,
     "calls": [
      "setOverlayClickThrough() (electron/services/FramePacerOverlay.js)"
     ]
@@ -7063,7 +7508,7 @@
    "handler": {
     "channel": "framepacer:setOverlayConfig",
     "file": "electron/main.js",
-    "line": 1747,
+    "line": 1749,
     "calls": [
      "setOverlayConfig() (electron/services/FramePacerOverlay.js)"
     ]
@@ -7079,7 +7524,7 @@
    "handler": {
     "channel": "framepacer:start",
     "file": "electron/main.js",
-    "line": 1713,
+    "line": 1715,
     "calls": [
      "FramePacerEngine.start (electron/services/FramePacerEngine.js)"
     ]
@@ -7097,7 +7542,7 @@
    "handler": {
     "channel": "framepacer:stop",
     "file": "electron/main.js",
-    "line": 1717,
+    "line": 1719,
     "calls": [
      "FramePacerEngine.stop (electron/services/FramePacerEngine.js)"
     ]
@@ -7115,7 +7560,7 @@
    "handler": {
     "channel": "framepacer:toggleOverlay",
     "file": "electron/main.js",
-    "line": 1739,
+    "line": 1741,
     "calls": [
      "toggleFramePacerOverlay() (electron/services/FramePacerOverlay.js)"
     ]
@@ -7133,7 +7578,7 @@
    "handler": {
     "channel": "framepacer:updateConfig",
     "file": "electron/main.js",
-    "line": 1721,
+    "line": 1723,
     "calls": [
      "FramePacerEngine.updateConfig (electron/services/FramePacerEngine.js)"
     ]
@@ -7150,7 +7595,7 @@
    "handler": {
     "channel": "fs:readFile",
     "file": "electron/main.js",
-    "line": 3090,
+    "line": 3092,
     "calls": []
    },
    "used_by": [
@@ -7166,7 +7611,7 @@
    "handler": {
     "channel": "fs:writeFile",
     "file": "electron/main.js",
-    "line": 3102,
+    "line": 3104,
     "calls": [
      "devPath.includes"
     ]
@@ -7179,7 +7624,7 @@
    "method": "getTrace",
    "channel": "dev:getTrace",
    "kind": "invoke",
-   "line": 776,
+   "line": 831,
    "handler": null,
    "used_by": []
   },
@@ -7829,7 +8274,7 @@
    "method": "hwsensors.setEnabled",
    "channel": "hwsensors:setEnabled",
    "kind": "invoke",
-   "line": 631,
+   "line": 686,
    "handler": {
     "channel": "hwsensors:setEnabled",
     "file": "electron/ipc/hwSensorsIpc.js",
@@ -7848,7 +8293,7 @@
    "method": "hwsensors.status",
    "channel": "hwsensors:status",
    "kind": "invoke",
-   "line": 630,
+   "line": 685,
    "handler": {
     "channel": "hwsensors:status",
     "file": "electron/ipc/hwSensorsIpc.js",
@@ -7869,7 +8314,7 @@
    "handler": {
     "channel": "injector:inject",
     "file": "electron/main.js",
-    "line": 1677,
+    "line": 1679,
     "calls": [
      "i.test",
      "dllPath.trim",
@@ -8311,7 +8756,7 @@
    "handler": {
     "channel": "library:discover",
     "file": "electron/main.js",
-    "line": 1300,
+    "line": 1302,
     "calls": [
      "content.matchAll",
      "steamPaths.push",
@@ -8333,7 +8778,7 @@
    "handler": {
     "channel": "library:fetchCover",
     "file": "electron/main.js",
-    "line": 1229,
+    "line": 1231,
     "calls": [
      "service.fetchCover",
      "i.test",
@@ -8355,7 +8800,7 @@
    "handler": {
     "channel": "library:list",
     "file": "electron/main.js",
-    "line": 1166,
+    "line": 1168,
     "calls": [
      "webContents.send"
     ]
@@ -8413,7 +8858,7 @@
    "handler": {
     "channel": "library:remove",
     "file": "electron/main.js",
-    "line": 1214,
+    "line": 1216,
     "calls": []
    },
    "used_by": [
@@ -8429,7 +8874,7 @@
    "handler": {
     "channel": "library:upsert",
     "file": "electron/main.js",
-    "line": 1178,
+    "line": 1180,
     "calls": []
    },
    "used_by": [
@@ -8445,7 +8890,7 @@
    "handler": {
     "channel": "library:upsertBulk",
     "file": "electron/main.js",
-    "line": 1196,
+    "line": 1198,
     "calls": []
    },
    "used_by": [
@@ -8523,7 +8968,7 @@
    "handler": {
     "channel": "metadata:read",
     "file": "electron/main.js",
-    "line": 3154,
+    "line": 3156,
     "calls": [
      "exifr.parse",
      "exiftool.read"
@@ -8539,7 +8984,7 @@
    "handler": {
     "channel": "metadata:remove",
     "file": "electron/main.js",
-    "line": 3171,
+    "line": 3173,
     "calls": [
      "exiftool.write"
     ]
@@ -8554,7 +8999,7 @@
    "handler": {
     "channel": "metadata:update",
     "file": "electron/main.js",
-    "line": 3191,
+    "line": 3193,
     "calls": [
      "exiftool.write",
      "WINGET_ID_RE.test",
@@ -8640,7 +9085,7 @@
    "method": "network.adapterInfo",
    "channel": "network:adapterInfo",
    "kind": "invoke",
-   "line": 759,
+   "line": 814,
    "handler": {
     "channel": "network:adapterInfo",
     "file": "electron/networkIPC.js",
@@ -8658,7 +9103,7 @@
    "method": "network.applyLatencyTweak",
    "channel": "network:applyLatencyTweak",
    "kind": "invoke",
-   "line": 767,
+   "line": 822,
    "handler": {
     "channel": "network:applyLatencyTweak",
     "file": "electron/networkIPC.js",
@@ -8675,7 +9120,7 @@
    "method": "network.bufferbloat",
    "channel": "network:bufferbloat",
    "kind": "invoke",
-   "line": 764,
+   "line": 819,
    "handler": {
     "channel": "network:bufferbloat",
     "file": "electron/networkIPC.js",
@@ -8692,7 +9137,7 @@
    "method": "network.dnsInfo",
    "channel": "network:dnsInfo",
    "kind": "invoke",
-   "line": 757,
+   "line": 812,
    "handler": {
     "channel": "network:dnsInfo",
     "file": "electron/networkIPC.js",
@@ -8707,7 +9152,7 @@
    "method": "network.flushDns",
    "channel": "network:flushDns",
    "kind": "invoke",
-   "line": 755,
+   "line": 810,
    "handler": {
     "channel": "network:flushDns",
     "file": "electron/networkIPC.js",
@@ -8722,7 +9167,7 @@
    "method": "network.latencyPresets",
    "channel": "network:latencyPresets",
    "kind": "invoke",
-   "line": 761,
+   "line": 816,
    "handler": {
     "channel": "network:latencyPresets",
     "file": "electron/networkIPC.js",
@@ -8739,7 +9184,7 @@
    "method": "network.latencyState",
    "channel": "network:latencyState",
    "kind": "invoke",
-   "line": 766,
+   "line": 821,
    "handler": {
     "channel": "network:latencyState",
     "file": "electron/networkIPC.js",
@@ -8756,7 +9201,7 @@
    "method": "network.mtuDiscover",
    "channel": "network:mtuDiscover",
    "kind": "invoke",
-   "line": 765,
+   "line": 820,
    "handler": {
     "channel": "network:mtuDiscover",
     "file": "electron/networkIPC.js",
@@ -8773,7 +9218,7 @@
    "method": "network.ping",
    "channel": "network:ping",
    "kind": "invoke",
-   "line": 753,
+   "line": 808,
    "handler": {
     "channel": "network:ping",
     "file": "electron/networkIPC.js",
@@ -8791,7 +9236,7 @@
    "method": "network.portScan",
    "channel": "network:portScan",
    "kind": "invoke",
-   "line": 754,
+   "line": 809,
    "handler": {
     "channel": "network:portScan",
     "file": "electron/networkIPC.js",
@@ -8813,7 +9258,7 @@
    "method": "network.probe",
    "channel": "network:probe",
    "kind": "invoke",
-   "line": 762,
+   "line": 817,
    "handler": {
     "channel": "network:probe",
     "file": "electron/networkIPC.js",
@@ -8830,7 +9275,7 @@
    "method": "network.renewIp",
    "channel": "network:renewIp",
    "kind": "invoke",
-   "line": 760,
+   "line": 815,
    "handler": {
     "channel": "network:renewIp",
     "file": "electron/networkIPC.js",
@@ -8845,7 +9290,7 @@
    "method": "network.resetTcp",
    "channel": "network:resetTcp",
    "kind": "invoke",
-   "line": 756,
+   "line": 811,
    "handler": {
     "channel": "network:resetTcp",
     "file": "electron/networkIPC.js",
@@ -8862,7 +9307,7 @@
    "method": "network.restoreLatencyTweak",
    "channel": "network:restoreLatencyTweak",
    "kind": "invoke",
-   "line": 768,
+   "line": 823,
    "handler": {
     "channel": "network:restoreLatencyTweak",
     "file": "electron/networkIPC.js",
@@ -8879,7 +9324,7 @@
    "method": "network.traceHops",
    "channel": "network:traceHops",
    "kind": "invoke",
-   "line": 763,
+   "line": 818,
    "handler": {
     "channel": "network:traceHops",
     "file": "electron/networkIPC.js",
@@ -8896,7 +9341,7 @@
    "method": "network.tracert",
    "channel": "network:tracert",
    "kind": "invoke",
-   "line": 758,
+   "line": 813,
    "handler": {
     "channel": "network:tracert",
     "file": "electron/networkIPC.js",
@@ -8917,7 +9362,7 @@
    "handler": {
     "channel": "ocr:extractText",
     "file": "electron/main.js",
-    "line": 2285,
+    "line": 2287,
     "calls": [
      "base64Data.replace",
      "img.resize",
@@ -8935,7 +9380,7 @@
    "method": "onIpcTrace",
    "channel": "dev:ipcTrace",
    "kind": "on",
-   "line": 778,
+   "line": 833,
    "handler": null,
    "used_by": []
   },
@@ -8947,7 +9392,7 @@
    "handler": {
     "channel": "optimizer:advancedNetworkApply",
     "file": "electron/main.js",
-    "line": 1825,
+    "line": 1827,
     "calls": [
      "NetworkEngine.advancedNetworkApply (electron/services/optimizer/NetworkEngine.js)"
     ]
@@ -8964,7 +9409,7 @@
    "handler": {
     "channel": "optimizer:advancedNetworkRevert",
     "file": "electron/main.js",
-    "line": 1826,
+    "line": 1828,
     "calls": [
      "NetworkEngine.advancedNetworkRevert (electron/services/optimizer/NetworkEngine.js)"
     ]
@@ -8981,7 +9426,7 @@
    "handler": {
     "channel": "optimizer:analyze",
     "file": "electron/main.js",
-    "line": 728,
+    "line": 730,
     "calls": [
      "SystemOptimizerService.analyze (electron/services/optimizer/SystemOptimizerService.js)"
     ]
@@ -8996,7 +9441,7 @@
    "handler": {
     "channel": "optimizer:applyCpuUnpark",
     "file": "electron/main.js",
-    "line": 2008,
+    "line": 2010,
     "calls": [
      "SystemEngine.applyCpuUnpark (electron/services/optimizer/SystemEngine.js)",
      "converterIpc.js"
@@ -9012,7 +9457,7 @@
    "handler": {
     "channel": "optimizer:applyDefenderControl",
     "file": "electron/main.js",
-    "line": 1984,
+    "line": 1986,
     "calls": [
      "DefenderControlEngine.runNativeDefenderControl (electron/services/optimizer/DefenderControlEngine.js)"
     ]
@@ -9029,7 +9474,7 @@
    "handler": {
     "channel": "optimizer:applyDns",
     "file": "electron/main.js",
-    "line": 1873,
+    "line": 1875,
     "calls": [
      "DnsEngine.apply (electron/services/optimizer/DnsEngine.js)"
     ]
@@ -9048,7 +9493,7 @@
    "handler": {
     "channel": "optimizer:applyExtremeKernelMod",
     "file": "electron/main.js",
-    "line": 1996,
+    "line": 1998,
     "calls": [
      "SystemEngine.applyExtremeKernelMod (electron/services/optimizer/SystemEngine.js)"
     ]
@@ -9063,7 +9508,7 @@
    "handler": {
     "channel": "optimizer:applyExtremeNetworkMod",
     "file": "electron/main.js",
-    "line": 2005,
+    "line": 2007,
     "calls": [
      "SystemEngine.applyExtremeNetworkMod (electron/services/optimizer/SystemEngine.js)"
     ]
@@ -9078,7 +9523,7 @@
    "handler": {
     "channel": "optimizer:applyMsiMode",
     "file": "electron/main.js",
-    "line": 1993,
+    "line": 1995,
     "calls": [
      "SystemEngine.applyMsiMode (electron/services/optimizer/SystemEngine.js)"
     ]
@@ -9093,7 +9538,7 @@
    "handler": {
     "channel": "optimizer:applyTweak",
     "file": "electron/main.js",
-    "line": 1829,
+    "line": 1831,
     "calls": [
      "MemoryEngine.optimizeRAM (electron/services/optimizer/MemoryEngine.js)",
      "StorageEngine.cleanTempFiles (electron/services/optimizer/StorageEngine.js)",
@@ -9112,7 +9557,7 @@
    "handler": {
     "channel": "optimizer:checkIsAdmin",
     "file": "electron/main.js",
-    "line": 743,
+    "line": 745,
     "calls": [
      "SystemOptimizerService.checkIsAdmin (electron/services/optimizer/SystemOptimizerService.js)"
     ]
@@ -9129,7 +9574,7 @@
    "handler": {
     "channel": "optimizer:checkOperationsStatus",
     "file": "electron/main.js",
-    "line": 724,
+    "line": 726,
     "calls": [
      "SystemOptimizerService.checkOperationsStatus (electron/services/optimizer/SystemOptimizerService.js)"
     ]
@@ -9146,7 +9591,7 @@
    "handler": {
     "channel": "optimizer:createRestorePoint",
     "file": "electron/main.js",
-    "line": 747,
+    "line": 749,
     "calls": [
      "SystemEngine.createRestorePoint (electron/services/optimizer/SystemEngine.js)"
     ]
@@ -9164,7 +9609,7 @@
    "handler": {
     "channel": "optimizer:deepTweaksAnalyze",
     "file": "electron/main.js",
-    "line": 1846,
+    "line": 1848,
     "calls": [
      "DeepTweaksEngine.listTweaks (electron/services/optimizer/DeepTweaksEngine.js)",
      "ids.includes",
@@ -9183,7 +9628,7 @@
    "handler": {
     "channel": "optimizer:deepTweaksApply",
     "file": "electron/main.js",
-    "line": 1852,
+    "line": 1854,
     "calls": [
      "DeepTweaksEngine.applyTweaks (electron/services/optimizer/DeepTweaksEngine.js)",
      "sender.send"
@@ -9201,7 +9646,7 @@
    "handler": {
     "channel": "optimizer:deepTweaksList",
     "file": "electron/main.js",
-    "line": 1828,
+    "line": 1830,
     "calls": [
      "DeepTweaksEngine.listTweaks (electron/services/optimizer/DeepTweaksEngine.js)"
     ]
@@ -9218,7 +9663,7 @@
    "handler": {
     "channel": "optimizer:deepTweaksRevert",
     "file": "electron/main.js",
-    "line": 1853,
+    "line": 1855,
     "calls": [
      "DeepTweaksEngine.revertTweaks (electron/services/optimizer/DeepTweaksEngine.js)",
      "sender.send"
@@ -9236,7 +9681,7 @@
    "handler": {
     "channel": "optimizer:deepTweaksStatus",
     "file": "electron/main.js",
-    "line": 1845,
+    "line": 1847,
     "calls": [
      "DeepTweaksEngine.checkTweaksStatus (electron/services/optimizer/DeepTweaksEngine.js)"
     ]
@@ -9253,7 +9698,7 @@
    "handler": {
     "channel": "optimizer:deepTweaksUndo",
     "file": "electron/main.js",
-    "line": 1854,
+    "line": 1856,
     "calls": [
      "DeepTweaksEngine.undoTweaks (electron/services/optimizer/DeepTweaksEngine.js)"
     ]
@@ -9270,7 +9715,7 @@
    "handler": {
     "channel": "optimizer:disableService",
     "file": "electron/main.js",
-    "line": 1809,
+    "line": 1811,
     "calls": [
      "AppManagerEngine.disableService (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9285,7 +9730,7 @@
    "handler": {
     "channel": "optimizer:disableStartupItem",
     "file": "electron/main.js",
-    "line": 1807,
+    "line": 1809,
     "calls": [
      "AppManagerEngine.disableStartupItem (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9302,7 +9747,7 @@
    "handler": {
     "channel": "optimizer:dnsBenchmark",
     "file": "electron/main.js",
-    "line": 1883,
+    "line": 1885,
     "calls": [
      "DnsEngine.benchmark (electron/services/optimizer/DnsEngine.js)"
     ]
@@ -9320,7 +9765,7 @@
    "handler": {
     "channel": "optimizer:getAuditLog",
     "file": "electron/main.js",
-    "line": 751,
+    "line": 753,
     "calls": [
      "runCommand() (electron/services/PowerShellRunner.js)",
      "runPowerShell() (electron/services/PowerShellRunner.js)",
@@ -9337,7 +9782,7 @@
    "handler": {
     "channel": "optimizer:getDefenderControlStatus",
     "file": "electron/main.js",
-    "line": 1981,
+    "line": 1983,
     "calls": [
      "DefenderControlEngine.getStatus (electron/services/optimizer/DefenderControlEngine.js)"
     ]
@@ -9354,7 +9799,7 @@
    "handler": {
     "channel": "optimizer:getDnsState",
     "file": "electron/main.js",
-    "line": 1864,
+    "line": 1866,
     "calls": [
      "DnsEngine.getState (electron/services/optimizer/DnsEngine.js)"
     ]
@@ -9373,7 +9818,7 @@
    "handler": {
     "channel": "optimizer:getGpuInfo",
     "file": "electron/main.js",
-    "line": 1819,
+    "line": 1821,
     "calls": [
      "AppManagerEngine.getGpuInfo (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9391,7 +9836,7 @@
    "handler": {
     "channel": "optimizer:getGpuPreferences",
     "file": "electron/main.js",
-    "line": 1816,
+    "line": 1818,
     "calls": [
      "AppManagerEngine.getGpuPreferences (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9408,7 +9853,7 @@
    "handler": {
     "channel": "optimizer:getHagsStatus",
     "file": "electron/main.js",
-    "line": 1820,
+    "line": 1822,
     "calls": [
      "AppManagerEngine.getHagsStatus (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9425,7 +9870,7 @@
    "handler": {
     "channel": "optimizer:getInstalledPrograms",
     "file": "electron/main.js",
-    "line": 1810,
+    "line": 1812,
     "calls": [
      "AppManagerEngine.getInstalledPrograms (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9442,7 +9887,7 @@
    "handler": {
     "channel": "optimizer:getRunningProcesses",
     "file": "electron/main.js",
-    "line": 1814,
+    "line": 1816,
     "calls": [
      "AppManagerEngine.getRunningProcesses (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9459,7 +9904,7 @@
    "handler": {
     "channel": "optimizer:getServices",
     "file": "electron/main.js",
-    "line": 1808,
+    "line": 1810,
     "calls": [
      "AppManagerEngine.getServices (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9474,7 +9919,7 @@
    "handler": {
     "channel": "optimizer:getStartupItems",
     "file": "electron/main.js",
-    "line": 1806,
+    "line": 1808,
     "calls": [
      "AppManagerEngine.getStartupItems (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9491,7 +9936,7 @@
    "handler": {
     "channel": "optimizer:globalRecommendedTweaks",
     "file": "electron/main.js",
-    "line": 1855,
+    "line": 1857,
     "calls": [
      "DeepTweaksEngine.applyRecommended (electron/services/optimizer/DeepTweaksEngine.js)",
      "sender.send"
@@ -9507,7 +9952,7 @@
    "handler": {
     "channel": "optimizer:listBloatware",
     "file": "electron/main.js",
-    "line": 1812,
+    "line": 1814,
     "calls": [
      "AppManagerEngine.listBloatware (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9524,7 +9969,7 @@
    "handler": {
     "channel": "optimizer:listOperations",
     "file": "electron/main.js",
-    "line": 720,
+    "line": 722,
     "calls": [
      "SystemOptimizerService.listOperations (electron/services/optimizer/SystemOptimizerService.js)"
     ]
@@ -9541,7 +9986,7 @@
    "handler": {
     "channel": "optimizer:listProfiles",
     "file": "electron/main.js",
-    "line": 739,
+    "line": 741,
     "calls": [
      "SystemOptimizerService.listProfiles (electron/services/optimizer/SystemOptimizerService.js)"
     ]
@@ -9569,7 +10014,7 @@
    "handler": {
     "channel": "optimizer:openTamperSettings",
     "file": "electron/main.js",
-    "line": 1990,
+    "line": 1992,
     "calls": [
      "DefenderControlEngine.openTamperSettings (electron/services/optimizer/DefenderControlEngine.js)"
     ]
@@ -9586,7 +10031,7 @@
    "handler": {
     "channel": "optimizer:removeGpuPreference",
     "file": "electron/main.js",
-    "line": 1818,
+    "line": 1820,
     "calls": [
      "AppManagerEngine.removeGpuPreference (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9603,7 +10048,7 @@
    "handler": {
     "channel": "optimizer:removeSelectedBloatware",
     "file": "electron/main.js",
-    "line": 1813,
+    "line": 1815,
     "calls": [
      "AppManagerEngine.removeSelectedBloatware (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9620,7 +10065,7 @@
    "handler": {
     "channel": "optimizer:restoreImageDefender",
     "file": "electron/main.js",
-    "line": 1987,
+    "line": 1989,
     "calls": [
      "DefenderControlEngine.restoreImageDefender (electron/services/optimizer/DefenderControlEngine.js)"
     ]
@@ -9637,7 +10082,7 @@
    "handler": {
     "channel": "optimizer:revertExtremeKernelMod",
     "file": "electron/main.js",
-    "line": 1999,
+    "line": 2001,
     "calls": [
      "SystemEngine.revertExtremeKernelMod (electron/services/optimizer/SystemEngine.js)"
     ]
@@ -9652,7 +10097,7 @@
    "handler": {
     "channel": "optimizer:revertHags",
     "file": "electron/main.js",
-    "line": 1822,
+    "line": 1824,
     "calls": [
      "AppManagerEngine.revertHags (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9669,7 +10114,7 @@
    "handler": {
     "channel": "optimizer:revertServicesTweak",
     "file": "electron/main.js",
-    "line": 2002,
+    "line": 2004,
     "calls": [
      "ServicesEngine.revertServicesTweak (electron/services/optimizer/ServicesEngine.js)"
     ]
@@ -9684,7 +10129,7 @@
    "handler": {
     "channel": "optimizer:run",
     "file": "electron/main.js",
-    "line": 732,
+    "line": 734,
     "calls": [
      "sender.send",
      "SystemOptimizerService.runTasks (electron/services/optimizer/SystemOptimizerService.js)"
@@ -9703,7 +10148,7 @@
    "handler": {
     "channel": "optimizer:runRoutine",
     "file": "electron/main.js",
-    "line": 1893,
+    "line": 1895,
     "calls": [
      "sender.send",
      "routineId.startsWith",
@@ -9723,7 +10168,7 @@
    "handler": {
     "channel": "optimizer:setDnsServers",
     "file": "electron/main.js",
-    "line": 1869,
+    "line": 1871,
     "calls": [
      "DnsEngine.apply (electron/services/optimizer/DnsEngine.js)"
     ]
@@ -9738,7 +10183,7 @@
    "handler": {
     "channel": "optimizer:setGpuPreference",
     "file": "electron/main.js",
-    "line": 1817,
+    "line": 1819,
     "calls": [
      "AppManagerEngine.setGpuPreference (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9755,7 +10200,7 @@
    "handler": {
     "channel": "optimizer:setHagsStatus",
     "file": "electron/main.js",
-    "line": 1821,
+    "line": 1823,
     "calls": [
      "AppManagerEngine.setHagsStatus (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9772,7 +10217,7 @@
    "handler": {
     "channel": "optimizer:setProcessPriority",
     "file": "electron/main.js",
-    "line": 1815,
+    "line": 1817,
     "calls": [
      "AppManagerEngine.setProcessPriority (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9789,7 +10234,7 @@
    "handler": {
     "channel": "optimizer:undoDns",
     "file": "electron/main.js",
-    "line": 1878,
+    "line": 1880,
     "calls": [
      "DnsEngine.undo (electron/services/optimizer/DnsEngine.js)"
     ]
@@ -9808,7 +10253,7 @@
    "handler": {
     "channel": "optimizer:uninstallProgram",
     "file": "electron/main.js",
-    "line": 1811,
+    "line": 1813,
     "calls": [
      "AppManagerEngine.uninstallProgram (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -9823,7 +10268,7 @@
    "handler": {
     "channel": "optimizer:uninstallProgramWithLeftovers",
     "file": "electron/main.js",
-    "line": 1824,
+    "line": 1826,
     "calls": [
      "AppManagerEngine.uninstallProgramWithLeftovers (electron/services/optimizer/AppManagerEngine.js)"
     ]
@@ -10261,7 +10706,7 @@
    "handler": {
     "channel": "pge:openPortable",
     "file": "electron/main.js",
-    "line": 1464,
+    "line": 1466,
     "calls": []
    },
    "used_by": [
@@ -10273,7 +10718,7 @@
    "method": "powershell.customStart",
    "channel": "powershell:customStart",
    "kind": "invoke",
-   "line": 734,
+   "line": 789,
    "handler": {
     "channel": "powershell:customStart",
     "file": "electron/ipc/powershellIpc.js",
@@ -10292,7 +10737,7 @@
    "method": "powershell.customStatus",
    "channel": "powershell:customStatus",
    "kind": "invoke",
-   "line": 736,
+   "line": 791,
    "handler": {
     "channel": "powershell:customStatus",
     "file": "electron/ipc/powershellIpc.js",
@@ -10309,7 +10754,7 @@
    "method": "powershell.customStop",
    "channel": "powershell:customStop",
    "kind": "invoke",
-   "line": 735,
+   "line": 790,
    "handler": {
     "channel": "powershell:customStop",
     "file": "electron/ipc/powershellIpc.js",
@@ -10326,7 +10771,7 @@
    "method": "powershell.exportResult",
    "channel": "powershell:export",
    "kind": "invoke",
-   "line": 726,
+   "line": 781,
    "handler": {
     "channel": "powershell:export",
     "file": "electron/ipc/powershellIpc.js",
@@ -10344,7 +10789,7 @@
    "method": "powershell.getPolicies",
    "channel": "powershell:getPolicies",
    "kind": "invoke",
-   "line": 717,
+   "line": 772,
    "handler": {
     "channel": "powershell:getPolicies",
     "file": "electron/ipc/powershellIpc.js",
@@ -10361,7 +10806,7 @@
    "method": "powershell.getSignature",
    "channel": "powershell:getSignature",
    "kind": "invoke",
-   "line": 719,
+   "line": 774,
    "handler": {
     "channel": "powershell:getSignature",
     "file": "electron/ipc/powershellIpc.js",
@@ -10376,7 +10821,7 @@
    "method": "powershell.hostsBackup",
    "channel": "powershell:hostsBackup",
    "kind": "invoke",
-   "line": 731,
+   "line": 786,
    "handler": {
     "channel": "powershell:hostsBackup",
     "file": "electron/ipc/powershellIpc.js",
@@ -10393,7 +10838,7 @@
    "method": "powershell.hostsPreview",
    "channel": "powershell:hostsPreview",
    "kind": "invoke",
-   "line": 732,
+   "line": 787,
    "handler": {
     "channel": "powershell:hostsPreview",
     "file": "electron/ipc/powershellIpc.js",
@@ -10410,7 +10855,7 @@
    "method": "powershell.hostsRead",
    "channel": "powershell:hostsRead",
    "kind": "invoke",
-   "line": 730,
+   "line": 785,
    "handler": {
     "channel": "powershell:hostsRead",
     "file": "electron/ipc/powershellIpc.js",
@@ -10427,7 +10872,7 @@
    "method": "powershell.hostsWrite",
    "channel": "powershell:hostsWrite",
    "kind": "invoke",
-   "line": 733,
+   "line": 788,
    "handler": {
     "channel": "powershell:hostsWrite",
     "file": "electron/ipc/powershellIpc.js",
@@ -10444,7 +10889,7 @@
    "method": "powershell.listScripts",
    "channel": "powershell:listScripts",
    "kind": "invoke",
-   "line": 718,
+   "line": 773,
    "handler": {
     "channel": "powershell:listScripts",
     "file": "electron/ipc/powershellIpc.js",
@@ -10461,7 +10906,7 @@
    "method": "powershell.onCustomEvent",
    "channel": "powershell:customEvent",
    "kind": "on",
-   "line": 737,
+   "line": 792,
    "handler": null,
    "used_by": [
     "src/components/pstools/CustomScriptRunner.tsx"
@@ -10471,7 +10916,7 @@
    "method": "powershell.openElevatedTerminal",
    "channel": "powershell:openElevatedTerminal",
    "kind": "invoke",
-   "line": 721,
+   "line": 776,
    "handler": {
     "channel": "powershell:openElevatedTerminal",
     "file": "electron/ipc/powershellIpc.js",
@@ -10488,7 +10933,7 @@
    "method": "powershell.openReport",
    "channel": "powershell:openReport",
    "kind": "invoke",
-   "line": 728,
+   "line": 783,
    "handler": {
     "channel": "powershell:openReport",
     "file": "electron/ipc/powershellIpc.js",
@@ -10508,7 +10953,7 @@
    "method": "powershell.pickFolder",
    "channel": "powershell:pickFolder",
    "kind": "invoke",
-   "line": 724,
+   "line": 779,
    "handler": {
     "channel": "powershell:pickFolder",
     "file": "electron/ipc/powershellIpc.js",
@@ -10526,7 +10971,7 @@
    "method": "powershell.pickSavePath",
    "channel": "powershell:pickSavePath",
    "kind": "invoke",
-   "line": 725,
+   "line": 780,
    "handler": {
     "channel": "powershell:pickSavePath",
     "file": "electron/ipc/powershellIpc.js",
@@ -10544,7 +10989,7 @@
    "method": "powershell.previewTool",
    "channel": "powershell:previewTool",
    "kind": "invoke",
-   "line": 722,
+   "line": 777,
    "handler": {
     "channel": "powershell:previewTool",
     "file": "electron/ipc/powershellIpc.js",
@@ -10561,7 +11006,7 @@
    "method": "powershell.revealFile",
    "channel": "powershell:revealFile",
    "kind": "invoke",
-   "line": 727,
+   "line": 782,
    "handler": {
     "channel": "powershell:revealFile",
     "file": "electron/ipc/powershellIpc.js",
@@ -10580,7 +11025,7 @@
    "method": "powershell.runScript",
    "channel": "powershell:runScript",
    "kind": "invoke",
-   "line": 720,
+   "line": 775,
    "handler": {
     "channel": "powershell:runScript",
     "file": "electron/ipc/powershellIpc.js",
@@ -10597,7 +11042,7 @@
    "method": "powershell.runTool",
    "channel": "powershell:runTool",
    "kind": "invoke",
-   "line": 723,
+   "line": 778,
    "handler": {
     "channel": "powershell:runTool",
     "file": "electron/ipc/powershellIpc.js",
@@ -10615,7 +11060,7 @@
    "method": "powershell.snippetDelete",
    "channel": "powershell:snippetDelete",
    "kind": "invoke",
-   "line": 744,
+   "line": 799,
    "handler": {
     "channel": "powershell:snippetDelete",
     "file": "electron/ipc/powershellIpc.js",
@@ -10632,7 +11077,7 @@
    "method": "powershell.snippetSave",
    "channel": "powershell:snippetSave",
    "kind": "invoke",
-   "line": 743,
+   "line": 798,
    "handler": {
     "channel": "powershell:snippetSave",
     "file": "electron/ipc/powershellIpc.js",
@@ -10649,7 +11094,7 @@
    "method": "powershell.snippetsList",
    "channel": "powershell:snippetsList",
    "kind": "invoke",
-   "line": 742,
+   "line": 797,
    "handler": {
     "channel": "powershell:snippetsList",
     "file": "electron/ipc/powershellIpc.js",
@@ -10666,7 +11111,7 @@
    "method": "powershell.wifiKey",
    "channel": "powershell:wifiKey",
    "kind": "invoke",
-   "line": 729,
+   "line": 784,
    "handler": {
     "channel": "powershell:wifiKey",
     "file": "electron/ipc/powershellIpc.js",
@@ -10683,7 +11128,7 @@
    "method": "realtime.clamavInstall",
    "channel": "realtime:clamavInstall",
    "kind": "invoke",
-   "line": 620,
+   "line": 675,
    "handler": {
     "channel": "realtime:clamavInstall",
     "file": "electron/ipc/realtimeIpc.js",
@@ -10700,7 +11145,7 @@
    "method": "realtime.clamavUpdate",
    "channel": "realtime:clamavUpdate",
    "kind": "invoke",
-   "line": 621,
+   "line": 676,
    "handler": {
     "channel": "realtime:clamavUpdate",
     "file": "electron/ipc/realtimeIpc.js",
@@ -10716,7 +11161,7 @@
    "method": "realtime.onEvent",
    "channel": "realtime:event",
    "kind": "on",
-   "line": 623,
+   "line": 678,
    "handler": null,
    "used_by": [
     "src/pages/Realtime.tsx"
@@ -10726,7 +11171,7 @@
    "method": "realtime.quarantineDelete",
    "channel": "realtime:quarantineDelete",
    "kind": "invoke",
-   "line": 619,
+   "line": 674,
    "handler": {
     "channel": "realtime:quarantineDelete",
     "file": "electron/ipc/realtimeIpc.js",
@@ -10741,7 +11186,7 @@
    "method": "realtime.quarantineList",
    "channel": "realtime:quarantineList",
    "kind": "invoke",
-   "line": 617,
+   "line": 672,
    "handler": {
     "channel": "realtime:quarantineList",
     "file": "electron/ipc/realtimeIpc.js",
@@ -10758,7 +11203,7 @@
    "method": "realtime.quarantineRestore",
    "channel": "realtime:quarantineRestore",
    "kind": "invoke",
-   "line": 618,
+   "line": 673,
    "handler": {
     "channel": "realtime:quarantineRestore",
     "file": "electron/ipc/realtimeIpc.js",
@@ -10775,7 +11220,7 @@
    "method": "realtime.scanFiles",
    "channel": "realtime:scanFiles",
    "kind": "invoke",
-   "line": 622,
+   "line": 677,
    "handler": {
     "channel": "realtime:scanFiles",
     "file": "electron/ipc/realtimeIpc.js",
@@ -10794,7 +11239,7 @@
    "method": "realtime.setConfig",
    "channel": "realtime:setConfig",
    "kind": "invoke",
-   "line": 616,
+   "line": 671,
    "handler": {
     "channel": "realtime:setConfig",
     "file": "electron/ipc/realtimeIpc.js",
@@ -10811,7 +11256,7 @@
    "method": "realtime.status",
    "channel": "realtime:status",
    "kind": "invoke",
-   "line": 615,
+   "line": 670,
    "handler": {
     "channel": "realtime:status",
     "file": "electron/ipc/realtimeIpc.js",
@@ -10831,7 +11276,7 @@
    "method": "recovery.backupTable",
    "channel": "recovery:backup-table",
    "kind": "invoke",
-   "line": 659,
+   "line": 714,
    "handler": {
     "channel": "recovery:backup-table",
     "file": "electron/ipc/recoveryIpc.js",
@@ -10846,7 +11291,7 @@
    "method": "recovery.cancel",
    "channel": "recovery:cancel",
    "kind": "invoke",
-   "line": 667,
+   "line": 722,
    "handler": {
     "channel": "recovery:cancel",
     "file": "electron/ipc/recoveryIpc.js",
@@ -10861,7 +11306,7 @@
    "method": "recovery.cancelCarve",
    "channel": "recovery:cancel-carve",
    "kind": "invoke",
-   "line": 666,
+   "line": 721,
    "handler": {
     "channel": "recovery:cancel-carve",
     "file": "electron/ipc/recoveryIpc.js",
@@ -10876,7 +11321,7 @@
    "method": "recovery.clone",
    "channel": "recovery:clone",
    "kind": "invoke",
-   "line": 661,
+   "line": 716,
    "handler": {
     "channel": "recovery:clone",
     "file": "electron/ipc/recoveryIpc.js",
@@ -10891,7 +11336,7 @@
    "method": "recovery.inspectDisk",
    "channel": "recovery:inspect-disk",
    "kind": "invoke",
-   "line": 654,
+   "line": 709,
    "handler": {
     "channel": "recovery:inspect-disk",
     "file": "electron/ipc/recoveryIpc.js",
@@ -10906,7 +11351,7 @@
    "method": "recovery.listDrives",
    "channel": "recovery:list-drives",
    "kind": "invoke",
-   "line": 653,
+   "line": 708,
    "handler": {
     "channel": "recovery:list-drives",
     "file": "electron/ipc/recoveryIpc.js",
@@ -10921,7 +11366,7 @@
    "method": "recovery.onProgress",
    "channel": "recovery:progress",
    "kind": "on",
-   "line": 675,
+   "line": 730,
    "handler": null,
    "used_by": []
   },
@@ -10929,7 +11374,7 @@
    "method": "recovery.partitionApply",
    "channel": "recovery:partition-apply",
    "kind": "invoke",
-   "line": 672,
+   "line": 727,
    "handler": {
     "channel": "recovery:partition-apply",
     "file": "electron/ipc/recoveryIpc.js",
@@ -10944,7 +11389,7 @@
    "method": "recovery.partitionLimits",
    "channel": "recovery:partition-limits",
    "kind": "invoke",
-   "line": 670,
+   "line": 725,
    "handler": {
     "channel": "recovery:partition-limits",
     "file": "electron/ipc/recoveryIpc.js",
@@ -10959,7 +11404,7 @@
    "method": "recovery.partitionList",
    "channel": "recovery:list-partitions",
    "kind": "invoke",
-   "line": 669,
+   "line": 724,
    "handler": {
     "channel": "recovery:list-partitions",
     "file": "electron/ipc/recoveryIpc.js",
@@ -10974,7 +11419,7 @@
    "method": "recovery.partitionPlan",
    "channel": "recovery:partition-plan",
    "kind": "invoke",
-   "line": 671,
+   "line": 726,
    "handler": {
     "channel": "recovery:partition-plan",
     "file": "electron/ipc/recoveryIpc.js",
@@ -10989,7 +11434,7 @@
    "method": "recovery.pickFolder",
    "channel": "recovery:pick-folder",
    "kind": "invoke",
-   "line": 673,
+   "line": 728,
    "handler": {
     "channel": "recovery:pick-folder",
     "file": "electron/ipc/recoveryIpc.js",
@@ -11002,7 +11447,7 @@
    "method": "recovery.pickImage",
    "channel": "recovery:pick-image",
    "kind": "invoke",
-   "line": 674,
+   "line": 729,
    "handler": {
     "channel": "recovery:pick-image",
     "file": "electron/ipc/recoveryIpc.js",
@@ -11015,7 +11460,7 @@
    "method": "recovery.readSector",
    "channel": "recovery:read-sector",
    "kind": "invoke",
-   "line": 655,
+   "line": 710,
    "handler": {
     "channel": "recovery:read-sector",
     "file": "electron/ipc/recoveryIpc.js",
@@ -11030,7 +11475,7 @@
    "method": "recovery.repairHeader",
    "channel": "recovery:repair-header",
    "kind": "invoke",
-   "line": 657,
+   "line": 712,
    "handler": {
     "channel": "recovery:repair-header",
     "file": "electron/ipc/recoveryIpc.js",
@@ -11045,7 +11490,7 @@
    "method": "recovery.restoreBackup",
    "channel": "recovery:restore-backup",
    "kind": "invoke",
-   "line": 660,
+   "line": 715,
    "handler": {
     "channel": "recovery:restore-backup",
     "file": "electron/ipc/recoveryIpc.js",
@@ -11060,7 +11505,7 @@
    "method": "recovery.setActive",
    "channel": "recovery:set-active",
    "kind": "invoke",
-   "line": 658,
+   "line": 713,
    "handler": {
     "channel": "recovery:set-active",
     "file": "electron/ipc/recoveryIpc.js",
@@ -11075,7 +11520,7 @@
    "method": "recovery.smart",
    "channel": "recovery:smart",
    "kind": "invoke",
-   "line": 664,
+   "line": 719,
    "handler": {
     "channel": "recovery:smart",
     "file": "electron/ipc/recoveryIpc.js",
@@ -11090,7 +11535,7 @@
    "method": "recovery.startCarve",
    "channel": "recovery:start-carve",
    "kind": "invoke",
-   "line": 665,
+   "line": 720,
    "handler": {
     "channel": "recovery:start-carve",
     "file": "electron/ipc/recoveryIpc.js",
@@ -11105,7 +11550,7 @@
    "method": "recovery.status",
    "channel": "recovery:status",
    "kind": "invoke",
-   "line": 668,
+   "line": 723,
    "handler": {
     "channel": "recovery:status",
     "file": "electron/ipc/recoveryIpc.js",
@@ -11120,7 +11565,7 @@
    "method": "recovery.surfaceTest",
    "channel": "recovery:surface-test",
    "kind": "invoke",
-   "line": 663,
+   "line": 718,
    "handler": {
     "channel": "recovery:surface-test",
     "file": "electron/ipc/recoveryIpc.js",
@@ -11135,7 +11580,7 @@
    "method": "recovery.verify",
    "channel": "recovery:verify",
    "kind": "invoke",
-   "line": 662,
+   "line": 717,
    "handler": {
     "channel": "recovery:verify",
     "file": "electron/ipc/recoveryIpc.js",
@@ -11150,7 +11595,7 @@
    "method": "recovery.writeSector",
    "channel": "recovery:write-sector",
    "kind": "invoke",
-   "line": 656,
+   "line": 711,
    "handler": {
     "channel": "recovery:write-sector",
     "file": "electron/ipc/recoveryIpc.js",
@@ -11607,7 +12052,7 @@
    "handler": {
     "channel": "security:auditTracking",
     "file": "electron/main.js",
-    "line": 2891,
+    "line": 2893,
     "calls": [
      "custom.map",
      "content.split",
@@ -11629,7 +12074,7 @@
    "handler": {
     "channel": "security:blockTracking",
     "file": "electron/main.js",
-    "line": 2998,
+    "line": 3000,
     "calls": [
      "custom.map",
      "d.toLowerCase",
@@ -11750,7 +12195,7 @@
    "handler": {
     "channel": "security:getSecurityScore",
     "file": "electron/main.js",
-    "line": 2887,
+    "line": 2889,
     "calls": []
    },
    "used_by": [
@@ -11765,7 +12210,7 @@
    "handler": {
     "channel": "security:getTrackingDomains",
     "file": "electron/main.js",
-    "line": 2941,
+    "line": 2943,
     "calls": [
      "custom.map",
      "HOSTNAME_RE.test"
@@ -11798,7 +12243,7 @@
    "handler": {
     "channel": "security:killProcess",
     "file": "electron/main.js",
-    "line": 3077,
+    "line": 3079,
     "calls": []
    },
    "used_by": [
@@ -11813,7 +12258,7 @@
    "handler": {
     "channel": "security:optimizeLatency",
     "file": "electron/main.js",
-    "line": 3066,
+    "line": 3068,
     "calls": [
      "runPowerShell() (electron/services/PowerShellRunner.js)"
     ]
@@ -11851,7 +12296,7 @@
    "handler": {
     "channel": "security:scanMalware",
     "file": "electron/main.js",
-    "line": 2759,
+    "line": 2761,
     "calls": [
      "si.processes",
      "safeRegex.test",
@@ -11902,7 +12347,7 @@
    "handler": {
     "channel": "security:setCustomTrackingDomains",
     "file": "electron/main.js",
-    "line": 2985,
+    "line": 2987,
     "calls": []
    },
    "used_by": [
@@ -11917,7 +12362,7 @@
    "handler": {
     "channel": "security:unblockTracking",
     "file": "electron/main.js",
-    "line": 3050,
+    "line": 3052,
     "calls": []
    },
    "used_by": [
@@ -11932,7 +12377,7 @@
    "handler": {
     "channel": "settings:getConfig",
     "file": "electron/main.js",
-    "line": 1540,
+    "line": 1542,
     "calls": [
      "loadPersistedConfig() (electron/configManager.js)"
     ]
@@ -11950,7 +12395,7 @@
    "handler": {
     "channel": "settings:updateLiveServices",
     "file": "electron/main.js",
-    "line": 1564,
+    "line": 1566,
     "calls": [
      "loadPersistedConfig() (electron/configManager.js)",
      "saveConfig() (electron/configManager.js)"
@@ -11968,7 +12413,7 @@
    "handler": {
     "channel": "settings:updateStartupBehavior",
     "file": "electron/main.js",
-    "line": 1607,
+    "line": 1609,
     "calls": [
      "runPowerShell() (electron/services/PowerShellRunner.js)",
      "stripBom() (electron/services/PowerShellRunner.js)",
@@ -11989,7 +12434,7 @@
    "handler": {
     "channel": "settings:updateWindowBehavior",
     "file": "electron/main.js",
-    "line": 1588,
+    "line": 1590,
     "calls": [
      "loadPersistedConfig() (electron/configManager.js)",
      "saveConfig() (electron/configManager.js)"
@@ -12007,7 +12452,7 @@
    "handler": {
     "channel": "setup:detectHardware",
     "file": "electron/main.js",
-    "line": 3367,
+    "line": 3369,
     "calls": [
      "si.cpu",
      "si.graphics",
@@ -12031,7 +12476,7 @@
    "handler": {
     "channel": "setup:installWinget",
     "file": "electron/main.js",
-    "line": 3294,
+    "line": 3296,
     "calls": [
      "sender.isDestroyed",
      "sender.send",
@@ -12060,7 +12505,7 @@
    "method": "share.aiStatus",
    "channel": "share:aiStatus",
    "kind": "invoke",
-   "line": 606,
+   "line": 661,
    "handler": {
     "channel": "share:aiStatus",
     "file": "electron/ipc/shareIpc.js",
@@ -12077,7 +12522,7 @@
    "method": "share.cancel",
    "channel": "share:cancel",
    "kind": "invoke",
-   "line": 596,
+   "line": 651,
    "handler": {
     "channel": "share:cancel",
     "file": "electron/ipc/shareIpc.js",
@@ -12092,7 +12537,7 @@
    "method": "share.capture",
    "channel": "share:capture",
    "kind": "invoke",
-   "line": 600,
+   "line": 655,
    "handler": {
     "channel": "share:capture",
     "file": "electron/ipc/shareIpc.js",
@@ -12105,7 +12550,7 @@
    "method": "share.captureRegion",
    "channel": "share:captureRegion",
    "kind": "invoke",
-   "line": 601,
+   "line": 656,
    "handler": {
     "channel": "share:captureRegion",
     "file": "electron/ipc/shareIpc.js",
@@ -12118,7 +12563,7 @@
    "method": "share.copy",
    "channel": "share:copy",
    "kind": "invoke",
-   "line": 598,
+   "line": 653,
    "handler": {
     "channel": "share:copy",
     "file": "electron/ipc/shareIpc.js",
@@ -12134,7 +12579,7 @@
    "method": "share.displays",
    "channel": "share:displays",
    "kind": "invoke",
-   "line": 605,
+   "line": 660,
    "handler": {
     "channel": "share:displays",
     "file": "electron/ipc/shareIpc.js",
@@ -12151,7 +12596,7 @@
    "method": "share.enhance",
    "channel": "share:enhance",
    "kind": "invoke",
-   "line": 607,
+   "line": 662,
    "handler": {
     "channel": "share:enhance",
     "file": "electron/ipc/shareIpc.js",
@@ -12166,7 +12611,7 @@
    "method": "share.grabRegion",
    "channel": "share:grabRegion",
    "kind": "invoke",
-   "line": 602,
+   "line": 657,
    "handler": {
     "channel": "share:grabRegion",
     "file": "electron/ipc/shareIpc.js",
@@ -12185,7 +12630,7 @@
    "method": "share.onEvent",
    "channel": "share:event",
    "kind": "on",
-   "line": 608,
+   "line": 663,
    "handler": null,
    "used_by": [
     "src/App.tsx",
@@ -12196,7 +12641,7 @@
    "method": "share.openFolder",
    "channel": "share:openFolder",
    "kind": "invoke",
-   "line": 603,
+   "line": 658,
    "handler": {
     "channel": "share:openFolder",
     "file": "electron/ipc/shareIpc.js",
@@ -12209,7 +12654,7 @@
    "method": "share.pickAndUpload",
    "channel": "share:pickAndUpload",
    "kind": "invoke",
-   "line": 593,
+   "line": 648,
    "handler": {
     "channel": "share:pickAndUpload",
     "file": "electron/ipc/shareIpc.js",
@@ -12224,7 +12669,7 @@
    "method": "share.qr",
    "channel": "share:qr",
    "kind": "invoke",
-   "line": 599,
+   "line": 654,
    "handler": {
     "channel": "share:qr",
     "file": "electron/ipc/shareIpc.js",
@@ -12243,7 +12688,7 @@
    "method": "share.recentShots",
    "channel": "share:recentShots",
    "kind": "invoke",
-   "line": 604,
+   "line": 659,
    "handler": {
     "channel": "share:recentShots",
     "file": "electron/ipc/shareIpc.js",
@@ -12260,7 +12705,7 @@
    "method": "share.remove",
    "channel": "share:delete",
    "kind": "invoke",
-   "line": 597,
+   "line": 652,
    "handler": {
     "channel": "share:delete",
     "file": "electron/ipc/shareIpc.js",
@@ -12278,7 +12723,7 @@
    "method": "share.setConfig",
    "channel": "share:setConfig",
    "kind": "invoke",
-   "line": 592,
+   "line": 647,
    "handler": {
     "channel": "share:setConfig",
     "file": "electron/ipc/shareIpc.js",
@@ -12291,7 +12736,7 @@
    "method": "share.state",
    "channel": "share:state",
    "kind": "invoke",
-   "line": 591,
+   "line": 646,
    "handler": {
     "channel": "share:state",
     "file": "electron/ipc/shareIpc.js",
@@ -12306,7 +12751,7 @@
    "method": "share.uploadFiles",
    "channel": "share:uploadPaths",
    "kind": "invoke",
-   "line": 594,
+   "line": 649,
    "handler": {
     "channel": "share:uploadPaths",
     "file": "electron/ipc/shareIpc.js",
@@ -12321,7 +12766,7 @@
    "method": "share.uploadScreenshot",
    "channel": "share:uploadFile",
    "kind": "invoke",
-   "line": 595,
+   "line": 650,
    "handler": {
     "channel": "share:uploadFile",
     "file": "electron/ipc/shareIpc.js",
@@ -12338,7 +12783,7 @@
    "handler": {
     "channel": "shell:openExternal",
     "file": "electron/main.js",
-    "line": 1400,
+    "line": 1402,
     "calls": [
      "RENDERER_SYSTEM_URIS.has",
      "raw.toLowerCase",
@@ -12350,10 +12795,784 @@
    "used_by": [
     "src/components/darkos/DarkOSReleaseCard.tsx",
     "src/components/hub/HubPreview.tsx",
+    "src/components/ssh/TerminalPane.tsx",
     "src/pages/Dashboard.tsx",
     "src/pages/Dlss5Manager.tsx",
     "src/pages/Presets.tsx",
     "src/pages/Share.tsx"
+   ]
+  },
+  {
+   "method": "ssh.connect",
+   "channel": "ssh:session:connect",
+   "kind": "invoke",
+   "line": 603,
+   "handler": {
+    "channel": "ssh:session:connect",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 174,
+    "calls": [
+     "manager.openSession"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/sshStore.ts"
+   ]
+  },
+  {
+   "method": "ssh.deleteCredential",
+   "channel": "ssh:keychain:delete",
+   "kind": "invoke",
+   "line": 599,
+   "handler": {
+    "channel": "ssh:keychain:delete",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 144,
+    "calls": [
+     "store.deleteCredential"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/KeychainView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.deleteGroup",
+   "channel": "ssh:group:delete",
+   "kind": "invoke",
+   "line": 593,
+   "handler": {
+    "channel": "ssh:group:delete",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 108,
+    "calls": [
+     "store.deleteGroup"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/HostsView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.deleteHost",
+   "channel": "ssh:host:delete",
+   "kind": "invoke",
+   "line": 595,
+   "handler": {
+    "channel": "ssh:host:delete",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 110,
+    "calls": [
+     "store.deleteHost",
+     "tunnels.stop"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/HostsView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.deleteKnownHost",
+   "channel": "ssh:knownHosts:delete",
+   "kind": "invoke",
+   "line": 602,
+   "handler": {
+    "channel": "ssh:knownHosts:delete",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 157,
+    "calls": [
+     "store.deleteKnownHost",
+     "senders.has",
+     "senders.add",
+     "manager.disconnectBySender",
+     "serial.closeBySender",
+     "wc.once"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/KeychainView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.deleteSnippet",
+   "channel": "ssh:snippet:delete",
+   "kind": "invoke",
+   "line": 615,
+   "handler": {
+    "channel": "ssh:snippet:delete",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 224,
+    "calls": [
+     "store.deleteSnippet"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/SnippetsView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.deleteTunnel",
+   "channel": "ssh:tunnel:delete",
+   "kind": "invoke",
+   "line": 618,
+   "handler": {
+    "channel": "ssh:tunnel:delete",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 242,
+    "calls": [
+     "tunnels.stop",
+     "store.deleteTunnel"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/TunnelsView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.disconnect",
+   "channel": "ssh:session:disconnect",
+   "kind": "invoke",
+   "line": 606,
+   "handler": {
+    "channel": "ssh:session:disconnect",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 177,
+    "calls": [
+     "serial.has",
+     "serial.close",
+     "manager.disconnect"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/sshStore.ts"
+   ]
+  },
+  {
+   "method": "ssh.generateKey",
+   "channel": "ssh:keychain:generateKey",
+   "kind": "invoke",
+   "line": 598,
+   "handler": {
+    "channel": "ssh:keychain:generateKey",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 143,
+    "calls": [
+     "store.generateKey"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/KeychainView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.getState",
+   "channel": "ssh:vault:getState",
+   "kind": "invoke",
+   "line": 591,
+   "handler": {
+    "channel": "ssh:vault:getState",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 104,
+    "calls": []
+   },
+   "used_by": [
+    "src/pages/SshClient.tsx"
+   ]
+  },
+  {
+   "method": "ssh.importSshConfig",
+   "channel": "ssh:host:importSshConfig",
+   "kind": "invoke",
+   "line": 596,
+   "handler": {
+    "channel": "ssh:host:importSshConfig",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 115,
+    "calls": [
+     "store.getState",
+     "parsed.filter",
+     "existing.some",
+     "hostname.toLowerCase",
+     "store.saveHost",
+     "imported.push",
+     "parseSshConfig() (electron/services/ssh/sshConfigParser.js)"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/HostsView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.openLog",
+   "channel": "ssh:logs:open",
+   "kind": "invoke",
+   "line": 627,
+   "handler": {
+    "channel": "ssh:logs:open",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 195,
+    "calls": [
+     "sessionLogs.find"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/KeychainView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.openLogsFolder",
+   "channel": "ssh:logs:openFolder",
+   "kind": "invoke",
+   "line": 628,
+   "handler": {
+    "channel": "ssh:logs:openFolder",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 201,
+    "calls": []
+   },
+   "used_by": [
+    "src/components/ssh/KeychainView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.rejectHostKey",
+   "channel": "ssh:knownHosts:reject",
+   "kind": "invoke",
+   "line": 601,
+   "handler": {
+    "channel": "ssh:knownHosts:reject",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 156,
+    "calls": [
+     "manager.resolveHostKey"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/KeychainView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.resize",
+   "channel": "ssh:session:resize",
+   "kind": "invoke",
+   "line": 605,
+   "handler": {
+    "channel": "ssh:session:resize",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 176,
+    "calls": [
+     "manager.resize"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/TerminalPane.tsx"
+   ]
+  },
+  {
+   "method": "ssh.respondAuth",
+   "channel": "ssh:auth:respond",
+   "kind": "invoke",
+   "line": 622,
+   "handler": {
+    "channel": "ssh:auth:respond",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 185,
+    "calls": [
+     "manager.resolveAuthPrompt"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/SshExtras.tsx"
+   ]
+  },
+  {
+   "method": "ssh.runSnippet",
+   "channel": "ssh:snippet:run",
+   "kind": "invoke",
+   "line": 616,
+   "handler": {
+    "channel": "ssh:snippet:run",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 225,
+    "calls": [
+     "store.getSnippet",
+     "ids.filter",
+     "manager.write",
+     "renderSnippet() (electron/services/ssh/snippetTemplate.js)"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/SnippetsView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.saveCredential",
+   "channel": "ssh:keychain:save",
+   "kind": "invoke",
+   "line": 597,
+   "handler": {
+    "channel": "ssh:keychain:save",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 142,
+    "calls": [
+     "store.saveCredential"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/KeychainView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.saveGroup",
+   "channel": "ssh:group:save",
+   "kind": "invoke",
+   "line": 592,
+   "handler": {
+    "channel": "ssh:group:save",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 107,
+    "calls": [
+     "store.saveGroup"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/HostsView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.saveHost",
+   "channel": "ssh:host:save",
+   "kind": "invoke",
+   "line": 594,
+   "handler": {
+    "channel": "ssh:host:save",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 109,
+    "calls": [
+     "store.saveHost"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/HostsView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.saveSettings",
+   "channel": "ssh:settings:save",
+   "kind": "invoke",
+   "line": 626,
+   "handler": {
+    "channel": "ssh:settings:save",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 193,
+    "calls": [
+     "store.saveSettings"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/SshExtras.tsx"
+   ]
+  },
+  {
+   "method": "ssh.saveSnippet",
+   "channel": "ssh:snippet:save",
+   "kind": "invoke",
+   "line": 614,
+   "handler": {
+    "channel": "ssh:snippet:save",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 223,
+    "calls": [
+     "store.savePackage",
+     "store.saveSnippet"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/SnippetsView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.saveTunnel",
+   "channel": "ssh:tunnel:save",
+   "kind": "invoke",
+   "line": 617,
+   "handler": {
+    "channel": "ssh:tunnel:save",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 235,
+    "calls": [
+     "tunnels.status",
+     "store.saveTunnel",
+     "tunnels.stop",
+     "tunnels.start"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/TunnelsView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.serialBreak",
+   "channel": "ssh:serial:break",
+   "kind": "invoke",
+   "line": 625,
+   "handler": {
+    "channel": "ssh:serial:break",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 190,
+    "calls": [
+     "serial.sendBreak"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/TerminalPane.tsx"
+   ]
+  },
+  {
+   "method": "ssh.serialConnect",
+   "channel": "ssh:serial:connect",
+   "kind": "invoke",
+   "line": 624,
+   "handler": {
+    "channel": "ssh:serial:connect",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 189,
+    "calls": [
+     "serial.open"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/sshStore.ts"
+   ]
+  },
+  {
+   "method": "ssh.serialPorts",
+   "channel": "ssh:serial:listPorts",
+   "kind": "invoke",
+   "line": 623,
+   "handler": {
+    "channel": "ssh:serial:listPorts",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 188,
+    "calls": [
+     "serial.listPorts"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/SshExtras.tsx"
+   ]
+  },
+  {
+   "method": "ssh.setLogging",
+   "channel": "ssh:session:setLogging",
+   "kind": "invoke",
+   "line": 621,
+   "handler": {
+    "channel": "ssh:session:setLogging",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 181,
+    "calls": [
+     "manager.setLogging"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/TerminalPane.tsx"
+   ]
+  },
+  {
+   "method": "ssh.sftpCancelTransfer",
+   "channel": "ssh:sftp:cancelTransfer",
+   "kind": "invoke",
+   "line": 611,
+   "handler": {
+    "channel": "ssh:sftp:cancelTransfer",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 212,
+    "calls": [
+     "sftp.cancelTransfer"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/SftpView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.sftpClose",
+   "channel": "ssh:sftp:close",
+   "kind": "invoke",
+   "line": 613,
+   "handler": {
+    "channel": "ssh:sftp:close",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 214,
+    "calls": [
+     "sftp.close"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/sshStore.ts"
+   ]
+  },
+  {
+   "method": "ssh.sftpDu",
+   "channel": "ssh:sftp:du",
+   "kind": "invoke",
+   "line": 632,
+   "handler": {
+    "channel": "ssh:sftp:du",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 218,
+    "calls": [
+     "sftp.du"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/SftpView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.sftpEditExternal",
+   "channel": "ssh:sftp:editExternal",
+   "kind": "invoke",
+   "line": 633,
+   "handler": {
+    "channel": "ssh:sftp:editExternal",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 219,
+    "calls": [
+     "sftp.editExternal"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/SftpView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.sftpFsOp",
+   "channel": "ssh:sftp:fsOp",
+   "kind": "invoke",
+   "line": 612,
+   "handler": {
+    "channel": "ssh:sftp:fsOp",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 213,
+    "calls": [
+     "sftp.fsOp"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/SftpView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.sftpListLocal",
+   "channel": "ssh:sftp:listLocal",
+   "kind": "invoke",
+   "line": 608,
+   "handler": {
+    "channel": "ssh:sftp:listLocal",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 209,
+    "calls": [
+     "sftp.listLocal"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/SftpView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.sftpListRemote",
+   "channel": "ssh:sftp:listRemote",
+   "kind": "invoke",
+   "line": 609,
+   "handler": {
+    "channel": "ssh:sftp:listRemote",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 210,
+    "calls": [
+     "sftp.listRemote"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/SftpView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.sftpOpen",
+   "channel": "ssh:sftp:open",
+   "kind": "invoke",
+   "line": 607,
+   "handler": {
+    "channel": "ssh:sftp:open",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 208,
+    "calls": [
+     "sftp.open"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/SftpView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.sftpReadText",
+   "channel": "ssh:sftp:readText",
+   "kind": "invoke",
+   "line": 629,
+   "handler": {
+    "channel": "ssh:sftp:readText",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 215,
+    "calls": [
+     "sftp.readText"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/EditorTabView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.sftpStat",
+   "channel": "ssh:sftp:stat",
+   "kind": "invoke",
+   "line": 631,
+   "handler": {
+    "channel": "ssh:sftp:stat",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 217,
+    "calls": [
+     "sftp.stat"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/SftpView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.sftpStopWatch",
+   "channel": "ssh:sftp:stopWatch",
+   "kind": "invoke",
+   "line": 634,
+   "handler": {
+    "channel": "ssh:sftp:stopWatch",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 220,
+    "calls": [
+     "sftp.stopWatch"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/SftpView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.sftpTransfer",
+   "channel": "ssh:sftp:transfer",
+   "kind": "invoke",
+   "line": 610,
+   "handler": {
+    "channel": "ssh:sftp:transfer",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 211,
+    "calls": [
+     "sftp.transfer"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/SftpView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.sftpWriteText",
+   "channel": "ssh:sftp:writeText",
+   "kind": "invoke",
+   "line": 630,
+   "handler": {
+    "channel": "ssh:sftp:writeText",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 216,
+    "calls": [
+     "sftp.writeText"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/EditorTabView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.startTunnel",
+   "channel": "ssh:tunnel:start",
+   "kind": "invoke",
+   "line": 619,
+   "handler": {
+    "channel": "ssh:tunnel:start",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 243,
+    "calls": [
+     "tunnels.start"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/TunnelsView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.stopTunnel",
+   "channel": "ssh:tunnel:stop",
+   "kind": "invoke",
+   "line": 620,
+   "handler": {
+    "channel": "ssh:tunnel:stop",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 247,
+    "calls": [
+     "tunnels.stop",
+     "tunnels.autoStart",
+     "tunnels.stopAll",
+     "sftp.closeAll",
+     "manager.disposeAll",
+     "serial.closeAll"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/TunnelsView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.trustHostKey",
+   "channel": "ssh:knownHosts:trust",
+   "kind": "invoke",
+   "line": 600,
+   "handler": {
+    "channel": "ssh:knownHosts:trust",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 147,
+    "calls": [
+     "manager.resolveHostKey",
+     "store.trustKnownHost"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/KeychainView.tsx"
+   ]
+  },
+  {
+   "method": "ssh.write",
+   "channel": "ssh:session:write",
+   "kind": "invoke",
+   "line": 604,
+   "handler": {
+    "channel": "ssh:session:write",
+    "file": "electron/ipc/sshIpc.js",
+    "line": 175,
+    "calls": [
+     "manager.write",
+     "sessionIds.slice"
+    ]
+   },
+   "used_by": [
+    "src/components/ssh/TerminalPane.tsx"
    ]
   },
   {
@@ -12409,7 +13628,7 @@
    "handler": {
     "channel": "system:enableProcessTracking",
     "file": "electron/main.js",
-    "line": 874,
+    "line": 876,
     "calls": []
    },
    "used_by": [
@@ -12424,7 +13643,7 @@
    "handler": {
     "channel": "system:getAdvancedHardware",
     "file": "electron/main.js",
-    "line": 888,
+    "line": 890,
     "calls": [
      "si.graphics",
      "si.baseboard",
@@ -12446,7 +13665,7 @@
    "handler": {
     "channel": "system:getBios",
     "file": "electron/main.js",
-    "line": 946,
+    "line": 948,
     "calls": [
      "si.baseboard",
      "si.bios"
@@ -12464,7 +13683,7 @@
    "handler": {
     "channel": "system:getDeepCategory",
     "file": "electron/main.js",
-    "line": 867,
+    "line": 869,
     "calls": [
      "DeepHardwareService.getCategory (electron/services/DeepHardwareService.js)"
     ]
@@ -12479,7 +13698,7 @@
    "handler": {
     "channel": "system:getDeepHardwareInfo",
     "file": "electron/main.js",
-    "line": 863,
+    "line": 865,
     "calls": [
      "DeepHardwareService.getDeepInfo (electron/services/DeepHardwareService.js)"
     ]
@@ -12494,7 +13713,7 @@
    "handler": {
     "channel": "system:getGraphics",
     "file": "electron/main.js",
-    "line": 935,
+    "line": 937,
     "calls": [
      "si.graphics"
     ]
@@ -12511,7 +13730,7 @@
    "handler": {
     "channel": "system:getInfo",
     "file": "electron/main.js",
-    "line": 805,
+    "line": 807,
     "calls": [
      "cpuModel.includes",
      "si.cpu",
@@ -12531,7 +13750,7 @@
    "handler": {
     "channel": "system:getJunkEstimate",
     "file": "electron/main.js",
-    "line": 1158,
+    "line": 1160,
     "calls": []
    },
    "used_by": [
@@ -12546,7 +13765,7 @@
    "handler": {
     "channel": "system:getLatency",
     "file": "electron/main.js",
-    "line": 977,
+    "line": 979,
     "calls": []
    },
    "used_by": []
@@ -12559,7 +13778,7 @@
    "handler": {
     "channel": "system:getLiveStats",
     "file": "electron/main.js",
-    "line": 1652,
+    "line": 1654,
     "calls": [
      "liveCpu.sample"
     ]
@@ -12576,7 +13795,7 @@
    "handler": {
     "channel": "system:getMemory",
     "file": "electron/main.js",
-    "line": 1647,
+    "line": 1649,
     "calls": []
    },
    "used_by": [
@@ -12591,7 +13810,7 @@
    "handler": {
     "channel": "system:getMetrics",
     "file": "electron/main.js",
-    "line": 1053,
+    "line": 1055,
     "calls": [
      "si.networkStats",
      "si.fsStats"
@@ -12607,7 +13826,7 @@
    "handler": {
     "channel": "system:getNetwork",
     "file": "electron/main.js",
-    "line": 1116,
+    "line": 1118,
     "calls": [
      "si.networkInterfaces",
      "si.networkStats"
@@ -12623,7 +13842,7 @@
    "handler": {
     "channel": "system:getSnapshot",
     "file": "electron/main.js",
-    "line": 716,
+    "line": 718,
     "calls": [
      "HardwareHAL.getSnapshot (electron/hal/HardwareHAL.js)"
     ]
@@ -12638,7 +13857,7 @@
    "handler": {
     "channel": "system:getStorage",
     "file": "electron/main.js",
-    "line": 1143,
+    "line": 1145,
     "calls": [
      "si.fsSize"
     ]
@@ -12655,7 +13874,7 @@
    "handler": {
     "channel": "system:getTemperatures",
     "file": "electron/main.js",
-    "line": 969,
+    "line": 971,
     "calls": [
      "si.sensorsTemperatures"
     ]
@@ -12672,7 +13891,7 @@
    "handler": {
     "channel": "system:runBenchmark",
     "file": "electron/main.js",
-    "line": 981,
+    "line": 983,
     "calls": [
      "hrtime.bigint",
      "parentPort.postMessage",
@@ -13013,7 +14232,7 @@
    "handler": {
     "channel": "vault:add",
     "file": "electron/main.js",
-    "line": 2531,
+    "line": 2533,
     "calls": [
      "crypto.randomUUID"
     ]
@@ -13045,7 +14264,7 @@
    "handler": {
     "channel": "vault:changeMasterPassword",
     "file": "electron/main.js",
-    "line": 2607,
+    "line": 2609,
     "calls": [
      "buildKdf() (electron/vaultCrypto.js)",
      "unwrapVaultKeyWithPassword() (electron/vaultCrypto.js)",
@@ -13062,7 +14281,7 @@
    "handler": {
     "channel": "vault:copyPassword",
     "file": "electron/main.js",
-    "line": 2594,
+    "line": 2596,
     "calls": [
      "clipboard.writeText",
      "clipboard.readText",
@@ -13081,7 +14300,7 @@
    "handler": {
     "channel": "vault:export",
     "file": "electron/main.js",
-    "line": 2651,
+    "line": 2653,
     "calls": []
    },
    "used_by": [
@@ -13096,7 +14315,7 @@
    "handler": {
     "channel": "vault:import",
     "file": "electron/main.js",
-    "line": 2660,
+    "line": 2662,
     "calls": [
      "backupVaultFile() (electron/services/vaultBridge/vaultHardening.js)"
     ]
@@ -13113,7 +14332,7 @@
    "handler": {
     "channel": "vault:init",
     "file": "electron/main.js",
-    "line": 2451,
+    "line": 2453,
     "calls": [
      "crypto.randomBytes",
      "recoveryWords.join",
@@ -13136,7 +14355,7 @@
    "handler": {
     "channel": "vault:list",
     "file": "electron/main.js",
-    "line": 2516,
+    "line": 2518,
     "calls": []
    },
    "used_by": [
@@ -13151,7 +14370,7 @@
    "handler": {
     "channel": "vault:lock",
     "file": "electron/main.js",
-    "line": 2511,
+    "line": 2513,
     "calls": []
    },
    "used_by": [
@@ -13191,7 +14410,7 @@
    "handler": {
     "channel": "vault:regenerateRecoveryWords",
     "file": "electron/main.js",
-    "line": 2633,
+    "line": 2635,
     "calls": [
      "recoveryWords.join",
      "buildKdf() (electron/vaultCrypto.js)",
@@ -13228,7 +14447,7 @@
    "handler": {
     "channel": "vault:remove",
     "file": "electron/main.js",
-    "line": 2577,
+    "line": 2579,
     "calls": []
    },
    "used_by": [
@@ -13243,7 +14462,7 @@
    "handler": {
     "channel": "vault:reveal",
     "file": "electron/main.js",
-    "line": 2586,
+    "line": 2588,
     "calls": []
    },
    "used_by": [
@@ -13276,7 +14495,7 @@
    "handler": {
     "channel": "vault:setAutoLockMinutes",
     "file": "electron/main.js",
-    "line": 2446,
+    "line": 2448,
     "calls": []
    },
    "used_by": [
@@ -13308,7 +14527,7 @@
    "handler": {
     "channel": "vault:status",
     "file": "electron/main.js",
-    "line": 2441,
+    "line": 2443,
     "calls": []
    },
    "used_by": [
@@ -13323,7 +14542,7 @@
    "handler": {
     "channel": "vault:transferCancel",
     "file": "electron/main.js",
-    "line": 2702,
+    "line": 2704,
     "calls": []
    },
    "used_by": []
@@ -13336,7 +14555,7 @@
    "handler": {
     "channel": "vault:transferReceive",
     "file": "electron/main.js",
-    "line": 2714,
+    "line": 2716,
     "calls": [
      "bytes.toString",
      "crypto.randomUUID",
@@ -13356,7 +14575,7 @@
    "handler": {
     "channel": "vault:transferSend",
     "file": "electron/main.js",
-    "line": 2682,
+    "line": 2684,
     "calls": [
      "crypto.randomUUID",
      "sealVault() (electron/services/vaultTransfer/vaultTransfer.js)",
@@ -13373,7 +14592,7 @@
    "handler": {
     "channel": "vault:unlock",
     "file": "electron/main.js",
-    "line": 2486,
+    "line": 2488,
     "calls": []
    },
    "used_by": [
@@ -13388,7 +14607,7 @@
    "handler": {
     "channel": "vault:unlockWithRecoveryWords",
     "file": "electron/main.js",
-    "line": 2498,
+    "line": 2500,
     "calls": [
      "words.trim",
      "derivePasswordFromRecoveryWords() (electron/vaultCrypto.js)"
@@ -13424,7 +14643,7 @@
    "handler": {
     "channel": "vault:update",
     "file": "electron/main.js",
-    "line": 2554,
+    "line": 2556,
     "calls": [
      "entries.findIndex",
      "entries.slice"
@@ -13436,11 +14655,11 @@
    "method": "window.close",
    "channel": "window:close",
    "kind": "invoke",
-   "line": 750,
+   "line": 805,
    "handler": {
     "channel": "window:close",
     "file": "electron/main.js",
-    "line": 3527,
+    "line": 3529,
     "calls": [
      "HardwareService.init (electron/services/HardwareService.js)",
      "UpdateService.init (electron/services/UpdateService.js)",
@@ -13458,11 +14677,11 @@
    "method": "window.isMaximized",
    "channel": "window:isMaximized",
    "kind": "invoke",
-   "line": 749,
+   "line": 804,
    "handler": {
     "channel": "window:isMaximized",
     "file": "electron/main.js",
-    "line": 3523,
+    "line": 3525,
     "calls": []
    },
    "used_by": []
@@ -13471,11 +14690,11 @@
    "method": "window.maximize",
    "channel": "window:maximize",
    "kind": "invoke",
-   "line": 748,
+   "line": 803,
    "handler": {
     "channel": "window:maximize",
     "file": "electron/main.js",
-    "line": 3515,
+    "line": 3517,
     "calls": []
    },
    "used_by": [
@@ -13486,11 +14705,11 @@
    "method": "window.minimize",
    "channel": "window:minimize",
    "kind": "invoke",
-   "line": 747,
+   "line": 802,
    "handler": {
     "channel": "window:minimize",
     "file": "electron/main.js",
-    "line": 3511,
+    "line": 3513,
     "calls": []
    },
    "used_by": [
@@ -13501,7 +14720,7 @@
    "method": "wintools.diagnoseWu",
    "channel": "wintools:diagnoseWu",
    "kind": "invoke",
-   "line": 700,
+   "line": 755,
    "handler": {
     "channel": "wintools:diagnoseWu",
     "file": "electron/ipc/winToolsIpc.js",
@@ -13518,7 +14737,7 @@
    "method": "wintools.listFeatures",
    "channel": "wintools:listFeatures",
    "kind": "invoke",
-   "line": 696,
+   "line": 751,
    "handler": {
     "channel": "wintools:listFeatures",
     "file": "electron/ipc/winToolsIpc.js",
@@ -13535,7 +14754,7 @@
    "method": "wintools.openPanel",
    "channel": "wintools:openPanel",
    "kind": "invoke",
-   "line": 699,
+   "line": 754,
    "handler": {
     "channel": "wintools:openPanel",
     "file": "electron/ipc/winToolsIpc.js",
@@ -13550,7 +14769,7 @@
    "method": "wintools.run",
    "channel": "wintools:run",
    "kind": "invoke",
-   "line": 698,
+   "line": 753,
    "handler": {
     "channel": "wintools:run",
     "file": "electron/ipc/winToolsIpc.js",
@@ -13567,7 +14786,7 @@
    "method": "wintools.setFeature",
    "channel": "wintools:setFeature",
    "kind": "invoke",
-   "line": 697,
+   "line": 752,
    "handler": {
     "channel": "wintools:setFeature",
     "file": "electron/ipc/winToolsIpc.js",
@@ -13586,7 +14805,7 @@
    "handler": {
     "channel": "youtube:cancel",
     "file": "electron/main.js",
-    "line": 2275,
+    "line": 2277,
     "calls": [
      "cancelActiveYtDlp() (electron/ytdlp.js)"
     ]
@@ -13603,7 +14822,7 @@
    "handler": {
     "channel": "youtube:download",
     "file": "electron/main.js",
-    "line": 2144,
+    "line": 2146,
     "calls": [
      "cookiesPath.trim",
      "cookiesFromBrowser.trim",
@@ -13625,7 +14844,7 @@
    "handler": {
     "channel": "youtube:getVideoInfo",
     "file": "electron/main.js",
-    "line": 2039,
+    "line": 2041,
     "calls": [
      "cookiesPath.trim",
      "cookiesFromBrowserRaw.trim",
@@ -16357,6 +17576,83 @@
     "line": 200
    }
   ],
+  "electron/ipc/sshIpc.js": [
+   {
+    "name": "makeVaultKeyProvider",
+    "kind": "function",
+    "line": 17
+   },
+   {
+    "name": "can",
+    "kind": "function",
+    "line": 20
+   },
+   {
+    "name": "load",
+    "kind": "function",
+    "line": 21
+   },
+   {
+    "name": "ok",
+    "kind": "function",
+    "line": 51
+   },
+   {
+    "name": "failOf",
+    "kind": "function",
+    "line": 52
+   },
+   {
+    "name": "idOf",
+    "kind": "function",
+    "line": 57
+   },
+   {
+    "name": "registerSshIPC",
+    "kind": "function",
+    "line": 60
+   },
+   {
+    "name": "broadcast",
+    "kind": "function",
+    "line": 67
+   },
+   {
+    "name": "handle",
+    "kind": "function",
+    "line": 86
+   },
+   {
+    "name": "state",
+    "kind": "function",
+    "line": 93
+   },
+   {
+    "name": "senderFor",
+    "kind": "function",
+    "line": 161
+   },
+   {
+    "name": "drop",
+    "kind": "function",
+    "line": 166
+   },
+   {
+    "name": "send",
+    "kind": "function",
+    "line": 170
+   },
+   {
+    "name": "insideLogs",
+    "kind": "function",
+    "line": 194
+   },
+   {
+    "name": "dispose",
+    "kind": "function",
+    "line": 251
+   }
+  ],
   "electron/ipc/startupIpc.js": [
    {
     "name": "registerStartupIPC",
@@ -16845,372 +18141,372 @@
    {
     "name": "getSystemInformation",
     "kind": "function",
-    "line": 131
+    "line": 132
    },
    {
     "name": "get",
     "kind": "method",
-    "line": 137
+    "line": 138
    },
    {
     "name": "getSharp",
     "kind": "function",
-    "line": 146
+    "line": 147
    },
    {
     "name": "getOcrWorker",
     "kind": "function",
-    "line": 155
+    "line": 156
    },
    {
     "name": "getExiftool",
     "kind": "function",
-    "line": 175
+    "line": 176
    },
    {
     "name": "getFfmpegPath",
     "kind": "function",
-    "line": 183
+    "line": 184
    },
    {
     "name": "getLibraryStore",
     "kind": "function",
-    "line": 215
+    "line": 216
    },
    {
     "name": "safeRegister",
     "kind": "function",
-    "line": 222
+    "line": 223
    },
    {
     "name": "getYtDlpTools",
     "kind": "function",
-    "line": 262
+    "line": 264
    },
    {
     "name": "isDev",
     "kind": "function",
-    "line": 267
+    "line": 269
    },
    {
     "name": "normalizeAccessPath",
     "kind": "function",
-    "line": 291
+    "line": 293
    },
    {
     "name": "isPathInside",
     "kind": "function",
-    "line": 301
+    "line": 303
    },
    {
     "name": "grantFilePath",
     "kind": "function",
-    "line": 307
+    "line": 309
    },
    {
     "name": "grantDirectoryPath",
     "kind": "function",
-    "line": 312
+    "line": 314
    },
    {
     "name": "hasFileAccessGrant",
     "kind": "function",
-    "line": 317
+    "line": 319
    },
    {
     "name": "assertOutputDirGranted",
     "kind": "function",
-    "line": 329
+    "line": 331
    },
    {
     "name": "assertFileAccessGranted",
     "kind": "function",
-    "line": 335
+    "line": 337
    },
    {
     "name": "assertFileAccessGrantedMany",
     "kind": "function",
-    "line": 344
+    "line": 346
    },
    {
     "name": "psSingleQuote",
     "kind": "function",
-    "line": 350
+    "line": 352
    },
    {
     "name": "loadRuntimeConfig",
     "kind": "function",
-    "line": 354
+    "line": 356
    },
    {
     "name": "isAllowedExternalProtocol",
     "kind": "function",
-    "line": 364
+    "line": 366
    },
    {
     "name": "getAllowedExternalUrl",
     "kind": "function",
-    "line": 368
+    "line": 370
    },
    {
     "name": "openAllowedExternalUrlDetached",
     "kind": "function",
-    "line": 378
+    "line": 380
    },
    {
     "name": "isEmbeddedExternalProtocol",
     "kind": "function",
-    "line": 389
+    "line": 391
    },
    {
     "name": "handleEmbeddedExternalNavigation",
     "kind": "function",
-    "line": 393
+    "line": 395
    },
    {
     "name": "isTrustedAppNavigation",
     "kind": "function",
-    "line": 405
+    "line": 407
    },
    {
     "name": "getAppIconPath",
     "kind": "function",
-    "line": 415
+    "line": 417
    },
    {
     "name": "showMainWindow",
     "kind": "function",
-    "line": 430
+    "line": 432
    },
    {
     "name": "ensureTray",
     "kind": "function",
-    "line": 443
+    "line": 445
    },
    {
     "name": "hideWindowToBackground",
     "kind": "function",
-    "line": 470
+    "line": 472
    },
    {
     "name": "computeJunkEstimate",
     "kind": "function",
-    "line": 478
+    "line": 480
    },
    {
     "name": "work",
     "kind": "function",
-    "line": 488
+    "line": 490
    },
    {
     "name": "createMainWindow",
     "kind": "function",
-    "line": 513
+    "line": 515
    },
    {
     "name": "kickWindowsPaint",
     "kind": "function",
-    "line": 578
+    "line": 580
    },
    {
     "name": "showWhenReady",
     "kind": "function",
-    "line": 650
+    "line": 652
    },
    {
     "name": "eventSender",
     "kind": "function",
-    "line": 735
+    "line": 737
    },
    {
     "name": "measureLatency",
     "kind": "function",
-    "line": 762
+    "line": 764
    },
    {
     "name": "getActiveAdapterName",
     "kind": "function",
-    "line": 792
+    "line": 794
    },
    {
     "name": "getMainCpuLoad",
     "kind": "function",
-    "line": 1028
+    "line": 1030
    },
    {
     "name": "broadcastLibraryEvent",
     "kind": "function",
-    "line": 1172
+    "line": 1174
    },
    {
     "name": "scoreExecutable",
     "kind": "function",
-    "line": 1248
+    "line": 1250
    },
    {
     "name": "key",
     "kind": "function",
-    "line": 1253
+    "line": 1255
    },
    {
     "name": "scanDirectoryForBestExe",
     "kind": "function",
-    "line": 1274
+    "line": 1276
    },
    {
     "name": "walk",
     "kind": "function",
-    "line": 1277
+    "line": 1279
    },
    {
     "name": "findPgeBat",
     "kind": "function",
-    "line": 1418
+    "line": 1420
    },
    {
     "name": "launchPgeBat",
     "kind": "function",
-    "line": 1438
+    "line": 1440
    },
    {
     "name": "isStartupTaskEnabled",
     "kind": "function",
-    "line": 1514
+    "line": 1516
    },
    {
     "name": "setStartupTask",
     "kind": "function",
-    "line": 1524
+    "line": 1526
    },
    {
     "name": "refreshLiveCounts",
     "kind": "function",
-    "line": 1635
+    "line": 1637
    },
    {
     "name": "sendEvent",
     "kind": "function",
-    "line": 1895
+    "line": 1897
    },
    {
     "name": "buildArgs",
     "kind": "function",
-    "line": 2063
+    "line": 2065
    },
    {
     "name": "vaultFilePath",
     "kind": "function",
-    "line": 2337
+    "line": 2339
    },
    {
     "name": "setVaultAutoLockMinutes",
     "kind": "function",
-    "line": 2345
+    "line": 2347
    },
    {
     "name": "clearVaultAutoLock",
     "kind": "function",
-    "line": 2352
+    "line": 2354
    },
    {
     "name": "scheduleVaultAutoLock",
     "kind": "function",
-    "line": 2359
+    "line": 2361
    },
    {
     "name": "touchVault",
     "kind": "function",
-    "line": 2368
+    "line": 2370
    },
    {
     "name": "vaultFileExists",
     "kind": "function",
-    "line": 2372
+    "line": 2374
    },
    {
     "name": "readVaultFile",
     "kind": "function",
-    "line": 2381
+    "line": 2383
    },
    {
     "name": "writeVaultFile",
     "kind": "function",
-    "line": 2386
+    "line": 2388
    },
    {
     "name": "lockVault",
     "kind": "function",
-    "line": 2394
+    "line": 2396
    },
    {
     "name": "ensureUnlocked",
     "kind": "function",
-    "line": 2401
+    "line": 2403
    },
    {
     "name": "loadVaultUsingWrapper",
     "kind": "function",
-    "line": 2406
+    "line": 2408
    },
    {
     "name": "persistVaultData",
     "kind": "function",
-    "line": 2427
+    "line": 2429
    },
    {
     "name": "getSecurityScoreV2",
     "kind": "function",
-    "line": 2799
+    "line": 2801
    },
    {
     "name": "add",
     "kind": "function",
-    "line": 2804
+    "line": 2806
    },
    {
     "name": "isValidHostname",
     "kind": "function",
-    "line": 2981
+    "line": 2983
    },
    {
     "name": "getClickEnginePath",
     "kind": "function",
-    "line": 3115
+    "line": 3117
    },
    {
     "name": "autoClickerCall",
     "kind": "function",
-    "line": 3141
+    "line": 3143
    },
    {
     "name": "isValidWingetId",
     "kind": "function",
-    "line": 3221
+    "line": 3223
    },
    {
     "name": "installGithubReleaseMsi",
     "kind": "function",
-    "line": 3233
+    "line": 3235
    },
    {
     "name": "installFromOfficialUrl",
     "kind": "function",
-    "line": 3261
+    "line": 3263
    },
    {
     "name": "progress",
     "kind": "function",
-    "line": 3297
+    "line": 3299
    },
    {
     "name": "runWinget",
     "kind": "function",
-    "line": 3322
+    "line": 3324
    },
    {
     "name": "runDeferredStartup",
     "kind": "function",
-    "line": 3404
+    "line": 3406
    }
   ],
   "electron/networkIPC.js": [
@@ -17606,37 +18902,42 @@
    {
     "name": "handler",
     "kind": "function",
-    "line": 609
+    "line": 640
    },
    {
     "name": "handler",
     "kind": "function",
-    "line": 624
-   },
-   {
-    "name": "listener",
-    "kind": "function",
-    "line": 647
-   },
-   {
-    "name": "listener",
-    "kind": "function",
-    "line": 676
-   },
-   {
-    "name": "listener",
-    "kind": "function",
-    "line": 711
-   },
-   {
-    "name": "listener",
-    "kind": "function",
-    "line": 738
+    "line": 664
    },
    {
     "name": "handler",
     "kind": "function",
-    "line": 779
+    "line": 679
+   },
+   {
+    "name": "listener",
+    "kind": "function",
+    "line": 702
+   },
+   {
+    "name": "listener",
+    "kind": "function",
+    "line": 731
+   },
+   {
+    "name": "listener",
+    "kind": "function",
+    "line": 766
+   },
+   {
+    "name": "listener",
+    "kind": "function",
+    "line": 793
+   },
+   {
+    "name": "handler",
+    "kind": "function",
+    "line": 834
    }
   ],
   "electron/services/CodeRunner.js": [
@@ -28246,6 +29547,927 @@
     "line": 66
    }
   ],
+  "electron/services/ssh/PortForwardService.js": [
+   {
+    "name": "TunnelError",
+    "kind": "class",
+    "line": 5
+   },
+   {
+    "name": "probeLocalPort",
+    "kind": "function",
+    "line": 13
+   },
+   {
+    "name": "parseSocksGreeting",
+    "kind": "function",
+    "line": 26
+   },
+   {
+    "name": "parseSocksRequest",
+    "kind": "function",
+    "line": 34
+   },
+   {
+    "name": "socksReply",
+    "kind": "function",
+    "line": 62
+   },
+   {
+    "name": "PortForwardService",
+    "kind": "class",
+    "line": 68
+   },
+   {
+    "name": "status",
+    "kind": "method",
+    "line": 77
+   },
+   {
+    "name": "list",
+    "kind": "method",
+    "line": 83
+   },
+   {
+    "name": "emit",
+    "kind": "method",
+    "line": 87
+   },
+   {
+    "name": "track",
+    "kind": "method",
+    "line": 97
+   },
+   {
+    "name": "cleanup",
+    "kind": "function",
+    "line": 102
+   },
+   {
+    "name": "start",
+    "kind": "method",
+    "line": 117
+   },
+   {
+    "name": "listen",
+    "kind": "method",
+    "line": 168
+   },
+   {
+    "name": "handleSocks",
+    "kind": "method",
+    "line": 176
+   },
+   {
+    "name": "fail",
+    "kind": "function",
+    "line": 179
+   },
+   {
+    "name": "onData",
+    "kind": "function",
+    "line": 181
+   },
+   {
+    "name": "teardown",
+    "kind": "method",
+    "line": 212
+   },
+   {
+    "name": "stop",
+    "kind": "method",
+    "line": 225
+   },
+   {
+    "name": "stopAll",
+    "kind": "method",
+    "line": 231
+   },
+   {
+    "name": "autoStart",
+    "kind": "method",
+    "line": 236
+   }
+  ],
+  "electron/services/ssh/SerialService.js": [
+   {
+    "name": "encode",
+    "kind": "function",
+    "line": 65
+   },
+   {
+    "name": "SerialError",
+    "kind": "class",
+    "line": 72
+   },
+   {
+    "name": "validateSerialOptions",
+    "kind": "function",
+    "line": 79
+   },
+   {
+    "name": "SerialService",
+    "kind": "class",
+    "line": 93
+   },
+   {
+    "name": "listPorts",
+    "kind": "method",
+    "line": 101
+   },
+   {
+    "name": "status",
+    "kind": "function",
+    "line": 125
+   },
+   {
+    "name": "settle",
+    "kind": "function",
+    "line": 129
+   },
+   {
+    "name": "output",
+    "kind": "method",
+    "line": 153
+   },
+   {
+    "name": "flush",
+    "kind": "method",
+    "line": 160
+   },
+   {
+    "name": "write",
+    "kind": "method",
+    "line": 168
+   },
+   {
+    "name": "sendBreak",
+    "kind": "method",
+    "line": 179
+   },
+   {
+    "name": "has",
+    "kind": "method",
+    "line": 185
+   },
+   {
+    "name": "finish",
+    "kind": "method",
+    "line": 187
+   },
+   {
+    "name": "close",
+    "kind": "method",
+    "line": 196
+   },
+   {
+    "name": "closeBySender",
+    "kind": "method",
+    "line": 206
+   },
+   {
+    "name": "closeAll",
+    "kind": "method",
+    "line": 210
+   }
+  ],
+  "electron/services/ssh/SftpService.js": [
+   {
+    "name": "SftpError",
+    "kind": "class",
+    "line": 17
+   },
+   {
+    "name": "isDirMode",
+    "kind": "function",
+    "line": 28
+   },
+   {
+    "name": "modeString",
+    "kind": "function",
+    "line": 30
+   },
+   {
+    "name": "normalizeRemote",
+    "kind": "function",
+    "line": 38
+   },
+   {
+    "name": "normalizeLocal",
+    "kind": "function",
+    "line": 44
+   },
+   {
+    "name": "parseMode",
+    "kind": "function",
+    "line": 51
+   },
+   {
+    "name": "decodeText",
+    "kind": "function",
+    "line": 61
+   },
+   {
+    "name": "encodeText",
+    "kind": "function",
+    "line": 76
+   },
+   {
+    "name": "remoteEntry",
+    "kind": "function",
+    "line": 83
+   },
+   {
+    "name": "p",
+    "kind": "function",
+    "line": 99
+   },
+   {
+    "name": "shq",
+    "kind": "function",
+    "line": 103
+   },
+   {
+    "name": "execCapture",
+    "kind": "function",
+    "line": 107
+   },
+   {
+    "name": "sftpOverStream",
+    "kind": "function",
+    "line": 126
+   },
+   {
+    "name": "fail",
+    "kind": "function",
+    "line": 148
+   },
+   {
+    "name": "openSudoSftp",
+    "kind": "function",
+    "line": 162
+   },
+   {
+    "name": "permErr",
+    "kind": "function",
+    "line": 182
+   },
+   {
+    "name": "notFound",
+    "kind": "function",
+    "line": 183
+   },
+   {
+    "name": "SftpService",
+    "kind": "class",
+    "line": 190
+   },
+   {
+    "name": "open",
+    "kind": "method",
+    "line": 207
+   },
+   {
+    "name": "dropped",
+    "kind": "method",
+    "line": 237
+   },
+   {
+    "name": "handle",
+    "kind": "method",
+    "line": 242
+   },
+   {
+    "name": "close",
+    "kind": "method",
+    "line": 248
+   },
+   {
+    "name": "listLocal",
+    "kind": "method",
+    "line": 261
+   },
+   {
+    "name": "listDrives",
+    "kind": "method",
+    "line": 276
+   },
+   {
+    "name": "listRemote",
+    "kind": "method",
+    "line": 282
+   },
+   {
+    "name": "side",
+    "kind": "method",
+    "line": 297
+   },
+   {
+    "name": "remoteExists",
+    "kind": "method",
+    "line": 326
+   },
+   {
+    "name": "remoteRename",
+    "kind": "method",
+    "line": 331
+   },
+   {
+    "name": "walk",
+    "kind": "method",
+    "line": 343
+   },
+   {
+    "name": "visit",
+    "kind": "function",
+    "line": 345
+   },
+   {
+    "name": "transfer",
+    "kind": "method",
+    "line": 364
+   },
+   {
+    "name": "emit",
+    "kind": "function",
+    "line": 388
+   },
+   {
+    "name": "copyFile",
+    "kind": "function",
+    "line": 404
+   },
+   {
+    "name": "cancelTransfer",
+    "kind": "method",
+    "line": 466
+   },
+   {
+    "name": "readText",
+    "kind": "method",
+    "line": 474
+   },
+   {
+    "name": "readAll",
+    "kind": "method",
+    "line": 490
+   },
+   {
+    "name": "writeText",
+    "kind": "method",
+    "line": 507
+   },
+   {
+    "name": "stat",
+    "kind": "method",
+    "line": 546
+   },
+   {
+    "name": "du",
+    "kind": "method",
+    "line": 561
+   },
+   {
+    "name": "editExternal",
+    "kind": "method",
+    "line": 570
+   },
+   {
+    "name": "check",
+    "kind": "function",
+    "line": 587
+   },
+   {
+    "name": "stopWatch",
+    "kind": "method",
+    "line": 625
+   },
+   {
+    "name": "listWatches",
+    "kind": "method",
+    "line": 635
+   },
+   {
+    "name": "removeRemote",
+    "kind": "method",
+    "line": 640
+   },
+   {
+    "name": "fsOp",
+    "kind": "method",
+    "line": 654
+   },
+   {
+    "name": "q",
+    "kind": "function",
+    "line": 694
+   },
+   {
+    "name": "closeAll",
+    "kind": "method",
+    "line": 710
+   }
+  ],
+  "electron/services/ssh/SshSessionManager.js": [
+   {
+    "name": "SshConnectError",
+    "kind": "class",
+    "line": 19
+   },
+   {
+    "name": "classifyError",
+    "kind": "function",
+    "line": 27
+   },
+   {
+    "name": "errorCode",
+    "kind": "function",
+    "line": 33
+   },
+   {
+    "name": "safeMessage",
+    "kind": "function",
+    "line": 41
+   },
+   {
+    "name": "stripAnsi",
+    "kind": "function",
+    "line": 46
+   },
+   {
+    "name": "makeDecoder",
+    "kind": "function",
+    "line": 50
+   },
+   {
+    "name": "SshSessionManager",
+    "kind": "class",
+    "line": 62
+   },
+   {
+    "name": "Client",
+    "kind": "method",
+    "line": 75
+   },
+   {
+    "name": "resolveHostKey",
+    "kind": "method",
+    "line": 82
+   },
+   {
+    "name": "pendingPrompts",
+    "kind": "method",
+    "line": 94
+   },
+   {
+    "name": "makeVerifier",
+    "kind": "method",
+    "line": 98
+   },
+   {
+    "name": "cancelPromptsOf",
+    "kind": "method",
+    "line": 120
+   },
+   {
+    "name": "resolveAuthPrompt",
+    "kind": "method",
+    "line": 127
+   },
+   {
+    "name": "pendingAuthPrompts",
+    "kind": "method",
+    "line": 138
+   },
+   {
+    "name": "makeKeyboardHandler",
+    "kind": "method",
+    "line": 142
+   },
+   {
+    "name": "authFor",
+    "kind": "method",
+    "line": 167
+   },
+   {
+    "name": "connectOne",
+    "kind": "method",
+    "line": 184
+   },
+   {
+    "name": "connectClient",
+    "kind": "method",
+    "line": 229
+   },
+   {
+    "name": "drop",
+    "kind": "function",
+    "line": 248
+   },
+   {
+    "name": "status",
+    "kind": "function",
+    "line": 280
+   },
+   {
+    "name": "runStartupSnippets",
+    "kind": "method",
+    "line": 316
+   },
+   {
+    "name": "startLog",
+    "kind": "method",
+    "line": 326
+   },
+   {
+    "name": "setLogging",
+    "kind": "method",
+    "line": 341
+   },
+   {
+    "name": "push",
+    "kind": "method",
+    "line": 349
+   },
+   {
+    "name": "flush",
+    "kind": "method",
+    "line": 363
+   },
+   {
+    "name": "finish",
+    "kind": "method",
+    "line": 377
+   },
+   {
+    "name": "write",
+    "kind": "method",
+    "line": 391
+   },
+   {
+    "name": "resize",
+    "kind": "method",
+    "line": 407
+   },
+   {
+    "name": "disconnect",
+    "kind": "method",
+    "line": 415
+   },
+   {
+    "name": "disconnectBySender",
+    "kind": "method",
+    "line": 423
+   },
+   {
+    "name": "listSessions",
+    "kind": "method",
+    "line": 427
+   },
+   {
+    "name": "disposeAll",
+    "kind": "method",
+    "line": 431
+   }
+  ],
+  "electron/services/ssh/SshVaultStore.js": [
+   {
+    "name": "SshVaultError",
+    "kind": "class",
+    "line": 26
+   },
+   {
+    "name": "fail",
+    "kind": "function",
+    "line": 33
+   },
+   {
+    "name": "now",
+    "kind": "function",
+    "line": 34
+   },
+   {
+    "name": "newId",
+    "kind": "function",
+    "line": 35
+   },
+   {
+    "name": "str",
+    "kind": "function",
+    "line": 36
+   },
+   {
+    "name": "req",
+    "kind": "function",
+    "line": 37
+   },
+   {
+    "name": "optId",
+    "kind": "function",
+    "line": 42
+   },
+   {
+    "name": "validPort",
+    "kind": "function",
+    "line": 43
+   },
+   {
+    "name": "tags",
+    "kind": "function",
+    "line": 48
+   },
+   {
+    "name": "hostname",
+    "kind": "function",
+    "line": 52
+   },
+   {
+    "name": "emptyData",
+    "kind": "function",
+    "line": 59
+   },
+   {
+    "name": "normalizeTerminalSettings",
+    "kind": "function",
+    "line": 68
+   },
+   {
+    "name": "n",
+    "kind": "function",
+    "line": 69
+   },
+   {
+    "name": "b",
+    "kind": "function",
+    "line": 70
+   },
+   {
+    "name": "SshVaultStore",
+    "kind": "class",
+    "line": 87
+   },
+   {
+    "name": "load",
+    "kind": "method",
+    "line": 101
+   },
+   {
+    "name": "save",
+    "kind": "method",
+    "line": 121
+   },
+   {
+    "name": "encrypt",
+    "kind": "method",
+    "line": 130
+   },
+   {
+    "name": "decrypt",
+    "kind": "method",
+    "line": 135
+   },
+   {
+    "name": "credentialSummary",
+    "kind": "method",
+    "line": 142
+   },
+   {
+    "name": "getState",
+    "kind": "method",
+    "line": 151
+   },
+   {
+    "name": "getSettings",
+    "kind": "method",
+    "line": 167
+   },
+   {
+    "name": "saveSettings",
+    "kind": "method",
+    "line": 172
+   },
+   {
+    "name": "saveGroup",
+    "kind": "method",
+    "line": 181
+   },
+   {
+    "name": "deleteGroup",
+    "kind": "method",
+    "line": 215
+   },
+   {
+    "name": "getHost",
+    "kind": "method",
+    "line": 226
+   },
+   {
+    "name": "resolveJumpChain",
+    "kind": "method",
+    "line": 232
+   },
+   {
+    "name": "saveHost",
+    "kind": "method",
+    "line": 248
+   },
+   {
+    "name": "deleteHost",
+    "kind": "method",
+    "line": 303
+   },
+   {
+    "name": "touchHost",
+    "kind": "method",
+    "line": 316
+   },
+   {
+    "name": "saveCredential",
+    "kind": "method",
+    "line": 324
+   },
+   {
+    "name": "generateKey",
+    "kind": "method",
+    "line": 378
+   },
+   {
+    "name": "deleteCredential",
+    "kind": "method",
+    "line": 403
+   },
+   {
+    "name": "getAuthMaterial",
+    "kind": "method",
+    "line": 413
+   },
+   {
+    "name": "findKnownHost",
+    "kind": "method",
+    "line": 423
+   },
+   {
+    "name": "checkHostKey",
+    "kind": "method",
+    "line": 433
+   },
+   {
+    "name": "trustKnownHost",
+    "kind": "method",
+    "line": 444
+   },
+   {
+    "name": "deleteKnownHost",
+    "kind": "method",
+    "line": 470
+   },
+   {
+    "name": "getSnippet",
+    "kind": "method",
+    "line": 479
+   },
+   {
+    "name": "savePackage",
+    "kind": "method",
+    "line": 484
+   },
+   {
+    "name": "saveSnippet",
+    "kind": "method",
+    "line": 503
+   },
+   {
+    "name": "deleteSnippet",
+    "kind": "method",
+    "line": 529
+   },
+   {
+    "name": "getTunnel",
+    "kind": "method",
+    "line": 546
+   },
+   {
+    "name": "saveTunnel",
+    "kind": "method",
+    "line": 551
+   },
+   {
+    "name": "deleteTunnel",
+    "kind": "method",
+    "line": 591
+   },
+   {
+    "name": "addSessionLog",
+    "kind": "method",
+    "line": 600
+   },
+   {
+    "name": "updateSessionLog",
+    "kind": "method",
+    "line": 619
+   }
+  ],
+  "electron/services/ssh/snippetTemplate.js": [
+   {
+    "name": "SnippetArgError",
+    "kind": "class",
+    "line": 10
+   },
+   {
+    "name": "placeholdersOf",
+    "kind": "function",
+    "line": 19
+   },
+   {
+    "name": "normalizeArgsSchema",
+    "kind": "function",
+    "line": 26
+   },
+   {
+    "name": "shellQuote",
+    "kind": "function",
+    "line": 42
+   },
+   {
+    "name": "renderSnippet",
+    "kind": "function",
+    "line": 53
+   }
+  ],
+  "electron/services/ssh/sshConfigParser.js": [
+   {
+    "name": "unquote",
+    "kind": "function",
+    "line": 5
+   },
+   {
+    "name": "parseSshConfig",
+    "kind": "function",
+    "line": 10
+   },
+   {
+    "name": "wildcard",
+    "kind": "function",
+    "line": 33
+   }
+  ],
+  "electron/services/ssh/sshKeys.js": [
+   {
+    "name": "utils",
+    "kind": "function",
+    "line": 6
+   },
+   {
+    "name": "fingerprintOfBlob",
+    "kind": "function",
+    "line": 9
+   },
+   {
+    "name": "keyTypeOfBlob",
+    "kind": "function",
+    "line": 14
+   },
+   {
+    "name": "hostKeyInfo",
+    "kind": "function",
+    "line": 23
+   },
+   {
+    "name": "publicKeyInfo",
+    "kind": "function",
+    "line": 29
+   },
+   {
+    "name": "rsaBits",
+    "kind": "function",
+    "line": 36
+   },
+   {
+    "name": "next",
+    "kind": "function",
+    "line": 40
+   },
+   {
+    "name": "algorithmOf",
+    "kind": "function",
+    "line": 49
+   },
+   {
+    "name": "parsePrivateKey",
+    "kind": "function",
+    "line": 60
+   },
+   {
+    "name": "generateSshKeyPair",
+    "kind": "function",
+    "line": 84
+   },
+   {
+    "name": "done",
+    "kind": "function",
+    "line": 88
+   }
+  ],
   "electron/services/startup/StartupService.js": [
    {
     "name": "Approved",
@@ -31815,32 +34037,32 @@
    {
     "name": "pageFromHash",
     "kind": "function",
-    "line": 57
+    "line": 58
    },
    {
     "name": "PageLoading",
     "kind": "component",
-    "line": 62
+    "line": 63
    },
    {
     "name": "App",
     "kind": "component",
-    "line": 77
+    "line": 78
    },
    {
     "name": "onHash",
     "kind": "function",
-    "line": 92
+    "line": 93
    },
    {
     "name": "reportRenderError",
     "kind": "function",
-    "line": 98
+    "line": 99
    },
    {
     "name": "renderPage",
     "kind": "function",
-    "line": 102
+    "line": 103
    }
   ],
   "src/components/DetailedHardwareInfo.tsx": [
@@ -34047,6 +36269,748 @@
     "line": 68
    }
   ],
+  "src/components/ssh/EditorTabView.tsx": [
+   {
+    "name": "languageFor",
+    "kind": "function",
+    "line": 38
+   },
+   {
+    "name": "EditorTabView",
+    "kind": "component",
+    "line": 45
+   },
+   {
+    "name": "reload",
+    "kind": "function",
+    "line": 159
+   },
+   {
+    "name": "changeEol",
+    "kind": "function",
+    "line": 164
+   }
+  ],
+  "src/components/ssh/HostsView.tsx": [
+   {
+    "name": "HostDrawer",
+    "kind": "component",
+    "line": 12
+   },
+   {
+    "name": "set",
+    "kind": "function",
+    "line": 18
+   },
+   {
+    "name": "save",
+    "kind": "function",
+    "line": 19
+   },
+   {
+    "name": "PasswordPrompt",
+    "kind": "component",
+    "line": 80
+   },
+   {
+    "name": "useConnect",
+    "kind": "function",
+    "line": 92
+   },
+   {
+    "name": "connect",
+    "kind": "function",
+    "line": 94
+   },
+   {
+    "name": "HostsView",
+    "kind": "component",
+    "line": 106
+   },
+   {
+    "name": "del",
+    "kind": "function",
+    "line": 123
+   },
+   {
+    "name": "saveGroup",
+    "kind": "function",
+    "line": 129
+   },
+   {
+    "name": "delGroup",
+    "kind": "function",
+    "line": 136
+   },
+   {
+    "name": "previewImport",
+    "kind": "function",
+    "line": 142
+   },
+   {
+    "name": "doImport",
+    "kind": "function",
+    "line": 149
+   },
+   {
+    "name": "hostCount",
+    "kind": "function",
+    "line": 155
+   }
+  ],
+  "src/components/ssh/KeychainView.tsx": [
+   {
+    "name": "CredentialDrawer",
+    "kind": "component",
+    "line": 7
+   },
+   {
+    "name": "set",
+    "kind": "function",
+    "line": 12
+   },
+   {
+    "name": "save",
+    "kind": "function",
+    "line": 13
+   },
+   {
+    "name": "GenerateDrawer",
+    "kind": "component",
+    "line": 54
+   },
+   {
+    "name": "gen",
+    "kind": "function",
+    "line": 62
+   },
+   {
+    "name": "KeychainView",
+    "kind": "component",
+    "line": 97
+   },
+   {
+    "name": "del",
+    "kind": "function",
+    "line": 101
+   },
+   {
+    "name": "KnownHostsView",
+    "kind": "component",
+    "line": 139
+   },
+   {
+    "name": "revoke",
+    "kind": "function",
+    "line": 141
+   },
+   {
+    "name": "HostKeyPrompt",
+    "kind": "component",
+    "line": 188
+   },
+   {
+    "name": "answer",
+    "kind": "function",
+    "line": 192
+   }
+  ],
+  "src/components/ssh/SftpView.tsx": [
+   {
+    "name": "Side",
+    "kind": "type",
+    "line": 12
+   },
+   {
+    "name": "SortKey",
+    "kind": "type",
+    "line": 13
+   },
+   {
+    "name": "SideState",
+    "kind": "type",
+    "line": 14
+   },
+   {
+    "name": "emptySide",
+    "kind": "function",
+    "line": 18
+   },
+   {
+    "name": "DND",
+    "kind": "component",
+    "line": 19
+   },
+   {
+    "name": "baseName",
+    "kind": "function",
+    "line": 20
+   },
+   {
+    "name": "joinPath",
+    "kind": "function",
+    "line": 21
+   },
+   {
+    "name": "isDirLike",
+    "kind": "function",
+    "line": 22
+   },
+   {
+    "name": "TItem",
+    "kind": "type",
+    "line": 23
+   },
+   {
+    "name": "ConflictAsk",
+    "kind": "type",
+    "line": 24
+   },
+   {
+    "name": "sortEntries",
+    "kind": "function",
+    "line": 26
+   },
+   {
+    "name": "ContextMenu",
+    "kind": "component",
+    "line": 40
+   },
+   {
+    "name": "PermGrid",
+    "kind": "component",
+    "line": 55
+   },
+   {
+    "name": "PropertiesModal",
+    "kind": "component",
+    "line": 71
+   },
+   {
+    "name": "calc",
+    "kind": "function",
+    "line": 79
+   },
+   {
+    "name": "apply",
+    "kind": "function",
+    "line": 80
+   },
+   {
+    "name": "PaneProps",
+    "kind": "type",
+    "line": 110
+   },
+   {
+    "name": "Pane",
+    "kind": "component",
+    "line": 117
+   },
+   {
+    "name": "click",
+    "kind": "function",
+    "line": 125
+   },
+   {
+    "name": "sortBy",
+    "kind": "function",
+    "line": 133
+   },
+   {
+    "name": "arrow",
+    "kind": "function",
+    "line": 134
+   },
+   {
+    "name": "SftpView",
+    "kind": "component",
+    "line": 220
+   },
+   {
+    "name": "patch",
+    "kind": "function",
+    "line": 249
+   },
+   {
+    "name": "refresh",
+    "kind": "function",
+    "line": 262
+   },
+   {
+    "name": "sudoMessage",
+    "kind": "function",
+    "line": 264
+   },
+   {
+    "name": "askConflict",
+    "kind": "function",
+    "line": 302
+   },
+   {
+    "name": "transferItems",
+    "kind": "function",
+    "line": 305
+   },
+   {
+    "name": "run",
+    "kind": "function",
+    "line": 311
+   },
+   {
+    "name": "selectedItems",
+    "kind": "function",
+    "line": 333
+   },
+   {
+    "name": "fsOp",
+    "kind": "function",
+    "line": 338
+   },
+   {
+    "name": "submitDialog",
+    "kind": "function",
+    "line": 344
+   },
+   {
+    "name": "del",
+    "kind": "function",
+    "line": 361
+   },
+   {
+    "name": "openEntry",
+    "kind": "function",
+    "line": 374
+   },
+   {
+    "name": "editExternal",
+    "kind": "function",
+    "line": 379
+   },
+   {
+    "name": "onKey",
+    "kind": "function",
+    "line": 384
+   },
+   {
+    "name": "paneActions",
+    "kind": "function",
+    "line": 396
+   },
+   {
+    "name": "menuItems",
+    "kind": "function",
+    "line": 410
+   }
+  ],
+  "src/components/ssh/SnippetsView.tsx": [
+   {
+    "name": "placeholders",
+    "kind": "function",
+    "line": 8
+   },
+   {
+    "name": "SnippetDrawer",
+    "kind": "component",
+    "line": 10
+   },
+   {
+    "name": "argOf",
+    "kind": "function",
+    "line": 16
+   },
+   {
+    "name": "setArg",
+    "kind": "function",
+    "line": 17
+   },
+   {
+    "name": "save",
+    "kind": "function",
+    "line": 18
+   },
+   {
+    "name": "RunSnippetModal",
+    "kind": "component",
+    "line": 58
+   },
+   {
+    "name": "run",
+    "kind": "function",
+    "line": 62
+   },
+   {
+    "name": "SnippetRunnerPanel",
+    "kind": "component",
+    "line": 81
+   },
+   {
+    "name": "fire",
+    "kind": "function",
+    "line": 87
+   },
+   {
+    "name": "SnippetsView",
+    "kind": "component",
+    "line": 114
+   },
+   {
+    "name": "savePkg",
+    "kind": "function",
+    "line": 131
+   },
+   {
+    "name": "del",
+    "kind": "function",
+    "line": 137
+   },
+   {
+    "name": "startRun",
+    "kind": "function",
+    "line": 142
+   }
+  ],
+  "src/components/ssh/SshExtras.tsx": [
+   {
+    "name": "SerialDrawer",
+    "kind": "component",
+    "line": 12
+   },
+   {
+    "name": "load",
+    "kind": "function",
+    "line": 19
+   },
+   {
+    "name": "set",
+    "kind": "function",
+    "line": 27
+   },
+   {
+    "name": "connect",
+    "kind": "function",
+    "line": 28
+   },
+   {
+    "name": "TerminalSettingsDrawer",
+    "kind": "component",
+    "line": 69
+   },
+   {
+    "name": "set",
+    "kind": "function",
+    "line": 73
+   },
+   {
+    "name": "save",
+    "kind": "function",
+    "line": 74
+   },
+   {
+    "name": "check",
+    "kind": "function",
+    "line": 79
+   },
+   {
+    "name": "AuthPromptModal",
+    "kind": "component",
+    "line": 118
+   },
+   {
+    "name": "send",
+    "kind": "function",
+    "line": 121
+   }
+  ],
+  "src/components/ssh/TerminalPane.tsx": [
+   {
+    "name": "Props",
+    "kind": "type",
+    "line": 13
+   },
+   {
+    "name": "beep",
+    "kind": "function",
+    "line": 27
+   },
+   {
+    "name": "TerminalPane",
+    "kind": "component",
+    "line": 36
+   },
+   {
+    "name": "mount",
+    "kind": "function",
+    "line": 59
+   },
+   {
+    "name": "paste",
+    "kind": "function",
+    "line": 94
+   },
+   {
+    "name": "onContext",
+    "kind": "function",
+    "line": 95
+   },
+   {
+    "name": "toggleLog",
+    "kind": "function",
+    "line": 161
+   }
+  ],
+  "src/components/ssh/TunnelsView.tsx": [
+   {
+    "name": "Switch",
+    "kind": "component",
+    "line": 8
+   },
+   {
+    "name": "TunnelDrawer",
+    "kind": "component",
+    "line": 17
+   },
+   {
+    "name": "set",
+    "kind": "function",
+    "line": 22
+   },
+   {
+    "name": "save",
+    "kind": "function",
+    "line": 23
+   },
+   {
+    "name": "TunnelsView",
+    "kind": "component",
+    "line": 71
+   },
+   {
+    "name": "toggle",
+    "kind": "function",
+    "line": 77
+   },
+   {
+    "name": "del",
+    "kind": "function",
+    "line": 85
+   }
+  ],
+  "src/components/ssh/sshStore.ts": [
+   {
+    "name": "PaneStatus",
+    "kind": "type",
+    "line": 7
+   },
+   {
+    "name": "Pane",
+    "kind": "type",
+    "line": 8
+   },
+   {
+    "name": "TermTab",
+    "kind": "type",
+    "line": 9
+   },
+   {
+    "name": "SftpTab",
+    "kind": "type",
+    "line": 10
+   },
+   {
+    "name": "EditorTab",
+    "kind": "type",
+    "line": 11
+   },
+   {
+    "name": "Tab",
+    "kind": "type",
+    "line": 12
+   },
+   {
+    "name": "State",
+    "kind": "type",
+    "line": 14
+   },
+   {
+    "name": "set",
+    "kind": "function",
+    "line": 24
+   },
+   {
+    "name": "subscribe",
+    "kind": "function",
+    "line": 28
+   },
+   {
+    "name": "useSshStore",
+    "kind": "function",
+    "line": 29
+   },
+   {
+    "name": "getSshState",
+    "kind": "function",
+    "line": 30
+   },
+   {
+    "name": "rid",
+    "kind": "function",
+    "line": 32
+   },
+   {
+    "name": "wire",
+    "kind": "function",
+    "line": 41
+   },
+   {
+    "name": "attachOutput",
+    "kind": "function",
+    "line": 62
+   },
+   {
+    "name": "ensureWired",
+    "kind": "function",
+    "line": 68
+   },
+   {
+    "name": "updatePane",
+    "kind": "function",
+    "line": 71
+   },
+   {
+    "name": "setActive",
+    "kind": "function",
+    "line": 79
+   },
+   {
+    "name": "startSession",
+    "kind": "function",
+    "line": 86
+   },
+   {
+    "name": "reconnectPane",
+    "kind": "function",
+    "line": 98
+   },
+   {
+    "name": "openSerial",
+    "kind": "function",
+    "line": 109
+   },
+   {
+    "name": "setPaneLogging",
+    "kind": "function",
+    "line": 113
+   },
+   {
+    "name": "openTerminal",
+    "kind": "function",
+    "line": 115
+   },
+   {
+    "name": "openSftpTab",
+    "kind": "function",
+    "line": 132
+   },
+   {
+    "name": "patchTab",
+    "kind": "function",
+    "line": 138
+   },
+   {
+    "name": "closePane",
+    "kind": "function",
+    "line": 142
+   },
+   {
+    "name": "openEditor",
+    "kind": "function",
+    "line": 156
+   },
+   {
+    "name": "setEditorDirty",
+    "kind": "function",
+    "line": 164
+   },
+   {
+    "name": "dependentsOf",
+    "kind": "function",
+    "line": 169
+   },
+   {
+    "name": "closeTab",
+    "kind": "function",
+    "line": 174
+   },
+   {
+    "name": "rememberTransfer",
+    "kind": "function",
+    "line": 185
+   },
+   {
+    "name": "clearFinishedTransfers",
+    "kind": "function",
+    "line": 189
+   }
+  ],
+  "src/components/ssh/terminalThemes.ts": [
+   {
+    "name": "TerminalTheme",
+    "kind": "type",
+    "line": 3
+   },
+   {
+    "name": "themeById",
+    "kind": "function",
+    "line": 26
+   }
+  ],
+  "src/components/ssh/ui.tsx": [
+   {
+    "name": "VaultProps",
+    "kind": "type",
+    "line": 5
+   },
+   {
+    "name": "Drawer",
+    "kind": "component",
+    "line": 8
+   },
+   {
+    "name": "onKey",
+    "kind": "function",
+    "line": 10
+   },
+   {
+    "name": "Modal",
+    "kind": "component",
+    "line": 28
+   },
+   {
+    "name": "Field",
+    "kind": "component",
+    "line": 40
+   },
+   {
+    "name": "EmptyState",
+    "kind": "component",
+    "line": 50
+   },
+   {
+    "name": "errText",
+    "kind": "function",
+    "line": 59
+   },
+   {
+    "name": "fmtBytes",
+    "kind": "function",
+    "line": 61
+   },
+   {
+    "name": "fmtDate",
+    "kind": "function",
+    "line": 68
+   }
+  ],
   "src/components/ui/PageHeader.tsx": [
    {
     "name": "PageHeader",
@@ -34837,17 +37801,17 @@
    {
     "name": "SupportedLang",
     "kind": "type",
-    "line": 32
+    "line": 34
    },
    {
     "name": "LanguageOption",
     "kind": "type",
-    "line": 34
+    "line": 36
    },
    {
     "name": "getTranslationTemplate",
     "kind": "function",
-    "line": 3447
+    "line": 3449
    }
   ],
   "src/i18n/overlayEditorMessages.ts": [
@@ -34868,37 +37832,67 @@
    {
     "name": "MainLayoutProps",
     "kind": "type",
-    "line": 17
+    "line": 18
    },
    {
     "name": "NavSection",
     "kind": "type",
-    "line": 23
+    "line": 24
    },
    {
     "name": "MainLayout",
     "kind": "component",
-    "line": 33
+    "line": 35
+   },
+   {
+    "name": "commitLayout",
+    "kind": "function",
+    "line": 163
+   },
+   {
+    "name": "endDrag",
+    "kind": "function",
+    "line": 169
+   },
+   {
+    "name": "onDropNav",
+    "kind": "function",
+    "line": 170
+   },
+   {
+    "name": "overItem",
+    "kind": "function",
+    "line": 178
+   },
+   {
+    "name": "overSection",
+    "kind": "function",
+    "line": 187
+   },
+   {
+    "name": "moveByKey",
+    "kind": "function",
+    "line": 201
    },
    {
     "name": "handleMenuClick",
     "kind": "function",
-    "line": 150
+    "line": 219
    },
    {
     "name": "handleNavKeyDown",
     "kind": "function",
-    "line": 173
+    "line": 242
    },
    {
     "name": "navButton",
     "kind": "function",
-    "line": 188
+    "line": 263
    },
    {
     "name": "rail",
     "kind": "function",
-    "line": 194
+    "line": 269
    }
   ],
   "src/lib/cipherTools.ts": [
@@ -35075,6 +38069,48 @@
     "name": "textIn",
     "kind": "function",
     "line": 28
+   }
+  ],
+  "src/lib/navLayout.ts": [
+   {
+    "name": "NavLayout",
+    "kind": "type",
+    "line": 4
+   },
+   {
+    "name": "HasId",
+    "kind": "type",
+    "line": 5
+   },
+   {
+    "name": "SectionLike",
+    "kind": "type",
+    "line": 6
+   },
+   {
+    "name": "moveItem",
+    "kind": "function",
+    "line": 62
+   },
+   {
+    "name": "moveSection",
+    "kind": "function",
+    "line": 75
+   },
+   {
+    "name": "sameLayout",
+    "kind": "function",
+    "line": 86
+   },
+   {
+    "name": "loadNavLayout",
+    "kind": "function",
+    "line": 90
+   },
+   {
+    "name": "saveNavLayout",
+    "kind": "function",
+    "line": 98
    }
   ],
   "src/lib/shutterSound.ts": [
@@ -37973,6 +41009,53 @@
     "line": 74
    }
   ],
+  "src/pages/SshClient.tsx": [
+   {
+    "name": "Section",
+    "kind": "type",
+    "line": 20
+   },
+   {
+    "name": "QuickConnect",
+    "kind": "component",
+    "line": 22
+   },
+   {
+    "name": "TerminalTabView",
+    "kind": "component",
+    "line": 52
+   },
+   {
+    "name": "themeOf",
+    "kind": "function",
+    "line": 58
+   },
+   {
+    "name": "split",
+    "kind": "function",
+    "line": 59
+   },
+   {
+    "name": "onKey",
+    "kind": "function",
+    "line": 66
+   },
+   {
+    "name": "SshClient",
+    "kind": "component",
+    "line": 110
+   },
+   {
+    "name": "onKey",
+    "kind": "function",
+    "line": 151
+   },
+   {
+    "name": "requestClose",
+    "kind": "function",
+    "line": 165
+   }
+  ],
   "src/pages/StartupManager.tsx": [
    {
     "name": "ListResult",
@@ -39167,6 +42250,18 @@
     "line": 216
    }
   ],
+  "tests/navLayout.test.ts": [
+   {
+    "name": "S",
+    "kind": "function",
+    "line": 4
+   },
+   {
+    "name": "ids",
+    "kind": "function",
+    "line": 5
+   }
+  ],
   "tests/noProhibitedSteamTools.test.ts": [
    {
     "name": "read",
@@ -39411,6 +42506,144 @@
     "name": "fetchImpl",
     "kind": "function",
     "line": 244
+   }
+  ],
+  "tests/sshE2E.test.ts": [
+   {
+    "name": "toFs",
+    "kind": "function",
+    "line": 33
+   },
+   {
+    "name": "attrsOf",
+    "kind": "function",
+    "line": 40
+   },
+   {
+    "name": "sftpHandlers",
+    "kind": "function",
+    "line": 44
+   },
+   {
+    "name": "toFs",
+    "kind": "function",
+    "line": 45
+   },
+   {
+    "name": "h",
+    "kind": "function",
+    "line": 48
+   },
+   {
+    "name": "hid",
+    "kind": "function",
+    "line": 49
+   },
+   {
+    "name": "wrap",
+    "kind": "function",
+    "line": 50
+   },
+   {
+    "name": "done",
+    "kind": "function",
+    "line": 106
+   },
+   {
+    "name": "firstLine",
+    "kind": "function",
+    "line": 107
+   },
+   {
+    "name": "on",
+    "kind": "function",
+    "line": 109
+   },
+   {
+    "name": "setup",
+    "kind": "function",
+    "line": 150
+   }
+  ],
+  "tests/sshKnownHosts.test.ts": [
+   {
+    "name": "blobFor",
+    "kind": "function",
+    "line": 15
+   },
+   {
+    "name": "FakeStream",
+    "kind": "class",
+    "line": 28
+   },
+   {
+    "name": "write",
+    "kind": "method",
+    "line": 32
+   },
+   {
+    "name": "pause",
+    "kind": "method",
+    "line": 34
+   },
+   {
+    "name": "resume",
+    "kind": "method",
+    "line": 35
+   },
+   {
+    "name": "end",
+    "kind": "method",
+    "line": 36
+   },
+   {
+    "name": "FakeClient",
+    "kind": "class",
+    "line": 39
+   },
+   {
+    "name": "connect",
+    "kind": "method",
+    "line": 42
+   },
+   {
+    "name": "shell",
+    "kind": "method",
+    "line": 51
+   },
+   {
+    "name": "forwardOut",
+    "kind": "method",
+    "line": 52
+   },
+   {
+    "name": "end",
+    "kind": "method",
+    "line": 53
+   },
+   {
+    "name": "setup",
+    "kind": "function",
+    "line": 56
+   },
+   {
+    "name": "send",
+    "kind": "function",
+    "line": 147
+   }
+  ],
+  "tests/sshSerial.test.ts": [
+   {
+    "name": "fakeBridge",
+    "kind": "function",
+    "line": 15
+   }
+  ],
+  "tests/sshVault.test.ts": [
+   {
+    "name": "mem",
+    "kind": "function",
+    "line": 17
    }
   ],
   "tests/susuya.test.ts": [

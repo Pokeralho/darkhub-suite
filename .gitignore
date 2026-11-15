@@ -131,3 +131,6 @@ vendor/imagetools/
 
 # compiled shaders are committed: building the engine does not need the Windows SDK
 !native_gpubench/shaders/out/
+
+# planning material for module replicas (third-party screenshots): local only
+replica/

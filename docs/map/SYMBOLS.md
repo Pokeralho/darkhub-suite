@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-12T22:06:46. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-14T21:44:44. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -192,6 +192,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `monitorMode`:16, `readJson`:18, `writeJson`:19, `normalizeShareConfig`:23, `registerShareIPC`:53, `broadcast`:66, `notify`:67, `liveHistory`:68, `upload`:70, `publicEntry`:100, `enhance`:105, `enhanceInBackground`:118, `capture`:148, `bindHotkey`:184, `handle`:193, `state`:200
 
+## `electron/ipc/sshIpc.js`
+
+`makeVaultKeyProvider`:17, `can`:20, `load`:21, `ok`:51, `failOf`:52, `idOf`:57, `registerSshIPC`:60, `broadcast`:67, `handle`:86, `state`:93, `senderFor`:161, `drop`:166, `send`:170, `insideLogs`:194, `dispose`:251
+
 ## `electron/ipc/startupIpc.js`
 
 `registerStartupIPC`:4, `handle`:6
@@ -222,7 +226,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/main.js`
 
-`getSystemInformation`:131, `get`:137, `getSharp`:146, `getOcrWorker`:155, `getExiftool`:175, `getFfmpegPath`:183, `getLibraryStore`:215, `safeRegister`:222, `getYtDlpTools`:262, `isDev`:267, `normalizeAccessPath`:291, `isPathInside`:301, `grantFilePath`:307, `grantDirectoryPath`:312, `hasFileAccessGrant`:317, `assertOutputDirGranted`:329, `assertFileAccessGranted`:335, `assertFileAccessGrantedMany`:344, `psSingleQuote`:350, `loadRuntimeConfig`:354, `isAllowedExternalProtocol`:364, `getAllowedExternalUrl`:368, `openAllowedExternalUrlDetached`:378, `isEmbeddedExternalProtocol`:389, `handleEmbeddedExternalNavigation`:393, `isTrustedAppNavigation`:405, `getAppIconPath`:415, `showMainWindow`:430, `ensureTray`:443, `hideWindowToBackground`:470, `computeJunkEstimate`:478, `work`:488, `createMainWindow`:513, `kickWindowsPaint`:578, `showWhenReady`:650, `eventSender`:735, `measureLatency`:762, `getActiveAdapterName`:792, `getMainCpuLoad`:1028, `broadcastLibraryEvent`:1172, `scoreExecutable`:1248, `key`:1253, `scanDirectoryForBestExe`:1274, `walk`:1277, `findPgeBat`:1418, `launchPgeBat`:1438, `isStartupTaskEnabled`:1514, `setStartupTask`:1524, `refreshLiveCounts`:1635, `sendEvent`:1895, `buildArgs`:2063, `vaultFilePath`:2337, `setVaultAutoLockMinutes`:2345, `clearVaultAutoLock`:2352, `scheduleVaultAutoLock`:2359, `touchVault`:2368, `vaultFileExists`:2372, `readVaultFile`:2381, `writeVaultFile`:2386, `lockVault`:2394, `ensureUnlocked`:2401, `loadVaultUsingWrapper`:2406, `persistVaultData`:2427, `getSecurityScoreV2`:2799, `add`:2804, `isValidHostname`:2981, `getClickEnginePath`:3115, `autoClickerCall`:3141, `isValidWingetId`:3221, `installGithubReleaseMsi`:3233, `installFromOfficialUrl`:3261, `progress`:3297, `runWinget`:3322, `runDeferredStartup`:3404
+`getSystemInformation`:132, `get`:138, `getSharp`:147, `getOcrWorker`:156, `getExiftool`:176, `getFfmpegPath`:184, `getLibraryStore`:216, `safeRegister`:223, `getYtDlpTools`:264, `isDev`:269, `normalizeAccessPath`:293, `isPathInside`:303, `grantFilePath`:309, `grantDirectoryPath`:314, `hasFileAccessGrant`:319, `assertOutputDirGranted`:331, `assertFileAccessGranted`:337, `assertFileAccessGrantedMany`:346, `psSingleQuote`:352, `loadRuntimeConfig`:356, `isAllowedExternalProtocol`:366, `getAllowedExternalUrl`:370, `openAllowedExternalUrlDetached`:380, `isEmbeddedExternalProtocol`:391, `handleEmbeddedExternalNavigation`:395, `isTrustedAppNavigation`:407, `getAppIconPath`:417, `showMainWindow`:432, `ensureTray`:445, `hideWindowToBackground`:472, `computeJunkEstimate`:480, `work`:490, `createMainWindow`:515, `kickWindowsPaint`:580, `showWhenReady`:652, `eventSender`:737, `measureLatency`:764, `getActiveAdapterName`:794, `getMainCpuLoad`:1030, `broadcastLibraryEvent`:1174, `scoreExecutable`:1250, `key`:1255, `scanDirectoryForBestExe`:1276, `walk`:1279, `findPgeBat`:1420, `launchPgeBat`:1440, `isStartupTaskEnabled`:1516, `setStartupTask`:1526, `refreshLiveCounts`:1637, `sendEvent`:1897, `buildArgs`:2065, `vaultFilePath`:2339, `setVaultAutoLockMinutes`:2347, `clearVaultAutoLock`:2354, `scheduleVaultAutoLock`:2361, `touchVault`:2370, `vaultFileExists`:2374, `readVaultFile`:2383, `writeVaultFile`:2388, `lockVault`:2396, `ensureUnlocked`:2403, `loadVaultUsingWrapper`:2408, `persistVaultData`:2429, `getSecurityScoreV2`:2801, `add`:2806, `isValidHostname`:2983, `getClickEnginePath`:3117, `autoClickerCall`:3143, `isValidWingetId`:3223, `installGithubReleaseMsi`:3235, `installFromOfficialUrl`:3263, `progress`:3299, `runWinget`:3324, `runDeferredStartup`:3406
 
 ## `electron/networkIPC.js`
 
@@ -234,7 +238,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:185, `listener`:196, `handler`:235, `handler`:298, `handler`:317, `handler`:327, `handler`:345, `handler`:357, `listener`:400, `handler`:452, `handler`:478, `handler`:484, `handler`:490, `handler`:496, `listener`:505, `listener`:516, `handler`:541, `listener`:554, `listener`:571, `handler`:609, `handler`:624, `listener`:647, `listener`:676, `listener`:711, `listener`:738, `handler`:779
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:185, `listener`:196, `handler`:235, `handler`:298, `handler`:317, `handler`:327, `handler`:345, `handler`:357, `listener`:400, `handler`:452, `handler`:478, `handler`:484, `handler`:490, `handler`:496, `listener`:505, `listener`:516, `handler`:541, `listener`:554, `listener`:571, `handler`:640, `handler`:664, `handler`:679, `listener`:702, `listener`:731, `listener`:766, `listener`:793, `handler`:834
 
 ## `electron/services/CodeRunner.js`
 
@@ -760,6 +764,38 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `wingetOutcome`:15, `parseWingetShow`:26, `pick`:27, `silentInstall`:36, `norm`:52, `signerMatches`:58, `isFetchableUrl`:66
 
+## `electron/services/ssh/PortForwardService.js`
+
+`TunnelError`:5 _class_, `probeLocalPort`:13, `parseSocksGreeting`:26, `parseSocksRequest`:34, `socksReply`:62, `PortForwardService`:68 _class_, `status`:77, `list`:83, `emit`:87, `track`:97, `cleanup`:102, `start`:117, `listen`:168, `handleSocks`:176, `fail`:179, `onData`:181, `teardown`:212, `stop`:225, `stopAll`:231, `autoStart`:236
+
+## `electron/services/ssh/SerialService.js`
+
+`encode`:65, `SerialError`:72 _class_, `validateSerialOptions`:79, `SerialService`:93 _class_, `listPorts`:101, `status`:125, `settle`:129, `output`:153, `flush`:160, `write`:168, `sendBreak`:179, `has`:185, `finish`:187, `close`:196, `closeBySender`:206, `closeAll`:210
+
+## `electron/services/ssh/SftpService.js`
+
+`SftpError`:17 _class_, `isDirMode`:28, `modeString`:30, `normalizeRemote`:38, `normalizeLocal`:44, `parseMode`:51, `decodeText`:61, `encodeText`:76, `remoteEntry`:83, `p`:99, `shq`:103, `execCapture`:107, `sftpOverStream`:126, `fail`:148, `openSudoSftp`:162, `permErr`:182, `notFound`:183, `SftpService`:190 _class_, `open`:207, `dropped`:237, `handle`:242, `close`:248, `listLocal`:261, `listDrives`:276, `listRemote`:282, `side`:297, `remoteExists`:326, `remoteRename`:331, `walk`:343, `visit`:345, `transfer`:364, `emit`:388, `copyFile`:404, `cancelTransfer`:466, `readText`:474, `readAll`:490, `writeText`:507, `stat`:546, `du`:561, `editExternal`:570, `check`:587, `stopWatch`:625, `listWatches`:635, `removeRemote`:640, `fsOp`:654, `q`:694, `closeAll`:710
+
+## `electron/services/ssh/SshSessionManager.js`
+
+`SshConnectError`:19 _class_, `classifyError`:27, `errorCode`:33, `safeMessage`:41, `stripAnsi`:46, `makeDecoder`:50, `SshSessionManager`:62 _class_, `Client`:75, `resolveHostKey`:82, `pendingPrompts`:94, `makeVerifier`:98, `cancelPromptsOf`:120, `resolveAuthPrompt`:127, `pendingAuthPrompts`:138, `makeKeyboardHandler`:142, `authFor`:167, `connectOne`:184, `connectClient`:229, `drop`:248, `status`:280, `runStartupSnippets`:316, `startLog`:326, `setLogging`:341, `push`:349, `flush`:363, `finish`:377, `write`:391, `resize`:407, `disconnect`:415, `disconnectBySender`:423, `listSessions`:427, `disposeAll`:431
+
+## `electron/services/ssh/SshVaultStore.js`
+
+`SshVaultError`:26 _class_, `fail`:33, `now`:34, `newId`:35, `str`:36, `req`:37, `optId`:42, `validPort`:43, `tags`:48, `hostname`:52, `emptyData`:59, `normalizeTerminalSettings`:68, `n`:69, `b`:70, `SshVaultStore`:87 _class_, `load`:101, `save`:121, `encrypt`:130, `decrypt`:135, `credentialSummary`:142, `getState`:151, `getSettings`:167, `saveSettings`:172, `saveGroup`:181, `deleteGroup`:215, `getHost`:226, `resolveJumpChain`:232, `saveHost`:248, `deleteHost`:303, `touchHost`:316, `saveCredential`:324, `generateKey`:378, `deleteCredential`:403, `getAuthMaterial`:413, `findKnownHost`:423, `checkHostKey`:433, `trustKnownHost`:444, `deleteKnownHost`:470, `getSnippet`:479, `savePackage`:484, `saveSnippet`:503, `deleteSnippet`:529, `getTunnel`:546, `saveTunnel`:551, `deleteTunnel`:591, `addSessionLog`:600, `updateSessionLog`:619
+
+## `electron/services/ssh/snippetTemplate.js`
+
+`SnippetArgError`:10 _class_, `placeholdersOf`:19, `normalizeArgsSchema`:26, `shellQuote`:42, `renderSnippet`:53
+
+## `electron/services/ssh/sshConfigParser.js`
+
+`unquote`:5, `parseSshConfig`:10, `wildcard`:33
+
+## `electron/services/ssh/sshKeys.js`
+
+`utils`:6, `fingerprintOfBlob`:9, `keyTypeOfBlob`:14, `hostKeyInfo`:23, `publicKeyInfo`:29, `rsaBits`:36, `next`:40, `algorithmOf`:49, `parsePrivateKey`:60, `generateSshKeyPair`:84, `done`:88
+
 ## `electron/services/startup/StartupService.js`
 
 `Approved`:16, `foreach`:41, `StartupService`:68 _class_, `_history`:73, `_record`:74, `list`:79, `_toggleScript`:98, `setEnabled`:116, `undo`:129
@@ -982,7 +1018,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/App.tsx`
 
-`pageFromHash`:57, `PageLoading`:62 _component_, `App`:77 _component_, `onHash`:92, `reportRenderError`:98, `renderPage`:102
+`pageFromHash`:58, `PageLoading`:63 _component_, `App`:78 _component_, `onHash`:93, `reportRenderError`:99, `renderPage`:103
 
 ## `src/components/DetailedHardwareInfo.tsx`
 
@@ -1232,6 +1268,50 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `RestoreComponentsPanel`:14 _component_, `api`:25, `load`:27, `errorText`:36, `restore`:38, `restoreAll`:61, `pickIso`:63, `badge`:68
 
+## `src/components/ssh/EditorTabView.tsx`
+
+`languageFor`:38, `EditorTabView`:45 _component_, `reload`:159, `changeEol`:164
+
+## `src/components/ssh/HostsView.tsx`
+
+`HostDrawer`:12 _component_, `set`:18, `save`:19, `PasswordPrompt`:80 _component_, `useConnect`:92, `connect`:94, `HostsView`:106 _component_, `del`:123, `saveGroup`:129, `delGroup`:136, `previewImport`:142, `doImport`:149, `hostCount`:155
+
+## `src/components/ssh/KeychainView.tsx`
+
+`CredentialDrawer`:7 _component_, `set`:12, `save`:13, `GenerateDrawer`:54 _component_, `gen`:62, `KeychainView`:97 _component_, `del`:101, `KnownHostsView`:139 _component_, `revoke`:141, `HostKeyPrompt`:188 _component_, `answer`:192
+
+## `src/components/ssh/SftpView.tsx`
+
+`Side`:12 _type_, `SortKey`:13 _type_, `SideState`:14 _type_, `emptySide`:18, `DND`:19 _component_, `baseName`:20, `joinPath`:21, `isDirLike`:22, `TItem`:23 _type_, `ConflictAsk`:24 _type_, `sortEntries`:26, `ContextMenu`:40 _component_, `PermGrid`:55 _component_, `PropertiesModal`:71 _component_, `calc`:79, `apply`:80, `PaneProps`:110 _type_, `Pane`:117 _component_, `click`:125, `sortBy`:133, `arrow`:134, `SftpView`:220 _component_, `patch`:249, `refresh`:262, `sudoMessage`:264, `askConflict`:302, `transferItems`:305, `run`:311, `selectedItems`:333, `fsOp`:338, `submitDialog`:344, `del`:361, `openEntry`:374, `editExternal`:379, `onKey`:384, `paneActions`:396, `menuItems`:410
+
+## `src/components/ssh/SnippetsView.tsx`
+
+`placeholders`:8, `SnippetDrawer`:10 _component_, `argOf`:16, `setArg`:17, `save`:18, `RunSnippetModal`:58 _component_, `run`:62, `SnippetRunnerPanel`:81 _component_, `fire`:87, `SnippetsView`:114 _component_, `savePkg`:131, `del`:137, `startRun`:142
+
+## `src/components/ssh/SshExtras.tsx`
+
+`SerialDrawer`:12 _component_, `load`:19, `set`:27, `connect`:28, `TerminalSettingsDrawer`:69 _component_, `set`:73, `save`:74, `check`:79, `AuthPromptModal`:118 _component_, `send`:121
+
+## `src/components/ssh/TerminalPane.tsx`
+
+`Props`:13 _type_, `beep`:27, `TerminalPane`:36 _component_, `mount`:59, `paste`:94, `onContext`:95, `toggleLog`:161
+
+## `src/components/ssh/TunnelsView.tsx`
+
+`Switch`:8 _component_, `TunnelDrawer`:17 _component_, `set`:22, `save`:23, `TunnelsView`:71 _component_, `toggle`:77, `del`:85
+
+## `src/components/ssh/sshStore.ts`
+
+`PaneStatus`:7 _type_, `Pane`:8 _type_, `TermTab`:9 _type_, `SftpTab`:10 _type_, `EditorTab`:11 _type_, `Tab`:12 _type_, `State`:14 _type_, `set`:24, `subscribe`:28, `useSshStore`:29, `getSshState`:30, `rid`:32, `wire`:41, `attachOutput`:62, `ensureWired`:68, `updatePane`:71, `setActive`:79, `startSession`:86, `reconnectPane`:98, `openSerial`:109, `setPaneLogging`:113, `openTerminal`:115, `openSftpTab`:132, `patchTab`:138, `closePane`:142, `openEditor`:156, `setEditorDirty`:164, `dependentsOf`:169, `closeTab`:174, `rememberTransfer`:185, `clearFinishedTransfers`:189
+
+## `src/components/ssh/terminalThemes.ts`
+
+`TerminalTheme`:3 _type_, `themeById`:26
+
+## `src/components/ssh/ui.tsx`
+
+`VaultProps`:5 _type_, `Drawer`:8 _component_, `onKey`:10, `Modal`:28 _component_, `Field`:40 _component_, `EmptyState`:50 _component_, `errText`:59, `fmtBytes`:61, `fmtDate`:68
+
 ## `src/components/ui/PageHeader.tsx`
 
 `PageHeader`:5 _component_
@@ -1306,7 +1386,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/i18n/messages.ts`
 
-`SupportedLang`:32 _type_, `LanguageOption`:34 _type_, `getTranslationTemplate`:3447
+`SupportedLang`:34 _type_, `LanguageOption`:36 _type_, `getTranslationTemplate`:3449
 
 ## `src/i18n/overlayEditorMessages.ts`
 
@@ -1318,7 +1398,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/layouts/MainLayout.tsx`
 
-`MainLayoutProps`:17 _type_, `NavSection`:23 _type_, `MainLayout`:33 _component_, `handleMenuClick`:150, `handleNavKeyDown`:173, `navButton`:188, `rail`:194
+`MainLayoutProps`:18 _type_, `NavSection`:24 _type_, `MainLayout`:35 _component_, `commitLayout`:163, `endDrag`:169, `onDropNav`:170, `overItem`:178, `overSection`:187, `moveByKey`:201, `handleMenuClick`:219, `handleNavKeyDown`:242, `navButton`:263, `rail`:269
 
 ## `src/lib/cipherTools.ts`
 
@@ -1331,6 +1411,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `src/lib/extensions.ts`
 
 `extPageId`:5, `parseExtPage`:6, `extensionsChanged`:12, `useExtensions`:15, `load`:19, `textIn`:28
+
+## `src/lib/navLayout.ts`
+
+`NavLayout`:4 _type_, `HasId`:5 _type_, `SectionLike`:6 _type_, `moveItem`:62, `moveSection`:75, `sameLayout`:86, `loadNavLayout`:90, `saveNavLayout`:98
 
 ## `src/lib/shutterSound.ts`
 
@@ -1504,6 +1588,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `Cell`:4 _type_, `squarify`:16, `layoutTree`:47, `visit`:49, `hitTest`:66, `formatBytes`:74
 
+## `src/pages/SshClient.tsx`
+
+`Section`:20 _type_, `QuickConnect`:22 _component_, `TerminalTabView`:52 _component_, `themeOf`:58, `split`:59, `onKey`:66, `SshClient`:110 _component_, `onKey`:151, `requestClose`:165
+
 ## `src/pages/StartupManager.tsx`
 
 `ListResult`:7 _type_, `Tab`:8 _type_, `Switch`:10 _component_, `secs`:19, `StartupManager`:21 _component_, `api`:31, `refresh`:32, `toggle`:45, `undo`:56
@@ -1672,6 +1760,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `ffmpegPath`:20, `exiftoolPath`:21, `tmp`:31, `field`:32, `ff`:33, `makeDocx`:80, `makePdf`:91, `cover`:216
 
+## `tests/navLayout.test.ts`
+
+`S`:4, `ids`:5
+
 ## `tests/noProhibitedSteamTools.test.ts`
 
 `read`:10
@@ -1743,6 +1835,22 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/securityAdvanced.test.ts`
 
 `fetchImpl`:244
+
+## `tests/sshE2E.test.ts`
+
+`toFs`:33, `attrsOf`:40, `sftpHandlers`:44, `toFs`:45, `h`:48, `hid`:49, `wrap`:50, `done`:106, `firstLine`:107, `on`:109, `setup`:150
+
+## `tests/sshKnownHosts.test.ts`
+
+`blobFor`:15, `FakeStream`:28 _class_, `write`:32, `pause`:34, `resume`:35, `end`:36, `FakeClient`:39 _class_, `connect`:42, `shell`:51, `forwardOut`:52, `end`:53, `setup`:56, `send`:147
+
+## `tests/sshSerial.test.ts`
+
+`fakeBridge`:15
+
+## `tests/sshVault.test.ts`
+
+`mem`:17
 
 ## `tests/susuya.test.ts`
 

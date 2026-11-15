@@ -41,6 +41,7 @@ const DiskRescue = lazy(() => import('./pages/DiskRescue'));
 const Cleaner = lazy(() => import('./pages/Cleaner'));
 const Maintenance = lazy(() => import('./pages/Maintenance'));
 const UsbControl = lazy(() => import('./pages/UsbControl'));
+const SshClient = lazy(() => import('./pages/SshClient'));
 const Kakugan = lazy(() => import('./pages/Kakugan'));
 const OverlayEditor = lazy(() => import('./pages/OverlayEditor'));
 const Presets = lazy(() => import('./pages/Presets'));
@@ -185,6 +186,8 @@ const App = () => {
         return <StartupManager />;
       case 'usb':
         return <UsbControl />;
+      case 'ssh':
+        return <SshClient />;
       case 'kakugan':
         return <Kakugan />;
       case 'presets':

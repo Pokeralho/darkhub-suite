@@ -471,6 +471,73 @@ export type RescueEvent =
   | { kind: string; event: 'progress'; phase: string; bytes: number; total: number; percent: number; speed_bps: number; eta_s: number; files?: number; found?: number; bad_sectors?: number; slow?: number; very_slow?: number; bad?: number; map?: string | null }
   | { kind: string; event: 'found'; file: RescueCarvedFile };
 
+// ---------- DarkHub SSH (electron/ipc/sshIpc.js) ----------
+export type SshResult<T = {}> = ({ ok: true } & T) | { ok: false; code: string; error: string; isDir?: boolean; deleted?: boolean; mtimeMs?: number; size?: number };
+export type SshOsIcon = 'linux' | 'ubuntu' | 'debian' | 'arch' | 'redhat' | 'windows' | 'macos' | 'freebsd' | 'network' | 'custom';
+export interface SshGroup { id: string; parentId: string | null; name: string; icon: string; color: string; sortOrder: number; createdAt: string; updatedAt: string }
+export interface SshHost {
+  id: string; groupId: string | null; label: string; hostname: string; port: number; username: string; osIcon: SshOsIcon;
+  credentialId: string | null; jumpHostId: string | null; startupSnippetId: string | null; themeId: string; charset: string;
+  keepaliveIntervalMs: number; logSession: boolean; agentForward: boolean; tags: string[]; lastConnectedAt: string | null; createdAt: string; updatedAt: string;
+}
+export type SshHostInput = Partial<Omit<SshHost, 'createdAt' | 'updatedAt' | 'lastConnectedAt'>> & { hostname: string };
+export type SshCredentialKind = 'password' | 'ssh_key' | 'agent';
+/** Public projection: secrets never leave the main process. */
+export interface SshCredentialSummary {
+  id: string; label: string; kind: SshCredentialKind; username: string; algorithm: 'ed25519' | 'rsa-4096' | 'rsa-2048' | 'ecdsa' | null;
+  publicKey: string | null; fingerprintSha256: string | null; hasSecret: boolean; hasPassphrase: boolean; createdAt: string; updatedAt: string;
+}
+export interface SshCredentialInput { id?: string; label: string; kind: SshCredentialKind; username?: string; secret?: string; privateKey?: string; passphrase?: string }
+export interface SshKnownHost { id: string; hostname: string; port: number; keyType: string; fingerprintSha256: string; publicKeyB64: string; trustedAt: string; lastSeenAt: string }
+export interface SshSnippetArg { name: string; label: string; default: string; raw: boolean }
+export interface SshSnippet { id: string; packageId: string | null; name: string; body: string; argsSchema: SshSnippetArg[]; tags: string[]; runOnConnect: boolean; createdAt: string; updatedAt: string }
+export interface SshSnippetPackage { id: string; name: string; description: string; icon: string; createdAt: string; updatedAt: string }
+export type SshTunnelKind = 'local' | 'remote' | 'dynamic';
+export interface SshTunnelRuntime { tunnelId: string; status: 'stopped' | 'starting' | 'active' | 'error'; activeConnections: number; bytesIn: number; bytesOut: number; boundPort?: number | null; error?: string }
+export interface SshTunnel {
+  id: string; hostId: string; label: string; kind: SshTunnelKind; bindAddress: string; bindPort: number; targetHost: string | null; targetPort: number | null;
+  autoStart: boolean; createdAt: string; updatedAt: string; runtime?: SshTunnelRuntime;
+}
+export interface SshSessionLog { id: string; hostId: string | null; hostSnapshot: string; startedAt: string; endedAt: string | null; status: string; errorCode: string | null; logFilePath: string | null }
+export interface SshTerminalSettings {
+  fontSize: number; fontFamily: string; lineHeight: number; cursorStyle: 'block' | 'bar' | 'underline'; cursorBlink: boolean; scrollback: number;
+  copyOnSelect: boolean; rightClickPaste: boolean; bell: boolean; confirmClose: boolean; defaultThemeId: string; logByDefault: boolean;
+}
+export interface SshAuthPrompt { requestId: string; ownerId: string; hostId: string; hostLabel: string; hostname: string; name: string; instructions: string; prompts: { prompt: string; echo: boolean }[] }
+export interface SshWatchEvent { watchId: string; sftpId: string; remotePath: string; localPath: string; status: 'watching' | 'uploading' | 'uploaded' | 'error' | 'stopped'; error?: string; at?: number; reason?: string }
+export interface SshTextFile { path: string; content: string; encoding: 'utf-8' | 'latin1'; eol: 'lf' | 'crlf'; bom: boolean; size: number; mtimeMs: number; mode: number; readOnly: boolean }
+export interface SshFileStat { path: string; type: 'file' | 'dir' | 'link'; size: number; mode: number; mtimeMs: number; atimeMs: number; uid?: number; gid?: number; linkTarget?: string | null }
+export interface SshSerialOptions { port: string; baud: number; dataBits?: 5 | 6 | 7 | 8; parity?: 'None' | 'Odd' | 'Even' | 'Mark' | 'Space'; stopBits?: 'One' | 'OnePointFive' | 'Two'; flow?: 'None' | 'XOnXOff' | 'RequestToSend' | 'RequestToSendXOnXOff'; newline?: 'cr' | 'lf' | 'crlf'; localEcho?: boolean }
+export interface SshHostKeyPrompt {
+  requestId: string; ownerId: string; hostId: string; hostLabel: string; hostname: string; port: number; keyType: string;
+  fingerprintSha256: string; publicKeyB64: string; status: 'unknown' | 'mismatch'; knownFingerprint: string | null;
+}
+export interface SshVaultState {
+  groups: SshGroup[]; hosts: SshHost[]; credentials: SshCredentialSummary[]; knownHosts: SshKnownHost[]; packages: SshSnippetPackage[];
+  snippets: SshSnippet[]; tunnels: SshTunnel[]; sessionLogs: SshSessionLog[]; sessions: { sessionId: string; hostId: string; status: string; logging: boolean; logFile: string | null }[];
+  pendingHostKeys: SshHostKeyPrompt[]; keyProtection: 'dpapi' | 'none';
+  pendingAuth: SshAuthPrompt[]; watches: { watchId: string; sftpId: string; remotePath: string; localPath: string }[]; logsDir: string;
+  settings: { terminal: SshTerminalSettings };
+}
+export interface SshFileEntry { name: string; path: string; type: 'file' | 'dir' | 'link'; size: number; mtimeMs: number; mode: number; permissions: string; linkTarget?: 'dir' | 'file' | 'broken' }
+export interface SshDirListing { path: string; parent: string | null; entries: SshFileEntry[]; drives?: string[] }
+export interface SshTransferProgress {
+  transferId: string; sftpId: string; direction: 'upload' | 'download'; transferredBytes: number; totalBytes: number; speedBps: number; status: 'running' | 'done' | 'failed' | 'cancelled'; error?: string;
+  isDir?: boolean; filesDone?: number; filesTotal?: number; filesSkipped?: number; currentFile?: string | null;
+}
+export interface SshSessionStatusEvent { sessionId: string; status: 'connecting' | 'connected' | 'closed' | 'error' | 'auth_failed' | 'hostkey_rejected'; error?: string; code?: string; hostId?: string }
+export interface SshEventMap {
+  'ssh:session:data': { sessionId: string; data: string };
+  'ssh:session:status': SshSessionStatusEvent;
+  'ssh:sftp:progress': SshTransferProgress;
+  'ssh:tunnel:status': SshTunnelRuntime;
+  'ssh:hostkey:prompt': SshHostKeyPrompt;
+  'ssh:hostkey:resolved': { requestId: string; accepted: boolean };
+  'ssh:auth:prompt': SshAuthPrompt;
+  'ssh:auth:resolved': { requestId: string };
+  'ssh:sftp:watch': SshWatchEvent;
+}
+
 export interface DarkHubAPI {
   darkos: import('./types/darkos').DarkOSAPI;
   hardware: {
@@ -1045,6 +1112,57 @@ export interface DarkHubAPI {
     getTrace: () => Promise<DevTraceEntry[]>;
     clearTrace: () => Promise<{ ok: boolean }>;
     onIpcTrace: (callback: (entry: DevTraceEntry) => void) => () => void;
+  };
+  ssh: {
+    getState: () => Promise<SshResult<SshVaultState>>;
+    saveGroup: (g: { id?: string; name: string; parentId?: string | null; icon?: string; color?: string }) => Promise<SshResult<{ group: SshGroup }>>;
+    deleteGroup: (id: string) => Promise<SshResult>;
+    saveHost: (h: SshHostInput) => Promise<SshResult<{ host: SshHost }>>;
+    deleteHost: (id: string) => Promise<SshResult>;
+    /** dryRun (default true) only previews what ~/.ssh/config would add. */
+    importSshConfig: (p?: { dryRun?: boolean }) => Promise<SshResult<{ imported: Array<SshHost | { alias: string; hostname: string; port: number; username: string; proxyJump: string | null }>; skipped: number; file: string }>>;
+    saveCredential: (c: SshCredentialInput) => Promise<SshResult<{ credential: SshCredentialSummary }>>;
+    generateKey: (p: { label: string; algorithm: 'ed25519' | 'rsa-4096'; passphrase?: string; username?: string }) => Promise<SshResult<{ credential: SshCredentialSummary; publicKey: string }>>;
+    deleteCredential: (id: string) => Promise<SshResult>;
+    /** { requestId } answers a pending handshake prompt; the full key fields add an entry by hand. */
+    trustHostKey: (p: { requestId: string } | { hostname: string; port: number; keyType: string; fingerprintSha256: string; publicKeyB64: string }) => Promise<SshResult<{ knownHost: SshKnownHost | null }>>;
+    rejectHostKey: (requestId: string) => Promise<SshResult<{ resolved: boolean }>>;
+    deleteKnownHost: (id: string) => Promise<SshResult>;
+    connect: (p: { sessionId: string; hostId: string; cols: number; rows: number; password?: string }) => Promise<SshResult<{ sessionId: string; status: string }>>;
+    write: (sessionIds: string[], data: string) => Promise<SshResult<{ writtenCount: number }>>;
+    resize: (sessionId: string, cols: number, rows: number) => Promise<SshResult<{ resized: boolean }>>;
+    disconnect: (sessionId: string) => Promise<SshResult<{ closed: boolean }>>;
+    /** root=true runs the server's sftp-server through sudo (sudoPassword defaults to the login password). */
+    sftpOpen: (p: { sftpId: string; hostId: string; password?: string; root?: boolean; sudoPassword?: string }) => Promise<SshResult<{ remoteCwd: string; localCwd: string; root: boolean }>>;
+    sftpListLocal: (dirPath: string) => Promise<SshResult<SshDirListing>>;
+    sftpListRemote: (sftpId: string, remotePath: string) => Promise<SshResult<SshDirListing>>;
+    sftpTransfer: (p: { transferId: string; sftpId: string; direction: 'upload' | 'download'; localPath: string; remotePath: string; overwrite?: boolean; conflict?: 'fail' | 'overwrite' | 'skip' }) => Promise<SshResult<{ transferId: string; filesDone: number; filesSkipped: number; totalBytes: number }>>;
+    sftpCancelTransfer: (transferId: string) => Promise<SshResult<{ cancelled: boolean }>>;
+    sftpFsOp: (p: { sftpId: string; side: 'local' | 'remote'; op: 'mkdir' | 'rename' | 'delete' | 'chmod' | 'touch' | 'symlink' | 'copy'; path: string; targetPath?: string; mode?: string }) => Promise<SshResult>;
+    sftpReadText: (p: { sftpId: string; side: 'local' | 'remote'; path: string; force?: boolean }) => Promise<SshResult<SshTextFile>>;
+    sftpWriteText: (p: { sftpId: string; side: 'local' | 'remote'; path: string; content: string; encoding?: string; eol?: 'lf' | 'crlf'; bom?: boolean; expectedMtimeMs?: number; expectedSize?: number; force?: boolean; create?: boolean }) => Promise<SshResult<{ path: string; size: number; mtimeMs: number }>>;
+    sftpStat: (p: { sftpId: string; side: 'local' | 'remote'; path: string }) => Promise<SshResult<SshFileStat>>;
+    sftpDu: (p: { sftpId: string; side: 'local' | 'remote'; path: string }) => Promise<SshResult<{ files: number; dirs: number; bytes: number }>>;
+    sftpEditExternal: (p: { sftpId: string; path: string }) => Promise<SshResult<{ watchId: string; localPath: string }>>;
+    sftpStopWatch: (watchId: string) => Promise<SshResult<{ stopped: boolean }>>;
+    setLogging: (sessionId: string, on: boolean) => Promise<SshResult<{ logging: boolean; logFile: string | null }>>;
+    respondAuth: (requestId: string, answers: string[] | null) => Promise<SshResult<{ resolved: boolean }>>;
+    serialPorts: () => Promise<SshResult<{ ports: { port: string; name: string }[] }>>;
+    serialConnect: (p: SshSerialOptions & { sessionId: string }) => Promise<SshResult<{ sessionId: string; status: string }>>;
+    serialBreak: (sessionId: string) => Promise<SshResult<{ sent: boolean }>>;
+    saveSettings: (p: { terminal: Partial<SshTerminalSettings> }) => Promise<SshResult<{ settings: { terminal: SshTerminalSettings } }>>;
+    openLog: (id: string) => Promise<SshResult>;
+    openLogsFolder: () => Promise<SshResult>;
+    pathsOf: (files: FileList | File[]) => string[];
+    sftpClose: (sftpId: string) => Promise<SshResult<{ closed: boolean }>>;
+    saveSnippet: (p: { kind?: 'snippet'; id?: string; name: string; body: string; packageId?: string | null; argsSchema?: Partial<SshSnippetArg>[]; tags?: string[]; runOnConnect?: boolean } | { kind: 'package'; id?: string; name: string; description?: string; icon?: string }) => Promise<SshResult<{ snippet?: SshSnippet; package?: SshSnippetPackage }>>;
+    deleteSnippet: (id: string, kind?: 'snippet' | 'package') => Promise<SshResult>;
+    runSnippet: (p: { snippetId: string; sessionIds: string[]; args?: Record<string, string> }) => Promise<SshResult<{ sentTo: string[] }>>;
+    saveTunnel: (t: { id?: string; hostId: string; label?: string; kind: SshTunnelKind; bindAddress?: string; bindPort: number; targetHost?: string | null; targetPort?: number | null; autoStart?: boolean }) => Promise<SshResult<{ tunnel: SshTunnel }>>;
+    deleteTunnel: (id: string) => Promise<SshResult>;
+    startTunnel: (id: string) => Promise<SshResult<{ status: string; boundPort: number | null }>>;
+    stopTunnel: (id: string) => Promise<SshResult<{ status: string }>>;
+    on: <K extends keyof SshEventMap>(channel: K, callback: (e: SshEventMap[K]) => void) => () => void;
   };
   share: {
     state: () => Promise<ShareState>;

@@ -28,6 +28,8 @@ import { benchmarkMessages } from './benchmarkMessages';
 import { gpuBenchMessages } from './gpuBenchMessages';
 import { overlayMessages } from './overlayMessages';
 import { saveBackupMessages } from './saveBackupMessages';
+import { sshMessages } from './sshMessages';
+import { navMessages } from './navMessages';
 
 export type SupportedLang = 'pt-BR' | 'en-US' | 'es-ES' | 'de-DE' | 'fr-FR' | 'it-IT' | 'ru-RU' | 'zh-CN' | 'ja-JP';
 
@@ -3438,7 +3440,7 @@ export const messages: Record<string, Record<string, string>> = {
 
 };
 
-for (const extra of [darkosMessages, realtimeMessages, optimizerUiMessages, diskMapMessages, networkMessages, devToolsMessages, psToolsMessages, securityMessages, vaultMessages, metadataMessages, converterMessages, decryptMessages, ocrMessages, videoMessages, textEditorMessages, saveBackupMessages, overlayMessages, benchmarkMessages, gpuBenchMessages, startupMessages, usbMessages, maintenanceMessages, driverMessages, restoreMessages, kakuganMessages, overlayEditorMessages, powerMessages, hubMessages, recoveryMessages, cleanerMessages]) {
+for (const extra of [navMessages, sshMessages, darkosMessages, realtimeMessages, optimizerUiMessages, diskMapMessages, networkMessages, devToolsMessages, psToolsMessages, securityMessages, vaultMessages, metadataMessages, converterMessages, decryptMessages, ocrMessages, videoMessages, textEditorMessages, saveBackupMessages, overlayMessages, benchmarkMessages, gpuBenchMessages, startupMessages, usbMessages, maintenanceMessages, driverMessages, restoreMessages, kakuganMessages, overlayEditorMessages, powerMessages, hubMessages, recoveryMessages, cleanerMessages]) {
   for (const [code, dict] of Object.entries(extra)) {
     messages[code] = { ...(messages[code] || {}), ...dict };
   }

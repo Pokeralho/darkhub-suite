@@ -73,6 +73,7 @@ import { registerOverlayIPC } from './ipc/overlayIpc.js'
 import { registerUsbIPC } from './ipc/usbIpc.js'
 import { registerRestoreIPC } from './ipc/restoreIpc.js'
 import { registerShareIPC } from './ipc/shareIpc.js'
+import { registerSshIPC } from './ipc/sshIpc.js'
 import { registerConverterIPC } from './ipc/converterIpc.js'
 import { registerKakuganIPC } from './ipc/kakuganIpc.js'
 import { registerHubIPC } from './ipc/hubIpc.js'
@@ -251,6 +252,7 @@ safeRegister('usb', () => registerUsbIPC({ ipcMain, logger: Logger }))
 safeRegister('restore', () => registerRestoreIPC({ ipcMain, logger: Logger }))
 safeRegister('upscale', () => registerUpscaleIPC({ app, ipcMain, BrowserWindow, logger: Logger }))
 safeRegister('share', () => registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotkeys, BrowserWindow, Notification, logger: Logger }))
+safeRegister('ssh', () => registerSshIPC({ app, ipcMain, BrowserWindow, safeStorage, shell, logger: Logger }))
 hubIpc = safeRegister('hub', () => registerHubIPC({ app, ipcMain, dialog, BrowserWindow, logger: Logger, getMainWindow: () => mainWindow, showMainWindow: () => showMainWindow() }))
 safeRegister('kakugan', () => registerKakuganIPC({
   app, ipcMain, shell, safeStorage, Notification, logger: Logger,
