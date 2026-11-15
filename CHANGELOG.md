@@ -6,6 +6,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-15
+
+### Added
+- **DarkHub SSH, Simple terminal mode** (optional, Classic stays the default): Notepad/VS Code style shortcuts
+  (Ctrl+C copies a selection and otherwise stops the command, Ctrl+V, Ctrl+A, Ctrl+F, word editing), a right-click
+  menu, a command box with history, and a confirmation before pasting several lines.
+- **Disk map**: an explicit "delete for good", confirmed twice by typing the item's name, for items the Recycle Bin
+  cannot take.
+
+### Fixed
+- **Driver Center**: a graphics card Windows has not identified yet (no driver at all) is now recognised and offered
+  its driver.
+- **Disk map**: "Move to Recycle Bin" no longer deletes for good on USB sticks, cards, network drives, a disabled
+  Recycle Bin or items bigger than the bin; it refuses and explains.
+- Security: PowerShell injection through typographic quotes, SFTP downloads writing outside the chosen folder, "edit
+  locally" running scripts, elevated scripts no longer read from %TEMP%, installer re-checked right before it runs.
+- Data safety: SSH vault key never replaced, text editor keeps the file's encoding, partition table backups only
+  restore to their own disk, Cleaner no longer follows junctions, a broken TEMP variable cannot widen "clean temp".
+- Password vault: recovery words now let you set a new master password; changing it rotates the data key.
+- Honest results: Optimizer status, OptiScaler/DLSS 5 restore, downloads, maintenance, winget and clone verification
+  now report failures instead of success.
+- Optimizer: reverting one optimization no longer undoes a part another one still uses; composite reverts ask for
+  administrator rights once; DNS and network tweaks target the adapter in use; Ultimate Performance works where the
+  built-in plan cannot be activated.
+- Hybrid laptops and multi-GPU PCs: the overlay, monitor and GPU Bench read the right card.
+- Saves with Steam/store user ids restore correctly; Steam, Xbox and Epic library discovery.
+
 ## [0.9.0] - 2026-11-14
 
 ### Added
