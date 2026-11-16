@@ -55,7 +55,7 @@ export async function runAuditScenarios(call, step) {
     if (!init?.ok || !Array.isArray(init.recoveryWords)) return { ok: false, detail: `init: ${JSON.stringify(init).slice(0, 120)}` }
     if (init.recoveryPassword) return { ok: false, detail: 'init still returns recoveryPassword' }
     const u1 = await call('vault:unlock', { masterPassword: 'Audit-Master-1' })
-    const add = await call('vault:add', { site: 'example.test', username: 'u', password: 'p4ss', notes: '' })
+    const add = await call('vault:add', { site: 'example.test', username: 'u', password: 'audit-fixture-pass', notes: '' })
     await call('vault:lock')
     // forgotten master: words typed in upper case with extra spaces
     const ur = await call('vault:unlockWithRecoveryWords', { words: `  ${init.recoveryWords.join('  ').toUpperCase()} ` })
