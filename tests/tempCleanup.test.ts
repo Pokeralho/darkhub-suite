@@ -77,8 +77,8 @@ describe('temp cleanup', () => {
 describe('dashboard estimate wiring', () => {
   const main = fs.readFileSync(path.resolve(__dirname, '../electron/main.js'), 'utf8')
   it('reads the cleaner folders and drops its cache after a clean', () => {
-    // the estimate and the Dashboard clean both include the Recycle Bin, so they cannot disagree
-    expect(main).toMatch(/StorageEngine\.analyzeTempFiles\(\{ deadlineMs: timeoutMs, recycleBin: true \}\)/)
+    // the estimate and the Dashboard clean both include the Recycle Bin on Windows; on other platforms recycle-bin is skipped
+    expect(main).toMatch(/StorageEngine\.analyzeTempFiles\(\{ deadlineMs: timeoutMs, recycleBin: process\.platform === 'win32' \}\)/)
     expect(main).not.toMatch(/app\.getPath\('cache'\)/)
     const clean = main.slice(main.indexOf("case 'clean-temp': {"), main.indexOf("case 'repair-windows'"))
     expect(clean).toMatch(/StorageEngine\.cleanTempFiles\(\{ recycleBin: process\.platform === 'win32' \}\)/)
