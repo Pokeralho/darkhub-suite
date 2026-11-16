@@ -1,3 +1,4 @@
+#![cfg(windows)]
 //! Commitments. Mirrors frameRoot, merkleRoot and merklePath in sceneModel.js.
 use sha2::{Digest, Sha256};
 

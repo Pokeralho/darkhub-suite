@@ -26,9 +26,12 @@ export default function WindowsToolsPanel() {
   const loadFeatures = useCallback(async () => {
     setLoadingFeatures(true);
     try {
-      const r = await api()?.listFeatures();
+      const r = await api()?.listFeatures() as any;
       if (r?.ok && r.features) setFeatures(r.features);
-      else setResult({ ok: false, text: r?.error || t('wintools.readFail', 'Could not read Windows features.') });
+      else if (r?.unsupported) {
+        setFeatures(null);
+        setResult({ ok: false, text: r?.error || t('wintools.unsupported', 'Windows tools are not available on this platform.') });
+      } else setResult({ ok: false, text: r?.error || t('wintools.readFail', 'Could not read Windows features.') });
     } finally { setLoadingFeatures(false); }
   }, [t]);
 
@@ -40,7 +43,11 @@ export default function WindowsToolsPanel() {
     try {
       const r = await fn();
       const reboot = r?.requiresReboot ? ` ${t('wintools.reboot', 'Restart Windows to finish.')}` : '';
-      setResult({ ok: r?.ok === true, text: r?.ok ? `${r.msg || t('wintools.done', 'Done and verified.')}${reboot}` : (r?.error || t('wintools.fail', 'Failed.')) });
+      const ok = r?.ok === true;
+      const text = ok
+        ? `${r.msg || t('wintools.done', 'Done and verified.')}${reboot}`
+        : (r?.error || r?.msg || t('wintools.fail', 'Failed.'));
+      setResult({ ok, text });
     } catch (e: any) {
       setResult({ ok: false, text: e?.message ?? String(e) });
     } finally { setBusy(null); }

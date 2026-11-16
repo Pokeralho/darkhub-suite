@@ -21,15 +21,19 @@ export default function GpuBench() {
   const [progress, setProgress] = useState<GpuBenchProgress | null>(null);
   const [quick, setQuick] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unsupported, setUnsupported] = useState<string | null>(null);
 
   const api = () => window.darkhub?.gpubench;
   const load = async () => {
     const s = await api()?.status().catch(() => null);
     if (!s?.ok) return;
-    setRuns(s.runs);
+    if ((s as any).unsupported) {
+      setUnsupported((s as any).error || t('gpubench.unsupported', 'Benchmark de GPU indisponível nesta plataforma.'));
+    }
+    setRuns(s.runs || []);
     setStressRuns(s.stress ?? []);
-    setEngine(s.engine);
-    setLinked(s.linked);
+    setEngine(Boolean(s.engine));
+    setLinked(Boolean(s.linked));
   };
 
   useEffect(() => {
@@ -57,7 +61,7 @@ export default function GpuBench() {
     const r = await api()?.run({ ranked, quick: !ranked && quick }).catch((e) => ({ ok: false as const, error: String(e?.message ?? e) }));
     setRunning(false);
     setProgress(null);
-    if (!r?.ok && r?.error !== 'cancelled') setError(r?.error ?? 'error');
+    if (!r?.ok && r?.error !== 'cancelled') setError((r as any)?.unsupported ? ((r as any).error || 'unsupported') : (r?.error ?? 'error'));
     await load();
   };
 
@@ -106,6 +110,7 @@ export default function GpuBench() {
         subtitle={t('gpubench.subtitle', 'Teste sintético de rasterização e ray tracing em 2560×1440, com a mesma carga em qualquer PC. Compare sua pontuação no ranking público.')}
       />
 
+      {unsupported ? <div className="dh-card p-4 text-[12.5px] text-zinc-300 border border-zinc-700/60">{unsupported}</div> : null}
       <section className="dh-card p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-[12.5px] text-zinc-300 select-none">

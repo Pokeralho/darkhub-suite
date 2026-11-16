@@ -80,6 +80,7 @@ class HwSensorsDaemon extends EventEmitter {
 
   /** Starts only when the user turned advanced sensors on. */
   start() {
+    if (process.platform !== 'win32') return;
     if (this.process || !this.enabled) return;
     if (!fs.existsSync(HWSENSORS_EXE)) { this.lastError = 'DarkHub.HwSensors.exe não encontrado.'; return; }
     // the helper runs elevated and loads 18 libraries: an installed app starts it only when all of them are the shipped ones

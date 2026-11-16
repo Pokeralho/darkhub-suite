@@ -8,11 +8,19 @@ import { createMetadataService } from '../services/metadata/MetadataService.js'
  */
 export function registerMetadataIPC({ ipcMain, assertFileAccessGranted, hasFileAccessGrant, getFfmpegPath, logger } = {}) {
   async function getExiftoolPath() {
-    const mod = await import('exiftool-vendored')
-    let p = await mod.exiftoolPath()
-    // ExifTool (Perl) cannot run from inside the asar archive.
-    if (p && p.includes(`app.asar${path.sep}`)) p = p.replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`)
-    return p && fs.existsSync(p) ? p : null
+    try {
+      const mod = await import('exiftool-vendored')
+      let p = await mod.exiftoolPath()
+      // ExifTool (Perl) cannot run from inside the asar archive.
+      if (p && p.includes(`app.asar${path.sep}`)) p = p.replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`)
+      if (p && fs.existsSync(p)) return p
+    } catch {}
+    try {
+      const { findOnPath } = await import('../services/binResolver.js')
+      const onPath = await findOnPath('exiftool')
+      if (onPath) return onPath
+    } catch {}
+    return null
   }
   const service = createMetadataService({ getExiftoolPath, getFfmpegPath, logger })
 

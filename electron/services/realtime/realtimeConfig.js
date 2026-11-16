@@ -42,10 +42,17 @@ export function effectiveRules(optimizer) {
 
 export function normalizeFolder(p) {
   const s = String(p ?? '').trim()
-  return path.isAbsolute(s) && s.length < 260 ? path.normalize(s) : null
+  if (!s || s.length >= 260) return null
+  const isWinDrive = /^[A-Za-z]:[\\/]/.test(s)
+  if (path.isAbsolute(s) || isWinDrive) {
+    // Preserve Windows path semantics when the input is Windows-formatted (tests/tools may pass C:\... on any host).
+    return isWinDrive ? path.win32.normalize(s) : path.normalize(s)
+  }
+  return null
 }
 
 export function defaults(home = '') {
+  const join = (a,b) => (/^[A-Za-z]:[\\/]/.test(String(a||'')) ? path.win32.join(a,b) : path.join(a,b))
   return {
     optimizer: {
       enabled: false,
@@ -60,7 +67,7 @@ export function defaults(home = '') {
     },
     protection: {
       enabled: false,
-      folders: home ? [path.join(home, 'Downloads'), path.join(home, 'Desktop')] : [],
+      folders: home ? [join(home, 'Downloads'), join(home, 'Desktop')] : [],
       clamav: false,
       autoQuarantine: true,
       maxFileMb: 200,

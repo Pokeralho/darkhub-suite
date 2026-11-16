@@ -727,6 +727,18 @@ export function classifyDlssGpu(rows = []) {
 
 export function registerDlss5IPC({ app, ipcMain, shell }) {
   const service = new Dlss5Service(app);
+
+  if (process.platform !== 'win32') {
+    const unsupported = (extra = {}) => ({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'DLSS 5 (legado) é suportado apenas no Windows.', ...extra });
+    ipcMain.handle('dlss5:getSteamGames', async () => []);
+    ipcMain.handle('dlss5:detectGpu', async () => unsupported({ vendor: 'other', model: 'Indisponível', driverVersion: '', isRtx: false, isAmd: false, isIntel: false, defaultProfile: null }));
+    ipcMain.handle('dlss5:scanGame', async () => unsupported());
+    ipcMain.handle('dlss5:revert', async () => unsupported());
+    ipcMain.handle('dlss5:getRecentGames', async () => []);
+    ipcMain.handle('dlss5:openFolder', async () => unsupported());
+    return;
+  }
+
   // apply/revert back up and swap game DLLs; never let two of them interleave
   // (double click, apply racing revert) or the backups capture modded files.
   let mutationChain = Promise.resolve();

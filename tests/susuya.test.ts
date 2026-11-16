@@ -80,16 +80,16 @@ afterEach(() => { closeServer?.(); closeServer = null; });
 
 describe('Susuya client', () => {
   it('uploads a multi-chunk file intact, retrying a failed chunk, and reports progress', async () => {
-    const srv = await fakeSusuya({ chunkSize: 1000, failFirstPutOf: 3 });
+    const srv = await fakeSusuya({ chunkSize: 256, failFirstPutOf: 3 });
     closeServer = srv.close;
-    const data = crypto.randomBytes(10500);
+    const data = crypto.randomBytes(1100);
     const progress: number[] = [];
     const r = await new SusuyaClient({ origin: srv.origin }).upload(tmpFile(data), { ttl: 3600, onProgress: (s: number) => progress.push(s) });
     expect((r as any).sha).toBe(crypto.createHash('sha256').update(data).digest('hex'));
     expect(r.deleteToken).toBe('tok');
     expect(r.directUrl).toBe(`https://susuya.darkhub.ink/d/${r.id}`);
-    expect(progress.at(-1)).toBe(10500);
-    expect(progress.length).toBe(11);
+    expect(progress.at(-1)).toBe(1100);
+    expect(progress.length).toBe(Math.ceil(1100 / 256));
   });
   it('refuses files above the server limit before sending anything', async () => {
     const srv = await fakeSusuya();
@@ -98,13 +98,13 @@ describe('Susuya client', () => {
     expect(srv.uploads.size).toBe(0);
   });
   it('cancels and removes the partial upload on the server', async () => {
-    const srv = await fakeSusuya({ chunkSize: 1000 });
+    const srv = await fakeSusuya({ chunkSize: 256 });
     closeServer = srv.close;
     const ctrl = new AbortController();
-    const p = new SusuyaClient({ origin: srv.origin }).upload(tmpFile(crypto.randomBytes(9000)), { signal: ctrl.signal, onProgress: () => ctrl.abort() });
+    const p = new SusuyaClient({ origin: srv.origin }).upload(tmpFile(crypto.randomBytes(1200)), { signal: ctrl.signal, onProgress: () => ctrl.abort() });
     const err = await p.catch((e: Error) => e);
     expect(err).toBeInstanceOf(Error);
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 50));
     expect([...srv.uploads.values()][0].deleted).toBe(true);
   });
   it('builds the same links as the site and guesses mime types', () => {

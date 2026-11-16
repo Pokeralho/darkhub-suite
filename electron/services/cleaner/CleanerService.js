@@ -1,4 +1,4 @@
-// "DarkHub Cleaner Core": drives DarkHub.Cleaner.exe (native_cleaner/, Rust). Every command returns one JSON
+// "DarkHub Cleaner Core": drives the native cleaner engine (native_cleaner/, Rust). Every command returns one JSON
 // object. The renderer only ever sends ids of targets/findings the engine itself listed: paths and registry keys
 // are rebuilt and re-validated inside the engine. Anything that deletes is a simulation unless `apply` AND
 // `confirm` are both true (the page asks for confirmation first).
@@ -11,11 +11,28 @@ import { fileURLToPath } from 'node:url';
 
 export const WINAPP2_URL = 'https://content.thewebatom.net/files/winapp2.ini';
 const WINAPP2_MAX = 16 << 20;
-export const BROWSERS = ['chrome', 'edge', 'brave', 'firefox', 'zen'];
+export const BROWSERS = ['chrome', 'edge', 'brave', 'firefox', 'zen', 'chromium'];
+
+function exeCandidates() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const base = here.replace(/app\.asar(?![.\w])/, 'app.asar.unpacked');
+  if (process.platform === 'win32') {
+    return [path.join(base, '..', 'DarkHub.Cleaner.exe')];
+  }
+  return [
+    path.join(base, '..', 'DarkHub.Cleaner'),
+    path.join(base, '..', 'DarkHub_Cleaner'),
+    path.resolve(here, '..', '..', '..', 'native_cleaner', 'target', 'release', 'DarkHub_Cleaner'),
+    path.resolve(here, '..', '..', '..', 'native_cleaner', 'target', 'debug', 'DarkHub_Cleaner')
+  ];
+}
 
 function defaultExe() {
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  return path.join(here.replace(/app\.asar(?![.\w])/, 'app.asar.unpacked'), '..', 'DarkHub.Cleaner.exe');
+  const candidates = exeCandidates();
+  for (const p of candidates) {
+    try { if (fs.existsSync(p)) return p; } catch { /* ignore */ }
+  }
+  return candidates[0];
 }
 
 /** Ids are short strings the engine produced; anything else is dropped before reaching it. */
@@ -41,25 +58,46 @@ export function validateWinapp2(buf) {
   return { ok: true, version, sections };
 }
 
+function platformReason(platform) {
+  if (platform === 'win32') return null;
+  if (platform === 'linux') return 'linux-partial';
+  return 'unsupported-platform';
+}
+
 export class CleanerService {
   constructor({ exePath = defaultExe(), dataDir, backupDir = null, execFileImpl = execFile, fetchImpl = globalThis.fetch, extraArgs = [] } = {}) {
     this.exePath = exePath;
     this.dataDir = dataDir || path.join(os.tmpdir(), 'DarkHub-Cleaner');
     this.backupDirPref = backupDir;
     this.execFile = execFileImpl;
+    this._injectedExec = execFileImpl !== execFile;
     this.fetch = fetchImpl;
     this.extraArgs = extraArgs; // tests: --test-root / --root
     this.busy = null;
   }
 
-  available() { return fs.existsSync(this.exePath); }
+  /** True when the native engine binary is present for this platform. */
+  available() {
+    if (this._injectedExec) return true;
+    return fs.existsSync(this.exePath);
+  }
+
+  /** File operations (targets/scan/clean/browsers) are supported where the engine is available. */
+  fileOpsSupported() {
+    if (this._injectedExec) return true;
+    return (process.platform === 'win32' || process.platform === 'linux') && fs.existsSync(this.exePath);
+  }
 
   get winapp2Path() { return path.join(this.dataDir, 'winapp2.ini'); }
   get metaPath() { return path.join(this.dataDir, 'winapp2.meta.json'); }
 
-  /** %ProgramData%\DarkHub\Cleaner\backups (shared with the rest of DarkHub), or the user folder when it is not writable. */
+  /** %ProgramData%\DarkHub\Cleaner\backups (Windows) or /var/lib/DarkHub/Cleaner/backups (Linux), with fallbacks. */
   backupDir() {
-    const candidates = [this.backupDirPref, path.join(process.env.ProgramData || 'C:\\ProgramData', 'DarkHub', 'Cleaner', 'backups'), path.join(this.dataDir, 'backups')].filter(Boolean);
+    const candidates = [
+      this.backupDirPref,
+      path.join(process.env.ProgramData || (process.platform === 'win32' ? 'C:\\ProgramData' : '/var/lib'), 'DarkHub', 'Cleaner', 'backups'),
+      path.join(this.dataDir, 'backups')
+    ].filter(Boolean);
     for (const dir of candidates) {
       try {
         fs.mkdirSync(dir, { recursive: true });
@@ -71,7 +109,14 @@ export class CleanerService {
   }
 
   run(args, { timeoutMs = 120000 } = {}) {
-    if (!this.available()) return Promise.resolve({ ok: false, code: 'missing_engine', error: 'DarkHub.Cleaner.exe não foi encontrado (rode npm run build:cleaner).' });
+    const platformOk = process.platform === 'win32' || process.platform === 'linux';
+    if (!platformOk && !this._injectedExec) {
+      return Promise.resolve({ ok: false, unsupported: true, platform: process.platform, reason: 'unsupported-platform', error: 'DarkHub Cleaner não é suportado nesta plataforma.' });
+    }
+    if (!this._injectedExec && !fs.existsSync(this.exePath)) {
+      const hint = process.platform === 'win32' ? 'rode npm run build:cleaner' : 'compile o motor nativo (native_cleaner) para esta plataforma';
+      return Promise.resolve({ ok: false, code: 'missing_engine', error: `Motor do Cleaner não foi encontrado (${hint}).` });
+    }
     return new Promise((resolve) => {
       this.execFile(this.exePath, [...args, ...this.extraArgs], { windowsHide: true, timeout: timeoutMs, maxBuffer: 256 << 20 }, (err, stdout, stderr) => {
         const line = String(stdout || '').trim().split(/\r?\n/).filter((l) => l.startsWith('{')).pop();
@@ -109,7 +154,31 @@ export class CleanerService {
   status() {
     let backupDir = null;
     try { backupDir = this.backupDir(); } catch { /* reported as null */ }
-    return { ok: true, engine: this.available(), busy: this.busy, backupDir, winapp2: this.definitions(), url: WINAPP2_URL };
+    const platform = process.platform;
+    const reason = platformReason(platform);
+    const supported = platform === 'win32';
+    const partial = platform === 'linux';
+    const engine = this.fileOpsSupported();
+    return {
+      ok: true,
+      platform,
+      supported,
+      partial,
+      unsupported: !supported && !partial,
+      reason: reason || undefined,
+      engine,
+      busy: this.busy,
+      backupDir,
+      winapp2: this.definitions(),
+      url: WINAPP2_URL,
+      capabilities: {
+        fileClean: engine,
+        browserVacuum: engine,
+        registry: supported,
+        recycleBin: supported,
+        definitions: true
+      }
+    };
   }
 
   /** User-initiated download of the community winapp2.ini (never automatic). Keeps the previous file on failure. */
@@ -169,16 +238,27 @@ export class CleanerService {
     return this._exclusive('browsers', apply, () => this.run(args, { timeoutMs: 600000 }));
   }
 
-  /** Size of the Recycle Bin (all drives); `apply` empties it (permanent). Also used by the Optimizer's temp clean. */
+  /** Size of the Recycle Bin (all drives); `apply` empties it (permanent). Windows-only. */
   recycleBin({ apply = false } = {}) {
+    if (process.platform !== 'win32') {
+      return Promise.resolve({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Lixeira não é suportada nesta plataforma.' });
+    }
     return this._exclusive('recycle-bin', apply, () => this.run(['recycle-bin', ...(apply ? ['--apply'] : [])], { timeoutMs: 300000 }));
   }
 
-  regScan() { return this.run(['reg-scan'], { timeoutMs: 120000 }); }
+  regScan() {
+    if (process.platform !== 'win32') {
+      return Promise.resolve({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Limpeza de registro é suportada apenas no Windows.' });
+    }
+    return this.run(['reg-scan'], { timeoutMs: 120000 });
+  }
 
-  /** Always writes a .reg restore file in the backup folder before the engine touches a key. */
+  /** Always writes a .reg restore file in the backup folder before the engine touches a key. Windows-only. */
   regClean({ ids, apply = false, confirm = false } = {}) {
     if (apply && confirm !== true) throw new Error('Confirme na tela antes de alterar o registro.');
+    if (process.platform !== 'win32') {
+      return Promise.resolve({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Limpeza de registro é suportada apenas no Windows.' });
+    }
     const args = ['reg-clean'];
     if (apply) {
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -190,11 +270,15 @@ export class CleanerService {
   listBackups() {
     let dir;
     try { dir = this.backupDir(); } catch (e) { return { ok: false, error: e.message }; }
-    const items = fs.readdirSync(dir).filter((n) => /\.reg$/i.test(n)).map((name) => {
-      const st = fs.statSync(path.join(dir, name));
-      return { name, bytes: st.size, modified: st.mtime.toISOString() };
-    }).sort((a, b) => b.modified.localeCompare(a.modified));
-    return { ok: true, dir, backups: items };
+    try {
+      const items = fs.readdirSync(dir).filter((n) => /\.reg$/i.test(n)).map((name) => {
+        const st = fs.statSync(path.join(dir, name));
+        return { name, bytes: st.size, modified: st.mtime.toISOString() };
+      }).sort((a, b) => b.modified.localeCompare(a.modified));
+      return { ok: true, dir, backups: items };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
   }
 
   /** `reg import` of one of our own backups (only a bare file name inside the backup folder is accepted). */
@@ -203,6 +287,7 @@ export class CleanerService {
     if (!/^[\w.-]+\.reg$/i.test(n) || n !== path.basename(n)) throw new Error('Backup inválido.');
     const file = path.join(this.backupDir(), n);
     if (!fs.existsSync(file)) throw new Error('Backup não encontrado.');
+    if (process.platform !== 'win32') return Promise.resolve({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Restauração de backups de registro (.reg) é suportada apenas no Windows.' });
     return new Promise((resolve) => {
       this.execFile('reg.exe', ['import', file], { windowsHide: true, timeout: 60000 }, (err, _out, stderr) => {
         if (err) resolve({ ok: false, error: String(stderr || err.message).trim() || 'Falha ao importar (execute como administrador para chaves de HKLM).' });

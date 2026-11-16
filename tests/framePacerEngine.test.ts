@@ -42,6 +42,12 @@ describe('FramePacerEngine start and failures', () => {
   };
 
   it('keeps 0 (unlimited) and rejects an unknown pacing mode', async () => {
+    if (process.platform !== 'win32') {
+      const r = engine.start({ targetFps: 0, pacingMode: 'bogus' });
+      expect(r).toMatchObject({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only' });
+      engine.stop();
+      return;
+    }
     const { spawn } = await import('node:child_process');
     const proc = fakeProc();
     (spawn as any).mockReturnValue(proc);
@@ -51,6 +57,12 @@ describe('FramePacerEngine start and failures', () => {
   });
 
   it('stops and reports the error when the native limiter cannot start', async () => {
+    if (process.platform !== 'win32') {
+      const r = engine.start({ targetFps: 60 });
+      expect(r).toMatchObject({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only' });
+      expect(engine.isRunning).toBe(false);
+      return;
+    }
     const { spawn } = await import('node:child_process');
     const proc = fakeProc();
     (spawn as any).mockReturnValue(proc);

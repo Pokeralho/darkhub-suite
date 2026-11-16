@@ -12,7 +12,7 @@ sha2 = "0.10"
 serde_json = "1"
 base64 = "0.22"
 
-[dependencies.windows]
+[target.'cfg(windows)'.dependencies.windows]
 version = "0.58"
 features = [
   "Win32_Foundation",

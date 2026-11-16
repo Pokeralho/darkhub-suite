@@ -8,8 +8,27 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-const CHROMIUM_DBS: &[&str] = &["History", "Favicons", "Web Data", "Top Sites", "Shortcuts", "Network Action Predictor", "Cookies", "Network\\Cookies"];
-const FIREFOX_DBS: &[&str] = &["places.sqlite", "favicons.sqlite", "cookies.sqlite", "formhistory.sqlite", "content-prefs.sqlite", "permissions.sqlite", "webappsstore.sqlite", "storage.sqlite"];
+const CHROMIUM_DBS: &[&str] = &[
+    "History",
+    "Favicons",
+    "Web Data",
+    "Top Sites",
+    "Shortcuts",
+    "Network Action Predictor",
+    "Cookies",
+    "Network/Cookies",
+    "Network\\Cookies",
+];
+const FIREFOX_DBS: &[&str] = &[
+    "places.sqlite",
+    "favicons.sqlite",
+    "cookies.sqlite",
+    "formhistory.sqlite",
+    "content-prefs.sqlite",
+    "permissions.sqlite",
+    "webappsstore.sqlite",
+    "storage.sqlite",
+];
 
 pub struct Db {
     pub browser: &'static str,
@@ -19,7 +38,10 @@ pub struct Db {
 
 fn is_sqlite(p: &Path) -> bool {
     let mut h = [0u8; 16];
-    fs::File::open(p).and_then(|mut f| f.read_exact(&mut h)).is_ok() && &h == b"SQLite format 3\0"
+    fs::File::open(p)
+        .and_then(|mut f| f.read_exact(&mut h))
+        .is_ok()
+        && &h == b"SQLite format 3\0"
 }
 
 fn chromium(out: &mut Vec<Db>, browser: &'static str, user_data: &Path) {
@@ -33,44 +55,100 @@ fn chromium(out: &mut Vec<Db>, browser: &'static str, user_data: &Path) {
         for name in CHROMIUM_DBS {
             let p = prof.join(name);
             if p.is_file() && is_sqlite(&p) {
-                out.push(Db { browser, profile: e.file_name().to_string_lossy().into(), path: p });
+                out.push(Db {
+                    browser,
+                    profile: e.file_name().to_string_lossy().into(),
+                    path: p,
+                });
             }
         }
     }
 }
 
-/// Finds the databases. `root` (tests) replaces the real profile folders: <root>\Chrome, <root>\Edge, <root>\Brave,
-/// <root>\Firefox, <root>\Zen.
+/// Finds the databases. `root` (tests) replaces the real profile folders.
+/// Windows: <root>\Chrome, <root>\Edge, <root>\Brave, <root>\Firefox, <root>\Zen.
+/// Linux:   <root>/chrome, <root>/chromium, <root>/edge, <root>/brave, <root>/firefox, <root>/zen.
 pub fn find(env: &Env, which: &[String], root: Option<&Path>) -> Vec<Db> {
     let want = |b: &str| which.is_empty() || which.iter().any(|w| w == "all" || w.eq_ignore_ascii_case(b));
-    let local = env.one("localappdata").cloned().unwrap_or_default();
-    let roaming = env.one("appdata").cloned().unwrap_or_default();
     let dir = |test: &str, real: PathBuf| root.map(|r| r.join(test)).unwrap_or(real);
     let mut out = Vec::new();
-    for (b, test, real) in [
-        ("chrome", "Chrome", local.join("Google\\Chrome\\User Data")),
-        ("edge", "Edge", local.join("Microsoft\\Edge\\User Data")),
-        ("brave", "Brave", local.join("BraveSoftware\\Brave-Browser\\User Data")),
-    ] {
-        if want(b) {
-            chromium(&mut out, b, &dir(test, real));
+
+    #[cfg(windows)]
+    {
+        let local = env.one("localappdata").cloned().unwrap_or_default();
+        let roaming = env.one("appdata").cloned().unwrap_or_default();
+        for (b, test, real) in [
+            ("chrome", "Chrome", local.join("Google\\Chrome\\User Data")),
+            ("edge", "Edge", local.join("Microsoft\\Edge\\User Data")),
+            ("brave", "Brave", local.join("BraveSoftware\\Brave-Browser\\User Data")),
+        ] {
+            if want(b) {
+                chromium(&mut out, b, &dir(test, real));
+            }
         }
-    }
-    // Firefox and its forks (Zen)
-    for (b, test, real) in [("firefox", "Firefox", roaming.join("Mozilla\\Firefox\\Profiles")), ("zen", "Zen", roaming.join("zen\\Profiles"))] {
-        if !want(b) {
-            continue;
-        }
-        let Ok(rd) = fs::read_dir(dir(test, real)) else { continue };
-        for e in rd.flatten() {
-            for name in FIREFOX_DBS {
-                let p = e.path().join(name);
-                if p.is_file() && is_sqlite(&p) {
-                    out.push(Db { browser: b, profile: e.file_name().to_string_lossy().into(), path: p });
+        for (b, test, real) in [
+            ("firefox", "Firefox", roaming.join("Mozilla\\Firefox\\Profiles")),
+            ("zen", "Zen", roaming.join("zen\\Profiles")),
+        ] {
+            if !want(b) {
+                continue;
+            }
+            let Ok(rd) = fs::read_dir(dir(test, real)) else { continue };
+            for e in rd.flatten() {
+                for name in FIREFOX_DBS {
+                    let p = e.path().join(name);
+                    if p.is_file() && is_sqlite(&p) {
+                        out.push(Db {
+                            browser: b,
+                            profile: e.file_name().to_string_lossy().into(),
+                            path: p,
+                        });
+                    }
                 }
             }
         }
     }
+
+    #[cfg(not(windows))]
+    {
+        let home = env
+            .one("home")
+            .cloned()
+            .unwrap_or_else(|| std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("/tmp")));
+        let config = env.one("xdg_config_home").cloned().unwrap_or_else(|| home.join(".config"));
+        for (b, test, real) in [
+            ("chrome", "chrome", config.join("google-chrome")),
+            ("chromium", "chromium", config.join("chromium")),
+            ("edge", "edge", config.join("microsoft-edge")),
+            ("brave", "brave", config.join("BraveSoftware/Brave-Browser")),
+        ] {
+            if want(b) {
+                chromium(&mut out, b, &dir(test, real));
+            }
+        }
+        for (b, test, real) in [
+            ("firefox", "firefox", home.join(".mozilla/firefox")),
+            ("zen", "zen", home.join(".zen")),
+        ] {
+            if !want(b) {
+                continue;
+            }
+            let Ok(rd) = fs::read_dir(dir(test, real)) else { continue };
+            for e in rd.flatten() {
+                for name in FIREFOX_DBS {
+                    let p = e.path().join(name);
+                    if p.is_file() && is_sqlite(&p) {
+                        out.push(Db {
+                            browser: b,
+                            profile: e.file_name().to_string_lossy().into(),
+                            path: p,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
     out
 }
 
@@ -79,7 +157,12 @@ fn in_use(p: &Path) -> bool {
     #[cfg(windows)]
     {
         use std::os::windows::fs::OpenOptionsExt;
-        fs::OpenOptions::new().read(true).write(true).share_mode(0).open(p).is_err()
+        fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .share_mode(0)
+            .open(p)
+            .is_err()
     }
     #[cfg(not(windows))]
     {
@@ -105,7 +188,11 @@ fn one(db: &Db, apply: bool) -> Value {
     if in_use(&db.path) {
         return with(json!({ "status": "in_use" }));
     }
-    let flags = if apply { OpenFlags::SQLITE_OPEN_READ_WRITE } else { OpenFlags::SQLITE_OPEN_READ_ONLY };
+    let flags = if apply {
+        OpenFlags::SQLITE_OPEN_READ_WRITE
+    } else {
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+    };
     let conn = match Connection::open_with_flags(&db.path, flags | OpenFlags::SQLITE_OPEN_NO_MUTEX) {
         Ok(c) => c,
         Err(e) => return with(json!({ "status": "error", "error": e.to_string() })),
@@ -117,13 +204,14 @@ fn one(db: &Db, apply: bool) -> Value {
     if !apply {
         return with(json!({ "status": "ok", "reclaimable": reclaimable }));
     }
-    let check: String = conn.query_row("PRAGMA quick_check", [], |r| r.get(0)).unwrap_or_else(|e| e.to_string());
+    let check: String = conn
+        .query_row("PRAGMA quick_check", [], |r| r.get(0))
+        .unwrap_or_else(|e| e.to_string());
     if check != "ok" {
-        return with(json!({ "status": "corrupt", "error": check }));
+        return with(json!({ "status": "corrupt", "error": check, "reclaimable": reclaimable }));
     }
-    if let Err(e) = conn.execute_batch("VACUUM;") {
-        let busy = e.sqlite_error_code() == Some(rusqlite::ErrorCode::DatabaseBusy) || e.sqlite_error_code() == Some(rusqlite::ErrorCode::DatabaseLocked);
-        return with(json!({ "status": if busy { "in_use" } else { "error" }, "error": e.to_string() }));
+    if let Err(e) = conn.execute_batch("VACUUM") {
+        return with(json!({ "status": "error", "error": e.to_string(), "reclaimable": reclaimable }));
     }
     drop(conn);
     let after = file_len(&db.path);
@@ -132,8 +220,19 @@ fn one(db: &Db, apply: bool) -> Value {
 
 pub fn vacuum(env: &Env, which: &[String], root: Option<&Path>, apply: bool) -> Value {
     let dbs = find(env, which, root);
-    let items: Vec<Value> = dbs.iter().map(|d| one(d, apply)).collect();
-    let sum = |k: &str| items.iter().map(|v| v[k].as_u64().unwrap_or(0)).sum::<u64>();
-    let in_use = items.iter().filter(|v| v["status"] == "in_use").count();
-    json!({ "dry_run": !apply, "databases": items, "total": { "count": dbs.len(), "bytes": sum("bytes"), "reclaimable": sum("reclaimable"), "saved": sum("saved"), "in_use": in_use } })
+    let mut total = json!({ "count": 0u64, "bytes": 0u64, "reclaimable": 0u64, "saved": 0u64, "in_use": 0u64 });
+    let mut list = Vec::new();
+    for db in &dbs {
+        let r = one(db, apply);
+        total["count"] = json!(total["count"].as_u64().unwrap_or(0) + 1);
+        total["bytes"] = json!(total["bytes"].as_u64().unwrap_or(0) + r["bytes"].as_u64().unwrap_or(0));
+        total["reclaimable"] =
+            json!(total["reclaimable"].as_u64().unwrap_or(0) + r["reclaimable"].as_u64().unwrap_or(0));
+        total["saved"] = json!(total["saved"].as_u64().unwrap_or(0) + r["saved"].as_u64().unwrap_or(0));
+        if r["status"].as_str() == Some("in_use") {
+            total["in_use"] = json!(total["in_use"].as_u64().unwrap_or(0) + 1);
+        }
+        list.push(r);
+    }
+    json!({ "dry_run": !apply, "databases": list, "total": total })
 }

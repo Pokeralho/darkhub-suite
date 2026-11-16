@@ -6,6 +6,21 @@ import { Autopilot } from '../services/upscale/Autopilot.js'
 
 /** `upscale:*`: NVIDIA DLSS runtime updates per game and DLSS 5 neural rendering through DLSS 5 Autopilot. */
 export function registerUpscaleIPC({ app, ipcMain, BrowserWindow, logger } = {}) {
+  const isWin32 = process.platform === 'win32'
+  const unsupported = (extra = {}) => ({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Upscale/DLSS (DLSS runtime e Autopilot) é suportado apenas no Windows/NVIDIA.', ...extra })
+  if (!isWin32) {
+    const handle = (channel, fn) => ipcMain.handle(channel, async () => fn())
+    handle('upscale:dlssLatest', () => unsupported())
+    handle('upscale:inspectGame', () => unsupported())
+    handle('upscale:updateGame', () => unsupported())
+    handle('upscale:restoreGame', () => unsupported())
+    handle('upscale:scanLibrary', () => ({ ...unsupported(), latest: null, games: [] }))
+    handle('upscale:autopilotStatus', () => ({ ...unsupported(), installed: false, available: false }))
+    handle('upscale:autopilotInstall', () => unsupported())
+    handle('upscale:autopilotLaunch', () => unsupported())
+    return
+  }
+
   const userData = app.getPath('userData')
   const updater = new DlssUpdater(path.join(userData, 'dlss-runtimes'))
   const autopilot = new Autopilot(path.join(userData, 'tools'))

@@ -34,13 +34,20 @@ export default function Dlss5Manager() {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
   const [confirmForce, setConfirmForce] = useState<string | null>(null);
+  const [unsupported, setUnsupported] = useState<string | null>(null);
 
   const refreshAutopilot = useCallback(async () => { const s = await up()?.autopilotStatus().catch(() => null); if (s) setAp(s); }, []);
 
   useEffect(() => {
-    void legacy()?.detectGpu().then((g) => setGpu(g?.ok ? { model: g.model, nvidia: g.vendor === 'nvidia' } : null)).catch(() => {});
+    void legacy()?.detectGpu().then((g) => {
+      if ((g as any)?.unsupported) { setUnsupported((g as any).error || t('dlss.unsupported', 'Recurso indisponível nesta plataforma.')); return; }
+      setGpu(g?.ok ? { model: g.model, nvidia: g.vendor === 'nvidia' } : null);
+    }).catch(() => {});
     void refreshAutopilot();
-    void up()?.dlssLatest().then((r) => r.ok && setLatest(r.version || null)).catch(() => {});
+    void up()?.dlssLatest().then((r) => {
+      if ((r as any)?.unsupported) { setUnsupported((r as any).error || t('dlss.unsupported', 'Recurso indisponível nesta plataforma.')); return; }
+      if (r.ok) setLatest(r.version || null);
+    }).catch(() => {});
     void legacy()?.getSteamGames().then((list) => setLegacyGames((list || []).filter((g) => g.isApplied).map((g) => ({ name: g.name, installDir: g.installDir })))).catch(() => {});
   }, [refreshAutopilot]);
 
@@ -106,6 +113,7 @@ export default function Dlss5Manager() {
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6">
       <PageHeader title={t('dlss.title', 'DLSS Manager')} subtitle={t('dlss.subtitle', 'DLSS 5 neural rendering em jogos que não o trazem, e o DLSS de cada jogo mantido na versão mais nova da NVIDIA.')} />
+      {unsupported ? <div className="dh-card p-4 text-[12.5px] text-zinc-300 border border-zinc-700/60">{unsupported}</div> : null}
       {notice ? <p role={notice.tone === 'err' ? 'alert' : 'status'} className={`text-[12.5px] ${notice.tone === 'err' ? 'text-red-300' : 'text-blue-200'}`}>{notice.text}</p> : null}
 
       {/* ------------------------------------------------------------ DLSS 5 */}

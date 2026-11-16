@@ -1,7 +1,14 @@
 import { UsbService } from '../services/usb/UsbService.js'
 
+const UNSUPPORTED = { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Gerenciamento de USB é suportado apenas no Windows.' }
+
 /** `usb:*`: USB ports screen (devices per port, turn devices off/on, storage policies, safe eject, history). */
 export function registerUsbIPC({ ipcMain, logger } = {}) {
+  const channels = ['usb:list', 'usb:setDeviceEnabled', 'usb:keepDisabled', 'usb:setStorageBlocked', 'usb:setWriteProtect', 'usb:setSelectiveSuspend', 'usb:eject']
+  if (process.platform !== 'win32') {
+    for (const ch of channels) ipcMain.handle(ch, async () => UNSUPPORTED)
+    return
+  }
   const svc = new UsbService()
   const handle = (channel, fn) => ipcMain.handle(channel, async (_e, payload) => {
     try { return await fn(payload ?? {}) } catch (err) {

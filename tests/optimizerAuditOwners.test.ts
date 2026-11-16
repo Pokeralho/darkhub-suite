@@ -35,7 +35,7 @@ describe('shared owners', () => {
   })
 })
 
-describe('SystemEngine composite operations', () => {
+describe.skipIf(process.platform !== 'win32')('SystemEngine composite operations', () => {
   let store: ReturnType<typeof memStore>
   let reverted: string[][]
   let extras: string[]
@@ -182,7 +182,7 @@ describe('USB input devices', () => {
   })
 })
 
-describe('Startup manager trusts only the item id', () => {
+describe.skipIf(process.platform !== 'win32')('Startup manager trusts only the item id', () => {
   beforeEach(() => vi.resetModules())
 
   async function service(items: object[]) {
@@ -213,7 +213,7 @@ describe('Startup manager trusts only the item id', () => {
   })
 })
 
-describe('services revert on DarkOS without a snapshot', () => {
+describe.skipIf(process.platform !== 'win32')('services revert on DarkOS without a snapshot', () => {
   beforeEach(() => vi.resetModules())
 
   it('skips instead of re-enabling services the DarkOS image disabled', async () => {

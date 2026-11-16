@@ -57,14 +57,23 @@ export default function DiskMap() {
 
   const active = Boolean(status?.active);
   const running = Boolean(status?.running);
+  const unsupported = Boolean((status as any)?.unsupported);
 
   // Drives + an existing scan (it lives in the main process, so it survives navigating away).
   useEffect(() => {
     api()?.status().then((s) => setStatus(s)).catch(() => {});
-    api()?.drives().then((r) => setDrives(r?.ok ? r.drives || [] : [])).catch(() => setDrives([]));
+    api()?.drives().then((r) => {
+      if (!r) { setDrives([]); return; }
+      if ((r as any).unsupported) {
+        setDrives([]);
+        return;
+      }
+      setDrives(r.ok ? r.drives || [] : []);
+      if (!r.ok && (r as any).error) setNotice({ ok: false, text: (r as any).error });
+    }).catch(() => setDrives([]));
     const off = api()?.onProgress((s) => setStatus(s));
     return () => { off?.(); };
-  }, []);
+  }, [t]);
 
   // Debounced filter: the whole tree is filtered in the main process.
   useEffect(() => { const h = setTimeout(() => setFilter(filterText.trim()), 250); return () => clearTimeout(h); }, [filterText]);
@@ -343,11 +352,16 @@ export default function DiskMap() {
               <h2 className="dh-section-title">{t('diskmap.pick.title', 'What do you want to analyse?')}</h2>
               <p className="mt-1 dh-help">{t('diskmap.pick.help', 'A whole drive also shows its free space and what the scan could not see (system files, restore points).')}</p>
             </div>
-            <button onClick={pickFolder} className="dh-btn shrink-0"><FolderOpen size={14} />{t('diskmap.pickFolder', 'Choose a folder')}</button>
+            <button onClick={pickFolder} disabled={unsupported} className="dh-btn shrink-0" title={unsupported ? ((status as any)?.error || t('diskmap.unsupported', 'O mapa de disco está disponível apenas no Windows.')) : undefined}><FolderOpen size={14} />{t('diskmap.pickFolder', 'Choose a folder')}</button>
           </div>
           {drives === null ? (
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-label={t('diskmap.loading', 'Loading')}>
               {[0, 1, 2].map((i) => <div key={i} className="h-[74px] rounded-xl bg-zinc-900 animate-pulse" />)}
+            </div>
+          ) : unsupported ? (
+            <div className="dh-card p-4 text-[12.5px] text-zinc-300">
+              <div className="font-medium text-zinc-100">{t('diskmap.unsupportedTitle', 'Indisponível nesta plataforma')}</div>
+              <p className="mt-1 dh-help">{(status as any)?.error || t('diskmap.unsupported', 'O mapa de disco está disponível apenas no Windows.')}</p>
             </div>
           ) : drives.length === 0 ? (
             <p className="text-[12.5px] text-zinc-500">{t('diskmap.noDrives', 'No drive found. Choose a folder instead.')}</p>

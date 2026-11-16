@@ -36,6 +36,7 @@ const darkhubApi = {
   },
   app: {
     getAbout: () => ipcRenderer.invoke('app:getAbout'),
+    getCapabilities: () => ipcRenderer.invoke('app:getCapabilities'),
     getResourceUsage: () => ipcRenderer.invoke('app:getResourceUsage')
   },
   downloads: {

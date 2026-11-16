@@ -17,24 +17,25 @@ export function registerGpuBenchIPC({ app, ipcMain, BrowserWindow, shell, safeSt
     const win = BrowserWindow.fromWebContents(e.sender)
     return win ? win.getNativeWindowHandle().readBigUInt64LE().toString() : null
   }
+  const unsupported = (extra = {}) => ({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'GPU Bench (D3D12/DXR) é suportado apenas no Windows.', ...extra })
   const handle = (channel, fn) => ipcMain.handle(channel, async (e, payload) => {
-    try { return await fn(payload ?? {}, e) } catch (err) {
+    try {
+      if (process.platform !== 'win32') return fn(payload ?? {}, e, true)
+      return await fn(payload ?? {}, e, false)
+    } catch (err) {
       logger?.error?.('GpuBench', `${channel}: ${err?.message ?? err}`)
       return { ok: false, error: err?.message ?? String(err) }
     }
   })
   handle('gpubench:status', () => svc.status())
-  handle('gpubench:run', (p, e) => svc.run({ ranked: Boolean(p.ranked), quick: Boolean(p.quick), label: String(p.label ?? ''), parent: parentOf(e) }))
-  handle('gpubench:stress', (p, e) => svc.stress({ minutes: p.minutes, load: p.load, tempLimit: p.tempLimit }, { parent: parentOf(e) }))
+  handle('gpubench:run', (p, e, off) => off ? unsupported() : svc.run({ ranked: Boolean(p.ranked), quick: Boolean(p.quick), label: String(p.label ?? ''), parent: parentOf(e) }))
+  handle('gpubench:stress', (p, e, off) => off ? unsupported() : svc.stress({ minutes: p.minutes, load: p.load, tempLimit: p.tempLimit }, { parent: parentOf(e) }))
   handle('gpubench:ranking', (p) => svc.ranking({ test: String(p.test ?? 'total') }))
-  handle('gpubench:viewport', (p) => {
-    const n = (v) => Math.round(Number(v) || 0)
-    return svc.viewport({ x: n(p.x), y: n(p.y), w: n(p.w), h: n(p.h), visible: p.visible !== false })
-  })
+  handle('gpubench:viewport', (p, _e, off) => off ? { ok: true, unsupported: true, platform: process.platform } : (() => { const n = (v) => Math.round(Number(v) || 0); return svc.viewport({ x: n(p.x), y: n(p.y), w: n(p.w), h: n(p.h), visible: p.visible !== false }) })())
   handle('gpubench:removeStress', ({ id }) => svc.removeStress(String(id)))
-  handle('gpubench:cancel', () => svc.cancel())
+  handle('gpubench:cancel', (_p, _e, off) => off ? { ok: true, unsupported: true, platform: process.platform } : svc.cancel())
   handle('gpubench:remove', ({ id }) => svc.remove(String(id)))
-  handle('gpubench:link', () => svc.link())
+  handle('gpubench:link', (_p, _e, off) => off ? unsupported() : svc.link())
   handle('gpubench:unlink', () => svc.unlink())
   handle('gpubench:openRanking', ({ id }) => svc.openRanking(id ? String(id) : null))
   app.on('before-quit', () => svc.cancel())

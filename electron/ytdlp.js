@@ -51,6 +51,12 @@ export async function ensureYtDlp(toolsDir, platform, { downloadToFile = null } 
     await fs.unlink(dest).catch(() => {})
   } catch {}
 
+  try {
+    const { findOnPath } = await import('./services/binResolver.js')
+    const onPath = await findOnPath('yt-dlp', platform)
+    if (onPath) return onPath
+  } catch {}
+
   const download = downloadToFile ?? (await import('./services/SecureDownload.js')).downloadToFile
   await fs.mkdir(toolsDir, { recursive: true })
   const tmpDest = `${dest}.download`
@@ -82,6 +88,12 @@ export async function ensureFfmpeg(toolsDir, platform) {
   if (fsRaw.existsSync(dest)) {
     return dest
   }
+
+  try {
+    const { findOnPath } = await import('./services/binResolver.js')
+    const onPath = await findOnPath('ffmpeg', platform)
+    if (onPath) return onPath
+  } catch {}
 
   await fs.mkdir(toolsDir, { recursive: true }).catch(() => {})
 
@@ -119,19 +131,6 @@ export async function ensureFfmpeg(toolsDir, platform) {
     }
   } catch {}
 
-  if (platform === 'win32') {
-    try {
-      // async lookup: execSync here blocked the Electron main process
-      const stdout = await new Promise((resolve, reject) => {
-        execFile('where.exe', ['ffmpeg'], { windowsHide: true, encoding: 'utf8', timeout: 5000 }, (err, out) => (err ? reject(err) : resolve(out)))
-      })
-      const whereOut = String(stdout ?? '').trim().split(/\r?\n/)[0]
-      if (whereOut && fsRaw.existsSync(whereOut)) {
-        return whereOut
-      }
-    } catch {}
-  }
-
   return dest
 }
 
@@ -139,12 +138,15 @@ export async function ensureFfmpeg(toolsDir, platform) {
 // replace it, or Cancel would stop the probe instead of the download.
 let activeYtDlpChild = null
 
-/** Kills a yt-dlp process and its ffmpeg children (Windows: taskkill /T /F). */
+/** Kills a yt-dlp process and its ffmpeg children. */
 function killTree(child) {
   try {
     const pid = child?.pid
     if (process.platform === 'win32' && pid) {
       execFile('taskkill.exe', ['/F', '/T', '/PID', String(pid)], { windowsHide: true }, () => {})
+    } else if (process.platform !== 'win32' && pid) {
+      try { process.kill(-pid, 'SIGKILL') } catch { child.kill('SIGKILL') }
+      return
     }
     child.kill('SIGKILL')
   } catch {}
@@ -162,7 +164,7 @@ export function cancelActiveYtDlp() {
 export function runYtDlp(ytdlpPath, args, { timeoutMs = 0, onProgress = null, track = false, spawnImpl = spawn } = {}) {
   return new Promise((resolve, reject) => {
     const finalArgs = onProgress && !args.includes('--newline') ? ['--newline', ...args] : args
-    const child = spawnImpl(ytdlpPath, finalArgs, { windowsHide: true })
+    const child = spawnImpl(ytdlpPath, finalArgs, { windowsHide: true, detached: process.platform !== 'win32' })
     if (track) activeYtDlpChild = child
     let stdout = ''
     let stderr = ''
@@ -250,5 +252,4 @@ export function runYtDlp(ytdlpPath, args, { timeoutMs = 0, onProgress = null, tr
     })
   })
 }
-
 

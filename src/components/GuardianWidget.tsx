@@ -3,6 +3,7 @@ import { visibleInterval } from '../utils/visibleInterval'
 import { Zap, X } from './icons'
 
 export default function GuardianWidget() {
+  const [supported, setSupported] = useState(true)
   const [enabled, setEnabled] = useState(false)
   const [ultraOn, setUltraOn] = useState(false)
   const [ping, setPing] = useState<number | null>(null)
@@ -47,7 +48,10 @@ export default function GuardianWidget() {
     if (!window.darkhub?.latency) return
     try {
       const res = await window.darkhub.latency.getConfig()
-      if (!res?.ok) return
+      if (!res?.ok) {
+        if (res?.unsupported) setSupported(false)
+        return
+      }
       const cfg = res.config ?? {}
       const st = res.status ?? {}
       const m = res.metrics ?? {}
@@ -95,15 +99,16 @@ export default function GuardianWidget() {
   }
 
   useEffect(() => {
+    if (!supported) return
     refresh()
     const stopPolling = visibleInterval(refresh, 1500)
     return () => {
       stopPolling()
       if (alertTimerRef.current) window.clearTimeout(alertTimerRef.current)
     }
-  }, [])
+  }, [supported])
 
-  if (!enabled) return null
+  if (!supported || !enabled) return null
 
   const fmt = (n: number | null) => (n == null || !Number.isFinite(n) ? null : n.toFixed(0))
 

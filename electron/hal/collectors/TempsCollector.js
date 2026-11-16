@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import SensorBus from './SensorBus.js';
 import GpuCollector from './GpuCollector.js';
 import { BaseCollector } from './BaseCollector.js';
@@ -21,6 +22,7 @@ class TempsCollector extends BaseCollector {
     this._lhm = null;
     this._lastLhmUpdate = 0;
     this._minMax = new Map();
+    this._linuxTempsStamp = 0;
 
     SensorBus.on('data', (payload) => {
       switch (payload.type) {
@@ -92,7 +94,66 @@ class TempsCollector extends BaseCollector {
     return null;
   }
 
+
+  _pollLinuxTemps() {
+    if (process.platform !== 'linux') return;
+    const now = Date.now();
+    if (now - this._linuxTempsStamp < 2000) return;
+    this._linuxTempsStamp = now;
+    try {
+      const base = '/sys/class/hwmon';
+      const dirs = fs.existsSync(base) ? fs.readdirSync(base) : [];
+      let cpu = null, gpu = null;
+      const disks = [];
+      for (const d of dirs) {
+        const dir = `${base}/${d}`;
+        let name = '';
+        try { name = fs.readFileSync(`${dir}/name`, 'utf8').trim(); } catch { continue; }
+        const lname = name.toLowerCase();
+        const entries = fs.readdirSync(dir).filter((f) => /^temp\d+_input$/.test(f));
+        for (const e of entries) {
+          let raw;
+          try { raw = Number(fs.readFileSync(`${dir}/${e}`, 'utf8').trim()); } catch { continue; }
+          if (!Number.isFinite(raw)) continue;
+          const tempC = raw > 1000 ? raw / 1000 : raw;
+          if (tempC <= 0 || tempC > 125) continue;
+          let label = '';
+          const labelFile = `${dir}/${e.replace('_input', '_label')}`;
+          try { if (fs.existsSync(labelFile)) label = fs.readFileSync(labelFile, 'utf8').trim(); } catch {}
+          const llabel = label.toLowerCase();
+          if (/coretemp|k10temp|zenpower|cpu|k8temp/.test(lname) || /package|tctl|tdie|cpu/.test(llabel)) {
+            if (cpu == null || tempC > cpu) cpu = tempC;
+          } else if (/amdgpu|nouveau|radeon|nvidia|i915|xe/.test(lname)) {
+            if (gpu == null || tempC > gpu) gpu = tempC;
+          } else if (/nvme|drivetemp/.test(lname)) {
+            disks.push({ model: name + (label ? ` ${label}` : ''), mediaType: /nvme/.test(lname) ? 'NVMe' : 'Disk', busType: /nvme/.test(lname) ? 'NVMe' : '', tempC });
+          }
+        }
+      }
+      if (cpu != null) { this._hwmonCpu = cpu; this._hwmonSource = 'hwmon'; this._lastHwmonUpdate = now; }
+      if (gpu != null) { this._hwmonGpu = gpu; this._lastHwmonUpdate = now; }
+      if (disks.length) { this._diskTemps = disks; this._lastDiskTempsUpdate = now; }
+      // thermal zones as system probes when present
+      const tzBase = '/sys/class/thermal';
+      if (fs.existsSync(tzBase)) {
+        const zones = [];
+        for (const z of fs.readdirSync(tzBase).filter((n) => /^thermal_zone\d+$/.test(n))) {
+          try {
+            const t = Number(fs.readFileSync(`${tzBase}/${z}/temp`, 'utf8').trim());
+            const tempC = t > 1000 ? t / 1000 : t;
+            if (!Number.isFinite(tempC) || tempC <= 0 || tempC > 125) continue;
+            let type = z;
+            try { type = fs.readFileSync(`${tzBase}/${z}/type`, 'utf8').trim(); } catch {}
+            zones.push({ zone: type, tempC });
+          } catch {}
+        }
+        if (zones.length) { this._thermalZones = zones; this._lastZonesUpdate = now; }
+      }
+    } catch {}
+  }
+
   poll() {
+    this._pollLinuxTemps();
     const gpuStamp = GpuCollector.lastUpdate || 0;
     const key = [
       this._lastHwmonUpdate,

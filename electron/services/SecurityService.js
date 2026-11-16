@@ -245,6 +245,26 @@ class SecurityService {
 
   async scanRunningProcesses() {
     return Logger.track('SecurityService', 'Process Reputation Scan', async () => {
+      if (process.platform !== 'win32') {
+        // On non-Windows platforms, fall back to a best-effort heuristic scan (no Authenticode/PowerShell).
+        try {
+          const si = await import('systeminformation').then((m) => m.default || m);
+          const processes = await si.processes();
+          const safeRegex = /^(\/usr\/|\/bin\/|\/sbin\/|\/lib|\/snap\/|\/opt\/|\/nix\/)/i;
+          const analyzed = (processes?.list || []).map((p) => {
+            let score = 0;
+            const flags = [];
+            const lowPath = String(p.path || '').toLowerCase();
+            const isSafeLoc = safeRegex.test(lowPath);
+            if (p.path && !isSafeLoc) { score += 20; flags.push('Execução fora de diretórios padrão do sistema'); }
+            if ((p.memRss || 0) > 4000000 && !isSafeLoc) { score += 20; flags.push('Alto uso de memória em local não padrão'); }
+            return { Id: p.pid, Name: p.name, Path: p.path || '', Company: '', IsSigned: null, Signer: '', MemoryMb: Math.round(((p.memRss || 0) / 1024) * 10) / 10, entropy: 0, score: Math.min(score, 100), risk: score >= 70 ? 'CRITICAL' : (score >= 40 ? 'WARNING' : 'SAFE'), flags, platform: process.platform };
+          });
+          return analyzed.filter((a) => a.score > 0).sort((a, b) => b.score - a.score);
+        } catch {
+          return [];
+        }
+      }
       const script = `
         $procs = Get-Process | Where-Object { $_.Path -ne $null } | Select-Object Id, ProcessName, Path, WorkingSet64
         $uniquePaths = $procs | Select-Object -ExpandProperty Path -Unique
@@ -457,27 +477,35 @@ class SecurityService {
     };
   }
 
-  async enablePhishingShield() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
-    try {
-      const hostsPath = 'C:\\Windows\\System32\\drivers\\etc\\hosts';
-      const backupPath = 'C:\\Windows\\System32\\drivers\\etc\\hosts.darkhub.bak';
+  _hostsPath() {
+    return process.platform === 'win32'
+      ? path.join(process.env.windir || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts')
+      : '/etc/hosts';
+  }
 
+  async enablePhishingShield() {
+    try {
+      const hostsPath = this._hostsPath();
       let currentHosts = '';
       if (fs.existsSync(hostsPath)) {
-        currentHosts = fs.readFileSync(hostsPath, 'utf8');
+        try { currentHosts = fs.readFileSync(hostsPath, 'utf8'); } catch {}
       }
 
+      const backupPath = path.join(path.dirname(this._getRulesFilePath()), 'hosts.darkhub.bak');
       if (!fs.existsSync(backupPath) && currentHosts) {
         try { fs.writeFileSync(backupPath, currentHosts, 'utf8'); } catch {}
       }
 
-      const cleanHosts = currentHosts.replace(/# DarkHub Anti-Phishing Shield - BEGIN[\s\S]*?# DarkHub Anti-Phishing Shield - END/g, '').trim();
-
+      const cleanHosts = String(currentHosts || '').replace(/# DarkHub Anti-Phishing Shield - BEGIN[\s\S]*?# DarkHub Anti-Phishing Shield - END/g, '').trim();
       const blockRules = this.getAllPhishingDomains().map(d => `0.0.0.0 ${d}\n0.0.0.0 www.${d}`).join('\n');
       const newBlock = `\n\n# DarkHub Anti-Phishing Shield - BEGIN\n${blockRules}\n# DarkHub Anti-Phishing Shield - END\n`;
+      const finalContent = (cleanHosts ? cleanHosts + newBlock : newBlock.trimStart());
 
-      const finalContent = cleanHosts + newBlock;
+      if (process.platform !== 'win32') {
+        // Writing /etc/hosts requires root; do not attempt silent elevation on Linux.
+        return { ok: false, unsupported: true, platform: process.platform, reason: 'elevation-required', error: 'Ativar o escudo exige permissão para gravar em /etc/hosts (ação elevada) — ainda não automatizado no Linux.', hostsPath, previewBytes: finalContent.length };
+      }
+
       const tmpFile = path.join(os.tmpdir(), `hosts_shield_${process.pid}_${Date.now()}.tmp`);
       fs.writeFileSync(tmpFile, finalContent, 'utf8');
 
@@ -501,13 +529,17 @@ class SecurityService {
   }
 
   async disablePhishingShield() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
     try {
-      const hostsPath = 'C:\\Windows\\System32\\drivers\\etc\\hosts';
+      const hostsPath = this._hostsPath();
       if (!fs.existsSync(hostsPath)) { this._writeShieldPref(false); return { ok: true, msg: 'Hosts padrão mantido.' }; }
 
-      const currentHosts = fs.readFileSync(hostsPath, 'utf8');
-      const cleanHosts = currentHosts.replace(/# DarkHub Anti-Phishing Shield - BEGIN[\s\S]*?# DarkHub Anti-Phishing Shield - END/g, '').trim();
+      let currentHosts = '';
+      try { currentHosts = fs.readFileSync(hostsPath, 'utf8'); } catch {}
+      const cleanHosts = String(currentHosts || '').replace(/# DarkHub Anti-Phishing Shield - BEGIN[\s\S]*?# DarkHub Anti-Phishing Shield - END/g, '').trim();
+
+      if (process.platform !== 'win32') {
+        return { ok: false, unsupported: true, platform: process.platform, reason: 'elevation-required', error: 'Desativar o escudo exige permissão para gravar em /etc/hosts (ação elevada) — ainda não automatizado no Linux.', hostsPath };
+      }
 
       const tmpFile = path.join(os.tmpdir(), `hosts_shield_clean_${process.pid}_${Date.now()}.tmp`);
       fs.writeFileSync(tmpFile, cleanHosts + '\n', 'utf8');
@@ -530,15 +562,17 @@ class SecurityService {
 
   getPhishingShieldStatus() {
     try {
-      const hostsPath = 'C:\\Windows\\System32\\drivers\\etc\\hosts';
-      if (!fs.existsSync(hostsPath)) return { ok: true, active: false, count: 0 };
-      const content = fs.readFileSync(hostsPath, 'utf8');
+      const hostsPath = this._hostsPath();
+      if (!fs.existsSync(hostsPath)) return { ok: true, active: false, count: 0, hostsPath };
+      let content = '';
+      try { content = fs.readFileSync(hostsPath, 'utf8'); } catch { return { ok: true, active: false, count: 0, hostsPath }; }
       const active = content.includes('# DarkHub Anti-Phishing Shield - BEGIN');
       return {
         ok: true,
         active,
         totalDomains: this.getAllPhishingDomains().length,
-        rulesCount: this.getAllPhishingDomains().length * 2
+        rulesCount: this.getAllPhishingDomains().length * 2,
+        hostsPath
       };
     } catch (e) {
       return { ok: false, active: false, error: e.message };
@@ -546,7 +580,50 @@ class SecurityService {
   }
 
   async getLiveNetworkConnections() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') {
+      try {
+        const { runCommand } = await import('./PowerShellRunner.js');
+        // Prefer `ss` (iproute2) for TCP state/PID/process info; fallback minimal.
+        let out = '';
+        const r = await runCommand('ss', ['-tunapH'], { timeoutMs: 10000, trim: true }).catch(() => null);
+        if (r && r.code === 0 && String(r.stdout || '').trim()) out = String(r.stdout);
+        else {
+          const r2 = await runCommand('ss', ['-tunap'], { timeoutMs: 10000, trim: true }).catch(() => null);
+          if (r2 && r2.code === 0) out = String(r2.stdout || '');
+        }
+        const list = [];
+        const lines = out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        for (const line of lines) {
+          // e.g. "LISTEN 0 4096 0.0.0.0:22 0.0.0.0:* users:(("sshd",pid=123,fd=3))"
+          if (/^State\s+/i.test(line) || /^Netid\s+/i.test(line)) continue;
+          const parts = line.split(/\s+/);
+          if (parts.length < 5) continue;
+          const state = parts[0];
+          if (!/^(LISTEN|ESTAB|ESTABLISHED|SYN-SENT|SYN-RECV|TIME-WAIT|CLOSE-WAIT)$/i.test(state)) continue;
+          const local = parts[4] || '';
+          const remote = parts[5] || 'N/A';
+          const procM = /users:\(\("([^"]+)",pid=(\d+)/.exec(line);
+          const processName = procM ? procM[1] : '';
+          const pid = procM ? Number(procM[2]) : 0;
+          const portM = /:(\d+)$/.exec(local.replace(/\]$/, ''));
+          const lport = portM ? Number(portM[1]) : 0;
+          const rportM = /:(\d+)$/.exec(String(remote).replace(/\]$/, ''));
+          const rport = rportM ? Number(rportM[1]) : 0;
+          const isSuspicious = [4444,5555,6666,6667,1337,31337,8888,9999].includes(lport) || [4444,5555,6666,6667,1337,31337].includes(rport);
+          list.push({ Local: local, Remote: remote || 'N/A', State: state, Pid: pid, ProcessName: processName || (pid ? `PID: ${pid}` : 'N/A'), IsSuspicious: isSuspicious });
+          if (list.length >= 60) break;
+        }
+        for (const c of list) {
+          const ip = String(c?.Remote || '').replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
+          let hit = null;
+          try { hit = ip && ip !== 'N/A' && ip !== '*' ? this.advanced.lookupIp(ip) : null; } catch { hit = null; }
+          if (hit) { c.Blocklisted = hit.source || true; c.IsSuspicious = true; }
+        }
+        return { ok: true, connections: list, platform: process.platform };
+      } catch (e) {
+        return { ok: false, error: e.message, connections: [] };
+      }
+    }
     const script = `
       $ErrorActionPreference = 'SilentlyContinue'
       $conns = Get-NetTCPConnection | Where-Object { $_.State -eq 'Listen' -or $_.State -eq 'Established' } | Select-Object -First 60 LocalAddress, LocalPort, RemoteAddress, RemotePort, State, OwningProcess
@@ -591,7 +668,7 @@ class SecurityService {
   }
 
   async checkRansomwareArmor() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Verificação de blindagem anti-ransomware (VSS/SMB1) é suportada apenas no Windows.' };
     const script = `
       $ErrorActionPreference = 'SilentlyContinue'
       $vss = (Get-Service -Name "VSS" -ErrorAction SilentlyContinue).Status
@@ -613,7 +690,7 @@ class SecurityService {
   }
 
   async enableRansomwareArmor() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Blindagem anti-ransomware (VSS/SMB1/ponto de restauração) é suportada apenas no Windows.' };
     const script = `
       $ErrorActionPreference = 'SilentlyContinue'
       # 1. Configura e inicia serviço de Volume Shadow Copy (VSS)

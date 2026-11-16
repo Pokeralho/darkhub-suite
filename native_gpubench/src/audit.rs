@@ -1,3 +1,4 @@
+#![cfg(windows)]
 //! Read-only checks that go with a ranked run: the driver profile that applies to this process (NVIDIA only, through
 //! the documented NVAPI DRS calls) and three clocks that must agree. Everything here is a report from the client: the
 //! server treats it as a claim. It catches a tuned control panel and off-the-shelf speedhacks, not a rebuilt engine.

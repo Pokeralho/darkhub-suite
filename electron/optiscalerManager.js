@@ -1248,7 +1248,10 @@ async function createManualBackup(payload = {}) {
 }
 
 export function registerOptiScalerIPC({ app, ipcMain, getLibraryStore }) {
+  const unsupported = (extra = {}) => ({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'OptiScaler Manager é suportado apenas no Windows.', ...extra })
+
   ipcMain.handle('optiscaler:analyze', async (_event, payload) => {
+    if (process.platform !== 'win32') return unsupported()
     try {
       return await buildAnalysis(app, payload)
     } catch (err) {
@@ -1257,6 +1260,7 @@ export function registerOptiScalerIPC({ app, ipcMain, getLibraryStore }) {
   })
 
   ipcMain.handle('optiscaler:apply', async (_event, payload) => {
+    if (process.platform !== 'win32') return unsupported()
     try {
       return await withMutationLock(() => applyOptiScaler(app, getLibraryStore, payload))
     } catch (err) {
@@ -1265,6 +1269,7 @@ export function registerOptiScalerIPC({ app, ipcMain, getLibraryStore }) {
   })
 
   ipcMain.handle('optiscaler:listBackups', async (_event, payload) => {
+    if (process.platform !== 'win32') return { ok: true, unsupported: true, platform: process.platform, backups: [] }
     try {
       return await listBackups(payload)
     } catch (err) {
@@ -1273,6 +1278,7 @@ export function registerOptiScalerIPC({ app, ipcMain, getLibraryStore }) {
   })
 
   ipcMain.handle('optiscaler:restoreBackup', async (_event, payload) => {
+    if (process.platform !== 'win32') return unsupported()
     try {
       return await withMutationLock(() => restoreBackup(app, getLibraryStore, payload))
     } catch (err) {
@@ -1281,6 +1287,7 @@ export function registerOptiScalerIPC({ app, ipcMain, getLibraryStore }) {
   })
 
   ipcMain.handle('optiscaler:deleteBackup', async (_event, payload) => {
+    if (process.platform !== 'win32') return unsupported()
     try {
       return await withMutationLock(() => deleteBackup(payload))
     } catch (err) {
@@ -1289,6 +1296,7 @@ export function registerOptiScalerIPC({ app, ipcMain, getLibraryStore }) {
   })
 
   ipcMain.handle('optiscaler:createManualBackup', async (_event, payload) => {
+    if (process.platform !== 'win32') return unsupported()
     try {
       return await withMutationLock(() => createManualBackup(payload))
     } catch (err) {
@@ -1297,6 +1305,7 @@ export function registerOptiScalerIPC({ app, ipcMain, getLibraryStore }) {
   })
 
   ipcMain.handle('optiscaler:checkUpdate', async () => {
+    if (process.platform !== 'win32') return { ok: true, unsupported: true, platform: process.platform, hasUpdate: false, currentVersion: null, latestVersion: null }
     try {
       const json = await fetchJson(RELEASES_LATEST)
       const version = json.tag_name || json.name
@@ -1310,6 +1319,7 @@ export function registerOptiScalerIPC({ app, ipcMain, getLibraryStore }) {
   })
 
   ipcMain.handle('optiscaler:downloadUpdate', async (_event, payload) => {
+    if (process.platform !== 'win32') return unsupported()
     try {
       const requested = typeof payload === 'string' ? payload : payload?.url
       const r = await installOfficialRelease(app, requested || null)

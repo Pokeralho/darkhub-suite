@@ -29,7 +29,7 @@ const safeName = (s) => String(s).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace
 export const templatePrefix = (tpl) => staticPrefix(String(tpl).replace(/<storeUserId>/g, '*').replace(/\//g, '\\'))
 
 export class SaveBackupService {
-  constructor({ app, getInstalledGames, onEvent }) {
+  constructor({ app, getInstalledGames, onEvent, now = Date.now }) {
     this.app = app
     this.dir = path.join(app.getPath('userData'), 'saves')
     this.settingsFile = path.join(this.dir, 'settings.json')
@@ -37,6 +37,9 @@ export class SaveBackupService {
     this.onEvent = onEvent
     this.index = null
     this.busy = false
+    this._now = now
+    this._lastStamp = ''
+    this._stampSeq = 0
     fs.mkdirSync(this.dir, { recursive: true })
   }
 
@@ -190,8 +193,11 @@ export class SaveBackupService {
       const prev = this.versions(name)[0]
       if (prev && prev.fingerprint === fingerprint && !regKeys.length) return { ok: true, skipped: true, reason: 'unchanged', id: prev.id }
 
-      const d = new Date()
-      const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}${String(d.getSeconds()).padStart(2, '0')}`
+      const d = new Date(this._now())
+      const baseStamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}${String(d.getSeconds()).padStart(2, '0')}`
+      // deterministic uniqueness even when tests inject a fixed clock
+      if (baseStamp === this._lastStamp) this._stampSeq += 1; else { this._lastStamp = baseStamp; this._stampSeq = 0 }
+      const stamp = this._stampSeq ? `${baseStamp}-${this._stampSeq + 1}` : baseStamp
       // two backups in the same second (e.g. the safety copy right before a restore) must never share a folder:
       // the second one would overwrite the version being restored
       let id = stamp
@@ -207,7 +213,7 @@ export class SaveBackupService {
         bytes += list[i].size
       }
       const registry = []
-      for (let i = 0; i < regKeys.length; i++) {
+      if (process.platform === 'win32') for (let i = 0; i < regKeys.length; i++) {
         const out = path.join(vdir, `registry-${i}.reg`)
         const r = await run('reg.exe', ['export', regKeys[i], out, '/y'])
         if (r.code === 0) registry.push({ key: regKeys[i], file: path.basename(out) })
@@ -247,7 +253,7 @@ export class SaveBackupService {
   }
 
   async _gameRunning(installDir) {
-    if (!installDir) return false
+    if (process.platform !== 'win32' || !installDir) return false
     const ps = `$d = ${psQuote(installDir)}; @(Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($d, [StringComparison]::OrdinalIgnoreCase) }).Count`
     const r = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], 20000)
     return Number(r.stdout.trim()) > 0
@@ -271,7 +277,7 @@ export class SaveBackupService {
         restored++
       }
       let registry = 0
-      for (const r of p.info.registry || []) {
+      if (process.platform === 'win32') for (const r of p.info.registry || []) {
         if (!/^HKEY_CURRENT_USER\\/i.test(r.key)) continue
         const res = await run('reg.exe', ['import', path.join(p.vdir, r.file)])
         if (res.code === 0) registry++

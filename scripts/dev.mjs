@@ -27,18 +27,42 @@ try { fs.writeFileSync(stateFile, argPage || '') } catch {}
 
 function killTree(child) {
   if (!child || child.exitCode !== null || !child.pid) return
-  if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' })
-  else child.kill('SIGTERM')
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' })
+  } else {
+    try { process.kill(-child.pid, 'SIGTERM') } catch {
+      try { child.kill('SIGTERM') } catch {}
+    }
+  }
 }
 
 // A dev Electron orphaned by an earlier restart keeps the single-instance lock, so every new launch quits as a
-// "second instance". Before each start (and on exit) close leftovers of THIS repo only: its electron.exe and the
+// "second instance". Before each start (and on exit) close leftovers of THIS repo only: its Electron binary and the
 // native daemons under electron/services.
 function killStaleDev() {
-  if (process.platform !== 'win32') return
-  const esc = (s) => s.replace(/'/g, "''")
-  const ps = `Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and ($_.ExecutablePath -like '${esc(path.join(root, 'node_modules', 'electron', 'dist'))}*' -or $_.ExecutablePath -like '${esc(path.join(root, 'electron', 'services'))}*') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`
-  spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { stdio: 'ignore' })
+  if (process.platform === 'win32') {
+    const esc = (s) => s.replace(/'/g, "''")
+    const ps = `Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and ($_.ExecutablePath -like '${esc(path.join(root, 'node_modules', 'electron', 'dist'))}*' -or $_.ExecutablePath -like '${esc(path.join(root, 'electron', 'services'))}*') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`
+    spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { stdio: 'ignore' })
+    return
+  }
+
+  // POSIX: best-effort cleanup of leftover Electron/daemon processes that belong to this repo.
+  try {
+    const out = spawnSync('ps', ['-eo', 'pid=,args='], { encoding: 'utf8' })
+    const electronDist = path.join(root, 'node_modules', 'electron', 'dist')
+    const servicesDir = path.join(root, 'electron', 'services')
+    for (const line of String(out.stdout || '').split('\n')) {
+      const m = line.trim().match(/^(\d+)\s+(.*)$/)
+      if (!m) continue
+      const pid = Number(m[1])
+      const args = m[2]
+      if (!pid || pid === process.pid) continue
+      if (args.includes(electronDist) || args.includes(servicesDir)) {
+        try { process.kill(pid, 'SIGTERM') } catch {}
+      }
+    }
+  } catch {}
 }
 
 function waitForVite(url, timeoutMs = 60000) {
@@ -56,7 +80,10 @@ function waitForVite(url, timeoutMs = 60000) {
 
 // ---------------------------------------------------------------- Vite
 const vite = spawn(process.execPath, [path.join(root, 'node_modules', 'vite', 'bin', 'vite.js')], {
-  cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: process.env
+  cwd: root,
+  stdio: ['ignore', 'pipe', 'pipe'],
+  env: process.env,
+  detached: process.platform !== 'win32'
 })
 const prefix = (tag, color) => (chunk) => {
   for (const line of String(chunk).split(/\r?\n/)) if (line.trim()) console.log(`${color}[${tag}]${c.reset} ${line}`)
@@ -79,7 +106,8 @@ function startElectron() {
   electron = spawn(electronPath, ['.'], {
     cwd: root,
     stdio: ['ignore', 'inherit', 'inherit'],
-    env: { ...process.env, DARKHUB_PAGE: page, DARKHUB_DEV_STATE: stateFile }
+    env: { ...process.env, DARKHUB_PAGE: page, DARKHUB_DEV_STATE: stateFile },
+    detached: process.platform !== 'win32'
   })
   electron.on('exit', (code) => {
     if (restarting || quitting) return
@@ -103,17 +131,38 @@ if (watch) {
   const ignore = /\.(exe|dll|pdb|lib|exp|log|tmp|json)$|[\\/](node_modules|assets)[\\/]/i
   const startedAt = Date.now()
   const seen = new Map() // file -> last mtimeMs; antivirus/indexer reads fire fs.watch without changing the file
-  fs.watch(path.join(root, 'electron'), { recursive: true }, (_event, file) => {
+  const onWatchEvent = (_event, file) => {
     if (!file || ignore.test(file)) return
     let mtime = 0
-    try { mtime = fs.statSync(path.join(root, 'electron', String(file))).mtimeMs } catch { return }
-    const prev = seen.get(String(file)) ?? startedAt
+    const rel = String(file).replace(/\\/g, '/')
+    try { mtime = fs.statSync(path.join(root, 'electron', rel)).mtimeMs } catch { return }
+    const prev = seen.get(rel) ?? startedAt
     if (mtime <= prev) return
-    seen.set(String(file), mtime)
-    lastFile = `electron/${String(file).replace(/\\/g, '/')}`
+    seen.set(rel, mtime)
+    lastFile = `electron/${rel}`
     clearTimeout(timer)
     timer = setTimeout(() => restartElectron(lastFile), 350)
-  })
+  }
+
+  try {
+    fs.watch(path.join(root, 'electron'), { recursive: true }, onWatchEvent)
+  } catch (err) {
+    // Fallback for platforms/filesystems where recursive watch is unavailable.
+    const walk = (dir) => {
+      try {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          if (!entry.isDirectory()) continue
+          if (ignore.test(entry.name + path.sep)) continue
+          const full = path.join(dir, entry.name)
+          try { fs.watch(full, onWatchEvent) } catch {}
+          walk(full)
+        }
+      } catch {}
+    }
+    try { fs.watch(path.join(root, 'electron'), onWatchEvent) } catch {}
+    walk(path.join(root, 'electron'))
+    say(`Recursive watch unavailable (${err?.message ?? err}); using fallback watcher.`, c.yellow)
+  }
 }
 
 function shutdown(code = 0) {

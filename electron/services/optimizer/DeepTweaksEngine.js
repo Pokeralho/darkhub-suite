@@ -774,7 +774,17 @@ class DeepTweaksEngine {
   listTweaks() {
     // IPC-safe copies: `commands.revert` is a function (tweak:disableHibernation) and Electron's structured clone
     // throws on functions, which made `optimizer:deepTweaksList` reject and the UI show no registry tweak at all.
-    return this.deepTweaks.map(({ commands, dynamicRows, templateChanges, templateRevert, ...rest }) => (commands ? { ...rest, hasCommands: true } : rest));
+    const win32Only = process.platform !== 'win32';
+    return this.deepTweaks.map(({ commands, dynamicRows, templateChanges, templateRevert, ...rest }) => {
+      const supportedPlatforms = Array.isArray(rest.supportedPlatforms) && rest.supportedPlatforms.length ? rest.supportedPlatforms : ['win32'];
+      const out = {
+        ...rest,
+        supportedPlatforms,
+        supported: supportedPlatforms.includes(process.platform),
+        ...(win32Only ? { unsupported: !supportedPlatforms.includes(process.platform) } : {})
+      };
+      return commands ? { ...out, hasCommands: true } : out;
+    });
   }
 
   /**
@@ -1174,7 +1184,7 @@ class DeepTweaksEngine {
   }
 
   async applyTweaks(idsInput, eventSender = () => {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const ids = (Array.isArray(idsInput) ? idsInput : []).filter((i) => typeof i === 'string');
     await this.ensureResolved();
     // a tweak that does not exist on this machine (other GPU vendor, Windows build) is never written
@@ -1202,7 +1212,7 @@ class DeepTweaksEngine {
 
   /** Apply an ad-hoc change set (used by other engines) with snapshot + read-back verification. */
   async applyChangeSet({ id, title, changes, statusOnly, commands, explorerRestart, liveAction, requiresReboot }, eventSender = () => {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const clean = (changes || []).map((c) => (c.deleteKey ? { key: c.key, deleteKey: true }
       : c.deleteValue ? { key: c.key, name: c.name || '', deleteValue: true }
         : { key: c.key, name: c.name || '', type: c.type || 'REG_SZ', data: String(c.data ?? '') }));
@@ -1311,7 +1321,7 @@ class DeepTweaksEngine {
 
   /** opts.extraCommand: a PowerShell block run in the same elevated batch (its output is in the returned stdout). */
   async revertTweaks(idsInput, eventSender = () => {}, { extraCommand = '' } = {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const ids = (Array.isArray(idsInput) ? idsInput : []).filter((i) => typeof i === 'string');
     await this.ensureResolved();
     const defs = ids.map((id) => this.getDefinition(id)).filter(Boolean);
@@ -1324,7 +1334,7 @@ class DeepTweaksEngine {
 
   /** Restore strictly from the saved snapshot (the exact previous values). */
   async undoTweaks(idsInput, eventSender = () => {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const ids = (Array.isArray(idsInput) ? idsInput : [idsInput]).filter((i) => typeof i === 'string');
     const defs = ids.map((id) => this.getDefinition(id)).filter((d) => d && this.deepTweaksUndoStore.has(d.id));
     if (defs.length === 0) return { ok: false, error: 'Nenhum snapshot disponível para os ajustes selecionados' };
@@ -1334,7 +1344,7 @@ class DeepTweaksEngine {
 
   /** Restore an ad-hoc change set applied through applyChangeSet. */
   async restoreChangeSet({ id, title, fallbackChanges, explorerRestart, liveAction, commands, statusOnly, requiresReboot }, eventSender = () => {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
+    if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const snap = this.deepTweaksUndoStore.get(id);
     const changes = snap?.applied || fallbackChanges || [];
     const def = {

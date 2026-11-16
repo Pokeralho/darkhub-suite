@@ -22,6 +22,10 @@ describe('PresentMonService', () => {
   it('waits for the previous ETW session to end before starting a new one, and survives a spawn error', async () => {
     const svc = new PresentMonService({ toolsDir: 'C:/nowhere' });
     svc.ensure = async () => svc.exe;
+    if (process.platform !== 'win32') {
+      await expect(svc.start({ pid: 1 })).rejects.toThrow(/only supported on Windows/i);
+      return;
+    }
     await svc.start({ pid: 1 });
     expect(calls.spawn).toHaveLength(1);
 

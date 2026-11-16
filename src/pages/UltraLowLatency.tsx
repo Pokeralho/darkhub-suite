@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { visibleInterval } from '../utils/visibleInterval'
 import { useI18n } from '../i18n/I18nProvider'
 import { Zap, Loader2 } from '../components/icons'
@@ -10,14 +10,18 @@ type LatencyPayload = {
   config?: any
   status?: any
   metrics?: any
+  unsupported?: boolean
+  platform?: string
+  reason?: string
+  error?: string
 }
 
 const Skel = ({ w = 'w-12' }: { w?: string }) => (
   <span aria-hidden="true" className={`inline-block h-4 ${w} rounded bg-zinc-800/80 animate-pulse align-middle`} />
 )
 
-const Check = ({ checked, onChange, children, disabled }: { checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode; disabled?: boolean }) => (
-  <label className={`flex items-center gap-2 text-[12.5px] ${disabled ? 'text-zinc-600' : 'text-zinc-300'} cursor-pointer`}>
+const Check = ({ checked, onChange, children, disabled, title }: { checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode; disabled?: boolean; title?: string }) => (
+  <label className={`flex items-center gap-2 text-[12.5px] ${disabled ? 'text-zinc-600' : 'text-zinc-300'} ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`} title={title}>
     <input
       type="checkbox"
       checked={checked}
@@ -28,6 +32,22 @@ const Check = ({ checked, onChange, children, disabled }: { checked: boolean; on
   </label>
 )
 
+function isTweakSupported(cap: any, key: string): boolean {
+  const t = cap?.tweaks?.[key]
+  if (!t) return true
+  if (t.supported === false) return false
+  if (t.supported === 'partial' || t.supported === true) return true
+  return true
+}
+
+function tweakSupportNote(cap: any, key: string): string | null {
+  const t = cap?.tweaks?.[key]
+  if (!t) return null
+  if (t.supported === false) return t.reason || t.note || 'Indisponível nesta plataforma'
+  if (t.supported === 'partial') return t.note || null
+  return null
+}
+
 export default function UltraLowLatency() {
   const { t } = useI18n()
   const [data, setData] = useState<LatencyPayload | null>(null)
@@ -37,6 +57,9 @@ export default function UltraLowLatency() {
   const [dirty, setDirty] = useState(false)
   const dirtyRef = useRef(false)
   const hotkeyEditingRef = useRef(false)
+  const [unsupported, setUnsupported] = useState<string | null>(null)
+  const [partialMode, setPartialMode] = useState(false)
+  const [capabilities, setCapabilities] = useState<any>(null)
   const [uiMode, setUiMode] = useState<'simple' | 'advanced'>(() => {
     try {
       const v = localStorage.getItem('darkhub.ullm.mode')
@@ -122,7 +145,19 @@ export default function UltraLowLatency() {
     try {
       const res = await window.darkhub.latency.getConfig()
       setData(res)
+      const cap = res?.status?.capabilities || null
+      if (cap) setCapabilities(cap)
+      // Fully unsupported service/platform (no diagnostics): keep the old full-page unsupported view.
+      if (res && res.ok === false && res.unsupported) {
+        const isPartial = cap?.level === 'partial' || String(res?.reason || '').includes('partial')
+        if (!isPartial) {
+          setUnsupported(res.error || 'Ultra Low Latency is only supported on Windows.')
+          return
+        }
+        // Partial unsupported payloads still carry usable info in some cases; fall through.
+      }
       if (res?.ok) {
+        if (cap?.level === 'partial') setPartialMode(true)
         if (res?.applied) setLastApplied(res.applied)
         else if (res?.status?.lastApplied) setLastApplied(res.status.lastApplied)
         if (!dirtyRef.current && !hotkeyEditingRef.current) {
@@ -142,6 +177,13 @@ export default function UltraLowLatency() {
             res.config?.tweaks && typeof res.config.tweaks === 'object' ? { ...prev, ...res.config.tweaks } : prev
           )
         }
+      } else if (res?.unsupported) {
+        const isPartial = (res?.status?.capabilities?.level === 'partial') || String(res?.reason || '').includes('partial')
+        if (!isPartial) {
+          setUnsupported(res.error || 'Ultra Low Latency is only supported on Windows.')
+          return
+        }
+        setPartialMode(true)
       }
     } catch (e: any) {
       setError(e?.message ?? String(e))
@@ -149,16 +191,18 @@ export default function UltraLowLatency() {
   }
 
   useEffect(() => {
+    if (unsupported) return
     refresh()
     return visibleInterval(refresh, 1500)
-  }, [])
+  }, [unsupported])
 
   const pickExe = async () => {
     setError(null)
     if (!window.darkhub?.dialog) return
+    const isWin = (data?.status?.capabilities?.platform || capabilities?.platform || '') === 'win32' || !partialMode
     const res = await window.darkhub.dialog.selectFiles({
       title: 'Selecione o executável do jogo',
-      filters: [{ name: 'Executável', extensions: ['exe'] }]
+      filters: isWin ? [{ name: 'Executável', extensions: ['exe'] }] : undefined
     })
     if (!res?.canceled && Array.isArray(res?.filePaths) && res.filePaths[0]) {
       markDirty()
@@ -296,6 +340,19 @@ export default function UltraLowLatency() {
     (lastApplied?.processPriorityHigh?.status === 'skipped' || (!status?.game?.pid && Boolean(status?.ultraEnabled)))
 
   const bridgeMissing = !window.darkhub?.latency
+
+  if (unsupported) {
+    return (
+      <div className="dh-page flex flex-col pb-24">
+        <div className="dh-page-header">
+          <PageHeader title={t('nav.ultralatency', 'Ultra Low Latency')} subtitle={t('latency.unsupported.desc', 'Latency tuning, timer control and the guardian engine depend on Windows APIs and are not available on this platform.')} />
+        </div>
+        <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/60 px-4 py-3 text-[13px] text-zinc-300">
+          {unsupported}
+        </div>
+      </div>
+    )
+  }
   const waiting = !data && !bridgeMissing
   const ultraOn = Boolean(status?.ultraEnabled)
 
@@ -334,6 +391,12 @@ export default function UltraLowLatency() {
     ['killBackground', 'Encerrar processos de fundo']
   ]
 
+  const platformLabel = capabilities?.platform || (partialMode ? 'linux' : 'win32')
+  const isLinuxPartial = partialMode || capabilities?.level === 'partial' || platformLabel === 'linux'
+  const boostSupported = capabilities?.features?.boostNow !== false
+  const launchSupported = capabilities?.features?.launchGameWithProfile !== false
+  const metricsGpuSupported = capabilities?.features?.metricsGpu !== false
+
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6">
       <PageHeader
@@ -346,6 +409,7 @@ export default function UltraLowLatency() {
               sections={[
                 { title: 'Básico', content: 'Um botão único para ativar o perfil com aplicação best-effort e foco em estabilidade.' },
                 { title: 'Avançado', content: 'Ajustes individuais (power plan, prioridade, QoS, Nagle, etc.), com mais risco e mais controle.' },
+                { title: 'Plataformas', content: 'Windows: conjunto completo. Linux: modo parcial com diagnósticos (CPU/RAM/ping) e ajustes seguros best-effort (perfil de energia, renice, flush DNS via Boost). Tweaks exclusivos do Windows ficam indisponíveis.' },
                 { title: 'Dica', content: 'Se o jogo não estiver rodando, a prioridade High pode ser adiada (comportamento mais estável). Abra o jogo e clique Ativar novamente.' }
               ]}
               example="Exemplo: selecione o executável do jogo, use “Básico” para aplicar o preset e, se necessário, ajuste no “Avançado”."
@@ -353,7 +417,7 @@ export default function UltraLowLatency() {
             />
           </span>
         }
-        subtitle={<>Perfil de baixa latência para jogos (manual ou automático). Atalho padrão: <span className="font-mono text-zinc-300">Ctrl+F1</span>.</>}
+        subtitle={<>Perfil de baixa latência para jogos (manual ou automático). Atalho padrão: <span className="font-mono text-zinc-300">Ctrl+F1</span>.{isLinuxPartial ? <span className="ml-2 text-amber-300/90">Modo parcial no Linux (diagnósticos + ajustes seguros).</span> : null}</>}
         actions={
           <div role="tablist" aria-label="Modo" className="flex items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900/60 p-0.5">
             {([['simple', 'Básico'], ['advanced', 'Avançado']] as const).map(([m, label]) => (
@@ -372,6 +436,12 @@ export default function UltraLowLatency() {
           </div>
         }
       />
+
+      {isLinuxPartial ? (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.04] px-4 py-3 text-[13px] text-amber-100/90">
+          Linux (Ubuntu): diagnósticos e controles limitados disponíveis. Ajustes exclusivos do Windows (timer 0.5ms, Fullscreen Optimizations, mouse accel por registro, QoS/Nagle/netsh, DNS por adaptador, limpeza de RAM) ficam desabilitados e são reportados como indisponíveis.
+        </div>
+      ) : null}
 
       {bridgeMissing ? (
         <p role="alert" className="text-[12.5px] text-red-300">{t('ull.apiUnavailable', 'Backend de latência indisponível. Reinicie o DarkHub para reconectar.')}</p>
@@ -402,9 +472,9 @@ export default function UltraLowLatency() {
           <div className="bg-zinc-950 px-4 py-3 min-w-0">
             <dt className="text-[11.5px] text-zinc-500">Timer Kernel</dt>
             <dd className="mt-1.5 font-mono text-[14px] text-zinc-50 tabular-nums">
-              {timerMs ? <>{timerMs}<span className="text-[11px] text-zinc-500"> ms</span></> : waiting ? <Skel w="w-16" /> : <span className="text-zinc-600">--</span>}
+              {timerMs ? <>{timerMs}<span className="text-[11px] text-zinc-500"> ms</span></> : (capabilities?.features?.queryTimer === false ? <span className="text-zinc-500 text-[12px]">N/D</span> : waiting ? <Skel w="w-16" /> : <span className="text-zinc-600">--</span>)}
             </dd>
-            <dd className="mt-0.5 text-[11px] text-zinc-500 truncate">{status?.timerResolutionInfo?.locked ? 'MMCSS Games Locked' : 'Default'}</dd>
+            <dd className="mt-0.5 text-[11px] text-zinc-500 truncate">{capabilities?.features?.queryTimer === false ? 'Indisponível no Linux' : (status?.timerResolutionInfo?.locked ? 'MMCSS Games Locked' : 'Default')}</dd>
           </div>
           <div className="bg-zinc-950 px-4 py-3 min-w-0 md:col-span-2 xl:col-span-1">
             <dt className="text-[11.5px] text-zinc-500">Jogo</dt>
@@ -634,24 +704,35 @@ export default function UltraLowLatency() {
                     markDirty()
                     setSmartCleanMinutes(Math.max(0, Math.min(240, Math.trunc(Number(e.target.value) || 0))))
                   }}
+                  disabled={capabilities?.features?.smartCleanRam === false}
                   className="dh-input w-full font-mono"
+                  title={capabilities?.features?.smartCleanRam === false ? 'Indisponível nesta plataforma' : undefined}
                 />
-                <p className="dh-help mt-1.5">0 desativa. Recomendado: 10 a 30.</p>
+                <p className="dh-help mt-1.5">{capabilities?.features?.smartCleanRam === false ? 'Indisponível no Linux (limpeza de working set é específica do Windows).' : '0 desativa. Recomendado: 10 a 30.'}</p>
               </div>
-              <div className="flex items-center gap-5 lg:pt-6">
-                <Check checked={smartCleanDuringGaming} onChange={dirtyThen(setSmartCleanDuringGaming)}>Permitir durante o jogo</Check>
-                <Check checked={gpuPollingEnabled} onChange={dirtyThen(setGpuPollingEnabled)}>Medir GPU (3D)</Check>
+              <div className="flex items-center gap-5 lg:pt-6 flex-wrap">
+                <Check checked={smartCleanDuringGaming} onChange={dirtyThen(setSmartCleanDuringGaming)} disabled={capabilities?.features?.smartCleanRam === false}>Permitir durante o jogo</Check>
+                <Check checked={gpuPollingEnabled} onChange={dirtyThen(setGpuPollingEnabled)} disabled={!metricsGpuSupported}>Medir GPU (3D)</Check>
+                {!metricsGpuSupported ? <span className="text-[11.5px] text-zinc-500">GPU (3D) indisponível nesta plataforma</span> : null}
               </div>
             </div>
 
             <div>
               <h2 className="dh-section-title mb-2.5">Tweaks</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2.5">
-                {tweakList.map(([key, label]) => (
-                  <Check key={key} checked={Boolean(tweaks[key])} onChange={dirtyThen((v) => setTweaks({ ...tweaks, [key]: v }))}>
-                    {label}
-                  </Check>
-                ))}
+                {tweakList.map(([key, label]) => {
+                  const supported = isTweakSupported(capabilities, key)
+                  const note = tweakSupportNote(capabilities, key)
+                  return (
+                    <div key={key} className="min-w-0">
+                      <Check checked={Boolean(tweaks[key])} onChange={dirtyThen((v) => setTweaks({ ...tweaks, [key]: v }))} disabled={!supported} title={note || undefined}>
+                        <span className={!supported ? 'line-through decoration-zinc-700' : ''}>{label}</span>
+                        {!supported ? <span className="ml-1 text-[11px] text-zinc-500">(indisponível)</span> : null}
+                      </Check>
+                      {note && supported ? <div className="mt-0.5 ml-6 text-[11px] text-zinc-500">{note}</div> : null}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -669,7 +750,9 @@ export default function UltraLowLatency() {
                 <span>{ultraOn ? 'Desativar (Estável)' : 'Ativar (Estável)'}</span>
               </button>
               <p className="dh-help max-w-[75ch]">
-                Preset estável: Power Plan + Prioridade do jogo (quando detectado) + Mouse Acceleration OFF. Tweaks agressivos ficam no modo Avançado.
+                {isLinuxPartial
+                  ? 'Preset estável (Linux, best-effort): perfil de energia e prioridade do processo (renice) quando o jogo for detectado. Ajustes do Windows são reportados como indisponíveis.'
+                  : 'Preset estável: Power Plan + Prioridade do jogo (quando detectado) + Mouse Acceleration OFF. Tweaks agressivos ficam no modo Avançado.'}
               </p>
             </div>
           ) : (
@@ -685,7 +768,7 @@ export default function UltraLowLatency() {
               <button onClick={disable} disabled={loading} className="dh-btn">
                 Desativar
               </button>
-              <button onClick={boostNow} disabled={loading} className="dh-btn dh-btn-ghost">
+              <button onClick={boostNow} disabled={loading || !boostSupported} className="dh-btn dh-btn-ghost" title={!boostSupported ? 'Indisponível nesta plataforma' : undefined}>
                 Boost now
               </button>
               {dirty ? <span className="ml-auto text-[11.5px] text-amber-300">Alterações não salvas</span> : null}
@@ -694,6 +777,11 @@ export default function UltraLowLatency() {
           {prioSkipped ? (
             <p role="status" className="mt-3 text-[12px] text-amber-300">
               Abra o jogo e clique Ativar novamente para aplicar prioridade High.
+            </p>
+          ) : null}
+          {!launchSupported ? (
+            <p className="mt-3 text-[12px] text-zinc-500">
+              Lançar jogo com perfil (latency:launchGameWithProfile) não está disponível nesta plataforma.
             </p>
           ) : null}
         </div>

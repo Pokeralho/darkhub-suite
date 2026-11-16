@@ -90,7 +90,8 @@ function safeJson(stdout, fallback) {
 }
 
 export class PowerShellToolsService {
-  constructor({ runner, cmdRunner, fsImpl, root } = {}) {
+  constructor({ runner, cmdRunner, fsImpl, root, platform } = {}) {
+    this._platform = platform || process.platform
     this._root = root || DARKOS_ROOT
     this._fs = fsImpl || fsDefault
     this._runner = runner || ((script, opts) => runPowerShell(script, opts))
@@ -121,7 +122,7 @@ export class PowerShellToolsService {
 
   /** Reads the execution policy of every scope and resolves the effective one (no admin needed). */
   async getPolicies() {
-    if (process.platform !== 'win32') return { ok: false, error: 'Disponível apenas no Windows.', scopes: [] }
+    if (this._platform !== 'win32') return { ok: false, unsupported: true, platform: this._platform, reason: 'windows-only', error: 'Disponível apenas no Windows.', scopes: [] }
     const script = `Get-ExecutionPolicy -List | ForEach-Object { [pscustomobject]@{ scope = $_.Scope.ToString(); policy = $_.ExecutionPolicy.ToString() } } | ConvertTo-Json -Compress`
     const res = await this._runner(script, { timeoutMs: 15000, trim: true })
     const scopes = normalizeScopes(safeJson(res?.stdout, []))
@@ -131,6 +132,9 @@ export class PowerShellToolsService {
 
   /** Lists the trusted .ps1 maintenance scripts under the DarkOS root, each with its signature. */
   async listScripts() {
+    if (this._platform !== 'win32') {
+      return { ok: false, unsupported: true, platform: this._platform, reason: 'windows-only', rootExists: false, root: this._root, scripts: [], error: 'Disponível apenas no Windows.' }
+    }
     if (!this._fs.existsSync(this._root)) {
       return { ok: true, rootExists: false, root: this._root, scripts: [] }
     }
@@ -169,6 +173,7 @@ ConvertTo-Json -InputObject @($out) -Depth 3 -Compress
 
   /** Returns the Authenticode signature of a single trusted script (validated path). */
   async getSignature(scriptPath) {
+    if (this._platform !== 'win32') return { ok: false, unsupported: true, platform: this._platform, reason: 'windows-only', error: 'Disponível apenas no Windows.' }
     if (!isPs1(scriptPath) || !this._isTrustedPath(scriptPath)) {
       return { ok: false, error: 'Caminho inválido ou fora de ' + this._root }
     }
@@ -186,6 +191,7 @@ ConvertTo-Json -InputObject @($out) -Depth 3 -Compress
    * passes `confirmUnsigned: true`, i.e. the user explicitly accepted running it.
    */
   async runScript({ path: scriptPath, confirmUnsigned } = {}) {
+    if (this._platform !== 'win32') return { ok: false, unsupported: true, platform: this._platform, reason: 'windows-only', error: 'Disponível apenas no Windows.' }
     if (!isPs1(scriptPath)) return { ok: false, error: 'Selecione um arquivo .ps1.' }
     if (!this._isTrustedPath(scriptPath)) {
       return { ok: false, error: `Por segurança, só é possível executar scripts dentro de ${this._root}.` }
@@ -221,7 +227,7 @@ ConvertTo-Json -InputObject @($out) -Depth 3 -Compress
    * UAC prompt, Start-Process throws and this returns ok:false.
    */
   async openElevatedTerminal({ startingPath, shell, loadProfile } = {}) {
-    if (process.platform !== 'win32') return { ok: false, error: 'Disponível apenas no Windows.' }
+    if (this._platform !== 'win32') return { ok: false, unsupported: true, platform: this._platform, reason: 'windows-only', error: 'Disponível apenas no Windows.' }
     let startIn = this._root
     if (startingPath && isStartFolder(startingPath) && this._isDirectory(startingPath.trim())) startIn = startingPath.trim()
     if (!this._fs.existsSync(startIn)) startIn = process.env.SystemRoot || 'C:\\'

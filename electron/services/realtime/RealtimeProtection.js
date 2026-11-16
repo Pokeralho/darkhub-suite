@@ -15,16 +15,17 @@ export const RISKY_EXT = new Set([
   '.docm', '.xlsm', '.pptm', '.dotm', '.xlam', '.one', '.chm', '.reg', '.appx', '.msix'
 ])
 const PARTIAL_RE = /\.(crdownload|part|partial|download|tmp|opdownload)$/i
-const SETTLE_MS = 2000
+const DEFAULT_SETTLE_MS = 2000
 const MAX_SETTLE_TRIES = 30
-const CLAM_BATCH_MS = 4000
+const DEFAULT_CLAM_BATCH_MS = 4000
 const CLAM_BATCH_MAX = 32
 const CLEAN_CACHE = 4000
 const LOG_SIZE = 300
 
 /** Whether a changed path is worth scanning. Pure. */
 export function isScanCandidate(file) {
-  const base = path.basename(String(file || ''))
+  const raw = String(file || '')
+  const base = path.basename(raw.replace(/\\/g, '/'))
   if (!base || base.startsWith('~$') || PARTIAL_RE.test(base)) return false
   return RISKY_EXT.has(path.extname(base).toLowerCase())
 }
@@ -37,9 +38,9 @@ export function sha256File(file) {
 }
 
 export class RealtimeProtection extends EventEmitter {
-  constructor({ getConfig, getHashDb, clamav, quarantine, notify = () => {}, now = Date.now } = {}) {
+  constructor({ getConfig, getHashDb, clamav, quarantine, notify = () => {}, now = Date.now, settleMs = DEFAULT_SETTLE_MS, clamBatchMs = DEFAULT_CLAM_BATCH_MS } = {}) {
     super()
-    Object.assign(this, { getConfig, getHashDb, clamav, quarantine, notify, now })
+    Object.assign(this, { getConfig, getHashDb, clamav, quarantine, notify, now, settleMs, clamBatchMs })
     this.watchers = []
     this.settling = new Map()
     this.queue = []
@@ -101,7 +102,7 @@ export class RealtimeProtection extends EventEmitter {
     const prev = this.settling.get(file)
     if (prev) clearTimeout(prev.timer)
     const entry = prev || { size: -1, tries: 0 }
-    entry.timer = setTimeout(() => this.#settle(file), SETTLE_MS)
+    entry.timer = setTimeout(() => this.#settle(file), this.settleMs)
     this.settling.set(file, entry)
   }
 
@@ -112,7 +113,7 @@ export class RealtimeProtection extends EventEmitter {
     try { st = fs.statSync(file) } catch { this.settling.delete(file); return } // deleted or renamed away
     if (st.size !== entry.size && ++entry.tries < MAX_SETTLE_TRIES) {
       entry.size = st.size
-      entry.timer = setTimeout(() => this.#settle(file), SETTLE_MS)
+      entry.timer = setTimeout(() => this.#settle(file), this.settleMs)
       return
     }
     this.settling.delete(file)
@@ -151,7 +152,7 @@ export class RealtimeProtection extends EventEmitter {
     if (cfg.clamav && this.clamav?.status().database) {
       this.clamBatch.push({ file, sha256, size: st.size, key })
       if (this.clamBatch.length >= CLAM_BATCH_MAX) this.#flushClam()
-      else if (!this.clamTimer) this.clamTimer = setTimeout(() => this.#flushClam(), CLAM_BATCH_MS)
+      else if (!this.clamTimer) this.clamTimer = setTimeout(() => this.#flushClam(), this.clamBatchMs)
       return
     }
     this.#markClean(key)

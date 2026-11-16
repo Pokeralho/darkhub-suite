@@ -20,6 +20,43 @@ export const REINSTALL_EDGE_SCRIPT = [
  * Progress for long operations is streamed to the calling window on 'darkos:runEvent'.
  */
 export function registerDarkOSIPC({ ipcMain, dialog, BrowserWindow, app, logger, service } = {}) {
+  if (process.platform !== 'win32') {
+    const unsupported = (extra = {}) => ({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'DarkOS/Windows tweaks são suportados apenas no Windows.', ...extra })
+    const handle = (channel, fn) => {
+      ipcMain.handle(channel, async (event, payload) => {
+        try { return await fn(payload ?? {}, { onEvent: () => {} }, event) } catch (err) {
+          try { logger?.error?.('DarkOS', `${channel}: ${err?.message ?? err}`) } catch { /* ignore */ }
+          return { ok: false, error: err?.message ?? String(err) }
+        }
+      })
+    }
+    handle('darkos:isDarkOS', async () => ({ ok: true, isDarkOS: false, platform: process.platform, supported: false, unsupported: true, reason: 'windows-only' }))
+    handle('darkos:latestRelease', async () => unsupported({ release: null }))
+    handle('darkos:getCatalog', () => unsupported({ items: [], profiles: [] }))
+    handle('darkos:getManifest', () => unsupported())
+    handle('darkos:getStatus', () => unsupported())
+    handle('darkos:applyChange', () => unsupported())
+    handle('darkos:revertChange', () => unsupported())
+    handle('darkos:setProfile', () => unsupported())
+    handle('darkos:restoreProfile', () => unsupported())
+    handle('darkos:getRemovedApps', () => unsupported({ apps: [] }))
+    handle('darkos:restoreAppx', () => unsupported())
+    handle('darkos:listSnapshots', () => unsupported({ snapshots: [] }))
+    handle('darkos:createSnapshot', () => unsupported())
+    handle('darkos:restoreSnapshot', () => unsupported())
+    handle('darkos:getFailures', () => unsupported({ failures: [] }))
+    handle('darkos:getRebootPending', () => unsupported({ pending: false }))
+    handle('darkos:usbDisks', () => unsupported({ disks: [] }))
+    handle('darkos:usbFindIsos', () => unsupported({ isos: [] }))
+    handle('darkos:usbPickIso', () => unsupported())
+    handle('darkos:usbHashIso', () => unsupported())
+    handle('darkos:usbWrite', () => unsupported())
+    handle('darkos:usbCancel', () => ({ ok: true, unsupported: true, platform: process.platform }))
+    handle('darkos:exportDiagnostics', () => unsupported())
+    handle('darkos:reinstallEdge', () => unsupported())
+    return null
+  }
+
   const svc = service || new DarkOSRecoveryService({ logger })
   // On a stock Windows the same screens drive "Windows mode": DarkOS tweaks one by one, own state folder.
   const win = new DarkOSRecoveryService({ logger, mode: 'windows' })

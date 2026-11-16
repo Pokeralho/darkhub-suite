@@ -9,6 +9,7 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
+const wp = path.win32
 import { EventEmitter } from 'node:events'
 import { fileURLToPath } from 'node:url'
 import { isValidAppxName } from '../optimizer/OptimizerUtils.js'
@@ -346,7 +347,7 @@ export class DarkOSRecoveryService extends EventEmitter {
   }
 
   get catalogPath() {
-    return this.bundledDir ? path.join(this.bundledDir, 'policy', 'catalog.json') : null
+    return this.bundledDir ? wp.join(this.bundledDir, 'policy', 'catalog.json') : null
   }
 
   resolveCli() {
@@ -357,8 +358,8 @@ export class DarkOSRecoveryService extends EventEmitter {
     ]
     let best = null
     for (const c of candidates) {
-      const cli = path.join(c.dir, CLI_FILE)
-      const mod = path.join(c.dir, MODULE_FILE)
+      const cli = wp.join(c.dir, CLI_FILE)
+      const mod = wp.join(c.dir, MODULE_FILE)
       try {
         if (!this.fs.existsSync(cli) || !this.fs.existsSync(mod)) continue
       } catch { continue }

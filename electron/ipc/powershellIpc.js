@@ -41,8 +41,10 @@ export function registerPowerShellIPC({ ipcMain, logger, service, toolkit, elect
   handle('powershell:openElevatedTerminal', (p) => svc.openElevatedTerminal(p))
 
   // ---- toolkit ----
-  handle('powershell:previewTool', (p) => kit.preview(String(p.id || ''), p.params || {}))
+  const winOnly = () => ({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Ferramentas PowerShell são suportadas apenas no Windows.' })
+  handle('powershell:previewTool', (p) => process.platform !== 'win32' ? winOnly() : kit.preview(String(p.id || ''), p.params || {}))
   handle('powershell:runTool', async (p) => {
+    if (process.platform !== 'win32') return winOnly()
     const r = await kit.runTool(String(p.id || ''), p.params || {}, { confirm: p.confirm === true })
     if (r?.ok && r.file) generated.add(String(r.file).toLowerCase())
     return r
@@ -65,6 +67,7 @@ export function registerPowerShellIPC({ ipcMain, logger, service, toolkit, elect
   })
   // The destination always comes from the native save dialog.
   handle('powershell:export', async (p, event) => {
+    if (process.platform !== 'win32') return winOnly()
     const format = ['csv', 'json', 'txt'].includes(p.format) ? p.format : 'txt'
     const r = await electronMod.dialog.showSaveDialog(winOf(event), {
       title: 'Exportar resultado', defaultPath: `${cleanName(p.defaultName, 'resultado')}.${format}`,
@@ -85,22 +88,22 @@ export function registerPowerShellIPC({ ipcMain, logger, service, toolkit, elect
     const err = await electronMod.shell.openPath(f)
     return err ? { ok: false, error: err } : { ok: true }
   })
-  handle('powershell:wifiKey', (p) => kit.revealWifiKey(p.name))
-  handle('powershell:hostsRead', () => kit.readHosts())
-  handle('powershell:hostsBackup', (p) => kit.readHostsBackup(p.name))
-  handle('powershell:hostsPreview', (p) => kit.previewHosts(p.content))
-  handle('powershell:hostsWrite', (p) => kit.writeHosts(p.content, { confirm: p.confirm === true }))
+  handle('powershell:wifiKey', (p) => process.platform !== 'win32' ? winOnly() : kit.revealWifiKey(p.name))
+  handle('powershell:hostsRead', () => process.platform !== 'win32' ? winOnly() : kit.readHosts())
+  handle('powershell:hostsBackup', (p) => process.platform !== 'win32' ? winOnly() : kit.readHostsBackup(p.name))
+  handle('powershell:hostsPreview', (p) => process.platform !== 'win32' ? winOnly() : kit.previewHosts(p.content))
+  handle('powershell:hostsWrite', (p) => process.platform !== 'win32' ? winOnly() : kit.writeHosts(p.content, { confirm: p.confirm === true }))
 
   // ---- custom scripts (live output on 'powershell:customEvent' to the window that started the run) ----
-  handle('powershell:customStart', (p, event) => kit.startCustom(
+  handle('powershell:customStart', (p, event) => process.platform !== 'win32' ? winOnly() : kit.startCustom(
     { script: p.script, elevated: p.elevated === true, confirm: p.confirm === true },
     (ev) => { try { if (!event.sender.isDestroyed()) event.sender.send('powershell:customEvent', ev) } catch { /* window closing */ } }
   ))
-  handle('powershell:customStop', () => kit.stopCustom())
-  handle('powershell:customStatus', () => ({ ok: true, running: kit.isCustomRunning() }))
-  handle('powershell:snippetsList', () => kit.listSnippets())
-  handle('powershell:snippetSave', (p) => kit.saveSnippet(p))
-  handle('powershell:snippetDelete', (p) => kit.deleteSnippet(String(p.id || '')))
+  handle('powershell:customStop', () => process.platform !== 'win32' ? winOnly() : kit.stopCustom())
+  handle('powershell:customStatus', () => ({ ok: true, running: process.platform === 'win32' ? kit.isCustomRunning() : false, ...(process.platform !== 'win32' ? { unsupported: true, platform: process.platform, reason: 'windows-only' } : {}) }))
+  handle('powershell:snippetsList', () => process.platform !== 'win32' ? winOnly() : kit.listSnippets())
+  handle('powershell:snippetSave', (p) => process.platform !== 'win32' ? winOnly() : kit.saveSnippet(p))
+  handle('powershell:snippetDelete', (p) => process.platform !== 'win32' ? winOnly() : kit.deleteSnippet(String(p.id || '')))
 
   return svc
 }
