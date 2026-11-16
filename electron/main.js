@@ -62,9 +62,11 @@ import ServicesEngine from './services/optimizer/ServicesEngine.js'
 import DnsEngine from './services/optimizer/DnsEngine.js'
 import StorageEngine from './services/optimizer/StorageEngine.js'
 import FramePacerEngine from './services/FramePacerEngine.js'
+import LowLatencyLayer from './services/LowLatencyLayerService.js'
 import { registerRealtimeIPC } from './ipc/realtimeIpc.js'
 import { registerCodeRunnerIPC } from './ipc/codeRunnerIpc.js'
 import { registerStartupIPC } from './ipc/startupIpc.js'
+import { findUntrustedWriters, unsafeFolderMessage } from './services/startup/elevatedTaskSafety.js'
 import { registerBenchmarkIPC } from './ipc/benchmarkIpc.js'
 import { registerGpuBenchIPC } from './ipc/gpuBenchIpc.js'
 import { registerMaintenanceIPC } from './ipc/maintenanceIpc.js'
@@ -1660,6 +1662,23 @@ function setFramePacerLive(on) {
   }
 }
 
+/**
+ * An autostart task created by an older version may point at a folder others can write to (portable .exe in Downloads):
+ * that is a silent way to administrator. Removed at launch; the user can enable it again from a protected folder.
+ */
+async function auditStartupTask() {
+  if (process.platform !== 'win32' || !(await isStartupTaskEnabled())) return
+  const r = await runCommand('schtasks.exe', ['/Query', '/TN', STARTUP_TASK_NAME, '/XML'], { timeoutMs: 8000 }).catch(() => null)
+  const xml = String(r?.stdout || '')
+  if (!/<RunLevel>\s*HighestAvailable\s*<\/RunLevel>/i.test(xml)) return
+  const m = /<Command>\s*"?([^"<]+?)"?\s*<\/Command>/i.exec(xml)
+  if (!m) return
+  const writers = await findUntrustedWriters(m[1].trim())
+  if (writers === null || !writers.length) return // could not check: leave the user's task alone
+  await runCommand('schtasks.exe', ['/Delete', '/TN', STARTUP_TASK_NAME, '/F'], { timeoutMs: 8000 }).catch(() => {})
+  log.warn(`[startup] elevated autostart task removed: ${unsafeFolderMessage(m[1].trim(), writers)}`)
+}
+
 async function isStartupTaskEnabled() {
   if (process.platform !== 'win32') return false
   try {
@@ -1680,6 +1699,9 @@ async function setStartupTask(enabled, hidden) {
   }
   // portable builds run from a temp extraction folder: register the portable .exe itself, not that copy
   const exe = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath
+  // the task runs as administrator with no UAC prompt: refuse when anyone but SYSTEM/Administrators can swap the program
+  const writers = await findUntrustedWriters(exe)
+  if (writers === null || writers.length) throw new Error(unsafeFolderMessage(exe, writers))
   const command = `"${exe}"${hidden ? ' --hidden' : ''}`
   const r = await runCommand('schtasks.exe', [
     '/Create', '/TN', STARTUP_TASK_NAME, '/TR', command,
@@ -1934,6 +1956,15 @@ ipcMain.handle('framepacer:getOverlayStatus', async () => {
   return getOverlayStatus()
 })
 
+// Experimental Vulkan low-latency layer (Reflex / Anti-Lag 2 for AMD and Intel in Vulkan games)
+ipcMain.handle('lowlatency:getStatus', async () => {
+  return LowLatencyLayer.getStatus()
+})
+
+ipcMain.handle('lowlatency:apply', async (_event, mode) => {
+  return LowLatencyLayer.apply(typeof mode === 'string' ? mode : '')
+})
+
 // Concede acesso a arquivos que o usuário arrastou (drag-and-drop) para a
 // janela do app — o drop em si é um sinal explícito de intenção do
 // usuário, equivalente a selecioná-los via diálogo nativo, mas o evento
@@ -2007,7 +2038,7 @@ ipcMain.handle('optimizer:uninstallProgramWithLeftovers', async (_event, payload
 ipcMain.handle('optimizer:advancedNetworkApply', async () => NetworkEngine.advancedNetworkApply());
 ipcMain.handle('optimizer:advancedNetworkRevert', async () => NetworkEngine.advancedNetworkRevert());
 
-ipcMain.handle('optimizer:deepTweaksList', async () => DeepTweaksEngine.listTweaks());
+ipcMain.handle('optimizer:deepTweaksList', async () => { await DeepTweaksEngine.ensureResolved(); return DeepTweaksEngine.listTweaks(); });
 ipcMain.handle('optimizer:applyTweak', async (_event, id) => {
   try {
     switch (id) {
@@ -3726,6 +3757,7 @@ app.whenReady().then(async () => {
 
   const runDeferredStartup = async () => {
     let liveServices = { latencyGuardian: true, overlay: true, autoClicker: true }
+    auditStartupTask().catch((err) => log.warn('[startup-bg] autostart audit failed:', err?.message ?? String(err)))
 
     try {
       log.info('[startup-bg] loading app config')

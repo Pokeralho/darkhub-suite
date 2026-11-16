@@ -139,7 +139,7 @@ export class UsbService {
   /** Read-only removable drives (applies to drives connected after the change). */
   setWriteProtect(on) {
     return this._run(on
-      ? `New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\StorageDevicePolicies' -Force | Out-Null
+      ? `if (-not (Test-Path -LiteralPath 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\StorageDevicePolicies')) { New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\StorageDevicePolicies' -Force | Out-Null }
 Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\StorageDevicePolicies' -Name WriteProtect -Type DWord -Value 1 -ErrorAction Stop`
       : `Remove-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\StorageDevicePolicies' -Name WriteProtect -ErrorAction SilentlyContinue`)
   }

@@ -14,6 +14,7 @@ export function collect(dir = services) {
   const add = (rel) => { files[rel] = crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, rel))).digest('hex') }
   for (const name of fs.readdirSync(dir).sort()) if (BINARY.test(name)) add(name)
   for (const name of fs.readdirSync(path.join(dir, 'hwsensors')).sort()) if (BINARY.test(name)) add(`hwsensors/${name}`)
+  for (const name of fs.readdirSync(path.join(dir, 'lowlatency')).sort()) if (BINARY.test(name)) add(`lowlatency/${name}`)
   return files
 }
 

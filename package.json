@@ -1,6 +1,6 @@
 {
   "name": "darkhub-suite",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "High-performance modular Windows utility suite for gamers and power users.",
   "author": "DarkHub Team",
   "license": "MIT",
@@ -16,6 +16,7 @@
     "build:native": "node scripts/require-win32.mjs build:native && powershell -NoProfile -ExecutionPolicy Bypass -Command \"& C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.LatencyEngine.exe electron\\services\\DarkHub.LatencyEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.FrameLimiter.exe electron\\services\\DarkHub.FrameLimiter.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.ClickEngine.exe electron\\services\\DarkHub.ClickEngine.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.SensorDaemon.exe electron\\services\\DarkHub.SensorDaemon.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\DarkHub.DiskScan.exe electron\\services\\DarkHub.DiskScan.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:x64 /optimize+ /out:electron\\services\\hwsensors\\DarkHub.HwSensors.exe /r:electron\\services\\hwsensors\\LibreHardwareMonitorLib.dll /r:System.Management.dll electron\\services\\hwsensors\\DarkHub.HwSensors.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:anycpu /optimize+ /out:electron\\services\\DarkHub.VaultBridgeHost.exe electron\\services\\DarkHub.VaultBridgeHost.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:anycpu /optimize+ /r:System.Web.Extensions.dll /out:electron\\services\\DarkHub.Mcp.exe electron\\services\\DarkHub.Mcp.cs; & C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:exe /platform:anycpu /optimize+ /out:electron\\services\\DarkHub.HotkeyWatch.exe electron\\services\\DarkHub.HotkeyWatch.cs\"",
     "build:renderer": "vite build",
     "integrity": "node scripts/gen-integrity.mjs",
+    "build:lowlatency": "native_lowlatency\\build-windows.cmd && node scripts/gen-integrity.mjs",
     "build:pacer": "node scripts/require-win32.mjs build:pacer && set \"RUSTFLAGS=-C target-feature=+crt-static\" && cargo build --release --target x86_64-pc-windows-msvc --manifest-path native_pacer/Cargo.toml --lib && cargo build --release --target i686-pc-windows-msvc --manifest-path native_pacer/Cargo.toml --lib --bins && powershell -NoProfile -Command \"Copy-Item native_pacer/target/x86_64-pc-windows-msvc/release/DarkHub_PacerHook.dll electron/services/DarkHub.PacerHook.x64.dll -Force; Copy-Item native_pacer/target/i686-pc-windows-msvc/release/DarkHub_PacerHook.dll electron/services/DarkHub.PacerHook.x86.dll -Force; Copy-Item native_pacer/target/i686-pc-windows-msvc/release/DarkHub_PacerInject.exe electron/services/DarkHub.PacerInject.x86.exe -Force\"",
     "test:pacer": "cargo test --manifest-path native_pacer/Cargo.toml -- --test-threads=1",
     "build:gpubench": "node scripts/require-win32.mjs build:gpubench && bash native_gpubench/build-shaders.sh && set \"RUSTFLAGS=-C target-feature=+crt-static\" && cargo build --release --manifest-path native_gpubench/Cargo.toml && powershell -NoProfile -Command \"Copy-Item native_gpubench/target/release/DarkHub_GpuBench.exe electron/services/DarkHub.GpuBench.exe -Force\"",
@@ -136,6 +137,7 @@
       "electron/services/darkos/policy/**",
       "electron/services/hub/schema/**",
       "electron/services/hwsensors/**",
+      "electron/services/lowlatency/**",
       "electron/services/fsr4_rdna2/**",
       "node_modules/sharp/**",
       "node_modules/@img/**",

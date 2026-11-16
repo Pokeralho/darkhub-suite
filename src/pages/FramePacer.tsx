@@ -10,6 +10,7 @@ import {
   Loader2
 } from '../components/icons'
 import PageHeader from '../components/ui/PageHeader'
+import VulkanLowLatencyCard from '../components/VulkanLowLatencyCard'
 
 export default function FramePacerPage() {
   const { t } = useI18n()
@@ -493,6 +494,8 @@ export default function FramePacerPage() {
           </div>
         </section>
       </div>
+
+      <VulkanLowLatencyCard />
     </div>
   )
 }

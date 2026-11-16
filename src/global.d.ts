@@ -29,7 +29,9 @@ export interface ConvertMediaPayload extends ConvertBasePayload { codec?: 'auto'
 export interface ConvertResult { inputFile: string; outputFile?: string; ok: boolean; error?: string; cancelled?: boolean; encoder?: string | null; hardware?: string | null; copy?: boolean; seconds?: number; bytes?: number | null; durationSec?: number; engine?: string; outputs?: string[] }
 export interface ConvertProgress { jobId: string; kind: 'image' | 'media' | 'document'; index: number; total: number; inputFile: string; stage: 'probe' | 'encode' | 'done' | 'error' | 'cancelled'; percent: number | null; speed?: number | null; fps?: number | null; encoder?: string | null; hardware?: string | null; copy?: boolean; finished?: number }
 export interface ConverterCapabilities { ffmpeg: boolean; hwEncoders: string[]; gpuVendors: string[]; libreoffice: { available: boolean; bundled: boolean }; texconv: boolean; raw: boolean; cpuThreads: number; imageInputs: string[]; imageOutputs: string[]; ddsFormats: string[]; mediaOutputs: string[]; docInputs: string[] }
-type HubInstallResult = { ok: boolean; error?: string; errors?: HubError[]; id?: string; applied?: number; skipped?: number; missingTasks?: string[]; notes?: string[]; requiresReboot?: boolean };
+export type LowLatencyMode = 'off' | 'antilag' | 'reflex'
+export interface LowLatencyLayerStatus { ok: boolean; mode: LowLatencyMode; bundled: boolean; installed: boolean; registered: boolean; upToDate: boolean; installDir: string; gpus: { name: string; vendor: 'nvidia' | 'amd' | 'intel' | 'other' }[]; recommendation: 'useful' | 'nativeNvidia' | 'none' }
+type HubInstallResult ={ ok: boolean; error?: string; errors?: HubError[]; id?: string; applied?: number; skipped?: number; missingTasks?: string[]; notes?: string[]; requiresReboot?: boolean };
 export type KgResult<T> = { ok: boolean; status?: number; error?: string } & T;
 export interface KgStatus { asfOnline: boolean; capacity: number | null; used: number; soldOut: boolean }
 export interface KgPlan { id: string; kind: 'HOURS' | 'CARDS' | 'UNLIMITED'; name: string; priceCents: number; slots: number; days: number; hours?: number; summary: string; features: string[]; highlight?: boolean }
@@ -1008,6 +1010,9 @@ export interface DarkHubAPI {
     setOverlayClickThrough: (enabled: boolean) => Promise<{ ok: boolean; clickThrough: boolean }>;
     setOverlayConfig: (config: any) => Promise<{ ok: boolean; overlayConfig: any }>;
     getOverlayStatus: () => Promise<{ isOpen: boolean; clickThrough: boolean; config: any }>;
+    /** Experimental Vulkan low-latency layer (Reflex / Anti-Lag 2 for AMD and Intel, Vulkan games only). */
+    lowLatencyStatus: () => Promise<LowLatencyLayerStatus>;
+    lowLatencyApply: (mode: LowLatencyMode) => Promise<{ ok: boolean; mode?: LowLatencyMode; restartRequired?: boolean; filesLeft?: boolean; error?: string }>;
     onMetrics: (callback: (metrics: any) => void) => () => void;
   };
   framepacer: {
@@ -1035,6 +1040,9 @@ export interface DarkHubAPI {
     setOverlayClickThrough: (enabled: boolean) => Promise<{ ok: boolean; clickThrough: boolean }>;
     setOverlayConfig: (config: any) => Promise<{ ok: boolean; overlayConfig: any }>;
     getOverlayStatus: () => Promise<{ isOpen: boolean; clickThrough: boolean; config: any }>;
+    /** Experimental Vulkan low-latency layer (Reflex / Anti-Lag 2 for AMD and Intel, Vulkan games only). */
+    lowLatencyStatus: () => Promise<LowLatencyLayerStatus>;
+    lowLatencyApply: (mode: LowLatencyMode) => Promise<{ ok: boolean; mode?: LowLatencyMode; restartRequired?: boolean; filesLeft?: boolean; error?: string }>;
     onMetrics: (callback: (metrics: any) => void) => () => void;
   };
   optiscaler: {

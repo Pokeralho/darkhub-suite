@@ -332,7 +332,7 @@ public static class NtTimer {
 
     const psWrite = `
       $ErrorActionPreference='Stop'
-      New-Item -Path "Registry::${key}" -Force | Out-Null
+      if (-not (Test-Path -LiteralPath "Registry::${key}")) { New-Item -Path "Registry::${key}" -Force | Out-Null }
       Set-ItemProperty -Path "Registry::${key}" -Name ${name} -Value '~ DISABLEDXMAXIMIZEDWINDOWEDMODE' -Force
     `
     const { code: c2, stderr: e2 } = await runPowerShell(psWrite, { timeoutMs: 8000 })
@@ -353,7 +353,7 @@ public static class NtTimer {
     }
     const psWrite = `
       $ErrorActionPreference='Stop'
-      New-Item -Path "Registry::${key}" -Force | Out-Null
+      if (-not (Test-Path -LiteralPath "Registry::${key}")) { New-Item -Path "Registry::${key}" -Force | Out-Null }
       Set-ItemProperty -Path "Registry::${key}" -Name ${psSingleQuote(exePath)} -Value ${psSingleQuote(p)} -Force
     `
     await runPowerShell(psWrite, { timeoutMs: 8000 })
@@ -417,7 +417,7 @@ public static class NtTimer {
 
     const psWrite = `
       $ErrorActionPreference='Stop'
-      New-Item -Path "Registry::${key}" -Force | Out-Null
+      if (-not (Test-Path -LiteralPath "Registry::${key}")) { New-Item -Path "Registry::${key}" -Force | Out-Null }
       Set-ItemProperty -Path "Registry::${key}" -Name ${psName} -Value 'GpuPreference=2;' -Force
     `
     const { code: c2, stderr: e2 } = await runPowerShell(psWrite, { timeoutMs: 8000 })
@@ -438,7 +438,7 @@ public static class NtTimer {
     }
     const psWrite = `
       $ErrorActionPreference='Stop'
-      New-Item -Path "Registry::${key}" -Force | Out-Null
+      if (-not (Test-Path -LiteralPath "Registry::${key}")) { New-Item -Path "Registry::${key}" -Force | Out-Null }
       Set-ItemProperty -Path "Registry::${key}" -Name ${psSingleQuote(exePath)} -Value ${psSingleQuote(p)} -Force
     `
     await runPowerShell(psWrite, { timeoutMs: 8000 })
@@ -556,7 +556,7 @@ public static class NtTimer {
     const psWrite = `
       $ErrorActionPreference='Stop'
       $k = ${psSingleQuote(key)}
-      New-Item -Path $k -Force | Out-Null
+      if (-not (Test-Path -LiteralPath $k)) { New-Item -Path $k -Force | Out-Null }
       Set-ItemProperty -Path $k -Name TcpAckFrequency -Type DWord -Value 1 -Force
       Set-ItemProperty -Path $k -Name TCPNoDelay -Type DWord -Value 1 -Force
       Set-ItemProperty -Path $k -Name TcpDelAckTicks -Type DWord -Value 0 -Force

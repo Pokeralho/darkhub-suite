@@ -1,0 +1,4 @@
+LIBRARY VkLayer_KORTHOS_LowLatency
+EXPORTS
+    LowLatency_GetInstanceProcAddr
+    LowLatency_GetDeviceProcAddr

@@ -372,6 +372,30 @@
   "risk": "low",
   "securityRelated": false
  },
+ "tweak:amdDisableAspm": {
+  "kind": "tweak",
+  "title": "AMD: desativar ASPM do PCIe na placa",
+  "risk": "medium",
+  "securityRelated": false
+ },
+ "tweak:amdDisableClockGating": {
+  "kind": "tweak",
+  "title": "AMD: desativar clock gating do codificador de vídeo",
+  "risk": "medium",
+  "securityRelated": false
+ },
+ "tweak:amdDisablePowerGating": {
+  "kind": "tweak",
+  "title": "AMD: desativar power gating e estados dinâmicos",
+  "risk": "medium",
+  "securityRelated": false
+ },
+ "tweak:amdDisableUlps": {
+  "kind": "tweak",
+  "title": "AMD: desativar ULPS (economia de energia profunda)",
+  "risk": "medium",
+  "securityRelated": false
+ },
  "tweak:batteryPercentage": {
   "kind": "tweak",
   "title": "Porcentagem da bateria na barra de tarefas",
@@ -432,6 +456,12 @@
   "risk": "low",
   "securityRelated": false
  },
+ "tweak:disableAccessibilityHotkeys": {
+  "kind": "tweak",
+  "title": "Desativar atalhos de Teclas de Alternância e Teclas de Filtragem",
+  "risk": "low",
+  "securityRelated": false
+ },
  "tweak:disableActivityHistory": {
   "kind": "tweak",
   "title": "Desativar Histórico de Atividades (Timeline)",
@@ -450,9 +480,21 @@
   "risk": "medium",
   "securityRelated": false
  },
+ "tweak:disableAutoLoggers": {
+  "kind": "tweak",
+  "title": "Desativar sessões de log de diagnóstico no boot (AutoLogger)",
+  "risk": "low",
+  "securityRelated": false
+ },
  "tweak:disableBackgroundApps": {
   "kind": "tweak",
   "title": "Bloquear Aplicativos UWP em Segundo Plano",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableClickToDo": {
+  "kind": "tweak",
+  "title": "Desativar o Click to Do (IA do Windows 11)",
   "risk": "low",
   "securityRelated": false
  },
@@ -479,6 +521,12 @@
   "title": "Desativar Inicialização Rápida (Fast Startup)",
   "risk": "low",
   "securityRelated": false
+ },
+ "tweak:disableFindMyDevice": {
+  "kind": "tweak",
+  "title": "Desativar \"Localizar meu dispositivo\"",
+  "risk": "medium",
+  "securityRelated": true
  },
  "tweak:disableFolderDiscovery": {
   "kind": "tweak",
@@ -540,9 +588,21 @@
   "risk": "low",
   "securityRelated": false
  },
+ "tweak:disablePowerThrottling": {
+  "kind": "tweak",
+  "title": "Desativar o Power Throttling (limitação de apps em segundo plano)",
+  "risk": "low",
+  "securityRelated": false
+ },
  "tweak:disableReservedStorage": {
   "kind": "tweak",
   "title": "Liberar o Armazenamento Reservado (~7 GB)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:disableSettingsAccountAds": {
+  "kind": "tweak",
+  "title": "Sem propagandas do Microsoft 365 e da conta no app Configurações",
   "risk": "low",
   "securityRelated": false
  },
@@ -570,6 +630,12 @@
   "risk": "medium",
   "securityRelated": false
  },
+ "tweak:disableTelemetryTasks": {
+  "kind": "tweak",
+  "title": "Desativar tarefas agendadas de telemetria",
+  "risk": "low",
+  "securityRelated": false
+ },
  "tweak:disableTeredo": {
   "kind": "tweak",
   "title": "Desativar túnel Teredo",
@@ -581,6 +647,12 @@
   "title": "Desativar VBS / Isolamento de Núcleo (HVCI)  [RISCO DE SEGURANÇA]",
   "risk": "high",
   "securityRelated": true
+ },
+ "tweak:disableWidgets": {
+  "kind": "tweak",
+  "title": "Desativar Widgets / Notícias e Interesses",
+  "risk": "low",
+  "securityRelated": false
  },
  "tweak:disableWindowSnapping": {
   "kind": "tweak",
@@ -612,6 +684,18 @@
   "risk": "low",
   "securityRelated": false
  },
+ "tweak:fasterMenus": {
+  "kind": "tweak",
+  "title": "Menus e inicialização do Explorer mais rápidos",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:fastKeyboardRepeat": {
+  "kind": "tweak",
+  "title": "Repetição de teclado mais rápida",
+  "risk": "low",
+  "securityRelated": false
+ },
  "tweak:hideCopilotButton": {
   "kind": "tweak",
   "title": "Ocultar Botão do Copilot na Barra de Tarefas",
@@ -621,6 +705,12 @@
  "tweak:hideHomeGallery": {
   "kind": "tweak",
   "title": "Remover \"Início\" e \"Galeria\" do Explorador",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:hideMeetNow": {
+  "kind": "tweak",
+  "title": "Ocultar o botão \"Reunir agora\" da barra de tarefas",
   "risk": "low",
   "securityRelated": false
  },
@@ -636,10 +726,28 @@
   "risk": "low",
   "securityRelated": false
  },
+ "tweak:hideStartRecommended": {
+  "kind": "tweak",
+  "title": "Ocultar a seção \"Recomendados\" do Iniciar",
+  "risk": "low",
+  "securityRelated": false
+ },
  "tweak:hideTaskViewButton": {
   "kind": "tweak",
   "title": "Ocultar Botão Visão de Tarefas (Task View)",
   "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:intelDisableAdaptiveVsync": {
+  "kind": "tweak",
+  "title": "Intel: desativar V-Sync adaptativo do driver",
+  "risk": "medium",
+  "securityRelated": false
+ },
+ "tweak:intelDisableAsyncFlips": {
+  "kind": "tweak",
+  "title": "Intel: desativar async flips",
+  "risk": "medium",
   "securityRelated": false
  },
  "tweak:keepClassicOutlook": {
@@ -651,6 +759,12 @@
  "tweak:legacyBootMenu": {
   "kind": "tweak",
   "title": "Menu de boot clássico (F8 / Modo de Segurança)",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:longerUpdatePause": {
+  "kind": "tweak",
+  "title": "Permitir pausar o Windows Update por mais tempo",
   "risk": "low",
   "securityRelated": false
  },
@@ -676,6 +790,18 @@
   "kind": "tweak",
   "title": "Num Lock ligado ao iniciar",
   "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:nvidiaDisableAsyncPstates": {
+  "kind": "tweak",
+  "title": "NVIDIA: desativar P-states assíncronos",
+  "risk": "medium",
+  "securityRelated": false
+ },
+ "tweak:nvidiaDisableDynamicPstate": {
+  "kind": "tweak",
+  "title": "NVIDIA: desativar P-states dinâmicos",
+  "risk": "medium",
   "securityRelated": false
  },
  "tweak:preferIPv4": {
@@ -714,6 +840,12 @@
   "risk": "low",
   "securityRelated": false
  },
+ "tweak:servicesManual": {
+  "kind": "tweak",
+  "title": "Serviços do Windows em modo Manual (lista ampla)",
+  "risk": "medium",
+  "securityRelated": false
+ },
  "tweak:setUtcTime": {
   "kind": "tweak",
   "title": "Relógio do Hardware em UTC (somente dual boot com Linux)",
@@ -744,6 +876,12 @@
   "risk": "low",
   "securityRelated": false
  },
+ "tweak:svchostGrouping": {
+  "kind": "tweak",
+  "title": "Agrupar serviços em menos processos svchost",
+  "risk": "low",
+  "securityRelated": false
+ },
  "tweak:taskbarAlignLeft": {
   "kind": "tweak",
   "title": "Alinhar Barra de Tarefas à Esquerda",
@@ -756,9 +894,27 @@
   "risk": "low",
   "securityRelated": false
  },
+ "tweak:telemetryExtended": {
+  "kind": "tweak",
+  "title": "Telemetria: pedidos de feedback, inventário de apps e dados opcionais",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:usbNoPowerDrainRecovery": {
+  "kind": "tweak",
+  "title": "USB: não desligar a porta após sobrecarga de energia",
+  "risk": "medium",
+  "securityRelated": false
+ },
  "tweak:verboseLogon": {
   "kind": "tweak",
   "title": "Mensagens detalhadas ao iniciar e desligar",
+  "risk": "low",
+  "securityRelated": false
+ },
+ "tweak:webdavLargeFiles": {
+  "kind": "tweak",
+  "title": "WebDAV: permitir arquivos maiores que 50 MB",
   "risk": "low",
   "securityRelated": false
  }

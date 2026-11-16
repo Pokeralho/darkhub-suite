@@ -580,7 +580,8 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
       });
     }
     for (const dt of deepTweaks) {
-      if (dt.internal || covered.has(dt.id)) continue;
+      // other GPU vendor, other Windows build, service/key not present: the tweak does not exist on this PC
+      if (dt.internal || covered.has(dt.id) || dt.applicable === false) continue;
       list.push({
         id: dt.id,
         kind: 'deep',
@@ -591,7 +592,7 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
         requiresAdmin: Boolean(dt.requiresAdmin),
         requiresReboot: Boolean(dt.requiresReboot),
         securityRelated: Boolean(dt.securityRelated),
-        warning: dt.warning ? String(dt.warning) : null,
+        warning: dt.warning ? t(`optimizer.audit.tweak.${dt.id}.warning`, String(dt.warning)) : null,
         revertId: null,
         applied: tweakStatus[dt.id] !== undefined ? Boolean(tweakStatus[dt.id]) : null,
         partial: Boolean(tweakPartial[dt.id]),
