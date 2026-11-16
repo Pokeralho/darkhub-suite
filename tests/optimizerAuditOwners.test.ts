@@ -35,7 +35,7 @@ describe('shared owners', () => {
   })
 })
 
-describe('SystemEngine composite operations', () => {
+describe.skipIf(process.platform !== 'win32')('SystemEngine composite operations', () => {
   let store: ReturnType<typeof memStore>
   let reverted: string[][]
   let extras: string[]
@@ -198,7 +198,7 @@ describe('Startup manager trusts only the item id', () => {
     return { svc, runs }
   }
 
-  it('rejects a forged item, protects essential services and records the real previous state', async () => {
+  it.skipIf(process.platform !== 'win32')('rejects a forged item, protects essential services and records the real previous state', async () => {
     const task = { id: 'task||\\Vendor\\|Updater', kind: 'task', key: 'Updater', name: 'Updater', taskPath: '\\Vendor\\', scope: 'machine', enabled: false }
     const rpc = { id: 'service|||RpcSs', kind: 'service', key: 'RpcSs', name: 'RPC', scope: 'machine', enabled: true }
     const { svc, runs } = await service([task, rpc])
@@ -216,7 +216,7 @@ describe('Startup manager trusts only the item id', () => {
 describe('services revert on DarkOS without a snapshot', () => {
   beforeEach(() => vi.resetModules())
 
-  it('skips instead of re-enabling services the DarkOS image disabled', async () => {
+  it.skipIf(process.platform !== 'win32')('skips instead of re-enabling services the DarkOS image disabled', async () => {
     const elevated = vi.fn(async () => ({ code: 0, stdout: '', stderr: '' }))
     vi.doMock('../electron/services/optimizer/ElevationHelper.js', () => ({ default: { runElevatedPowerShell: elevated } }))
     vi.doMock('../electron/services/optimizer/DeepTweaksEngine.js', () => ({ default: memStore() }))

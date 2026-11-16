@@ -216,8 +216,9 @@ class DeepHardwareService {
       const layout = await si.diskLayout().catch(() => []);
 
       let wmiDisks = [];
-      if (process.platform === 'win32')       if (process.platform === 'win32') try {
-        const ps = `
+      if (process.platform === 'win32') {
+        try {
+          const ps = `
           $ErrorActionPreference='SilentlyContinue'
           Get-PhysicalDisk | ForEach-Object {
             $disk = $_
@@ -234,14 +235,15 @@ class DeepHardwareService {
             }
           } | ConvertTo-Json -Compress
         `;
-        const wmiRes = await this.runPowerShell(ps, 5000);
-        if (wmiRes.stdout && !wmiRes.timeout) {
+          const wmiRes = await this.runPowerShell(ps, 5000);
+          if (wmiRes.stdout && !wmiRes.timeout) {
 
-           let parsed = JSON.parse(wmiRes.stdout);
-           if (!Array.isArray(parsed)) parsed = [parsed];
-           wmiDisks = parsed;
-        }
-      } catch (e) {  }
+            let parsed = JSON.parse(wmiRes.stdout);
+            if (!Array.isArray(parsed)) parsed = [parsed];
+            wmiDisks = parsed;
+          }
+        } catch (e) { }
+      }
 
       const mapped = layout.map(d => {
 

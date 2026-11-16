@@ -41,11 +41,15 @@ export function normalizeRemote(p) {
   return n === '' ? '.' : n
 }
 
+const isWinPath = (p) => /^[A-Za-z]:[\\/]/.test(p) || String(p ?? '').startsWith('\\\\')
+const pathModFor = (p) => (process.platform === 'win32' || isWinPath(String(p ?? ''))) ? path.win32 : path
+
 export function normalizeLocal(p) {
   const s = String(p ?? '').trim()
   if (!s) return os.homedir()
-  if (!path.isAbsolute(s)) throw new SftpError('VALIDATION', 'local path must be absolute')
-  return path.resolve(s)
+  const mod = pathModFor(s)
+  if (!mod.isAbsolute(s)) throw new SftpError('VALIDATION', 'local path must be absolute')
+  return mod.resolve(s)
 }
 
 // ---------- local (Windows) safety ----------
@@ -72,8 +76,10 @@ export function sanitizeLocalName(name) {
 
 /** target is root itself or below it (Windows paths compare case-insensitively). */
 export function isInsideLocal(root, target) {
-  const rel = path.relative(path.resolve(root), path.resolve(target))
-  return rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel)
+  const mod = pathModFor(String(root ?? '')) || pathModFor(String(target ?? ''))
+  const rel = mod.relative(mod.resolve(String(root ?? '')), mod.resolve(String(target ?? '')))
+  const sep = mod.sep
+  return rel !== '..' && !rel.startsWith(`..${sep}`) && !mod.isAbsolute(rel)
 }
 
 // extensions that open in a viewer/editor and never execute: everything else gets ".txt" appended before opening
@@ -92,8 +98,8 @@ export function editLocalName(remoteName, pathext = process.env.PATHEXT) {
  */
 export function protectedLocalRoots(extra = [], env = process.env) {
   const out = [env.WINDIR, env.SystemRoot, env.ProgramFiles, env['ProgramFiles(x86)'], env.ProgramW6432,
-    env.ProgramData ? path.join(env.ProgramData, 'Microsoft') : null, ...extra]
-  return [...new Set(out.filter((d) => typeof d === 'string' && d.trim()).map((d) => path.resolve(d)))]
+    env.ProgramData ? (isWinPath(String(env.ProgramData)) ? path.win32.join(env.ProgramData, 'Microsoft') : path.join(env.ProgramData, 'Microsoft')) : null, ...extra]
+  return [...new Set(out.filter((d) => typeof d === 'string' && d.trim()).map((d) => pathModFor(d).resolve(d)))]
 }
 
 export function parseMode(mode) {

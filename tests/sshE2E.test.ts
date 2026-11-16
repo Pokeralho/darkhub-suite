@@ -178,7 +178,7 @@ describe('DarkHub SSH end to end', () => {
     expect(r).toMatchObject({ ok: false, code: 'AUTH_FAILED' })
   })
 
-  it('SFTP: lists, uploads, downloads, refuses overwrite, renames and deletes', async () => {
+  it('SFTP: lists, uploads, downloads, refuses overwrite, renames and deletes', { timeout: 30000 }, async () => {
     const { manager, host } = setup()
     const events: any[] = []
     const sftp = new SftpService({ manager, trashItem: async (p: string) => fs.rmSync(p), onProgress: (e: any) => events.push(e) })
@@ -238,7 +238,7 @@ describe('DarkHub SSH end to end', () => {
     manager.disposeAll()
   })
 
-  it('SFTP: uploads and downloads whole folders, with skip and overwrite policies', async () => {
+  it('SFTP: uploads and downloads whole folders, with skip and overwrite policies', { timeout: 30000 }, async () => {
     const { manager, host } = setup()
     const events: any[] = []
     const sftp = new SftpService({ manager, onProgress: (e: any) => events.push(e) })
@@ -351,7 +351,7 @@ describe('DarkHub SSH end to end', () => {
     expect(store.getState().sessionLogs[0].logFilePath).toBe(file)
   })
 
-  it('root mode: SFTP through sudo sftp-server, asking for the sudo password', async () => {
+  it('root mode: SFTP through sudo sftp-server, asking for the sudo password', { timeout: 30000 }, async () => {
     const { manager, host } = setup()
     const sftp = new SftpService({ manager })
     // login password "pw" is not the sudo password

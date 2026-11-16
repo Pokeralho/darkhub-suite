@@ -70,9 +70,10 @@ export const BAUDS = [300, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/
 
 export class SerialError extends Error {
-  constructor(code, message) {
+  constructor(code, message, extra = {}) {
     super(message || code)
     this.code = code
+    Object.assign(this, extra)
   }
 }
 
@@ -115,7 +116,7 @@ export class SerialService {
     if (!ID_RE.test(String(sessionId ?? ''))) throw new SerialError('VALIDATION', 'invalid sessionId')
     if (this.sessions.has(sessionId)) throw new SerialError('VALIDATION', 'session already exists')
     const o = validateSerialOptions(opts)
-    if (this.platform !== 'win32') throw new SerialError('UNSUPPORTED', 'serial ports are supported on Windows only')
+    if (this.platform !== 'win32') throw new SerialError('UNSUPPORTED', 'serial ports are supported on Windows only', { unsupported: true, platform: this.platform, reason: 'windows-only' })
     const child = this.spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encode(BRIDGE)], {
       windowsHide: true,
       env: { ...process.env, DH_PORT: o.port, DH_BAUD: String(o.baud), DH_PARITY: o.parity, DH_DATABITS: String(o.dataBits), DH_STOPBITS: o.stopBits, DH_FLOW: o.flow }

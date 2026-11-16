@@ -202,7 +202,7 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotke
   const state = () => ({ ok: true, config, hotkeyActive: Boolean(registered.hotkey), regionHotkeyActive: Boolean(registered.regionHotkey), history: liveHistory().map(publicEntry), uploading: jobs.size })
   handle('share:state', state)
   handle('share:displays', () => ({ ok: true, displays: listDisplays() }))
-  handle('share:aiStatus', () => ({ ok: true, available: ai.available() }))
+  handle('share:aiStatus', () => ({ ok: true, available: ai.available(), ...(ai.available() ? {} : { platform: process.platform, reason: 'unavailable' }) }))
   // AI enhancement of a screenshot DarkHub saved (same folder rule as share:uploadFile)
   handle('share:enhance', async ({ file }) => {
     const f = String(file || '')

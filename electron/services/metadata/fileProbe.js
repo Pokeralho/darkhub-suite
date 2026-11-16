@@ -218,7 +218,13 @@ export function validStreamName(name) {
 }
 
 export async function removeStream(filePath, name) {
-  if (process.platform !== 'win32') throw new Error('Alternate data streams are only supported on Windows')
+  if (process.platform !== 'win32') {
+    const err = new Error('Alternate data streams are only supported on Windows')
+    err.unsupported = true
+    err.platform = process.platform
+    err.reason = 'windows-only'
+    throw err
+  }
   if (!validStreamName(name)) throw new Error('invalid stream name')
   await fs.unlink(`${filePath}:${name}`)
 }

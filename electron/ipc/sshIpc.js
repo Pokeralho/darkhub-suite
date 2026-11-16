@@ -64,7 +64,11 @@ export function makeVaultKeyProvider(file, safeStorage) {
 
 const ok = (extra = {}) => ({ ok: true, ...extra })
 const failOf = (err) => ({
-  ok: false, code: typeof err?.code === 'string' ? err.code : 'ERROR', error: String(err?.message ?? err ?? 'error').slice(0, 400),
+  ok: false,
+  code: typeof err?.code === 'string' ? err.code : 'ERROR',
+  error: String(err?.message ?? err ?? 'error').slice(0, 400),
+  ...(err?.unsupported === true || err?.code === 'UNSUPPORTED' ? { unsupported: true, platform: err?.platform ?? process.platform } : {}),
+  ...(typeof err?.reason === 'string' ? { reason: err.reason } : (err?.code === 'UNSUPPORTED' ? { reason: 'unsupported' } : {})),
   ...(typeof err?.isDir === 'boolean' ? { isDir: err.isDir } : {}), ...(err?.deleted ? { deleted: true } : {}),
   ...(typeof err?.mtimeMs === 'number' ? { mtimeMs: err.mtimeMs } : {}), ...(typeof err?.size === 'number' ? { size: err.size } : {})
 })

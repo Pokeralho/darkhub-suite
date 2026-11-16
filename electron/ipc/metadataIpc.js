@@ -39,7 +39,11 @@ export function registerMetadataIPC({ ipcMain, assertFileAccessGranted, hasFileA
   const handle = (channel, fn) => ipcMain.handle(channel, async (_e, payload) => {
     try { return await fn(payload ?? {}) } catch (err) {
       logger?.error?.('Metadata', `${channel}: ${err?.message ?? err}`)
-      return { ok: false, error: err?.message ?? String(err) }
+      return {
+        ok: false,
+        error: err?.message ?? String(err),
+        ...(err?.unsupported ? { unsupported: true, platform: err?.platform ?? process.platform, reason: err?.reason ?? 'unsupported' } : {})
+      }
     }
   })
 
