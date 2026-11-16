@@ -154,6 +154,8 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
   const analyzeSeq = React.useRef(0);
   const [confirmAction, setConfirmAction] = useState<null | { kind: 'apply' } | { kind: 'deleteBackup'; backupId: string }>(null);
   const busy = applying || restoring;
+  const isUnsupportedResponse = (res: any) => Boolean(res && res.unsupported);
+  const unsupportedText = (res: any) => String(res?.error || res?.reason || t('optiscaler.unsupported', 'OptiScaler indisponível nesta plataforma.'));
 
   // Selected game reference
   const selectedGame = useMemo(() => {

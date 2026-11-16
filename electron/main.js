@@ -495,7 +495,7 @@ async function computeJunkEstimate(payload) {
 
   const work = (async () => {
     const start = Date.now()
-    const r = await StorageEngine.analyzeTempFiles({ deadlineMs: timeoutMs, recycleBin: true })
+    const r = await StorageEngine.analyzeTempFiles({ deadlineMs: timeoutMs, recycleBin: process.platform === 'win32' })
     const result = {
       ok: true,
       ts: Date.now(),
@@ -504,7 +504,8 @@ async function computeJunkEstimate(payload) {
       files: r.summary.files,
       truncated: r.summary.truncated,
       recycleBin: r.summary.recycleBin ?? null,
-      roots: StorageEngine.tempDirs
+      roots: StorageEngine.tempDirs,
+      ...(process.platform !== 'win32' ? { partial: true, platform: process.platform, reason: 'windows-only-features-skipped' } : {})
     }
     junkEstimateCache = { ts: Date.now(), result, inFlight: null }
     return result
@@ -1736,8 +1737,11 @@ ipcMain.handle('settings:updateLiveServices', async (_event, payload) => {
     if (typeof patch.overlay === 'boolean') setFramePacerLive(patch.overlay)
     if (typeof patch.autoClicker === 'boolean' && patch.autoClicker !== (was.autoClicker !== false)) {
       try {
-        if (patch.autoClicker) { autoClicker.load(); autoClicker.arm() }
-        else if (!autoClicker.running) autoClicker.dispose()
+        if (patch.autoClicker) {
+          if (process.platform === 'win32') { autoClicker.load(); autoClicker.arm() }
+        } else if (!autoClicker.running) {
+          autoClicker.dispose()
+        }
       } catch (err) {
         log.warn('[settings] autoclicker toggle failed:', err?.message ?? String(err))
       }
