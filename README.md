@@ -231,9 +231,9 @@ Windows installers are written to `dist_release/` (`DarkHub Setup x.y.z.exe` and
 
 ### Linux/Ubuntu (incremental, capability-gated)
 
-Linux support is being added incrementally (Option A: keep Electron/React + stable IPC/preload contracts and gate
-Windows-only capabilities with structured `{ ok:false, unsupported, platform, reason }` responses). The app/UI can run
-for development on Ubuntu, but many system-changing features remain Windows-only.
+Linux support is incremental (Option A: keep Electron/React + stable IPC/preload contracts and gate Windows-only
+capabilities with structured `{ ok:false, unsupported, platform, reason, error }` / `partial` responses). The UI can run
+for development on Ubuntu, but runtime parity with Windows is not complete.
 
 ```bash
 git clone https://github.com/Pokeralho/darkhub-suite.git
@@ -246,13 +246,24 @@ npm run dev
 npx tsc --noEmit -p .
 npx vitest run --pool=forks --maxWorkers=2
 npx vite build
+
+# Rust (Linux): native_cleaner is the only native runtime target integrated/packaged for Linux
+cargo check --manifest-path native_cleaner/Cargo.toml
+cargo test  --manifest-path native_cleaner/Cargo.toml
+cargo check --manifest-path native_disk/Cargo.toml
+cargo check --manifest-path native_pacer/Cargo.toml
+cargo check --manifest-path native_gpubench/Cargo.toml
+
+# Build native cleaner (cross-platform) and Linux package smoke (dir)
+npm run build:cleaner
+npm run build:linux   # native_cleaner + renderer + integrity + electron-builder --linux dir
 ```
 
-Notes: Windows-native helpers/daemons, registry/services/Defender/power/HAGS tweaks, frame pacing/overlay,
-OptiScaler/Limiter/capture and other Windows-coupled features report as unsupported on Linux. `cargo check` is
-validated on Linux for `native_cleaner`, `native_disk`, `native_pacer`, and `native_gpubench` (gpubench runtime is
-gated to Windows). electron-builder Linux targets (AppImage/deb/dir) are configured for packaging experiments; runtime
-capability parity is still in progress.
+**Capability matrix (Linux, current):**
+- **Supported/partial:** Electron/React UI, IPC/preload contracts, and `native_cleaner` (Rust) runtime where the engine binary is present (`file clean` / `browserVacuum` depending on engine support). Cleaner reports `partial` on Linux (no Windows registry, Recycle Bin, or `.reg` restore). Some read-only diagnostics may work when system tools are available (e.g. ping/traceroute/DNS info/flush depending on distro tools).
+- **Unsupported/gated (structured):** `native_disk` scan/map, `native_gpubench`, `native_pacer`/frame pacing & overlay, OptiScaler/DLSS/injection, realtime native/optimizer protections tied to Windows APIs, PowerShell/win tools, Windows tweaks/services/registry/Defender/power plans/HAGS, and other Windows-coupled features. These must return structured `unsupported`/`partial` responses without Windows-only spawns.
+- **Packaging/runtime:** Linux artifacts can be smoke-built as `electron-builder --linux dir`; AppImage/deb targets are configured but may depend on host tooling. Only `native_cleaner` is built/copied/packaged for Linux runtime; other native binaries are not packaged for Linux.
+- **Caveats:** Wayland/X11 and permissions vary by distro/session; `/tmp` usage and availability of tools like `resolvectl`, `systemd-resolve`, `traceroute`/`tracepath`, `nmcli`, `ip` affect diagnostics.
 
 **Where things are.** Contributor docs live in [.github/](./.github) (CONTRIBUTING, SECURITY) and [docs/](./docs)
 (design rules, translations, project map). Instructions for AI coding assistants are in [docs/AGENTS.md](./docs/AGENTS.md)

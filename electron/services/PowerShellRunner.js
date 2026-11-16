@@ -2,13 +2,16 @@
 
 import log from 'electron-log'
 import { spawn } from 'node:child_process'
-import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
-import crypto from 'node:crypto'
 
 /** Longest -EncodedCommand value that keeps the whole command line under Windows' 32767-char limit. */
 export const MAX_ENCODED_ARG = 30000
+
+/** Reads the whole script from stdin as UTF-8 bytes (no console code page involved) and runs it as one script block. */
+export const STDIN_BOOTSTRAP = [
+  '$__dhMs = New-Object System.IO.MemoryStream',
+  '[Console]::OpenStandardInput().CopyTo($__dhMs)',
+  '& ([ScriptBlock]::Create([Text.Encoding]::UTF8.GetString($__dhMs.ToArray())))'
+].join('\n')
 
 export function runCommand(command, args = [], {
   timeoutMs = 30000,
@@ -17,7 +20,8 @@ export function runCommand(command, args = [], {
   maxBuffer = 8 * 1024 * 1024,
   trim = false,
   onStdout = null,
-  onStderr = null
+  onStderr = null,
+  input = null
 } = {}) {
   // On non-Windows hosts, Windows-specific tool invocations are not supported.
   // Fail fast with a structured error so callers can degrade gracefully.
@@ -33,6 +37,10 @@ export function runCommand(command, args = [], {
       windowsHide: true,
       ...spawnOptions
     })
+    if (input != null) {
+      child.stdin?.on('error', () => {}) // child exited before reading everything: 'close' reports it
+      child.stdin?.end(input)
+    }
     let stdout = ''
     let stderr = ''
     let settled = false
@@ -211,17 +219,13 @@ ${script}`
   }
 
   // Windows caps a command line at 32767 chars and -EncodedCommand doubles the script size (UTF-16 + base64):
-  // big scripts (e.g. the batched registry status read of every tweak) go through a private temp .ps1 instead.
+  // big scripts (e.g. the batched registry status read of every tweak) are piped through stdin to a tiny bootstrap.
+  // Never through a temp .ps1: the app runs elevated and %TEMP% is writable by unelevated processes of the same
+  // user, which could swap the file between write and -File.
   if (encodedScript.length > MAX_ENCODED_ARG) {
-    const file = path.join(os.tmpdir(), `dh_ps_${process.pid}_${crypto.randomBytes(8).toString('hex')}.ps1`)
-    fs.writeFileSync(file, `﻿${script}`, 'utf8')
-    try {
-      return await runCommand('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-NonInteractive', '-File', file], {
-        timeoutMs, spawnOptions, onStdout, onStderr, maxBuffer, trim
-      })
-    } finally {
-      try { fs.rmSync(file, { force: true }) } catch {}
-    }
+    return runCommand('powershell.exe', powerShellArgsForEncodedScript(encodePowerShellScript(STDIN_BOOTSTRAP)), {
+      timeoutMs, spawnOptions, onStdout, onStderr, maxBuffer, trim, input: Buffer.from(script, 'utf8')
+    })
   }
 
   return runCommand('powershell.exe', powerShellArgsForEncodedScript(encodedScript), {

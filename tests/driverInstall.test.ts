@@ -40,6 +40,11 @@ describe('scan normalization', () => {
     expect(P.normalizeDevice({ ...NV_GPU_BASIC, instanceId: 'PCI\\VEN_1002&DEV_73BF\\1', hardwareIds: ['PCI\\VEN_1002&DEV_73BF'] }).vendor).toBe('amd');
     expect(P.normalizeDevice({ ...NV_GPU_BASIC, instanceId: 'PCI\\VEN_8086&DEV_A780\\1', hardwareIds: ['PCI\\VEN_8086&DEV_A780'] }).vendor).toBe('intel');
   });
+  it('a GPU Windows has not identified yet (no class, code 28) is still a GPU that needs a driver', () => {
+    const d = P.normalizeDevice({ ...NV_GPU_BASIC, name: 'Video Controller', cls: '', code: 28, service: '', compatibleIds: ['PCI\\VEN_10DE&CC_030000', 'PCI\\CC_030000'] });
+    expect(d).toMatchObject({ isDisplay: true, isGpu: true, vendor: 'nvidia', reason: 'noDriver' });
+    expect(P.normalizeDevice(NIC_NO_DRIVER).isDisplay).toBe(false);
+  });
   it('a GPU with the vendor driver is not flagged', () => {
     const d = P.normalizeDevice({ ...NV_GPU_BASIC, name: 'NVIDIA GeForce RTX 5060', service: 'nvlddmkm', provider: 'NVIDIA' });
     expect(d.reason).toBeNull();

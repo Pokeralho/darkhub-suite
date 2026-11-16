@@ -2,11 +2,14 @@ import ElevationHelper from './ElevationHelper.js';
 import DeepTweaksEngine from './DeepTweaksEngine.js';
 import { runCommand, runPowerShell } from '../PowerShellRunner.js';
 import { psQuote } from './OptimizerUtils.js';
+import { PS_SELECT_PRIMARY_ADAPTER } from './activeAdapterPs.js';
+import { partitionShared, claimShared, releaseShared } from './sharedOwners.js';
 
 const TCPIP_PARAMS = 'HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters';
 const PSCHED = 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Psched';
 const SET_ID = 'network:advanced';
 const EEE_SNAPSHOT = 'network:eee';
+const GAME_ROUTE_OP = 'optimizer:optimizeGameRoute';
 const GUID_RE = /^\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}$/;
 
 /** Values the previous version wrote in the GLOBAL key (where Windows ignores them). Removed on revert. */
@@ -24,12 +27,44 @@ export function buildAdvancedNetworkChanges(adapters) {
   return changes;
 }
 
+/**
+ * Pure: sets the *EEE advanced property of each adapter to `value` and reads it back; throws (-ErrorAction Stop)
+ * when the driver refuses or does not keep the value. With `missingOk` an adapter that no longer exposes *EEE
+ * (renamed/removed since the snapshot) is reported with DHEEE|missing instead of failing the whole revert.
+ */
+export function buildEeeSetScript(targets, { missingOk = false } = {}) {
+  const lines = [];
+  for (const e of targets || []) {
+    if (!e?.name || !/^\d+$/.test(String(e.value))) continue;
+    const n = psQuote(e.name);
+    const v = Number(e.value);
+    const get = (ea) => `Get-NetAdapterAdvancedProperty -Name ${n} -AllProperties -ErrorAction ${ea} | Where-Object { $_.RegistryKeyword -eq '*EEE' } | Select-Object -First 1`;
+    const onMissing = missingOk ? `Write-Output ('DHEEE|missing|' + ${n})` : `throw ('Energy-Efficient Ethernet nao encontrado em ' + ${n})`;
+    lines.push(`$p = ${get(missingOk ? 'SilentlyContinue' : 'Stop')}
+if (-not $p) { ${onMissing} } else {
+  $p | Set-NetAdapterAdvancedProperty -RegistryValue ${v} -ErrorAction Stop
+  $chk = ${get('Stop')}
+  if ([string]($chk.RegistryValue | Select-Object -First 1) -ne '${v}') { throw ('Energy-Efficient Ethernet de ' + ${n} + ' nao manteve o valor ${v}') }
+}`);
+  }
+  return lines.join('\r\n');
+}
+
+/** Pure: removes the values the previous version wrote in the global Tcpip key (no-op when absent). */
+export function buildLegacyCleanupScript() {
+  const k = psQuote(`Registry::HKEY_LOCAL_MACHINE\\${TCPIP_PARAMS.slice('HKLM\\'.length)}`);
+  return `foreach ($n in @(${LEGACY_GLOBAL_VALUES.map(psQuote).join(',')})) {
+  Remove-ItemProperty -LiteralPath ${k} -Name $n -ErrorAction SilentlyContinue
+  if ($null -ne (Get-ItemProperty -LiteralPath ${k} -Name $n -ErrorAction SilentlyContinue)) { Write-Output ('DHLEGACY|left|' + $n) }
+}`;
+}
+
 class NetworkEngine {
   async getActiveAdapterName() {
     if (process.platform !== 'win32') return '';
     const ps = `
 $ErrorActionPreference='Stop'
-$a = Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | Sort-Object -Property LinkSpeed -Descending | Select-Object -First 1
+${PS_SELECT_PRIMARY_ADAPTER}
 if ($null -eq $a) { '' } else { $a.Name }`;
     try {
       const r = await runPowerShell(ps, { timeoutMs: 15000, trim: true });
@@ -156,9 +191,7 @@ ConvertTo-Json -InputObject @($out) -Compress`;
     }
 
     const eeeTargets = eeeBefore.filter((e) => String(e.value) !== '0');
-    const eeeScript = eeeTargets.length
-      ? `$ErrorActionPreference = 'Continue'\r\n${eeeTargets.map((e) => `Get-NetAdapterAdvancedProperty -Name ${psQuote(e.name)} -AllProperties -ErrorAction SilentlyContinue | Where-Object { $_.RegistryKeyword -eq '*EEE' } | Set-NetAdapterAdvancedProperty -RegistryValue 0`).join('\r\n')}`
-      : null;
+    const eeeScript = eeeTargets.length ? buildEeeSetScript(eeeTargets.map((e) => ({ name: e.name, value: 0 }))) : null;
 
     const res = await DeepTweaksEngine.applyChangeSet({
       id: SET_ID,
@@ -185,36 +218,36 @@ ConvertTo-Json -InputObject @($out) -Compress`;
         { key: `${TCPIP_PARAMS}\\Interfaces\\${a.guid}`, name: 'TCPNoDelay', deleteValue: true }
       ])
     ];
-    const res = await DeepTweaksEngine.restoreChangeSet({ id: SET_ID, title: 'Rede: ajustes de latência TCP', fallbackChanges });
-
-    // values written by the previous version of this tweak into the global key
-    const legacy = await DeepTweaksEngine.runRegistryOps(LEGACY_GLOBAL_VALUES.map((name) => ({ key: TCPIP_PARAMS, name, deleteValue: true })));
-    const legacyFailed = legacy.some((r) => !r?.ok);
-
-    // EEE back to what each adapter had
+    // ONE elevated run (one UAC prompt): registry restore + the legacy global values + EEE back to each adapter's value
     const snap = DeepTweaksEngine.getExtra(EEE_SNAPSHOT);
-    let eeeNote = '';
-    if (snap?.adapters?.length) {
-      const lines = ["$ErrorActionPreference = 'Continue'"];
-      for (const e of snap.adapters) {
-        if (/^\d+$/.test(String(e.value))) lines.push(`Get-NetAdapterAdvancedProperty -Name ${psQuote(e.name)} -AllProperties -ErrorAction SilentlyContinue | Where-Object { $_.RegistryKeyword -eq '*EEE' } | Set-NetAdapterAdvancedProperty -RegistryValue ${Number(e.value)}`);
-      }
-      const r = await ElevationHelper.runElevatedPowerShell(lines.join('\r\n'));
-      if (r.code === 0) { DeepTweaksEngine.clearExtra(EEE_SNAPSHOT); eeeNote = ' Energy-Efficient Ethernet restaurado.'; }
-      else eeeNote = ' Não foi possível restaurar o Energy-Efficient Ethernet.';
-    }
+    const revertScript = [buildLegacyCleanupScript(), buildEeeSetScript(snap?.adapters || [], { missingOk: true })].filter(Boolean).join('\r\n');
+    const res = await DeepTweaksEngine.restoreChangeSet({ id: SET_ID, title: 'Rede: ajustes de latência TCP', fallbackChanges, commands: { revert: revertScript } });
     if (!res.ok) return { ok: false, error: res.error };
+    if (snap) DeepTweaksEngine.clearExtra(EEE_SNAPSHOT);
+    const out = String(res.stdout || '');
+    const missing = [...out.matchAll(/^DHEEE\|missing\|(.+)$/gm)].map((m) => m[1].trim());
+    const eeeNote = snap?.adapters?.length
+      ? ` Energy-Efficient Ethernet restaurado${missing.length ? ` (adaptador(es) ausente(s): ${missing.join(', ')})` : ''}.`
+      : '';
+    const legacyFailed = /^DHLEGACY\|left\|/m.test(out);
     return { ok: true, msg: `Ajustes de rede revertidos (${res.msg})${eeeNote}${legacyFailed ? ' Alguns valores legados não puderam ser removidos.' : ''}` };
   }
 
   /** MMCSS game profile now lives in the verified/snapshotted tweak `tweak:mmcssGames`. */
   async optimizeGameRoute() {
     const res = await DeepTweaksEngine.applyTweaks(['tweak:mmcssGames']);
+    if (res.ok) claimShared(DeepTweaksEngine, GAME_ROUTE_OP, ['tweak:mmcssGames']);
     return res.ok ? { ok: true, msg: `Perfil multimídia para jogos aplicado e verificado. ${res.msg}` } : { ok: false, error: res.error };
   }
 
   async revertGameRoute() {
+    // the Kernel/Latency operation uses the same profile: keep it while that one is still applied
+    if (partitionShared(DeepTweaksEngine, GAME_ROUTE_OP, ['tweak:mmcssGames']).kept.length) {
+      releaseShared(DeepTweaksEngine, GAME_ROUTE_OP, ['tweak:mmcssGames']);
+      return { ok: true, msg: 'Perfil MMCSS de jogos mantido porque outra otimização aplicada (Kernel e Latência) ainda o usa.' };
+    }
     const res = await DeepTweaksEngine.revertTweaks(['tweak:mmcssGames']);
+    if (res.ok) releaseShared(DeepTweaksEngine, GAME_ROUTE_OP, ['tweak:mmcssGames']);
     return res.ok ? { ok: true, msg: res.msg } : { ok: false, error: res.error };
   }
 }

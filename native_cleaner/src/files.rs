@@ -1,5 +1,5 @@
 //! Scan and clean of file rules, with optional shredding (overwrite before unlink).
-use crate::safety::{is_protected_dir, is_protected_file, Env};
+use crate::safety::{is_protected_dir, is_protected_file, norm, Env};
 use crate::util::{wild_match, XorShift};
 use crate::winapp2::{Rule, Target};
 use serde_json::{json, Value};
@@ -15,6 +15,25 @@ pub fn is_reparse(md: &Metadata) -> bool {
     }
     #[cfg(not(windows))]
     md.file_type().is_symlink()
+}
+
+/// Refuses a rule folder when it, or any folder between it and the allowed root it matched, is a link or junction:
+/// a literal segment like `Foo\Cache` pointing at another drive would otherwise be cleaned through the link.
+/// The root itself may be a junction (e.g. %TEMP% moved to a RAM disk).
+pub fn check_links(env: &Env, dir: &Path) -> Result<(), String> {
+    let Some(root) = env.matched_root(dir) else { return Ok(()) }; // check_rule already refuses it
+    let mut cur = dir.to_path_buf();
+    while norm(&cur).len() > root.len() {
+        if let Ok(md) = fs::symlink_metadata(&cur) {
+            if is_reparse(&md) {
+                return Err(format!("link ou junção no caminho ({})", cur.to_string_lossy()));
+            }
+        }
+        if !cur.pop() {
+            break;
+        }
+    }
+    Ok(())
 }
 
 #[derive(Default)]
@@ -148,7 +167,7 @@ pub fn run(env: &Env, targets: &[&Target], o: &Opts) -> Value {
         let mut s = Stats::default();
         let mut refused = Vec::new();
         for rule in &t.rules {
-            if let Err(why) = env.check_rule(&rule.dir, &rule.patterns, rule.recurse) {
+            if let Err(why) = env.check_rule(&rule.dir, &rule.patterns, rule.recurse).and_then(|_| check_links(env, &rule.dir)) {
                 refused.push(json!({ "dir": rule.dir.to_string_lossy(), "reason": why }));
                 continue;
             }

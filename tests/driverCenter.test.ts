@@ -57,6 +57,11 @@ describe('DriverCenter official source handling', () => {
 });
 
 describe('DriverCenter normalizeAdapter', () => {
+  it('a GPU without any driver (not identified yet) still shows its vendor and needs a driver', () => {
+    const a = D.normalizeAdapter({ name: 'Controlador de vídeo', pnpId: 'PCI\\VEN_10DE&DEV_2D05&SUBSYS_53711462\\1', status: 'Error', problem: 'code 28', noDriver: true });
+    expect(a).toMatchObject({ vendor: 'nvidia', noDriver: true, genericDriver: true, model: 'Placa NVIDIA (sem driver instalado)' });
+    expect(D.normalizeAdapter({ name: 'Controlador de vídeo', pnpId: 'PCI\\VEN_1AF4&DEV_1050\\1', noDriver: true }).model).toBe('Controlador de vídeo (sem driver instalado)');
+  });
   it('attaches vendor, dedicated flag and official sources', () => {
     const a = D.normalizeAdapter({ name: 'NVIDIA GeForce RTX 4090', driverVersion: '551.23', vramMb: 24576 });
     expect(a.vendor).toBe('nvidia');

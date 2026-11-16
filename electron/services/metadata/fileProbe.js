@@ -170,7 +170,7 @@ const PS_INFO = `$ErrorActionPreference='Stop'
 $p=$env:DH_META_PATH
 $i=Get-Item -LiteralPath $p -Force
 $s=@()
-try { $s=@(Get-Item -LiteralPath $p -Stream * -ErrorAction Stop | Where-Object { $_.Stream -ne ':$DATA' } | ForEach-Object { [pscustomobject]@{ name=$_.Stream; size=[int64]$_.Length } }) } catch {}
+try { $s=@(Get-Item -LiteralPath $p -Stream * -Force -ErrorAction Stop | Where-Object { $_.Stream -ne ':$DATA' } | ForEach-Object { [pscustomobject]@{ name=$_.Stream; size=[int64]$_.Length } }) } catch {}
 [pscustomobject]@{ attributes=[int]$i.Attributes; streams=$s } | ConvertTo-Json -Compress -Depth 4`
 
 export function parseZoneIdentifier(text) {

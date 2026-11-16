@@ -28,3 +28,42 @@ describe('FramePacerEngine adapter filter', () => {
     engine._nativeProcess = null;
   });
 });
+
+describe('FramePacerEngine start and failures', () => {
+  const fakeProc = () => {
+    const { EventEmitter } = require('node:events');
+    const p: any = new EventEmitter();
+    p.stdin = { destroyed: false, write: vi.fn(), on: vi.fn() };
+    p.stdout = new EventEmitter();
+    p.stderr = new EventEmitter();
+    p.kill = vi.fn();
+    p.exitCode = null;
+    return p;
+  };
+
+  it('keeps 0 (unlimited) and rejects an unknown pacing mode', async () => {
+    const { spawn } = await import('node:child_process');
+    const proc = fakeProc();
+    (spawn as any).mockReturnValue(proc);
+    const r = engine.start({ targetFps: 0, pacingMode: 'bogus' });
+    expect(r).toMatchObject({ ok: true, targetFps: 0, pacingMode: 'flatline' });
+    engine.stop();
+  });
+
+  it('stops and reports the error when the native limiter cannot start', async () => {
+    const { spawn } = await import('node:child_process');
+    const proc = fakeProc();
+    (spawn as any).mockReturnValue(proc);
+    const statuses: any[] = [];
+    const onStatus = (s: any) => statuses.push(s);
+    engine.on('status', onStatus);
+    engine.start({ targetFps: 60 });
+    proc.emit('error', new Error('spawn ENOENT'));
+    proc.emit('exit', -2);
+    expect(engine.isRunning).toBe(false);
+    expect(engine.getMetrics()).toMatchObject({ isRunning: false });
+    expect(engine.getMetrics().error).toMatch(/ENOENT/);
+    expect(statuses.at(-1)).toMatchObject({ isRunning: false });
+    engine.off('status', onStatus);
+  });
+});

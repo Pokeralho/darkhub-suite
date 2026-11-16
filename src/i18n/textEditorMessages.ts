@@ -3,6 +3,9 @@ export const textEditorMessages: Record<'pt-BR' | 'en-US', Record<string, string
   'pt-BR': {
     'textx.filter.all': 'Texto e código',
     'textx.filter.any': 'Todos os arquivos',
+    'textx.discardConfirm': 'Há alterações não salvas. Descartar e continuar?',
+    'textx.notText': 'Este arquivo não é texto (conteúdo binário).',
+    'textx.badEncoding': 'Codificação não suportada: só arquivos UTF-8 e UTF-16 LE podem ser editados sem corromper o conteúdo.',
     'textx.replaceConfirm': 'Substituir o texto atual pelo exemplo?',
     'textx.missing': '{lang} não está instalado neste PC.',
     'textx.cancelled': 'Execução interrompida.',
@@ -33,6 +36,9 @@ export const textEditorMessages: Record<'pt-BR' | 'en-US', Record<string, string
   'en-US': {
     'textx.filter.all': 'Text and code',
     'textx.filter.any': 'All files',
+    'textx.discardConfirm': 'There are unsaved changes. Discard them and continue?',
+    'textx.notText': 'This is not a text file (binary content).',
+    'textx.badEncoding': 'Unsupported encoding: only UTF-8 and UTF-16 LE files can be edited without corrupting them.',
     'textx.replaceConfirm': 'Replace the current text with the example?',
     'textx.missing': '{lang} is not installed on this PC.',
     'textx.cancelled': 'Run stopped.',

@@ -11,6 +11,7 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import fsRaw from 'node:fs'
 import os from 'node:os'
+import crypto from 'node:crypto'
 import { createRequire } from 'node:module'
 import { run, uniqueOutputPath, mapLimit, extOf } from './processUtil.js'
 import { encodeBmp, encodeIco, decodeIcoBest } from './imageCodecs.js'
@@ -128,7 +129,7 @@ export function createImageConverter({ getSharp, getFfmpegPath, getExiftool, log
     // Fallback: the full-size JPEG most cameras embed in the RAW.
     const et = await getExiftool?.()
     if (!et) throw new Error('RAW decoder not available')
-    const tmp = path.join(os.tmpdir(), `dh-raw-${process.pid}-${Date.now()}.jpg`)
+    const tmp = path.join(os.tmpdir(), `dh-raw-${process.pid}-${Date.now()}-${crypto.randomBytes(6).toString('hex')}.jpg`) // unique: RAW files convert in parallel
     try {
       await et.extractJpgFromRaw(file, tmp).catch(() => et.extractPreview(file, tmp))
       return await fs.readFile(tmp)

@@ -265,44 +265,17 @@ class Dlss5Service {
 
     try {
       const script = `
-        Get-CimInstance Win32_VideoController | Select-Object -Property Name, DriverVersion, AdapterRAM | ConvertTo-Json -Compress
+        Get-CimInstance Win32_VideoController | Select-Object -Property Name, DriverVersion, AdapterRAM, PNPDeviceID | ConvertTo-Json -Compress
       `;
       // runPowerShell forces UTF-8 output: through exec the name came in the console code page
       // ("Adaptador de V�deo B�sico da Microsoft")
       const { stdout } = await runPowerShell(script.trim(), { timeoutMs: 20000 });
       if (!stdout || !stdout.trim()) {
-        return { vendor: 'other', model: 'Genérico', isRtx: false, isAmd: false, defaultProfile: 'nvidia' };
+        return { vendor: 'other', model: 'Genérico', isRtx: false, isAmd: false, defaultProfile: null };
       }
 
-      let parsed = JSON.parse(stdout.trim());
-      if (Array.isArray(parsed)) {
-        parsed = parsed.find(g => (g.AdapterRAM && g.AdapterRAM > 500000000)) || parsed[0];
-      }
-
-      const name = parsed.Name || '';
-      const driver = parsed.DriverVersion || '';
-      const lower = name.toLowerCase();
-
-      const isNvidia = lower.includes('nvidia') || lower.includes('geforce') || lower.includes('rtx') || lower.includes('gtx');
-      const isAmd = lower.includes('amd') || lower.includes('radeon');
-      const isIntel = lower.includes('intel') || lower.includes('arc');
-      const isRtx = isNvidia && (lower.includes('rtx') || lower.includes('titan'));
-
-      let vendor = 'other';
-      if (isNvidia) vendor = 'nvidia';
-      else if (isAmd) vendor = 'amd';
-      else if (isIntel) vendor = 'intel';
-
-      return {
-        ok: true,
-        vendor,
-        model: name || 'GPU Desconhecida',
-        driverVersion: driver,
-        isRtx,
-        isAmd,
-        isIntel,
-        defaultProfile: isAmd ? 'amd' : 'nvidia'
-      };
+      const parsed = JSON.parse(stdout.trim());
+      return { ok: true, ...classifyDlssGpu(Array.isArray(parsed) ? parsed : [parsed]) };
     } catch (e) {
       Logger.warn('Dlss5Service', 'Erro ao detectar GPU via WMI', e);
       return { ok: false, error: 'Não foi possível identificar a placa de vídeo (WMI).', vendor: 'unknown', model: '', driverVersion: '', isRtx: false, isAmd: false, isIntel: false };
@@ -670,22 +643,31 @@ class Dlss5Service {
       if (inside(d)) await fs.rmdir(d).catch(() => {});
     }
 
-    // 4) Registry bypass
+    // 4) Registry bypass. If it could not be undone (UAC denied, no admin), the NVIDIA signature check stays
+    // disabled: keep it in the manifest so the next revert tries again.
+    let bypassLeft = null;
     if (manifest.signatureBypass?.applied) {
-      await this.restoreSignatureCheckBypass(manifest.signatureBypass.previous);
+      const reg = await this.restoreSignatureCheckBypass(manifest.signatureBypass.previous);
+      if (!reg?.ok) bypassLeft = manifest.signatureBypass;
     }
 
     // 5) Cleanup. If anything could not be undone (e.g. the game is running and
     // holds the DLLs), keep a manifest of what is left so revert can be retried
     // instead of losing track of the injected files and the backups.
-    if (failed.length > 0 || stillInjected.length > 0) {
-      const remaining = { ...manifest, injectedFiles: stillInjected, backedUp: failed, signatureBypass: null, partialRevertAt: Date.now() };
+    if (failed.length > 0 || stillInjected.length > 0 || bypassLeft) {
+      const remaining = { ...manifest, injectedFiles: stillInjected, backedUp: failed, signatureBypass: bypassLeft, partialRevertAt: Date.now() };
       await fs.writeFile(path.join(targetDir, MANIFEST_NAME), JSON.stringify(remaining, null, 2), 'utf8').catch(() => {});
-      onLog(`[AVISO] Reversão parcial: ${stillInjected.length + failed.length} arquivo(s) em uso. Feche o jogo e reverta novamente.`);
+      const fileCount = stillInjected.length + failed.length;
+      onLog(fileCount
+        ? `[AVISO] Reversão parcial: ${fileCount} arquivo(s) em uso. Feche o jogo e reverta novamente.`
+        : '[AVISO] Reversão parcial: não foi possível reativar a verificação de assinatura da NVIDIA no registro. Reverta novamente e aceite o pedido de administrador.');
       return {
         ok: false,
         partial: true,
-        error: `Reversão parcial: ${stillInjected.length + failed.length} arquivo(s) não puderam ser alterados (o jogo está aberto?). Feche o jogo e tente novamente.`,
+        signatureBypassLeft: Boolean(bypassLeft),
+        error: fileCount
+          ? `Reversão parcial: ${fileCount} arquivo(s) não puderam ser alterados (o jogo está aberto?). Feche o jogo e tente novamente.`
+          : 'Reversão parcial: a verificação de assinatura da NVIDIA continua desativada no registro (permissão de administrador negada?). Tente novamente.',
         restoredCount,
         failed,
         stillInjected: stillInjected.map((e) => (typeof e === 'string' ? e : e.file))
@@ -705,6 +687,42 @@ class Dlss5Service {
       failed
     };
   }
+}
+
+const GPU_VENDOR_IDS = { '10DE': 'nvidia', '1002': 'amd', '8086': 'intel' };
+const VM_ADAPTER = /virtualbox|vmware|hyper-v|qxl|virtio|red hat|parallels|citrix|basic (display|render)|remote display|rdp/i;
+
+/**
+ * Picks the gaming GPU from Win32_VideoController rows by PCI vendor id (VEN_10DE / 1002 / 8086, priority
+ * NVIDIA > AMD > Intel). Microsoft adapters (VEN_1414: Basic Display, Remote Display) and VM adapters are skipped;
+ * nothing recognised gives vendor "other" and defaultProfile null.
+ */
+export function classifyDlssGpu(rows = []) {
+  const candidates = [];
+  for (const g of rows) {
+    if (!g) continue;
+    const name = String(g.Name || '');
+    const ven = String(g.PNPDeviceID || '').toUpperCase().match(/VEN_([0-9A-F]{4})/)?.[1] || '';
+    if (ven === '1414' || VM_ADAPTER.test(name)) continue;
+    const vendor = GPU_VENDOR_IDS[ven] || null;
+    if (vendor) candidates.push({ g, name, vendor });
+  }
+  const order = ['nvidia', 'amd', 'intel'];
+  candidates.sort((a, b) => order.indexOf(a.vendor) - order.indexOf(b.vendor) || (Number(b.g.AdapterRAM) || 0) - (Number(a.g.AdapterRAM) || 0));
+  const pick = candidates[0];
+  if (!pick) {
+    return { vendor: 'other', model: 'GPU Desconhecida', driverVersion: '', isRtx: false, isAmd: false, isIntel: false, defaultProfile: null };
+  }
+  const lower = pick.name.toLowerCase();
+  return {
+    vendor: pick.vendor,
+    model: pick.name || 'GPU Desconhecida',
+    driverVersion: String(pick.g.DriverVersion || ''),
+    isRtx: pick.vendor === 'nvidia' && /\brtx\b|titan/.test(lower),
+    isAmd: pick.vendor === 'amd',
+    isIntel: pick.vendor === 'intel',
+    defaultProfile: pick.vendor === 'amd' ? 'amd' : pick.vendor === 'nvidia' ? 'nvidia' : null
+  };
 }
 
 export function registerDlss5IPC({ app, ipcMain, shell }) {
@@ -771,8 +789,12 @@ export function registerDlss5IPC({ app, ipcMain, shell }) {
 
   ipcMain.handle('dlss5:openFolder', async (_event, targetPath) => {
     try {
-      if (shell?.openPath && targetPath) {
-        await shell.openPath(targetPath);
+      // only an existing folder: openPath on a file would run it (an .exe, a script)
+      let isDir = false;
+      try { isDir = Boolean(targetPath) && fsRaw.statSync(String(targetPath)).isDirectory(); } catch {}
+      if (!isDir) return { ok: false, error: 'Pasta não encontrada' };
+      if (shell?.openPath) {
+        await shell.openPath(String(targetPath));
         return { ok: true };
       }
       return { ok: false, error: 'Shell não disponível' };

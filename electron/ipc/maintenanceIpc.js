@@ -1,8 +1,14 @@
 import path from 'node:path'
 import { MaintenanceService } from '../services/maintenance/MaintenanceService.js'
 
+const UNSUPPORTED = { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Manutenção agendada é suportada apenas no Windows.' }
+
 /** `maint:*`: scheduled maintenance (off by default). Progress goes out on `maint:event`. */
 export function registerMaintenanceIPC({ app, ipcMain, BrowserWindow, Notification, logger } = {}) {
+  if (process.platform !== 'win32') {
+    for (const ch of ['maint:state', 'maint:setTask', 'maint:runNow']) ipcMain.handle(ch, async () => UNSUPPORTED)
+    return
+  }
   const broadcast = (msg) => { for (const w of BrowserWindow.getAllWindows()) { try { w.webContents.send('maint:event', msg) } catch { /* closing */ } } }
   const notify = (e) => {
     try {

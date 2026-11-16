@@ -11,6 +11,7 @@ import {
 } from '../components/icons';
 import { extPageId, textIn, useExtensions } from '../lib/extensions';
 import { useI18n } from '../i18n/I18nProvider';
+import { applyNavLayout, layoutOf, loadNavLayout, moveItem, moveSection, saveNavLayout, sameLayout, type NavLayout } from '../lib/navLayout';
 
 const GuardianWidget = React.lazy(() => import('../components/GuardianWidget'));
 
@@ -21,6 +22,7 @@ interface MainLayoutProps {
 }
 
 interface NavSection {
+  id: string;
   category: string;
   items: {
     id: string;
@@ -74,6 +76,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
 
   const navSections: NavSection[] = [
     {
+      id: 'overview',
       category: t('nav.cat.overview', 'Overview'),
       items: [
         { id: 'home', label: t('nav.home', 'Home'), icon: HomeIcon },
@@ -86,6 +89,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
       ]
     },
     {
+      id: 'gaming',
       category: t('nav.cat.gaming', 'Gaming & Performance'),
       items: [
         { id: 'darkpacer', label: t('nav.darkpacer', 'DarkPacer (FPS Lock)'), icon: Activity, badge: 'DXGI' },
@@ -102,11 +106,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
       ]
     },
     {
+      id: 'diagnostics',
       category: t('nav.cat.diagnostics', 'Diagnostics & Hardware'),
       items: [
         { id: 'monitor', label: t('nav.monitor', 'System Monitor'), icon: Monitor },
         { id: 'driver', label: t('nav.driver', 'Driver Center'), icon: MonitorCog },
         { id: 'networktools', label: t('nav.networktools', 'Network & Latency'), icon: Network },
+        { id: 'ssh', label: t('nav.ssh', 'DarkHub SSH'), icon: Terminal },
         { id: 'setuphub', label: t('nav.setuphub', 'Post-Install Hub'), icon: Zap },
         { id: 'maintenance', label: t('nav.maintenance', 'Scheduled maintenance'), icon: History },
         { id: 'usb', label: t('nav.usb', 'USB ports'), icon: Usb },
@@ -114,6 +120,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
       ]
     },
     {
+      id: 'utilities',
       category: t('nav.cat.utilities', 'Utilities & Tools'),
       items: [
         { id: 'spacesniffer', label: t('nav.diskmap', 'Disk map'), icon: LayoutGrid },
@@ -136,6 +143,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
       ]
     },
     {
+      id: 'services',
       category: t('nav.cat.services', 'DarkHub services'),
       items: [
         { id: 'kakugan', label: t('nav.kakugan', 'Kakugan'), icon: Eye },
@@ -144,8 +152,69 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
         { id: 'juuzou', label: t('nav.juuzou', 'Juuzou'), icon: Download }
       ]
     },
-    ...(extItems.length ? [{ category: t('nav.cat.extensions', 'Extensões'), items: extItems }] : [])
+    ...(extItems.length ? [{ id: 'extensions', category: t('nav.cat.extensions', 'Extensões'), items: extItems }] : [])
   ];
+
+  // ---- user order (drag and drop) ----
+  const [savedLayout, setSavedLayout] = React.useState<NavLayout | null>(() => loadNavLayout());
+  const sections = applyNavLayout(navSections, savedLayout);
+  const [drag, setDrag] = React.useState<{ kind: 'item' | 'section'; id: string } | null>(null);
+  const [drop, setDrop] = React.useState<{ kind: 'item'; section: string; index: number } | { kind: 'section'; index: number } | null>(null);
+  const commitLayout = (next: NavLayout) => {
+    // back to the default order = nothing stored, so future default changes apply again
+    const value = sameLayout(next, layoutOf(navSections)) ? null : next;
+    setSavedLayout(value);
+    saveNavLayout(value);
+  };
+  const endDrag = () => { setDrag(null); setDrop(null); };
+  const onDropNav = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!drag || !drop) return endDrag();
+    const current = layoutOf(sections);
+    if (drag.kind === 'item' && drop.kind === 'item') commitLayout(moveItem(current, drag.id, drop.section, drop.index));
+    if (drag.kind === 'section' && drop.kind === 'section') commitLayout(moveSection(current, drag.id, drop.index));
+    endDrag();
+  };
+  const overItem = (e: React.DragEvent, sectionId: string, index: number) => {
+    if (drag?.kind !== 'item') return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const at = e.clientY > r.top + r.height / 2 ? index + 1 : index;
+    if (drop?.kind !== 'item' || drop.section !== sectionId || drop.index !== at) setDrop({ kind: 'item', section: sectionId, index: at });
+  };
+  const overSection = (e: React.DragEvent, secIdx: number, sec: NavSection) => {
+    if (!drag) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (drag.kind === 'section') {
+      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const at = e.clientY > r.top + r.height / 2 ? secIdx + 1 : secIdx;
+      if (drop?.kind !== 'section' || drop.index !== at) setDrop({ kind: 'section', index: at });
+    } else if (drop?.kind !== 'item' || drop.section !== sec.id) {
+      // empty space of a section: drop at its end
+      setDrop({ kind: 'item', section: sec.id, index: sec.items.length });
+    }
+  };
+  // Alt+Up / Alt+Down move the focused entry (keyboard alternative to dragging)
+  const moveByKey = (itemId: string, delta: number) => {
+    const flat = sections.flatMap((s) => s.items.map((i, idx) => ({ section: s.id, idx, id: i.id })));
+    const pos = flat.findIndex((x) => x.id === itemId);
+    const target = flat[pos + delta];
+    const cur = flat[pos];
+    if (!cur) return;
+    const current = layoutOf(sections);
+    if (target && target.section === cur.section) commitLayout(moveItem(current, itemId, cur.section, delta > 0 ? target.idx + 1 : target.idx));
+    else {
+      const si = sections.findIndex((s) => s.id === cur.section) + (delta > 0 ? 1 : -1);
+      const sec = sections[si];
+      if (!sec) return;
+      commitLayout(moveItem(current, itemId, sec.id, delta > 0 ? 0 : sec.items.length));
+    }
+    requestAnimationFrame(() => navRef.current?.querySelector<HTMLButtonElement>(`button[data-nav-id="${itemId}"]`)?.focus());
+  };
+  const dropLine = <span aria-hidden="true" className="block h-0.5 mx-1.5 my-px rounded-full bg-blue-400" />;
 
   const handleMenuClick = async (id: string) => {
     if (id === 'pge-portable') {
@@ -172,6 +241,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
   // Up/Down/Home/End move focus between sidebar entries (Tab still works as usual).
   const handleNavKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+    const focusedId = (document.activeElement as HTMLElement | null)?.dataset?.navId;
+    if (e.altKey && focusedId && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault();
+      moveByKey(focusedId, e.key === 'ArrowUp' ? -1 : 1);
+      return;
+    }
     const items = Array.from(navRef.current?.querySelectorAll<HTMLButtonElement>('button[data-nav-item]:not(:disabled)') ?? []);
     if (!items.length) return;
     const idx = items.indexOf(document.activeElement as HTMLButtonElement);
@@ -248,32 +323,45 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
             ref={navRef}
             aria-label={t('nav.main', 'Navegação principal')}
             onKeyDown={handleNavKeyDown}
+            onDrop={onDropNav}
+            onDragOver={(e) => { if (drag) e.preventDefault(); }}
             className="px-2.5 pt-3 pb-2 flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-4"
           >
-            {navSections.map((sec, idx) => (
-              <div key={idx} role="group" aria-label={sec.category}>
+            {sections.map((sec, idx) => (
+              <React.Fragment key={sec.id}>
+              {drop?.kind === 'section' && drop.index === idx ? dropLine : null}
+              <div role="group" aria-label={sec.category} onDragOver={(e) => overSection(e, idx, sec)}
+                className={drag?.kind === 'section' && drag.id === sec.id ? 'opacity-40' : undefined}>
                 {!collapsed ? (
-                  <p className="text-[11px] font-medium text-zinc-500 px-2.5 pb-1.5" aria-hidden="true">
+                  <p draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/x-darkhub-nav', sec.id); setDrag({ kind: 'section', id: sec.id }); }} onDragEnd={endDrag}
+                    title={t('nav.dragHint', 'Arraste títulos e itens para reorganizar o menu (ou Alt + ↑/↓ no item)')}
+                    className="text-[11px] font-medium text-zinc-500 px-2.5 pb-1.5 cursor-grab active:cursor-grabbing hover:text-zinc-300">
                     {sec.category}
                   </p>
                 ) : (
                   idx > 0 && <div className="h-px bg-zinc-900 mx-2 mb-2" aria-hidden="true" />
                 )}
                 <div className="space-y-px">
-                  {sec.items.map((item) => {
+                  {sec.items.map((item, itemIdx) => {
                     const Icon = item.icon;
                     const isActive = currentPage === item.id;
                     const isPge = item.id === 'pge-portable';
                     return (
+                      <React.Fragment key={item.id}>
+                      {drop?.kind === 'item' && drop.section === sec.id && drop.index === itemIdx ? dropLine : null}
                       <button
-                        key={item.id}
                         data-nav-item
+                        data-nav-id={item.id}
+                        draggable
+                        onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/x-darkhub-nav', item.id); setDrag({ kind: 'item', id: item.id }); }}
+                        onDragEnd={endDrag}
+                        onDragOver={(e) => overItem(e, sec.id, itemIdx)}
                         onClick={() => handleMenuClick(item.id)}
                         disabled={isPge && pgeBusy}
                         title={collapsed ? item.label : undefined}
                         aria-label={collapsed ? item.label : undefined}
                         aria-current={isActive ? 'page' : undefined}
-                        className={navButton(isActive)}
+                        className={`${navButton(isActive)} ${drag?.kind === 'item' && drag.id === item.id ? 'opacity-40' : ''}`}
                       >
                         {rail(isActive)}
                         <span className="flex items-center gap-2.5 min-w-0">
@@ -295,11 +383,23 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPage, setCurre
                           )
                         )}
                       </button>
+                      </React.Fragment>
                     );
                   })}
+                  {drop?.kind === 'item' && drop.section === sec.id && drop.index === sec.items.length ? dropLine : null}
+                  {drag?.kind === 'item' && !sec.items.length ? <div className="h-8 rounded-md border border-dashed border-zinc-800" /> : null}
                 </div>
               </div>
+              </React.Fragment>
             ))}
+            {drop?.kind === 'section' && drop.index === sections.length ? dropLine : null}
+
+            {!collapsed && savedLayout ? (
+              <button type="button" onClick={() => commitLayout(layoutOf(navSections))}
+                className={`w-full text-left px-2.5 text-[11px] text-zinc-600 hover:text-zinc-300 ${focusRing}`}>
+                {t('nav.resetOrder', 'Restaurar ordem padrão do menu')}
+              </button>
+            ) : null}
 
             {!collapsed && pgeStatus ? (
               <div role="status" className={`rounded-md px-2.5 py-2 text-[11.5px] ${

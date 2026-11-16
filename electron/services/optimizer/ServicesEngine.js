@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import ElevationHelper from './ElevationHelper.js';
 import DeepTweaksEngine from './DeepTweaksEngine.js';
 import { runPowerShell } from '../PowerShellRunner.js';
@@ -15,6 +16,8 @@ export const MANAGED_SERVICES = [
 ];
 
 const SNAPSHOT_ID = 'services:redundant';
+// same marker DarkOSRecoveryService.isDarkOS() uses
+const DARKOS_MANIFEST = 'C:\\ProgramData\\DarkOS\\Recovery\\manifest.json';
 
 /** Win32_Service StartMode (+DelayedAutoStart) -> argument for `sc.exe config start=`. */
 export function scArgFromStartMode(startMode, delayed) {
@@ -29,6 +32,11 @@ export function scArgFromStartMode(startMode, delayed) {
 }
 
 class ServicesEngine {
+  /** Kept as a method so tests can stub it. */
+  _isDarkOS() {
+    try { return fs.existsSync(DARKOS_MANIFEST); } catch { return false; }
+  }
+
   /** Reads the real service configuration (StartMode/State) of the managed services. */
   async readServices(names = MANAGED_SERVICES.map((s) => s.name)) {
     // single-quoted PowerShell literal: names such as "MSSQL$SQLEXPRESS" were expanded as variables inside "..."
@@ -114,6 +122,11 @@ class ServicesEngine {
   async revertServicesTweak() {
     if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const snap = DeepTweaksEngine.getExtra(SNAPSHOT_ID);
+    // Without a snapshot the fallback turns the services back on with Windows defaults. On DarkOS these services are
+    // disabled by the image itself (managed by the DarkOS catalog), so the fallback would undo DarkOS, not DarkHub.
+    if (!snap?.services?.length && this._isDarkOS()) {
+      return { ok: false, skipped: true, error: 'Nada a restaurar: não há registro do estado anterior e, no DarkOS, estes serviços são desativados pelo próprio sistema. Para reativá-los use a tela DarkOS (Recuperação).' };
+    }
     const entries = snap?.services?.length
       ? snap.services
       : MANAGED_SERVICES.map((s) => ({ name: s.name, startArg: s.fallback, wasRunning: s.name !== 'lfsvc' }));

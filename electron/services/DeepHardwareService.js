@@ -2,6 +2,30 @@ import si from 'systeminformation';
 import cp from 'node:child_process';
 import Logger from './LoggerService.js';
 import { runPowerShell as runPowerShellShared } from './PowerShellRunner.js';
+import { pairGpus } from '../hal/models/gpuMatch.js';
+
+/** SUBSYS id (8 hex digits) from a PNPDeviceID, or ''. systeminformation exposes the same value as subDeviceId. */
+const subsysOf = (pnp) => (String(pnp || '').match(/SUBSYS_([0-9A-F]{8})/i)?.[1] || '').toUpperCase();
+
+/**
+ * Pairs adapters with WMI rows (index into rows, or -1), never reusing a row. The PCI subsystem id wins when both
+ * sides have it; otherwise names, exact first. An empty name (adapter not identified yet) matches nothing by name.
+ */
+export function pairWmiRows(gpus, rows) {
+  const out = gpus.map(() => -1);
+  const used = new Set();
+  gpus.forEach((g, i) => {
+    const sub = String(g?.subDeviceId || '').toUpperCase();
+    if (!sub) return;
+    const j = rows.findIndex((r, jj) => !used.has(jj) && subsysOf(r?.PNPDeviceID) === sub && (!g.model || !r?.Name || pairGpus([g.model], [r.Name])[0] === 0));
+    if (j >= 0) { out[i] = j; used.add(j); }
+  });
+  const restG = gpus.map((_, i) => i).filter((i) => out[i] < 0);
+  const restR = rows.map((_, j) => j).filter((j) => !used.has(j));
+  const byName = pairGpus(restG.map((i) => gpus[i]?.model), restR.map((j) => rows[j]?.Name));
+  restG.forEach((i, k) => { if (byName[k] >= 0) out[i] = restR[byName[k]]; });
+  return out;
+}
 
 class DeepHardwareService {
   constructor() {
@@ -122,20 +146,23 @@ class DeepHardwareService {
       }));
 
       try {
-        const ps = `Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion, VideoProcessor, VideoArchitecture, CurrentRefreshRate | ConvertTo-Json -Compress`;
+        const ps = `Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion, VideoProcessor, VideoArchitecture, CurrentRefreshRate, PNPDeviceID | ConvertTo-Json -Compress`;
         const wmiRes = await this.runPowerShell(ps, 5000);
         if (wmiRes.stdout && !wmiRes.timeout) {
           let parsed = JSON.parse(wmiRes.stdout);
           if (!Array.isArray(parsed)) parsed = [parsed];
-          parsed.forEach(w => {
-            const match = gpus.find(g => String(g.model).includes(w.Name) || String(w.Name).includes(g.model));
-            if (match) {
-              if (!match.driverVersion && w.DriverVersion) match.driverVersion = w.DriverVersion;
-              match.videoProcessor = w.VideoProcessor;
-              match.refreshRate = w.CurrentRefreshRate;
-              match.architecture = w.VideoArchitecture;
-            }
-            // no name match: the WMI row belongs to another adapter (Basic Display, remote), never copied over
+          // one row per adapter (PCI subsystem id, then exact name): an empty name used to match every row
+          // (includes('')); a row with no match belongs to another adapter (Basic Display, remote), never copied over
+          const pairs = pairWmiRows(gpus, parsed.filter(Boolean));
+          const rows = parsed.filter(Boolean);
+          gpus.forEach((match, i) => {
+            const w = pairs[i] >= 0 ? rows[pairs[i]] : null;
+            if (!w) return;
+            if (!match.driverVersion && w.DriverVersion) match.driverVersion = w.DriverVersion;
+            match.videoProcessor = w.VideoProcessor;
+            match.refreshRate = w.CurrentRefreshRate;
+            match.architecture = w.VideoArchitecture;
+            if (w.PNPDeviceID) match.pnpDeviceId = w.PNPDeviceID;
           });
         }
 
@@ -145,10 +172,12 @@ class DeepHardwareService {
         if (regRes.stdout && !regRes.timeout) {
           let regs = JSON.parse(regRes.stdout);
           if (!Array.isArray(regs)) regs = [regs];
-          for (const g of gpus) {
-            const r = regs.find((x) => x && (String(g.model).includes(x.DriverDesc) || String(x.DriverDesc).includes(g.model)));
+          regs = regs.filter(Boolean);
+          const regPairs = pairGpus(gpus.map((g) => g.model), regs.map((x) => x.DriverDesc));
+          gpus.forEach((g, i) => {
+            const r = regPairs[i] >= 0 ? regs[regPairs[i]] : null;
             if (r) { g.driverDate = r.DriverDate; g.featureScore = r.FeatureScore; }
-          }
+          });
         }
       } catch (e) {  }
 
@@ -164,13 +193,12 @@ class DeepHardwareService {
 
            // one <gpu> block per card: the power limit is taken from the block whose product name matches
            const blocks = smiRes.stdout.split(/<gpu id=/).slice(1);
-           gpus = gpus.map(g => {
-             if (String(g.vendor).toLowerCase().includes('nvidia')) {
-               const block = blocks.find((b) => { const n = /<product_name>([^<]+)<\/product_name>/.exec(b)?.[1] || ''; return n && (String(g.model).includes(n) || n.includes(g.model)); });
-               const pwrMatch = block && block.match(/<power_limit>([\d.]+)\s*W<\/power_limit>/);
-               if (pwrMatch) g.powerLimit = pwrMatch[1];
-             }
-             return g;
+           const nvIdx = gpus.map((g, i) => (String(g.vendor).toLowerCase().includes('nvidia') ? i : -1)).filter((i) => i >= 0);
+           const smiPairs = pairGpus(nvIdx.map((i) => gpus[i].model), blocks.map((b) => /<product_name>([^<]+)<\/product_name>/.exec(b)?.[1] || ''));
+           nvIdx.forEach((i, k) => {
+             const block = smiPairs[k] >= 0 ? blocks[smiPairs[k]] : null;
+             const pwrMatch = block && block.match(/<power_limit>([\d.]+)\s*W<\/power_limit>/);
+             if (pwrMatch) gpus[i].powerLimit = pwrMatch[1];
            });
         }
       } catch (e) {  }

@@ -387,3 +387,55 @@ fn recycle_bin_is_never_touched_in_test_mode() {
     assert!(!v["targets"].as_array().unwrap().iter().any(|t| t["id"] == "dh:recycle-bin"));
     let _ = fs::remove_dir_all(&base);
 }
+
+#[cfg(windows)]
+fn junction(link: &Path, target: &Path) {
+    fs::create_dir_all(link.parent().unwrap()).unwrap();
+    let ok = std::process::Command::new("cmd").args(["/c", "mklink", "/J"]).arg(link).arg(target).output().unwrap().status.success();
+    assert!(ok, "mklink /J {} {}", link.display(), target.display());
+}
+
+#[cfg(windows)]
+#[test]
+fn literal_segments_through_junctions_are_refused() {
+    let base = tmp("junc");
+    let env = Env::rooted(&base);
+    let outside = base.join("Elsewhere");
+    put(&outside.join("Cache\\precious.bin"), 10);
+    let local = base.join("Users\\me\\AppData\\Local");
+    // %LocalAppData%\Foo is a junction to a folder outside the allowed roots.
+    junction(&local.join("Foo"), &outside);
+    let ini = "[Foo]\nFileKey1=%LocalAppData%\\Foo\\Cache|*.*\n";
+    let (targets, _) = winapp2::load_all(&env, Some(ini), &no_reg);
+    let t = targets.iter().find(|t| t.id == "w2:Foo").expect("listed with the refused rule");
+    assert!(t.rules.is_empty());
+    assert_eq!(t.rejected.len(), 1, "{:?}", t.rejected);
+    // A rule that slipped through (built before the link appeared) is refused again at clean time.
+    let forged = winapp2::Target {
+        id: t.id.clone(),
+        name: t.name.clone(),
+        category: t.category.clone(),
+        source: t.source,
+        warning: None,
+        rules: vec![winapp2::Rule { dir: local.join("Foo\\Cache"), patterns: vec!["*.*".into()], recurse: false, remove_self: false }],
+        excludes: vec![],
+        rejected: vec![],
+        ignored_registry: 0,
+    };
+    let r = files::run(&env, &[&forged], &Opts { apply: true, shred: 0, sample: 10 });
+    assert_eq!(r["targets"][0]["refused"].as_array().unwrap().len(), 1);
+    assert!(outside.join("Cache\\precious.bin").exists());
+
+    // The temp root itself may be a junction (RAM disk): still cleaned.
+    let ram = base.join("RamDisk");
+    put(&ram.join("junk.tmp"), 7);
+    junction(&local.join("Temp"), &ram);
+    let ini = "[Temp]\nFileKey1=%Temp%|*.*\n";
+    let (targets, _) = winapp2::load_all(&env, Some(ini), &no_reg);
+    let t = targets.iter().find(|t| t.id == "w2:Temp").unwrap();
+    assert_eq!(t.rules.len(), 1, "{:?}", t.rejected);
+    let r = files::run(&env, &[t], &Opts { apply: true, shred: 0, sample: 10 });
+    assert_eq!(r["total"]["files"], 1);
+    assert!(!ram.join("junk.tmp").exists());
+    let _ = fs::remove_dir_all(&base);
+}

@@ -2,7 +2,7 @@ import si from 'systeminformation';
 import SensorBus from './SensorBus.js';
 import NvidiaDaemon from './NvidiaDaemon.js';
 import { BaseCollector } from './BaseCollector.js';
-import { createSensor, createUnavailableSensor, numOrNull, sameGpu } from '../models/SensorModel.js';
+import { createSensor, createUnavailableSensor, numOrNull, pairGpus } from '../models/SensorModel.js';
 import Logger from '../../services/LoggerService.js';
 
 const STALE_MS = 20000;
@@ -75,10 +75,13 @@ class GpuCollector extends BaseCollector {
       const base = pdhFresh && this._adapters.length
         ? this._adapters.map((a) => ({ name: a.name, pdh: a }))
         : this._staticGpus.map((g) => ({ name: g.name, vram: g.vram }));
-      // an NVIDIA card nvidia-smi sees but the base list missed is still listed
+      // each nvidia-smi row pairs with one adapter (exact name first, never reused: two identical cards get their
+      // own rows); an NVIDIA card nvidia-smi sees but the base list missed is still listed
       const nv = nvidiaFresh ? this._nvidiaGpus : [];
-      for (const g of nv) if (!base.some((b) => sameGpu(b.name, g.name))) base.push({ name: g.name });
-      const gpus = base.map((b, idx) => this._build(b, nv.find((g) => sameGpu(b.name, g.name)), idx));
+      const pairs = pairGpus(base.map((b) => b.name), nv.map((g) => g.name));
+      const usedNv = new Set(pairs.filter((j) => j >= 0));
+      nv.forEach((g, j) => { if (!usedNv.has(j)) { base.push({ name: g.name }); pairs.push(j); } });
+      const gpus = base.map((b, idx) => this._build(b, pairs[idx] >= 0 ? nv[pairs[idx]] : undefined, idx));
       this.cachedGpus = gpus;
       this.lastUpdate = Date.now();
       return { status: 'OK', timestamp: this.lastUpdate, values: { gpus } };

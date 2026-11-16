@@ -1,9 +1,9 @@
 {
  "algorithm": "sha256",
  "files": {
-  "DarkHub.Cleaner.exe": "165be3ad69e0342a0d989448368cfe3433a503184db7f701370c8485be4c6342",
+  "DarkHub.Cleaner.exe": "dd2c6fb73f529e0e149f30d7531a5baf6ae2e96ed3d114cf4d9b735393f478ab",
   "DarkHub.ClickEngine.exe": "5071a7ffa5326c5fd2d2d5af81193de10e1e1f6fec699757edebbb265358777f",
-  "DarkHub.DiskRescue.exe": "4088bb55550b41c3b54bddb5e631c3a0d996baf7b3e34d15971fed59a08f5959",
+  "DarkHub.DiskRescue.exe": "f9b07e0b945dea206b633d8befb76f1bf07cb31c893364c74f287381ea81777e",
   "DarkHub.DiskScan.exe": "e81937249b7c24a6e68eb7249e6e1d2ef546fb6165c48ca9560afbf508f93e31",
   "DarkHub.FrameLimiter.exe": "a4c9b683530b4fe6124f08612f3dac9c5c34ad126ffa37e26e45fc6aacefc706",
   "DarkHub.GpuBench.exe": "1b95251df66154851041f6af8ce6a97936c039b66183e1606a72e3e641426eff",

@@ -11,6 +11,8 @@ try { electron = createRequire(import.meta.url)('electron'); } catch { electron 
 
 const app = electron?.app || null;
 
+const NOT_WINDOWS = { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Planos de energia do Windows não são suportados nesta plataforma.' };
+
 class PowerEngine {
   constructor() {
     this.powerPlans = null;
@@ -22,6 +24,7 @@ class PowerEngine {
   }
 
   async _powercfg(args) {
+    if (process.platform !== 'win32') return { code: 1, stdout: '', stderr: 'unsupported' };
     try {
       // latin1 + decodeConsoleText: powercfg writes in the OEM code page ("configura��o" in error messages)
       const r = await runCommand('powercfg.exe', args, { timeoutMs: 15000, encoding: 'latin1' });
@@ -32,22 +35,26 @@ class PowerEngine {
   }
 
   async _fetchPowerPlans() {
+    if (process.platform !== 'win32') { this.powerPlans = []; return this.powerPlans; }
     const r = await this._powercfg(['/L']);
     this.powerPlans = r.code === 0 ? parsePowercfgList(r.stdout) : [];
     return this.powerPlans;
   }
 
   async analyzeHighPerformance() {
+    if (process.platform !== 'win32') return NOT_WINDOWS;
     await this._fetchPowerPlans();
     return { ok: true, summary: { command: `powercfg /setactive ${POWER_GUIDS.high}` } };
   }
 
   async analyzeBalanced() {
+    if (process.platform !== 'win32') return NOT_WINDOWS;
     await this._fetchPowerPlans();
     return { ok: true, summary: { command: `powercfg /setactive ${POWER_GUIDS.balanced}` } };
   }
 
   async _getActiveSchemeGuid() {
+    if (process.platform !== 'win32') return null;
     const r = await this._powercfg(['/getactivescheme']);
     const m = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i.exec(r.stdout);
     return m ? m[1].toLowerCase() : null;
@@ -55,6 +62,7 @@ class PowerEngine {
 
   /** Plans are matched by GUID (names are localized, and High Performance is hidden on many PCs). */
   async _ensurePlan(guid) {
+    if (process.platform !== 'win32') return { ok: false, error: NOT_WINDOWS.error };
     const plans = this.powerPlans || await this._fetchPowerPlans();
     if (plans.some((p) => p.guid === guid)) return { ok: true, created: false };
     // The built-in scheme exists in the system even when not listed: duplicate it under the same GUID.
@@ -65,6 +73,13 @@ class PowerEngine {
     // the plan is there, so let /setactive + the active-scheme check decide.
     if ((fresh || []).some((p) => p.guid === guid) || /GUID/i.test(`${dup.stderr}${dup.stdout}`)) return { ok: true, created: false };
     return { ok: false, error: dup.stderr || dup.stdout || 'Plano de energia indisponível neste PC' };
+  }
+
+  /** True for the built-in Ultimate GUID or the copy created on a PC where the built-in one cannot be activated. */
+  isUltimateGuid(g) {
+    if (!g) return false;
+    if (g === POWER_GUIDS.ultimate) return true;
+    try { return JSON.parse(fs.readFileSync(this._statePath().replace(/previous\.json$/, 'ultimate.json'), 'utf8'))?.guid === g; } catch { return false; }
   }
 
   _rememberPrevious(guid) {
@@ -97,9 +112,26 @@ class PowerEngine {
   }
 
   async _activate(guid, label) {
+    if (process.platform !== 'win32') return NOT_WINDOWS;
     const ensured = await this._ensurePlan(guid);
     if (!ensured.ok) return this._result('Error', `Plano "${label}" indisponível: ${ensured.error}`);
-    const set = await this._powercfg(['/setactive', guid]);
+    let set = await this._powercfg(['/setactive', guid]);
+    // Some PCs keep only a hidden, non-activatable template under the built-in GUID ("unsupported configuration"):
+    // a copy under a new GUID is the documented way to get the plan there.
+    if (set.code !== 0 && guid === POWER_GUIDS.ultimate) {
+      // reuse the copy made by an earlier apply instead of piling up duplicates
+      const known = (await this._fetchPowerPlans()).find((p) => p.guid !== guid && this.isUltimateGuid(p.guid))?.guid;
+      const copy = known ? { code: 0, stdout: known } : await this._powercfg(['/duplicatescheme', guid]);
+      const fresh = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i.exec(copy.stdout)?.[1]?.toLowerCase();
+      if (copy.code === 0 && fresh && fresh !== guid) {
+        set = await this._powercfg(['/setactive', fresh]);
+        if (set.code === 0 && (await this._getActiveSchemeGuid()) === fresh) {
+          try { fs.writeFileSync(this._statePath().replace(/previous\.json$/, 'ultimate.json'), JSON.stringify({ guid: fresh }), 'utf8'); } catch { /* status falls back to the built-in GUID */ }
+          return this._result('Success', `Plano de energia ativo (verificado): ${label} (cópia criada neste PC).`);
+        }
+      }
+      return this._result('Error', `Este PC não permite ativar o plano "${label}" (${(set.stderr || set.stdout).trim()}). Use "Alto Desempenho".`);
+    }
     if (set.code !== 0) return this._result('Error', `Falha ao ativar o plano "${label}": ${set.stderr || set.stdout}`);
     const active = await this._getActiveSchemeGuid();
     if (active !== guid) {
@@ -113,24 +145,28 @@ class PowerEngine {
    * and heat, and it does not by itself raise FPS. The previously active plan is remembered.
    */
   async setHighPerformance() {
+    if (process.platform !== 'win32') return NOT_WINDOWS;
     const before = await this._getActiveSchemeGuid();
-    if (before && before !== POWER_GUIDS.high && before !== POWER_GUIDS.ultimate) this._rememberPrevious(before);
+    if (before && before !== POWER_GUIDS.high && !this.isUltimateGuid(before)) this._rememberPrevious(before);
     return this._activate(POWER_GUIDS.high, 'Alto Desempenho');
   }
 
   /** Ultimate Performance (hidden plan, created on demand). Desktop-oriented: no power-saving at all. */
   async setUltimate() {
+    if (process.platform !== 'win32') return NOT_WINDOWS;
     const before = await this._getActiveSchemeGuid();
-    if (before && before !== POWER_GUIDS.high && before !== POWER_GUIDS.ultimate) this._rememberPrevious(before);
+    if (before && before !== POWER_GUIDS.high && !this.isUltimateGuid(before)) this._rememberPrevious(before);
     return this._activate(POWER_GUIDS.ultimate, 'Desempenho Máximo');
   }
 
   async setBalanced() {
+    if (process.platform !== 'win32') return NOT_WINDOWS;
     return this._activate(POWER_GUIDS.balanced, 'Equilibrado');
   }
 
   /** Back to whatever was active before the app switched to High Performance (or Balanced when unknown). */
   async restorePrevious() {
+    if (process.platform !== 'win32') return NOT_WINDOWS;
     const prev = this._readPrevious();
     if (!prev) return this.setBalanced();
     const plans = await this._fetchPowerPlans();

@@ -12,6 +12,7 @@ import {
 } from './services/PowerShellRunner.js'
 
 import { downloadToFile, fetchJson, assetSha256, SYSTEM_TAR } from './services/SecureDownload.js'
+import { isPe64 } from './services/upscale/pe.js'
 
 const fs = fsRaw.promises
 const log = { info: (...a) => console.log(...a) }
@@ -183,8 +184,10 @@ async function getGpuInfo() {
   const primary = priority.map((v) => classified.find((c) => c.vendor === v)).find(Boolean)
   const vendor = primary?.vendor ?? 'unknown'
   const amdArchitecture = vendor === 'amd' ? classifyAmdArchitecture(primary.name) : null
-  cachedGpuInfo = { vendor, amdArchitecture, controllers: list }
-  return cachedGpuInfo
+  const info = { vendor, amdArchitecture, controllers: list }
+  // a failed or empty probe (WMI busy right after boot) must not stick for the whole session
+  if (list.length) cachedGpuInfo = info
+  return info
 }
 
 function getWindowsBuild() {
@@ -488,6 +491,11 @@ async function buildAnalysis(app, payload = {}) {
     }
   }
 
+  // OptiScaler ships only x64 DLLs: a 32-bit game would fail to load them (or crash at start)
+  let is64 = false
+  try { is64 = isPe64(targetExePath) } catch { /* unreadable: treat as unsupported */ }
+  if (!is64) return { ok: false, error: `O executavel nao e 64-bit (x64); o OptiScaler so funciona em jogos 64-bit: ${targetExePath}` }
+
   const files = await walkFiles(targetDir, { maxDepth: 4, maxFiles: 6000 })
   const detected = detectUpscaleFiles(files)
   const installed = await detectInstalledLoaders(targetDir, releaseDir)
@@ -735,12 +743,15 @@ async function resolveFsr4Rdna2Path(app) {
     const release = await fetchJson('https://api.github.com/repos/the3rdparty1917/fsr4xyz/releases/tags/4.1.1b')
     const asset = release?.assets?.find((a) => a.name === 'FSR_4.1.1b_INT8_with_RDNA2_fix.7z')
     if (!asset?.browser_download_url) throw new Error('Asset FSR 4.1.1b nao encontrado no release.')
+    // third-party DLL injected into games: never install it without a hash published by GitHub to check against
+    const expectedSha256 = assetSha256(asset)
+    if (!expectedSha256) throw new Error('O release FSR 4.1.1b nao publica o hash SHA-256 do arquivo; download recusado.')
 
     const { sha256 } = await downloadToFile(asset.browser_download_url, archivePath, {
-      expectedSha256: assetSha256(asset),
+      expectedSha256,
       maxBytes: 200 * 1024 * 1024
     })
-    log.info?.(`[OptiScaler] FSR4 RDNA2 baixado (sha256=${sha256}, verificado=${Boolean(assetSha256(asset))})`)
+    log.info?.(`[OptiScaler] FSR4 RDNA2 baixado e verificado (sha256=${sha256})`)
 
     await execFileAsync(SYSTEM_TAR, ['-xf', archivePath, '-C', targetDir], { windowsHide: true })
     const subDll = path.join(targetDir, '4.1.1b', 'amd_fidelityfx_upscaler_dx12.dll')
@@ -846,12 +857,12 @@ async function applyOptiScaler(app, getLibraryStore, payload = {}) {
 
     if (analysis.choices.upscaler === 'fsr4_rdna2') {
       const fsr4Rdna2Src = await resolveFsr4Rdna2Path(app)
-      if (fsr4Rdna2Src && fsRaw.existsSync(fsr4Rdna2Src)) {
-        const dest = path.join(targetDir, 'amd_fidelityfx_upscaler_dx12.dll')
-        await backupPathIfExists(dest, backupDir, manifest)
-        manifest.copied.push({ source: fsr4Rdna2Src, path: dest, note: 'FSR 4.1.1b INT8 (the3rdparty1917)' })
-        await fs.copyFile(fsr4Rdna2Src, dest)
-      }
+      // the RDNA2 profile is useless without this DLL: fail so the rollback below undoes the partial install
+      if (!fsr4Rdna2Src || !fsRaw.existsSync(fsr4Rdna2Src)) throw new Error('Nao foi possivel obter o FSR 4.1.1b para RDNA2 (amd_fidelityfx_upscaler_dx12.dll).')
+      const dest = path.join(targetDir, 'amd_fidelityfx_upscaler_dx12.dll')
+      await backupPathIfExists(dest, backupDir, manifest)
+      manifest.copied.push({ source: fsr4Rdna2Src, path: dest, note: 'FSR 4.1.1b INT8 (the3rdparty1917)' })
+      await fs.copyFile(fsr4Rdna2Src, dest)
     }
 
     const iniPath = path.join(targetDir, 'OptiScaler.ini')
@@ -988,6 +999,16 @@ async function restoreBackup(app, getLibraryStore, payload = {}) {
 
   const restored = []
   const removed = []
+  // files that could not be removed (EBUSY/EPERM while the game runs): the restore is then only partial
+  const failed = []
+  const removeTracked = async (p, fn) => {
+    try {
+      await fn()
+      removed.push(p)
+    } catch (e) {
+      if (e?.code !== 'ENOENT') failed.push({ path: p, error: e?.code || e?.message || String(e) })
+    }
+  }
   let usedManifest = null
 
   try {
@@ -1057,30 +1078,20 @@ async function restoreBackup(app, getLibraryStore, payload = {}) {
           }
           if (replaced) continue
         }
-        if (isOpti) {
-          try {
-            await fs.unlink(p)
-            removed.push(p)
-          } catch {}
-        }
+        if (isOpti) await removeTracked(p, () => fs.unlink(p))
       }
     }
 
-    // 3. Purge all known OptiScaler files
+    // 3. Purge all known OptiScaler files (the tracking json MANIFEST_FILE goes last, only on full success)
     const filesToClean = [
       'OptiScaler.dll', 'OptiScaler.ini', 'OptiScaler.log', 'OptiScaler.asi',
-      'DarkHubOptiScaler.json', 'fakenvapi.ini', 'nvngx.ini'
+      'fakenvapi.ini', 'nvngx.ini'
     ]
     for (const f of filesToClean) {
       const p = path.join(targetDir, f)
       if (await exists(p)) {
         const wasRestored = restored.some(r => normalizeWinPath(r).toLowerCase() === normalizeWinPath(p).toLowerCase())
-        if (!wasRestored) {
-          try {
-            await fs.unlink(p)
-            removed.push(p)
-          } catch {}
-        }
+        if (!wasRestored) await removeTracked(p, () => fs.unlink(p))
       }
     }
 
@@ -1109,12 +1120,10 @@ async function restoreBackup(app, getLibraryStore, payload = {}) {
     }
     for (const p of injectedFiles) {
       if (restoredKeys.has(p.toLowerCase())) continue
-      try {
-        const st = await fs.lstat(p)
-        if (!st.isFile()) continue
-        await fs.unlink(p)
-        removed.push(p)
-      } catch {}
+      let st = null
+      try { st = await fs.lstat(p) } catch { continue }
+      if (!st.isFile() || path.basename(p).toLowerCase() === MANIFEST_FILE.toLowerCase()) continue
+      await removeTracked(p, () => fs.unlink(p))
     }
 
     // Purge D3D12_Optiscaler & Licenses only when OptiScaler put them there
@@ -1127,11 +1136,27 @@ async function restoreBackup(app, getLibraryStore, payload = {}) {
       const wasRestoredDir = restored.some((r) => path.resolve(r).toLowerCase() === path.resolve(p).toLowerCase())
       const ownedByOptiScaler = dirName === 'D3D12_Optiscaler' || installedByUs.has(path.resolve(p).toLowerCase())
       if (wasRestoredDir || !ownedByOptiScaler) continue
-      if (await exists(p)) {
-        try {
-          await fs.rm(p, { recursive: true, force: true })
-          removed.push(p)
-        } catch {}
+      if (await exists(p)) await removeTracked(p, () => fs.rm(p, { recursive: true, force: true }))
+    }
+
+    // Something is still in use: keep the tracking json (so a later restore still knows the install) and do not mark
+    // the game as restored in the Library. Same contract as Dlss5Service.revert.
+    if (failed.length) {
+      return {
+        ok: false,
+        partial: true,
+        error: `Restauração parcial: ${failed.length} arquivo(s) do OptiScaler não puderam ser removidos (o jogo está aberto?). Feche o jogo e tente novamente.`,
+        restored,
+        removed,
+        failed,
+        backupDir
+      }
+    }
+    const trackingFile = path.join(targetDir, MANIFEST_FILE)
+    if (!restored.some((r) => normalizeWinPath(r).toLowerCase() === normalizeWinPath(trackingFile).toLowerCase())) {
+      await removeTracked(trackingFile, () => fs.unlink(trackingFile))
+      if (failed.length) {
+        return { ok: false, partial: true, error: `Restauração parcial: não foi possível remover ${MANIFEST_FILE}.`, restored, removed, failed, backupDir }
       }
     }
 

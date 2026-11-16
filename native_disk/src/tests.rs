@@ -126,10 +126,47 @@ fn restores_wiped_primary_gpt_and_protective_mbr() {
         assert_eq!(after[ss..2 * ss], orig[ss..2 * ss], "primary header identical to the original (ss={ss})");
 
         // The backup file puts the wiped sectors back.
-        let (bss, writes) = repair::load_backup(bk.to_str().unwrap()).unwrap();
-        assert_eq!(bss as usize, ss);
-        assert!(writes.iter().all(|x| x.data.iter().all(|&b| b == 0)));
+        let backup = repair::load_backup(bk.to_str().unwrap()).unwrap();
+        assert_eq!(backup.sector_size as usize, ss);
+        assert_eq!(backup.disk_size, (total as usize * ss) as u64);
+        assert!(backup.writes.iter().all(|x| x.data.iter().all(|&b| b == 0)));
+        // Taken from a wiped disk (no identity): restoring onto the same disk passes the size check.
+        backup.check_target(&mut w).unwrap();
     }
+}
+
+#[test]
+fn backup_refuses_other_disk() {
+    let a = tmp("a.raw");
+    build_gpt(&a, 512, 8192, 2048, 6143);
+    let bk = tmp("t.dhbk");
+    {
+        let mut d = open(&a, false, 512);
+        repair::save_backup(&mut d, &[(0, 34)], bk.to_str().unwrap()).unwrap();
+    }
+    let backup = repair::load_backup(bk.to_str().unwrap()).unwrap();
+    assert!(backup.identity.is_some(), "GPT GUID stored");
+    backup.check_target(&mut open(&a, false, 512)).unwrap();
+    // Different size.
+    let b = tmp("b.raw");
+    build_gpt(&b, 512, 16384, 2048, 6143);
+    assert_eq!(backup.check_target(&mut open(&b, false, 512)).unwrap_err().code, "disk_mismatch");
+    // Same size, different GPT disk GUID.
+    let c = tmp("c.raw");
+    let mut img = build_gpt(&c, 512, 8192, 2048, 6143);
+    img[512 + 56] ^= 0xFF;
+    fs::write(&c, &img).unwrap();
+    assert_eq!(backup.check_target(&mut open(&c, false, 512)).unwrap_err().code, "disk_mismatch");
+    // v1 files (no identity) still load.
+    let mut raw = fs::read(&bk).unwrap();
+    raw[..8].copy_from_slice(b"DHDKBK01");
+    raw.drain(24..44);
+    let v1 = tmp("v1.dhbk");
+    fs::write(&v1, &raw).unwrap();
+    let old = repair::load_backup(v1.to_str().unwrap()).unwrap();
+    assert!(old.identity.is_none());
+    assert_eq!(old.writes.len(), 1);
+    old.check_target(&mut open(&c, false, 512)).unwrap();
 }
 
 #[test]
@@ -346,4 +383,17 @@ fn surface_test_maps_whole_image() {
     assert_eq!(v["bad"], 0);
     assert_eq!(v["complete"], true);
     assert_eq!(v["map"].as_str().unwrap().len(), 10);
+}
+
+#[cfg(windows)]
+#[test]
+fn disks_of_path_resolves_local_and_refuses_unknown() {
+    // Read-only queries: a local temp folder (and a not-yet-created child) maps to at least one disk.
+    let t = std::env::temp_dir();
+    let d = crate::win::disks_of_path(t.to_str().unwrap());
+    assert!(d.as_ref().is_some_and(|v| !v.is_empty()), "temp dir: {d:?}");
+    let child = t.join("dh_not_created_yet").join("out");
+    assert_eq!(crate::win::disks_of_path(child.to_str().unwrap()), d);
+    // A network path that cannot be resolved is undeterminable (callers refuse).
+    assert_eq!(crate::win::disks_of_path(r"\\dh-no-such-host\share\out"), None);
 }

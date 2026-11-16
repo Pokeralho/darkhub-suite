@@ -25,7 +25,7 @@ import {
 } from './vaultCrypto.js'
 import { registerNetworkIPC } from './networkIPC.js'
 import { registerOptiScalerIPC } from './optiscalerManager.js'
-import { registerDlss5IPC } from './services/dlss5/Dlss5Service.js'
+import Dlss5Service, { registerDlss5IPC } from './services/dlss5/Dlss5Service.js'
 import { registerDownloadsIPC } from './services/downloads/registerDownloadsIPC.js'
 import { registerDarkOSIPC } from './ipc/darkosIpc.js'
 import { registerWinToolsIPC } from './ipc/winToolsIpc.js'
@@ -73,6 +73,7 @@ import { registerOverlayIPC } from './ipc/overlayIpc.js'
 import { registerUsbIPC } from './ipc/usbIpc.js'
 import { registerRestoreIPC } from './ipc/restoreIpc.js'
 import { registerShareIPC } from './ipc/shareIpc.js'
+import { registerSshIPC } from './ipc/sshIpc.js'
 import { registerConverterIPC } from './ipc/converterIpc.js'
 import { registerKakuganIPC } from './ipc/kakuganIpc.js'
 import { registerHubIPC } from './ipc/hubIpc.js'
@@ -184,7 +185,7 @@ async function getExiftool() {
 async function getFfmpegPath() {
   if (ffmpegStaticPromise) return ffmpegStaticPromise
   ffmpegStaticPromise = (async () => {
-    const { platformBinaryName, fileExists, findOnPath } = await import('./services/binResolver.js')
+    const { fileExists } = await import('./services/binResolver.js')
     try {
       const toolsDir = path.join(app.getPath ? app.getPath('userData') : '', 'tools')
       const { ensureFfmpeg } = await getYtDlpTools()
@@ -194,15 +195,7 @@ async function getFfmpegPath() {
       }
     } catch {}
 
-    const localBin = path.join(app.getPath ? app.getPath('userData') : '', 'tools', platformBinaryName('ffmpeg'))
-    if (fileExists(localBin)) return localBin
-
-    try {
-      const mod = await import('ffmpeg-static')
-      const p = mod.default ?? mod
-      if (fileExists(p)) return p
-    } catch {}
-
+    const { findOnPath } = await import('./services/binResolver.js')
     return await findOnPath('ffmpeg')
   })()
   return ffmpegStaticPromise
@@ -247,6 +240,7 @@ safeRegister('usb', () => registerUsbIPC({ ipcMain, logger: Logger }))
 safeRegister('restore', () => registerRestoreIPC({ ipcMain, logger: Logger }))
 safeRegister('upscale', () => registerUpscaleIPC({ app, ipcMain, BrowserWindow, logger: Logger }))
 safeRegister('share', () => registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotkeys, BrowserWindow, Notification, logger: Logger }))
+safeRegister('ssh', () => registerSshIPC({ app, ipcMain, BrowserWindow, safeStorage, shell, logger: Logger }))
 hubIpc = safeRegister('hub', () => registerHubIPC({ app, ipcMain, dialog, BrowserWindow, logger: Logger, getMainWindow: () => mainWindow, showMainWindow: () => showMainWindow() }))
 safeRegister('kakugan', () => registerKakuganIPC({
   app, ipcMain, shell, safeStorage, Notification, logger: Logger,
@@ -807,9 +801,10 @@ async function measureLatency(host = '1.1.1.1', timeoutMs = 900) {
 
 async function getActiveAdapterName() {
   if (process.platform !== 'win32') return ''
+  const { PS_SELECT_PRIMARY_ADAPTER } = await import('./services/optimizer/activeAdapterPs.js')
   const ps = `
     $ErrorActionPreference='Stop'
-    $a = Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | Sort-Object -Property LinkSpeed -Descending | Select-Object -First 1
+    ${PS_SELECT_PRIMARY_ADAPTER}
     if ($null -eq $a) { '' } else { $a.Name }
   `
   const { code, stdout } = await runPowerShell(ps, { timeoutMs: 15000 })
@@ -880,11 +875,19 @@ ipcMain.handle('system:getInfo', async () => {
 })
 
 ipcMain.handle('system:getDeepHardwareInfo', async (_, forceRefresh) => {
-  return await DeepHardwareService.getDeepInfo(forceRefresh);
+  try {
+    return await DeepHardwareService.getDeepInfo(forceRefresh);
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err) };
+  }
 })
 
 ipcMain.handle('system:getDeepCategory', async (_, category, forceRefresh) => {
-  return await DeepHardwareService.getCategory(category, forceRefresh);
+  try {
+    return await DeepHardwareService.getCategory(category, forceRefresh);
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err) };
+  }
 })
 
 const PROCS_FLAG = path.join(os.tmpdir(), 'darkhub_procs_enabled.flag');
@@ -1351,6 +1354,16 @@ ipcMain.handle('library:discover', async () => {
           path.join(home, '.local', 'share', 'Steam', 'steamapps', 'libraryfolders.vdf'),
           path.join(home, '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam', 'steamapps', 'libraryfolders.vdf'),
         ];
+    // Steam installed anywhere else (D:\Steam, ...): the registry SteamPath and its libraryfolders.vdf
+    if (process.platform === 'win32') {
+      try {
+        const steamSvc = new Dlss5Service(app);
+        const steamRoot = steamSvc.getSteamPath();
+        if (steamRoot) {
+          for (const lib of steamSvc.getLibraryPaths(steamRoot)) steamPaths.push(path.join(lib, 'steamapps', 'common'));
+        }
+      } catch {}
+    }
     for (const vdf of vdfPaths) {
       try {
         const content = await fs.readFile(vdf, 'utf8');
@@ -1388,8 +1401,12 @@ ipcMain.handle('library:discover', async () => {
       for (const manifest of manifests) {
         try {
           const data = JSON.parse(await fs.readFile(path.join(epicManifestDir, manifest), 'utf8'));
-          if (data.InstallLocation && data.LaunchExecutable) {
-            discovered.push({ platform: 'Epic Games', name: data.DisplayName || data.AppName, exePath: path.join(data.InstallLocation, data.LaunchExecutable), workingDir: data.InstallLocation });
+          // a download in progress (or an uninstalled game whose manifest stayed) has no playable exe
+          if (data.InstallLocation && data.LaunchExecutable && data.bIsIncompleteInstall !== true) {
+            const exePath = path.join(data.InstallLocation, data.LaunchExecutable);
+            if (fsRaw.existsSync(exePath)) {
+              discovered.push({ platform: 'Epic Games', name: data.DisplayName || data.AppName, exePath, workingDir: data.InstallLocation });
+            }
           }
         } catch {}
       }
@@ -1414,22 +1431,23 @@ ipcMain.handle('library:discover', async () => {
     } catch {}
 
     // ── 4. Xbox / Microsoft Store ─────────────────────────────────────────────
+    // The Xbox app installs PC Game Pass games to <drive>:\XboxGames\<Game>\Content (WindowsApps is ACL-locked and
+    // holds apps, not games). Every game there is a game, Microsoft's own included (Halo, Forza, Flight Simulator).
     try {
-      const xboxDir = path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'WindowsApps');
-      const entries = await fs.readdir(xboxDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        try {
-          const gameDir = path.join(xboxDir, entry.name);
-          const lowerName = entry.name.toLowerCase();
-          const ignoredPrefixes = ['microsoft', 'windows', 'msteams', 'whatsapp', 'python', 'intel', 'nvidia', 'realtek', 'dolby', 'disney', 'spotify', 'netflix', 'appup', 'hewlettpackard', 'lenovo', 'dell'];
-          if (!ignoredPrefixes.some(p => lowerName.startsWith(p))) {
-            const bestExe = await scanDirectoryForBestExe(gameDir);
+      for (const letter of 'CDEFGHIJKLMNOPQRSTUVWXYZ') {
+        const xboxDir = `${letter}:\\XboxGames`;
+        let entries;
+        try { entries = await fs.readdir(xboxDir, { withFileTypes: true }); } catch { continue; }
+        for (const entry of entries) {
+          if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+          try {
+            const contentDir = path.join(xboxDir, entry.name, 'Content');
+            const bestExe = await scanDirectoryForBestExe(contentDir);
             if (bestExe) {
-              discovered.push({ platform: 'Xbox', name: entry.name.split('_')[0], exePath: bestExe, workingDir: path.dirname(bestExe) });
+              discovered.push({ platform: 'Xbox', name: entry.name, exePath: bestExe, workingDir: path.dirname(bestExe) });
             }
-          }
-        } catch {}
+          } catch {}
+        }
       }
     } catch {}
   } else {
@@ -1606,6 +1624,41 @@ ipcMain.handle('app:getCapabilities', async () => getCapabilities())
 
 const STARTUP_TASK_NAME = 'DarkHub Suite Autostart'
 
+// Settings > background services > "overlay": the Frame Pacer overlay hotkey (Ctrl+Shift+F while it runs) and the
+// metrics pushed to the window. Switchable at runtime.
+const FP_HOTKEY = 'CommandOrControl+Shift+F'
+let framePacerLiveOn = false
+let framePacerLiveWired = false
+function setFramePacerLive(on) {
+  framePacerLiveOn = Boolean(on)
+  if (framePacerLiveOn && !framePacerLiveWired) {
+    framePacerLiveWired = true
+    // Ctrl+Shift+F is a common shortcut (search in editors and browsers): it belongs to DarkHub only while the
+    // Frame Pacer runs, the only time its overlay is useful
+    FramePacerEngine.on('status', ({ isRunning }) => {
+      try {
+        const want = framePacerLiveOn && isRunning
+        if (want && !globalShortcut.isRegistered(FP_HOTKEY)) globalShortcut.register(FP_HOTKEY, () => toggleFramePacerOverlay())
+        else if (!want && globalShortcut.isRegistered(FP_HOTKEY)) globalShortcut.unregister(FP_HOTKEY)
+      } catch (e) {
+        log.warn('[framepacer] hotkey:', e?.message ?? e)
+      }
+    })
+    FramePacerEngine.on('metrics', (metrics) => {
+      if (framePacerLiveOn && mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('framepacer:metrics', metrics)
+      }
+    })
+  }
+  try {
+    const want = framePacerLiveOn && FramePacerEngine.isRunning
+    if (want && !globalShortcut.isRegistered(FP_HOTKEY)) globalShortcut.register(FP_HOTKEY, () => toggleFramePacerOverlay())
+    else if (!want && globalShortcut.isRegistered(FP_HOTKEY)) globalShortcut.unregister(FP_HOTKEY)
+  } catch (e) {
+    log.warn('[framepacer] hotkey:', e?.message ?? e)
+  }
+}
+
 async function isStartupTaskEnabled() {
   if (process.platform !== 'win32') return false
   try {
@@ -1617,12 +1670,15 @@ async function isStartupTaskEnabled() {
 }
 
 async function setStartupTask(enabled, hidden) {
-  if (process.platform !== 'win32') return false
+  if (process.platform !== 'win32') {
+    throw new Error('Inicialização automática via tarefa agendada é suportada apenas no Windows.')
+  }
   if (!enabled) {
     await runCommand('schtasks.exe', ['/Delete', '/TN', STARTUP_TASK_NAME, '/F'], { timeoutMs: 8000 }).catch(() => {})
     return true
   }
-  const exe = process.execPath
+  // portable builds run from a temp extraction folder: register the portable .exe itself, not that copy
+  const exe = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath
   const command = `"${exe}"${hidden ? ' --hidden' : ''}`
   const r = await runCommand('schtasks.exe', [
     '/Create', '/TN', STARTUP_TASK_NAME, '/TR', command,
@@ -1666,6 +1722,7 @@ ipcMain.handle('settings:updateLiveServices', async (_event, payload) => {
       if (typeof payload?.[key] === 'boolean') patch[key] = payload[key]
     }
 
+    const was = { latencyGuardian: true, overlay: true, autoClicker: true, ...(current.liveServices ?? {}) }
     const next = await saveConfig({
       ...current,
       liveServices: {
@@ -1674,7 +1731,19 @@ ipcMain.handle('settings:updateLiveServices', async (_event, payload) => {
       }
     })
     await loadRuntimeConfig()
-    return { ok: true, liveServices: next.liveServices }
+    // apply what can be switched live; the latency guardian registers IPC handlers at startup, so it needs a restart
+    let restartRequired = false
+    if (typeof patch.overlay === 'boolean') setFramePacerLive(patch.overlay)
+    if (typeof patch.autoClicker === 'boolean' && patch.autoClicker !== (was.autoClicker !== false)) {
+      try {
+        if (patch.autoClicker) { autoClicker.load(); autoClicker.arm() }
+        else if (!autoClicker.running) autoClicker.dispose()
+      } catch (err) {
+        log.warn('[settings] autoclicker toggle failed:', err?.message ?? String(err))
+      }
+    }
+    if (typeof patch.latencyGuardian === 'boolean' && patch.latencyGuardian !== (was.latencyGuardian !== false)) restartRequired = true
+    return { ok: true, liveServices: next.liveServices, restartRequired }
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) }
   }
@@ -1701,6 +1770,9 @@ ipcMain.handle('settings:updateWindowBehavior', async (_event, payload) => {
 
 ipcMain.handle('settings:updateStartupBehavior', async (_event, payload) => {
   try {
+    if (process.platform !== 'win32') {
+      return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Inicialização automática via tarefa agendada é suportada apenas no Windows.' }
+    }
     const openAtLogin = Boolean(payload?.openAtLogin)
     const openAsHidden = Boolean(payload?.openAsHidden ?? true)
     await setStartupTask(openAtLogin, openAsHidden)
@@ -1745,7 +1817,7 @@ ipcMain.handle('system:getMemory', () => {
 })
 
 ipcMain.handle('system:getLiveStats', async () => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Disponível apenas no Windows.' }
+  if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Estatísticas ao vivo (processos/serviços Windows) indisponíveis nesta plataforma.' }
   try {
     if (!liveCounts) await refreshLiveCounts()
     else if (Date.now() - liveCountsAt > 30000) void refreshLiveCounts()
@@ -1771,6 +1843,9 @@ ipcMain.handle('system:getLiveStats', async () => {
 
 ipcMain.handle('injector:inject', async (_event, payload) => {
   try {
+    if (process.platform !== 'win32') {
+      return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Injeção de DLL é suportada apenas no Windows.' }
+    }
     const { processName, dllPath } = payload;
     if (!processName || !dllPath) return { ok: false, error: 'Processo ou DLL invalidos' };
     if (typeof processName !== 'string' || typeof dllPath !== 'string') {
@@ -1805,6 +1880,8 @@ ipcMain.handle('injector:inject', async (_event, payload) => {
 // ============================================================
 // FRAMEPACER IPC HANDLERS
 // ============================================================
+const framePacerUnsupported = (extra = {}) => ({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Frame pacing/limiter nativo é suportado apenas no Windows.', ...extra })
+
 ipcMain.handle('framepacer:start', async (_event, payload) => {
   return FramePacerEngine.start(payload)
 })
@@ -1822,28 +1899,34 @@ ipcMain.handle('framepacer:getMetrics', async () => {
 })
 
 ipcMain.handle('framepacer:createOverlay', async () => {
+  if (process.platform !== 'win32') return framePacerUnsupported({ isOpen: false })
   createFramePacerOverlay()
   return { ok: true }
 })
 
 ipcMain.handle('framepacer:closeOverlay', async () => {
+  if (process.platform !== 'win32') return framePacerUnsupported({ isOpen: false })
   closeFramePacerOverlay()
   return { ok: true }
 })
 
 ipcMain.handle('framepacer:toggleOverlay', async () => {
+  if (process.platform !== 'win32') return framePacerUnsupported({ isOpen: false })
   return toggleFramePacerOverlay()
 })
 
 ipcMain.handle('framepacer:setOverlayClickThrough', async (_event, enabled) => {
+  if (process.platform !== 'win32') return framePacerUnsupported({ clickThrough: false })
   return setOverlayClickThrough(enabled)
 })
 
 ipcMain.handle('framepacer:setOverlayConfig', async (_event, config) => {
+  if (process.platform !== 'win32') return framePacerUnsupported()
   return setOverlayConfig(config)
 })
 
 ipcMain.handle('framepacer:getOverlayStatus', async () => {
+  if (process.platform !== 'win32') return { ok: true, unsupported: true, platform: process.platform, isOpen: false, clickThrough: false, config: null }
   return getOverlayStatus()
 })
 
@@ -2068,7 +2151,11 @@ ipcMain.handle('optimizer:runRoutine', async (_event, routineId) => {
         case 'defender-disable': res = await DefenderControlEngine.runNativeDefenderControl('disable'); break;
         case 'defender-enable': res = await DefenderControlEngine.runNativeDefenderControl('enable'); break;
         case 'defender-restore-image': res = await DefenderControlEngine.restoreImageDefender(); break;
-        case 'open-tamper-settings': res = DefenderControlEngine.openTamperSettings(); break;
+        case 'open-tamper-settings':
+          res = process.platform !== 'win32'
+            ? { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Configurações do Microsoft Defender são suportadas apenas no Windows.' }
+            : DefenderControlEngine.openTamperSettings();
+          break;
         case 'dns-benchmark': res = { ok: true, msg: 'Use a aba DNS' }; break;
         default: throw new Error(`Unknown routine: ${routineId}`);
       }
@@ -2099,6 +2186,7 @@ ipcMain.handle('optimizer:restoreImageDefender', async () => {
   return await DefenderControlEngine.restoreImageDefender();
 });
 ipcMain.handle('optimizer:openTamperSettings', async () => {
+  if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Configurações do Microsoft Defender são suportadas apenas no Windows.' };
   return DefenderControlEngine.openTamperSettings();
 });
 ipcMain.handle('optimizer:applyMsiMode', async () => {
@@ -2368,8 +2456,9 @@ ipcMain.handle('youtube:download', async (event, payload) => {
     args.push(...extraArgs)
     args.push('--', String(url))
 
-    const { code, stderr } = await runYtDlp(ytdlpPath, args, {
+    const { code, stderr, canceled } = await runYtDlp(ytdlpPath, args, {
       timeoutMs: 60 * 60 * 1000,
+      track: true,
       onProgress: (prog) => {
         try {
           if (!event.sender.isDestroyed()) {
@@ -2379,6 +2468,7 @@ ipcMain.handle('youtube:download', async (event, payload) => {
       }
     })
 
+    if (canceled) return { ok: false, canceled: true }
     if (code !== 0) throw new Error(stderr || 'Download via yt-dlp falhou.')
     return { ok: true, msg: isPlaylistMode ? 'Playlist baixada e convertida com sucesso!' : 'Download concluído com sucesso.' }
   } catch (err) {
@@ -2501,16 +2591,46 @@ async function readVaultFile() {
 async function writeVaultFile(obj) {
   const content = JSON.stringify(obj)
   const target = vaultFilePath()
-  const tmp = `${target}.${process.pid}.tmp`
-  await fs.writeFile(tmp, content, 'utf8')
-  await fs.rename(tmp, target)
+  // random suffix: two writers never share a temp file
+  const tmp = `${target}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`
+  try {
+    await fs.writeFile(tmp, content, 'utf8')
+    await fs.rename(tmp, target)
+  } catch (err) {
+    await fs.rm(tmp, { force: true }).catch(() => {})
+    throw err
+  }
 }
+
+// Every read-modify-write of vault.dhv runs through this queue so concurrent saves cannot interleave.
+let vaultWriteChain = Promise.resolve()
+function withVaultWriteLock(fn) {
+  const run = vaultWriteChain.then(fn, fn)
+  vaultWriteChain = run.catch(() => {})
+  return run
+}
+
+// 'master' | 'recovery' | null: a recovery-word unlock may set a new master password without the old one.
+let vaultUnlockedVia = null
+// Bumped whenever the data key is replaced, so queued writes never use a stale key.
+let vaultKeyGen = 0
 
 function lockVault() {
   vaultUnlocked = false
   vaultKey = null
   vaultData = null
+  vaultUnlockedVia = null
   clearVaultAutoLock()
+}
+
+/** Removes vault.dhv.bak-* copies: they hold the previous key wrapped with the previous password. */
+async function removeVaultBackups() {
+  const dir = path.dirname(vaultFilePath())
+  const prefix = `${path.basename(vaultFilePath())}.bak-`
+  const names = await fs.readdir(dir).catch(() => [])
+  for (const n of names) {
+    if (n.startsWith(prefix)) await fs.rm(path.join(dir, n), { force: true }).catch(() => {})
+  }
 }
 
 async function ensureUnlocked() {
@@ -2528,34 +2648,40 @@ async function loadVaultUsingWrapper(wrapper, password) {
   const data = decryptVaultData(vk, file?.data)
   // Hardening: re-wrap with the current scrypt parameters when this wrapper is weaker (old file backed up first).
   try {
-    await upgradeWrapperIfWeak({ vaultPath: vaultFilePath(), wrapperName: wrapper, secret: password, vaultKey: vk, readFile: readVaultFile, writeFile: writeVaultFile })
+    await withVaultWriteLock(() => upgradeWrapperIfWeak({ vaultPath: vaultFilePath(), wrapperName: wrapper, secret: password, vaultKey: vk, readFile: readVaultFile, writeFile: writeVaultFile }))
   } catch (err) {
     log.warn(`[vault] KDF upgrade skipped: ${err?.message || err}`)
   }
   vaultUnlocked = true
   vaultKey = vk
   vaultData = data
+  vaultUnlockedVia = wrapper
   scheduleVaultAutoLock()
   return { file, data }
 }
 
 async function persistVaultData() {
   await ensureUnlocked()
-  const file = await readVaultFile()
-  const next = {
-    ...file,
-    data: encryptVaultData(vaultKey, {
-      ...vaultData,
-      updatedAt: Date.now()
-    })
-  }
-  await writeVaultFile(next)
-  vaultData = decryptVaultData(vaultKey, next.data)
+  // Captured before any await: an auto-lock in the middle must not null the key under us.
+  let key = vaultKey
+  const gen = vaultKeyGen
+  const data = vaultData
+  data.updatedAt = Date.now()
+  await withVaultWriteLock(async () => {
+    // The data key may have been rotated (master password change) while this write waited:
+    // the file now needs the new key, never the captured old one.
+    if (vaultKeyGen !== gen) {
+      if (!vaultKey) throw new Error('Vault is locked')
+      key = vaultKey
+    }
+    const file = await readVaultFile()
+    await writeVaultFile({ ...file, data: encryptVaultData(key, data) })
+  })
 }
 
 ipcMain.handle('vault:status', async () => {
   const initialized = await vaultFileExists()
-  return { initialized, locked: !vaultUnlocked, autoLockMinutes: vaultAutoLockMinutes }
+  return { initialized, locked: !vaultUnlocked, autoLockMinutes: vaultAutoLockMinutes, unlockedVia: vaultUnlocked ? vaultUnlockedVia : null }
 })
 
 ipcMain.handle('vault:setAutoLockMinutes', async (_event, minutes) => {
@@ -2592,10 +2718,11 @@ ipcMain.handle('vault:init', async (_event, payload) => {
     data: encryptVaultData(newVaultKey, base)
   }
 
-  await writeVaultFile(file)
+  await withVaultWriteLock(() => writeVaultFile(file))
   lockVault()
 
-  return { ok: true, recoveryWords, recoveryPassword }
+  // The words are the recovery secret; the derived wrapper password is internal and opens nothing by itself.
+  return { ok: true, recoveryWords }
 })
 
 ipcMain.handle('vault:unlock', async (_event, payload) => {
@@ -2615,7 +2742,8 @@ ipcMain.handle('vault:unlockWithRecoveryWords', async (_event, payload) => {
   if (typeof words !== 'string' || words.trim().length === 0) return { ok: false, error: 'Invalid recovery words' }
   if (!(await vaultFileExists())) return { ok: false, error: 'Vault not initialized' }
   try {
-    const recoveryPassword = derivePasswordFromRecoveryWords(words)
+    // Generated words are lowercase: accept any case and stray spaces.
+    const recoveryPassword = derivePasswordFromRecoveryWords(words.trim().toLowerCase())
     await loadVaultUsingWrapper('recovery', recoveryPassword)
     return { ok: true }
   } catch (err) {
@@ -2724,43 +2852,60 @@ ipcMain.handle('vault:changeMasterPassword', async (_event, payload) => {
   const newPassword = payload?.newMasterPassword
   const currentPassword = payload?.currentMasterPassword
   if (typeof newPassword !== 'string' || newPassword.length < 8) return { ok: false, error: 'Invalid master password' }
-  if (typeof currentPassword !== 'string' || !currentPassword) return { ok: false, error: 'Current master password required' }
+  // A session opened with the recovery words is how a forgotten master password gets replaced.
+  const viaRecovery = vaultUnlockedVia === 'recovery'
+  if (!viaRecovery && (typeof currentPassword !== 'string' || !currentPassword)) return { ok: false, error: 'Current master password required' }
 
-  const file = await readVaultFile()
-  try {
-    await unwrapVaultKeyWithPassword(file?.wrappers?.master, currentPassword)
-  } catch {
-    return { ok: false, error: 'Current master password is incorrect' }
-  }
-  const masterWrapper = await wrapVaultKeyWithPassword(vaultKey, newPassword, buildKdf())
-  const next = {
-    ...file,
-    wrappers: {
-      ...(file.wrappers ?? {}),
-      master: masterWrapper
+  return withVaultWriteLock(async () => {
+    const file = await readVaultFile()
+    if (!viaRecovery) {
+      try {
+        await unwrapVaultKeyWithPassword(file?.wrappers?.master, currentPassword)
+      } catch {
+        return { ok: false, error: 'Current master password is incorrect' }
+      }
     }
-  }
-  await writeVaultFile(next)
-  touchVault()
-  return { ok: true }
+    if (!vaultUnlocked || !vaultData) return { ok: false, error: 'Vault is locked' }
+    const data = vaultData // captured: an auto-lock during the KDF work below nulls the global
+    // Fresh data key: the old password (and any old copy of the file) must not open the new data.
+    // The recovery wrapper is rebuilt too, so new recovery words are issued.
+    const newKey = crypto.randomBytes(32)
+    const recoveryWords = generateRecoveryWords(undefined, 16)
+    const recoveryPassword = derivePasswordFromRecoveryWords(recoveryWords.join(' '))
+    const masterWrapper = await wrapVaultKeyWithPassword(newKey, newPassword, buildKdf())
+    const recoveryWrapper = await wrapVaultKeyWithPassword(newKey, recoveryPassword, buildKdf())
+    const next = {
+      ...file,
+      wrappers: { master: masterWrapper, recovery: recoveryWrapper },
+      data: encryptVaultData(newKey, { ...data, updatedAt: Date.now() })
+    }
+    await writeVaultFile(next)
+    vaultKeyGen += 1
+    if (vaultUnlocked) {
+      vaultKey = newKey
+      vaultUnlockedVia = 'master'
+    }
+    // Backups hold the old key wrapped with the old password: drop them once the new file is on disk.
+    await removeVaultBackups()
+    touchVault()
+    return { ok: true, recoveryWords }
+  })
 })
 
 ipcMain.handle('vault:regenerateRecoveryWords', async () => {
   await ensureUnlocked()
-  const file = await readVaultFile()
+  const key = vaultKey
+  const gen = vaultKeyGen
   const recoveryWords = generateRecoveryWords(undefined, 16)
   const recoveryPassword = derivePasswordFromRecoveryWords(recoveryWords.join(' '))
-  const recoveryWrapper = await wrapVaultKeyWithPassword(vaultKey, recoveryPassword, buildKdf())
-  const next = {
-    ...file,
-    wrappers: {
-      ...(file.wrappers ?? {}),
-      recovery: recoveryWrapper
-    }
-  }
-  await writeVaultFile(next)
-  touchVault()
-  return { ok: true, recoveryWords, recoveryPassword }
+  const recoveryWrapper = await wrapVaultKeyWithPassword(key, recoveryPassword, buildKdf())
+  return withVaultWriteLock(async () => {
+    if (vaultKeyGen !== gen) return { ok: false, error: 'Vault key changed, try again' }
+    const file = await readVaultFile()
+    await writeVaultFile({ ...file, wrappers: { ...(file.wrappers ?? {}), recovery: recoveryWrapper } })
+    touchVault()
+    return { ok: true, recoveryWords }
+  })
 })
 
 ipcMain.handle('vault:export', async (_event, payload) => {
@@ -2785,9 +2930,12 @@ ipcMain.handle('vault:import', async (_event, payload) => {
     return { ok: false, error: 'Invalid vault file' }
   }
   // Never overwrite the current vault without a copy of it.
-  if (await vaultFileExists()) await backupVaultFile(vaultFilePath(), 'pre-import')
-  await fs.copyFile(sourcePath, vaultFilePath())
-  lockVault()
+  await withVaultWriteLock(async () => {
+    if (await vaultFileExists()) await backupVaultFile(vaultFilePath(), 'pre-import')
+    await fs.copyFile(sourcePath, vaultFilePath())
+    lockVault()
+    vaultKeyGen += 1 // a different vault file: queued saves of the old one must not land on it
+  })
   return { ok: true }
 })
 
@@ -2840,9 +2988,12 @@ ipcMain.handle('vault:transferReceive', async (_event, payload) => {
     const candidate = JSON.parse(bytes.toString('utf8'))
     if (candidate?.version !== VAULT_VERSION || !candidate?.wrappers?.master || !candidate?.data) return { ok: false, error: 'Invalid vault file' }
     // Never overwrite the current vault without a copy of it.
-    if (await vaultFileExists()) await backupVaultFile(vaultFilePath(), 'pre-transfer')
-    await fs.writeFile(vaultFilePath(), bytes)
-    lockVault()
+    await withVaultWriteLock(async () => {
+      if (await vaultFileExists()) await backupVaultFile(vaultFilePath(), 'pre-transfer')
+      await fs.writeFile(vaultFilePath(), bytes)
+      lockVault()
+      vaultKeyGen += 1 // a different vault file: queued saves of the old one must not land on it
+    })
     return { ok: true }
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) }
@@ -3242,20 +3393,29 @@ ipcMain.handle('fs:readFile', async (_event, filePath) => {
     if (!hasFileAccessGrant(filePath)) {
       return { ok: false, error: 'File access was not granted through the file dialog' }
     }
-    const content = await fs.readFile(filePath, 'utf-8')
-    return { ok: true, content }
+    const { readTextFile } = await import('./services/textFile.js')
+    const r = await readTextFile(filePath)
+    if (!r.ok) {
+      const error = r.code === 'not-text'
+        ? 'This is not a text file (binary content).'
+        : 'Unsupported text encoding: only UTF-8 and UTF-16 LE files can be edited without corrupting them.'
+      return { ok: false, code: r.code, error }
+    }
+    return { ok: true, content: r.content, encoding: r.encoding, bom: r.bom }
   } catch (err) {
     return { ok: false, error: err.message }
   }
 })
 
 ipcMain.handle('fs:writeFile', async (_event, payload) => {
-  const { filePath, content } = payload
+  const { filePath, content, encoding, bom } = payload ?? {}
   try {
     if (!hasFileAccessGrant(filePath)) {
       return { ok: false, error: 'File access was not granted through the file dialog' }
     }
-    await fs.writeFile(filePath, content, 'utf-8')
+    if (typeof content !== 'string') return { ok: false, error: 'Invalid content' }
+    const { writeTextFile } = await import('./services/textFile.js')
+    await writeTextFile(filePath, content, { encoding, bom }) // same encoding/BOM it was read with; temp file + rename
     return { ok: true }
   } catch (err) {
     return { ok: false, error: err.message }
@@ -3314,7 +3474,7 @@ ipcMain.handle('metadata:read', async (_event, imagePath) => {
     const output = await exiftool.read(imagePath)
     return { ok: true, metadata: output || {} }
   } catch (err) {
-    return { ok: false, error: err.message }
+    return { ok: false, error: err?.message ?? String(err), unavailable: /not found|enoent|spawn|exiftool/i.test(String(err?.message ?? err)) || undefined }
   }
 })
 
@@ -3330,11 +3490,12 @@ ipcMain.handle('metadata:remove', async (_event, payload) => {
       return { ok: true, path: outputPath }
     } catch {
       const sharp = await getSharp()
-      await sharp(inputPath).withMetadata(false).toFile(outputPath)
+      // sharp drops EXIF/XMP/IPTC by default; withMetadata(...) (even with false) would keep it
+      await sharp(inputPath).toFile(outputPath)
       return { ok: true, path: outputPath }
     }
   } catch (err) {
-    return { ok: false, error: err.message }
+    return { ok: false, error: err?.message ?? String(err) }
   }
 })
 
@@ -3575,7 +3736,7 @@ app.whenReady().then(async () => {
       log.warn('[startup-bg] app config failed:', err?.message ?? String(err))
     }
 
-    if (liveServices.autoClicker !== false) {
+    if (liveServices.autoClicker !== false && process.platform === 'win32') {
       try {
         autoClicker.load()
         autoClicker.arm()
@@ -3625,33 +3786,7 @@ app.whenReady().then(async () => {
       }
     }
 
-    if (process.platform === 'win32' && liveServices.overlay !== false) {
-
-      // Ctrl+Shift+F is a common shortcut (search in editors and browsers): it belongs to DarkHub only while the
-      // Frame Pacer runs, the only time its overlay is useful
-      const FP_HOTKEY = 'CommandOrControl+Shift+F'
-      FramePacerEngine.on('status', ({ isRunning }) => {
-        try {
-          if (isRunning && !globalShortcut.isRegistered(FP_HOTKEY)) globalShortcut.register(FP_HOTKEY, () => toggleFramePacerOverlay())
-          else if (!isRunning && globalShortcut.isRegistered(FP_HOTKEY)) globalShortcut.unregister(FP_HOTKEY)
-        } catch (e) {
-          log.warn('[framepacer] hotkey:', e?.message ?? e)
-        }
-      })
-
-      FramePacerEngine.on('metrics', (metrics) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('framepacer:metrics', metrics)
-        }
-      })
-    } else if (process.platform !== 'win32') {
-      // Frame pacer/overlay are Win32-specific today; keep status events harmless but avoid registering hotkeys.
-      FramePacerEngine.on('metrics', (metrics) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('framepacer:metrics', metrics)
-        }
-      })
-    }
+    setFramePacerLive(liveServices.overlay !== false)
 
   }
 

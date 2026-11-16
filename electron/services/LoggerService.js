@@ -7,6 +7,7 @@ const AUDIT_FIELD_MAX_CHARS = 4000;
 const AUDIT_MAX_BYTES = 10 * 1024 * 1024;
 const AUDIT_KEEP_LINES_ON_ROTATE = 5000;
 const LOG_MAX_BYTES = 5 * 1024 * 1024;
+const LOG_ROTATE_CHECK_EVERY = 500;
 
 // Masks credentials that may end up in messages (URLs with tokens, auth headers, key=value pairs).
 const SECRET_PATTERNS = [
@@ -111,7 +112,12 @@ class LoggerService {
     if (this.logs.length > this.maxLogs) this.logs.pop();
     
     if (this.logPath) {
-
+      // the app can run for weeks: check the size now and then, not only at startup
+      this._writesSinceRotate = (this._writesSinceRotate ?? 0) + 1;
+      if (this._writesSinceRotate >= LOG_ROTATE_CHECK_EVERY) {
+        this._writesSinceRotate = 0;
+        this._rotateLogIfNeeded();
+      }
       fs.appendFile(this.logPath, line + '\n', () => {});
     }
     

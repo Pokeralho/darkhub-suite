@@ -156,7 +156,7 @@ export class DiskRecoveryService {
     const args = ['--backup', this._backupPath(target, tag)];
     const n = diskNumberOf(target);
     if (n !== null) {
-      if (confirmDisk === undefined || confirmDisk === null || Number(confirmDisk) !== n) throw new Error(`Confirme digitando o número do disco (${n}).`);
+      if (!/^\d+$/.test(String(confirmDisk ?? '').trim()) || Number(confirmDisk) !== n) throw new Error(`Confirme digitando o número do disco (${n}).`);
       args.push('--confirm-disk', String(n));
     }
     return args;
@@ -221,7 +221,7 @@ export class DiskRecoveryService {
     if (!apply) return this.run([...args, '--dry-run']);
     const n = diskNumberOf(t);
     if (n !== null) {
-      if (Number(confirmDisk) !== n) throw new Error(`Confirme digitando o número do disco de destino (${n}).`);
+      if (!/^\d+$/.test(String(confirmDisk ?? '').trim()) || Number(confirmDisk) !== n) throw new Error(`Confirme digitando o número do disco de destino (${n}).`);
       args.push('--confirm-disk', String(n));
     }
     return this.stream('clone', args, onEvent);

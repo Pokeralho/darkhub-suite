@@ -23,8 +23,10 @@ const run = (cmd, args, timeout = 60000) => new Promise((resolve) => {
   execFile(cmd, args, { windowsHide: true, timeout, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => resolve({ code: err ? (typeof err.code === 'number' ? err.code : 1) : 0, stdout: String(stdout || ''), stderr: String(stderr || '') }))
 })
 const safeName = (s) => String(s).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/, '').slice(0, 100) || 'game'
-// manifest templates use "/"; turn the non-glob part into a template prefix we can resolve again at restore time
-const templatePrefix = (tpl) => staticPrefix(String(tpl).replace(/\//g, '\\'))
+// manifest templates use "/"; turn the non-glob part into a template prefix we can resolve again at restore time.
+// <storeUserId> resolves to "*" (any account), so it must end the prefix here too, exactly like in the resolved
+// pattern; otherwise the stored prefix keeps the placeholder and a restore resolves it to a path containing "*".
+export const templatePrefix = (tpl) => staticPrefix(String(tpl).replace(/<storeUserId>/g, '*').replace(/\//g, '\\'))
 
 export class SaveBackupService {
   constructor({ app, getInstalledGames, onEvent, now = Date.now }) {
@@ -211,7 +213,7 @@ export class SaveBackupService {
         bytes += list[i].size
       }
       const registry = []
-      for (let i = 0; i < regKeys.length; i++) {
+      if (process.platform === 'win32') for (let i = 0; i < regKeys.length; i++) {
         const out = path.join(vdir, `registry-${i}.reg`)
         const r = await run('reg.exe', ['export', regKeys[i], out, '/y'])
         if (r.code === 0) registry.push({ key: regKeys[i], file: path.basename(out) })
@@ -242,15 +244,16 @@ export class SaveBackupService {
     const targets = info.files.map((f) => {
       const base = resolveTemplate(f.prefixTemplate.replace(/\\/g, '/'), env)
       const dest = base ? path.join(base, f.rel) : null
-      // never write outside the save location the manifest names
-      const inside = dest && !path.relative(base, dest).startsWith('..') && !path.isAbsolute(path.relative(base, dest))
+      // never write outside the save location the manifest names, nor to a path that still holds a wildcard
+      // (old backups stored "<storeUserId>" in the prefix, which resolves to "*")
+      const inside = dest && !/[*?]/.test(dest) && !path.relative(base, dest).startsWith('..') && !path.isAbsolute(path.relative(base, dest))
       return { rel: f.rel, group: info.groups.indexOf(f.prefixTemplate), dest: inside ? dest : null, size: f.size, exists: Boolean(dest && fs.existsSync(dest)) }
     })
     return { ok: true, info: { ...info, files: undefined }, targets, vdir, installDir: m.game.installDir || null }
   }
 
   async _gameRunning(installDir) {
-    if (!installDir) return false
+    if (process.platform !== 'win32' || !installDir) return false
     const ps = `$d = ${psQuote(installDir)}; @(Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($d, [StringComparison]::OrdinalIgnoreCase) }).Count`
     const r = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], 20000)
     return Number(r.stdout.trim()) > 0
@@ -274,7 +277,7 @@ export class SaveBackupService {
         restored++
       }
       let registry = 0
-      for (const r of p.info.registry || []) {
+      if (process.platform === 'win32') for (const r of p.info.registry || []) {
         if (!/^HKEY_CURRENT_USER\\/i.test(r.key)) continue
         const res = await run('reg.exe', ['import', path.join(p.vdir, r.file)])
         if (res.code === 0) registry++

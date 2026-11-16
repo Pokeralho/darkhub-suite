@@ -162,7 +162,7 @@ const YoutubeDownloader = () => {
   };
 
   const handleSearch = async () => {
-    if (!url.trim()) return;
+    if (!url.trim() || isDownloading) return;
     setIsSearching(true);
     setInfo(null);
     setDownloadStatus(null);
@@ -190,10 +190,15 @@ const YoutubeDownloader = () => {
   const handleCancelDownload = async () => {
     if (!window.darkhub?.youtube?.cancel) return;
     try {
-      await window.darkhub.youtube.cancel();
+      const res = await window.darkhub.youtube.cancel();
+      if (!res?.stopped) {
+        // Nothing was killed (e.g. yt-dlp is still being prepared): keep the download state honest.
+        setDownloadStatus({ ok: false, msg: t('youtube.cancelNotRunning', 'Nada para parar ainda: o download ainda está sendo preparado.') });
+        return;
+      }
       setIsDownloading(false);
       setProgress(null);
-      setDownloadStatus({ ok: false, msg: 'Download cancelado pelo usuário.' });
+      setDownloadStatus({ ok: false, msg: t('youtube.cancelled', 'Download cancelado pelo usuário.') });
     } catch (err: any) {
       console.error('Failed to cancel download:', err);
     }
@@ -249,8 +254,11 @@ const YoutubeDownloader = () => {
             eta: '',
             line: t('youtube.finished', 'Download e conversão finalizados.')
           });
+        } else if (res?.canceled) {
+          setDownloadStatus({ ok: false, msg: t('youtube.cancelled', 'Download cancelado pelo usuário.') });
+          setProgress(null);
         } else {
-          setDownloadStatus({ ok: false, msg: res?.error ?? res?.msg ?? 'Download falhou.' });
+          setDownloadStatus({ ok: false, msg: res?.error ?? res?.msg ?? t('youtube.failed', 'Download falhou.') });
           setProgress(null);
         }
       } catch (err: any) {
@@ -328,7 +336,7 @@ const YoutubeDownloader = () => {
         </div>
         <button
           onClick={handleSearch}
-          disabled={isSearching || !url.trim()}
+          disabled={isSearching || isDownloading || !url.trim()}
           className={`dh-btn shrink-0 ${info ? '' : 'dh-btn-primary'}`}
         >
           {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}

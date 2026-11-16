@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { RescueCarveResult, RescueCarvedFile } from '../../global';
 import { FolderOpen, Loader2, Play } from '../icons';
 import { useI18n } from '../../i18n/I18nProvider';
-import { api, ErrorLine, fmtBytes, JobProgress, type ProgressEv } from './rescueUtils';
+import { api, ErrorLine, fmtBytes, JobProgress, rescueError, type ProgressEv } from './rescueUtils';
 
 const TYPES: { id: string; label: string }[] = [
   { id: 'jpg', label: 'JPEG' }, { id: 'png', label: 'PNG' }, { id: 'gif', label: 'GIF' }, { id: 'bmp', label: 'BMP' }, { id: 'heic', label: 'HEIC' },
@@ -27,6 +27,14 @@ export default function CarvingManager({ target, diskNumber }: { target: string;
     else if (e.event === 'found') setFound((f) => (f.length >= 2000 ? f : [...f, e.file]));
   }), []);
 
+  // Not remounted per disk (a running scan must keep its progress): clear the previous disk's results instead.
+  const runningRef = useRef(false);
+  runningRef.current = running;
+  useEffect(() => {
+    if (runningRef.current) return;
+    setResult(null); setFound([]); setError(null); setEv(null);
+  }, [target]);
+
   const pick = async () => {
     const r = await api()?.pickFolder();
     if (r?.ok && r.path) setOut(r.path);
@@ -36,7 +44,7 @@ export default function CarvingManager({ target, diskNumber }: { target: string;
     setRunning(true); setError(null); setResult(null); setFound([]); setEv(null);
     try {
       const r = await api()?.startCarve({ target, out, types });
-      if (r?.ok) setResult(r); else setError(r?.error || t('rescue.carve.fail', 'A varredura falhou.'));
+      if (r?.ok) setResult(r); else setError(rescueError(t, r, t('rescue.carve.fail', 'A varredura falhou.')));
     } finally { setRunning(false); }
   };
 

@@ -11,7 +11,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { execFile } from 'node:child_process'
-import { probeFile, hexDump, readFsInfo, setFsProps, removeStream, detectType } from './fileProbe.js'
+import { probeFile, hexDump, readFsInfo, setFsProps, removeStream, detectType, validStreamName } from './fileProbe.js'
 import { readTags, readBinaryTag, writeTagsTo, assignArg } from './exiftoolRunner.js'
 import { readOoxmlProps, writeOoxmlProps, readZipEntries, entryData, crc32 } from './ooxmlZip.js'
 
@@ -493,9 +493,15 @@ export function createMetadataService({ getExiftoolPath, getFfmpegPath, logger }
       }
 
       let finalPath = target, backupPath = null
-      let zone = null
       if (inPlace) {
-        try { zone = await fs.readFile(`${src}:Zone.Identifier`) } catch { /* none */ }
+        // The swap replaces the file: remember its NTFS streams (Zone.Identifier and any other) and its
+        // read-only / hidden / system attributes so they can be put back on the new file.
+        const before = process.platform === 'win32' ? await readFsInfo(src).catch(() => null) : null
+        const streams = []
+        for (const st of before?.streams ?? []) {
+          if (!validStreamName(st.name) || st.size > 64 * 1024 * 1024) continue
+          try { streams.push({ name: st.name, data: await fs.readFile(`${src}:${st.name}`) }) } catch { /* unreadable: skip */ }
+        }
         if (req.backup !== false) {
           backupPath = await uniqueBackupPath(src)
           await fs.rename(src, backupPath)
@@ -503,8 +509,13 @@ export function createMetadataService({ getExiftoolPath, getFfmpegPath, logger }
         } else {
           await fs.rename(tmp, src)
         }
-        // Keep the "downloaded from the internet" mark: replacing the file must not silently drop it.
-        if (zone && process.platform === 'win32') await fs.writeFile(`${src}:Zone.Identifier`, zone).catch(() => {})
+        for (const st of streams) {
+          await fs.writeFile(`${src}:${st.name}`, st.data).catch((e) => logger?.warn?.('Metadata', `stream ${st.name} not restored: ${e.message}`))
+        }
+        if (before && (before.readOnly || before.hidden || before.system)) {
+          await setFsProps(src, { readOnly: before.readOnly, hidden: before.hidden, system: before.system })
+            .catch((e) => logger?.warn?.('Metadata', `attributes not restored: ${e.message}`))
+        }
       } else {
         await fs.rename(tmp, target)
       }

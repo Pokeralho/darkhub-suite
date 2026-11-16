@@ -8,7 +8,8 @@ use std::io;
 use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::AsRawHandle;
 use windows_sys::Win32::Storage::FileSystem::{
-    FindFirstVolumeW, FindNextVolumeW, FindVolumeClose, GetVolumePathNamesForVolumeNameW,
+    FindFirstVolumeW, FindNextVolumeW, FindVolumeClose, GetVolumeNameForVolumeMountPointW, GetVolumePathNameW,
+    GetVolumePathNamesForVolumeNameW,
 };
 use windows_sys::Win32::System::Registry::{RegGetValueW, HKEY_LOCAL_MACHINE, RRF_RT_REG_SZ};
 use windows_sys::Win32::System::IO::DeviceIoControl;
@@ -267,15 +268,45 @@ pub fn list_drives() -> Value {
     json!({ "drives": drives, "system_disks": sys })
 }
 
-/// Disk number that holds a filesystem path (e.g. a carving output folder).
-pub fn disk_of_path(path: &str) -> Option<u32> {
-    let p = std::path::Path::new(path);
-    let root = p.components().next()?.as_os_str().to_string_lossy().trim_end_matches('\\').to_string();
-    if root.len() == 2 && root.ends_with(':') {
-        volume_extents(&format!(r"\\.\{root}")).first().map(|e| e.0)
-    } else {
-        None
+/// Physical disks that hold a filesystem path (e.g. a carving output folder or an image file).
+/// Handles drive letters, folder mount points, `\\?\` paths, junctions/symlinks and subst drives (the nearest
+/// existing ancestor is canonicalized, so links resolve to the real volume). `None` when it cannot be
+/// determined (network share, volume without disk extents): callers must refuse instead of guessing.
+pub fn disks_of_path(path: &str) -> Option<Vec<u32>> {
+    let mut p = std::path::Path::new(path);
+    let existing = loop {
+        if p.exists() {
+            break p;
+        }
+        p = p.parent()?;
+    };
+    let real = std::fs::canonicalize(existing).ok()?.to_string_lossy().to_string();
+    // Network paths (\\server\share, \\?\UNC\...) have no local disk extents: undeterminable.
+    if real.starts_with(r"\\?\UNC\") || (real.starts_with(r"\\") && !real.starts_with(r"\\?\")) {
+        return None;
     }
+    let w = wide(&real);
+    let mut mount = vec![0u16; 1024];
+    if unsafe { GetVolumePathNameW(w.as_ptr(), mount.as_mut_ptr(), mount.len() as u32) } == 0 {
+        return None;
+    }
+    let mut mount_s = from_wide(&mount);
+    if !mount_s.ends_with('\\') {
+        mount_s.push('\\');
+    }
+    let mw = wide(&mount_s);
+    let mut guid = vec![0u16; 64];
+    if unsafe { GetVolumeNameForVolumeMountPointW(mw.as_ptr(), guid.as_mut_ptr(), guid.len() as u32) } == 0 {
+        return None;
+    }
+    let vol = from_wide(&guid);
+    let mut disks: Vec<u32> = volume_extents(vol.trim_end_matches('\\')).iter().map(|e| e.0).collect();
+    if disks.is_empty() {
+        return None;
+    }
+    disks.sort();
+    disks.dedup();
+    Some(disks)
 }
 
 /// Which volumes of disk `n` have nothing open: tries the lock and releases it, never dismounts.

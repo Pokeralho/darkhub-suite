@@ -3,8 +3,24 @@ import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import crypto from 'node:crypto';
 import Logger from './LoggerService.js';
 import { downloadToFile, assetSha256, GITHUB_HOSTS } from './SecureDownload.js';
+
+/** Asset names compared loosely: GitHub turns spaces into dots, latest.yml uses dashes ("DarkHub Setup 1.0.exe"). */
+export const normalizeAssetName = (name) => String(name ?? '').toLowerCase().replace(/[\s._-]+/g, '-');
+export const sameAssetName = (a, b) => Boolean(a) && Boolean(b) && normalizeAssetName(a) === normalizeAssetName(b);
+
+/** The NSIS installer of a release: an .exe that is not the portable build (which ignores /S and would just run). */
+export function pickInstallerAsset(assets) {
+  const exes = (Array.isArray(assets) ? assets : []).filter((a) => /\.exe$/i.test(String(a?.name ?? '')) && !/blockmap/i.test(a.name));
+  return exes.find((a) => /setup/i.test(a.name) && !/portable/i.test(a.name)) || exes.find((a) => !/portable/i.test(a.name)) || null;
+}
+
+/** SHA-256 of a file on disk, hex. */
+export function sha256File(file) {
+  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
 
 // An update offer older than this is checked again before downloading (a newer release may be out).
 const STALE_CHECK_MS = 60 * 1000;
@@ -167,7 +183,7 @@ class UpdateService {
 
       if (this._isNewerVersion(latestVer, currentVer)) {
         this._setState('available');
-        const asset = release.assets?.find(a => a.name.endsWith('.exe') && !a.name.includes('blockmap')) || null;
+        const asset = pickInstallerAsset(release.assets);
 
         this._updateInfo = {
           version: latestVer,
@@ -281,12 +297,13 @@ class UpdateService {
 
     Logger.info('UpdateService', 'Download complete. SHA-256 verified.');
     this._downloadedFilePath = destFile;
+    this._downloadedSha256 = String(info.sha256).toLowerCase();
     this._setState('downloaded');
     this._emit({ type: 'downloaded', stage: 'downloaded', version: info.version });
     return { ok: true };
   }
 
-  installUpdate() {
+  async installUpdate() {
     if (this._state !== 'downloaded') {
       return { ok: false, error: 'Update not yet downloaded.' };
     }
@@ -298,12 +315,25 @@ class UpdateService {
         return { ok: true };
       }
 
-      if (this._downloadedFilePath && fs.existsSync(this._downloadedFilePath)) {
-        Logger.info('UpdateService', `Launching downloaded installer: ${this._downloadedFilePath}`);
-        spawn(this._downloadedFilePath, ['/S'], {
-          detached: true,
-          stdio: 'ignore'
-        }).unref();
+      const file = this._downloadedFilePath;
+      if (file && fs.existsSync(file)) {
+        // The installer sat in the user's %TEMP% since the download, and this process is elevated: anything running
+        // unelevated as the same user could have replaced it. Hash it again right before running it.
+        let actual = null;
+        try { actual = sha256File(file); } catch { /* unreadable */ }
+        if (!this._downloadedSha256 || actual !== this._downloadedSha256) {
+          this._downloadedFilePath = null;
+          this._setState('error');
+          Logger.warn('UpdateService', 'Downloaded installer changed on disk since it was verified; refusing to run it.');
+          return { ok: false, error: 'The downloaded installer no longer matches its SHA-256. Download it again.' };
+        }
+        Logger.info('UpdateService', `Launching downloaded installer: ${file}`);
+        // quit only once the installer process really started: a failed spawn (AV block, missing file) keeps the app open
+        await new Promise((resolve, reject) => {
+          const child = spawn(file, ['/S'], { detached: true, stdio: 'ignore' });
+          child.once('error', reject);
+          child.once('spawn', () => { child.unref(); resolve(); });
+        });
 
         setTimeout(() => {
           app.quit();
@@ -315,7 +345,7 @@ class UpdateService {
       return { ok: false, error: 'Installer file not found on disk.' };
     } catch (err) {
       Logger.error('UpdateService', 'Error installing update:', err);
-      return { ok: false, error: err.message };
+      return { ok: false, error: err?.message ?? String(err) };
     }
   }
 
@@ -324,7 +354,10 @@ class UpdateService {
     try {
       const release = await this._fetchLatestGitHubRelease();
       if (release?.tag_name?.replace(/^v/, '') !== info.version) return null;
-      return assetSha256(release.assets?.find((a) => a.name === info.assetName));
+      const assets = Array.isArray(release?.assets) ? release.assets : [];
+      const asset = assets.find((a) => a.name === info.assetName) || assets.find((a) => sameAssetName(a.name, info.assetName));
+      if (!asset || /portable/i.test(asset.name)) return null;
+      return assetSha256(asset);
     } catch (e) {
       Logger.warn('UpdateService', `Could not read the release digest: ${e?.message ?? e}`);
       return null;

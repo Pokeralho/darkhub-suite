@@ -60,3 +60,5 @@ jobs:
           cargo check --manifest-path native_disk/Cargo.toml
           cargo check --manifest-path native_pacer/Cargo.toml
           cargo check --manifest-path native_gpubench/Cargo.toml
+      - name: Linux package smoke (dir)
+        run: npm run build:linux

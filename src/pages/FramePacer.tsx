@@ -205,7 +205,7 @@ export default function FramePacerPage() {
     { label: '165 FPS', val: 165, sub: '6.0ms' },
     { label: '240 FPS', val: 240, sub: '4.1ms' },
     { label: '360 FPS', val: 360, sub: '2.7ms' },
-    { label: 'Desbloqueado', val: 0, sub: 'Monitor' }
+    { label: t('framepacer.preset.unlocked', 'Desbloqueado'), val: 0, sub: 'Monitor' }
   ]
 
   const targetFrametime = targetFps > 0 ? (1000 / targetFps).toFixed(2) : '0.00'

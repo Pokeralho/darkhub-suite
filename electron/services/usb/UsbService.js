@@ -1,5 +1,9 @@
 // USB ports: what is plugged where, turn single devices off/on, USB storage policies, safe eject and the history of
 // storage devices. Changes run elevated through ElevationHelper and record what they changed so they can be undone.
+import crypto from 'node:crypto'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { runPowerShellJson } from '../PowerShellRunner.js'
 import Elevation from '../optimizer/ElevationHelper.js'
 import { psQuote } from '../optimizer/OptimizerUtils.js'
@@ -44,9 +48,32 @@ $ac = if ($hex.Count) { [Convert]::ToInt32($hex[0].Groups[1].Value, 16) } else {
 [pscustomobject]@{ devices = $devices; history = $history; drives = $drives; storageBlocked = ($usbstor -eq 4); writeProtect = ($wp -eq 1); selectiveSuspend = $ac } | ConvertTo-Json -Depth 5 -Compress
 `
 
+/**
+ * Pure: the elevated script that turns an INPUT device off with its safety revert armed in the same UAC run.
+ * A detached elevated PowerShell sleeps and turns the device back on unless `keepFlag` exists by then. The old
+ * revert was an in-memory timer that asked for a NEW UAC prompt, which a user without keyboard/mouse cannot answer
+ * (and which was lost if the app closed). The revert is armed BEFORE the device is disabled.
+ */
+export function buildInputDisableScript(instanceId, keepFlag, seconds = INPUT_REVERT_MS / 1000) {
+  const id = psQuote(instanceId)
+  const flag = psQuote(keepFlag)
+  const revert = `Start-Sleep -Seconds ${Math.max(5, Math.round(Number(seconds) || 20))}
+if (-not (Test-Path -LiteralPath ${flag})) { Enable-PnpDevice -InstanceId ${id} -Confirm:$false -ErrorAction SilentlyContinue }
+Remove-Item -LiteralPath ${flag} -Force -ErrorAction SilentlyContinue`
+  const encoded = Buffer.from(revert, 'utf16le').toString('base64')
+  return `Remove-Item -LiteralPath ${flag} -Force -ErrorAction SilentlyContinue
+Start-Process -FilePath 'powershell.exe' -WindowStyle Hidden -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-EncodedCommand','${encoded}') -ErrorAction Stop | Out-Null
+Disable-PnpDevice -InstanceId ${id} -Confirm:$false -ErrorAction Stop`
+}
+
 export class UsbService {
-  constructor() {
+  constructor({ keepDir } = {}) {
     this.pendingReverts = new Map()
+    this.keepDir = keepDir || path.join(process.env.LOCALAPPDATA || os.tmpdir(), 'DarkHub', 'usb-keep')
+  }
+
+  _keepFlag(instanceId) {
+    return path.join(this.keepDir, `${crypto.createHash('sha256').update(String(instanceId).toUpperCase()).digest('hex').slice(0, 24)}.keep`)
   }
 
   async list() {
@@ -73,23 +100,32 @@ export class UsbService {
   async setDeviceEnabled({ instanceId, name, kind }, enabled) {
     const check = canToggle({ instanceId, name, kind })
     if (!check.ok) return { ok: false, error: check.reason === 'controller' ? 'Controladoras e hubs não são desligados por aqui (poderia cortar teclado e mouse juntos).' : 'Dispositivo inválido' }
-    const r = await this._run(`${enabled ? 'Enable' : 'Disable'}-PnpDevice -InstanceId ${psQuote(instanceId)} -Confirm:$false -ErrorAction Stop`)
-    if (!r.ok) return r
     if (!enabled && check.input) {
+      // the automatic re-enable is armed inside the same elevated run (see buildInputDisableScript)
+      try { fs.mkdirSync(this.keepDir, { recursive: true }) } catch { /* the elevated script still arms the revert */ }
+      const r = await this._run(buildInputDisableScript(instanceId, this._keepFlag(instanceId)))
+      if (!r.ok) return r
       clearTimeout(this.pendingReverts.get(instanceId))
-      const t = setTimeout(() => {
-        this.pendingReverts.delete(instanceId)
-        void this._run(`Enable-PnpDevice -InstanceId ${psQuote(instanceId)} -Confirm:$false -ErrorAction Stop`)
-      }, INPUT_REVERT_MS)
+      // only tracks the countdown for the UI; the revert itself does not depend on this process
+      const t = setTimeout(() => this.pendingReverts.delete(instanceId), INPUT_REVERT_MS)
       this.pendingReverts.set(instanceId, t)
       return { ok: true, revertInMs: INPUT_REVERT_MS }
     }
+    const r = await this._run(`${enabled ? 'Enable' : 'Disable'}-PnpDevice -InstanceId ${psQuote(instanceId)} -Confirm:$false -ErrorAction Stop`)
+    if (!r.ok) return r
     if (enabled) { clearTimeout(this.pendingReverts.get(instanceId)); this.pendingReverts.delete(instanceId) }
     return { ok: true }
   }
 
   /** The user confirmed they still have control: keep the input device off. */
   keepDisabled(instanceId) {
+    if (!this.pendingReverts.has(instanceId)) return { ok: false, error: 'O prazo acabou: o dispositivo já foi religado.' }
+    try {
+      fs.mkdirSync(this.keepDir, { recursive: true })
+      fs.writeFileSync(this._keepFlag(instanceId), String(Date.now()))
+    } catch (e) {
+      return { ok: false, error: `Não foi possível confirmar: ${e?.message ?? e}` }
+    }
     clearTimeout(this.pendingReverts.get(instanceId))
     this.pendingReverts.delete(instanceId)
     return { ok: true }

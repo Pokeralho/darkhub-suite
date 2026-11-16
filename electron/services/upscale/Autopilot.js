@@ -75,6 +75,8 @@ export class Autopilot {
     const local = this.installed()
     if (!local) throw new Error('DLSS 5 Autopilot is not installed')
     const child = cp.spawn(local.exe, [], { cwd: path.dirname(local.exe), detached: true, stdio: 'ignore' })
+    // spawn failure (blocked by SmartScreen/antivirus, file removed) is async: without a listener it crashes main
+    child.on('error', (e) => { console.warn('[Autopilot] launch failed:', e?.message ?? e) })
     child.unref()
     return local
   }

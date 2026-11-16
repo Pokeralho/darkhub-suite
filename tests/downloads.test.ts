@@ -69,10 +69,12 @@ describe('DownloadManager (real HTTP server)', () => {
   const cleanup: Array<() => void> = [];
   afterEach(() => { while (cleanup.length) cleanup.pop()!(); });
 
-  function startServer(data: Buffer, { ranges = true, slowChunkMs = 0 } = {}) {
+  function startServer(data: Buffer, { ranges = true, slowChunkMs = 0, failPieces = false } = {}) {
     const hits = { ranged: 0, total: 0 };
     const server = http.createServer((req, res) => {
       hits.total++;
+      // failPieces: the bytes=0-0 probe works, every real piece request gets HTTP 500.
+      if (failPieces && req.headers.range !== 'bytes=0-0') { res.writeHead(500); res.end(); return; }
       const range = /bytes=(\d+)-(\d*)/.exec(String(req.headers.range ?? ''));
       let start = 0, end = data.length - 1, status = 200;
       const headers: Record<string, string | number> = { 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="server-name.bin"' };
@@ -175,6 +177,15 @@ describe('DownloadManager (real HTTP server)', () => {
     await m.add({ url, sha256: 'a'.repeat(64) });
     await waitFor(() => m.list()[0]?.status === 'error');
     expect(m.list()[0].error).toBe('sha256-mismatch');
+  });
+
+  it('marks the item as error when a piece keeps failing (not stuck in downloading)', async () => {
+    const data = crypto.randomBytes(3 * 1024 * 1024);
+    const { url } = await startServer(data, { failPieces: true });
+    const { m } = await newManager({ retries: 0 });
+    await m.add({ url, connections: 4 });
+    await waitFor(() => m.list()[0]?.status === 'error');
+    expect(m.list()[0].error).toMatch(/HTTP 500/);
   });
 
   it('refuses non-http urls', async () => {

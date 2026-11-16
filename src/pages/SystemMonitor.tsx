@@ -15,6 +15,7 @@ import LhmSensorTree from '../components/monitor/LhmSensorTree';
 import PowerPanel from '../components/monitor/PowerPanel';
 import { Sparkline } from '../components/library/Sparkline';
 import { useSensorHistory } from '../hooks/useSensorHistory';
+import { pickPrimaryGpu } from '../../electron/hal/models/gpuMatch.js';
 
 const formatBytes = (bytes: number | null | undefined) => {
   if (bytes == null || isNaN(bytes)) return '--';
@@ -225,7 +226,9 @@ const SystemMonitor = () => {
 
   const cpuLoadHistory = useSensorHistory(metrics?.cpu?.values?.currentLoad?.value, 60, metrics);
   const ramUseHistory = useSensorHistory(metrics?.ram?.values?.percent?.value, 60, metrics);
-  const gpuUtilHistory = useSensorHistory(metrics?.gpu?.values?.gpus?.[0]?.utilization?.value, 60, metrics);
+  // hybrid / multi-GPU: the discrete card, not the first adapter listed
+  const mainGpu: any = pickPrimaryGpu(metrics?.gpu?.values?.gpus);
+  const gpuUtilHistory = useSensorHistory(mainGpu?.utilization?.value, 60, metrics);
   const diskActHistory = useSensorHistory(metrics?.diskIo?.values?.activity?.value, 60, metrics);
   const tempHistory = useSensorHistory(metrics?.temps?.values?.main?.value, 60, metrics);
   const dpcHistory = useSensorHistory(metrics?.latency?.values?.dpcsQueued?.value, 60, metrics);
@@ -386,7 +389,7 @@ const SystemMonitor = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-px rounded-xl border border-zinc-800/80 bg-zinc-800/70 overflow-hidden">
                 <Gauge label={t('monitor.gauge.cpuLoad', 'Carga da CPU')} value={toFixedSafe(metrics?.cpu?.values?.currentLoad?.value, 1)} unit="%" history={cpuLoadHistory} warn={85} crit={95} />
                 <Gauge label={t('monitor.gauge.ramUsage', 'Uso de RAM')} value={toFixedSafe(metrics?.ram?.values?.percent?.value, 1)} unit="%" history={ramUseHistory} warn={80} crit={90} />
-                <Gauge label={t('monitor.gauge.gpuUtil', 'Uso da GPU')} value={toFixedSafe(metrics?.gpu?.values?.gpus?.[0]?.utilization?.value, 1)} unit="%" history={gpuUtilHistory} />
+                <Gauge label={t('monitor.gauge.gpuUtil', 'Uso da GPU')} value={toFixedSafe(mainGpu?.utilization?.value, 1)} unit="%" history={gpuUtilHistory} />
                 <Gauge label={t('monitor.gauge.diskAct', 'Atividade do Disco')} value={toFixedSafe(metrics?.diskIo?.values?.activity?.value, 1)} unit="%" history={diskActHistory} warn={95} />
                 <Gauge label={t('monitor.gauge.cpuTemp', 'Temp. da CPU')} value={toFixedSafe(metrics?.temps?.values?.main?.value, 0)} unit="°C" history={tempHistory} warn={80} crit={90} />
                 <Gauge label="DPC/s" value={toFixedSafe(metrics?.latency?.values?.dpcsQueued?.value, 0)} unit="" history={dpcHistory} max={25000} warn={5000} crit={15000} />
@@ -627,7 +630,7 @@ const SystemMonitor = () => {
           return { text: 'text-zinc-50', bar: 'bg-blue-400', label: t('monitor.temps.optimal', 'Ótimo'), labelTone: 'text-zinc-500' };
         };
 
-        const primaryGpu = metrics?.gpu?.values?.gpus?.[0];
+        const primaryGpu = mainGpu;
         const gpuTempObj = probes.find((p: any) => p.category === 'gpu')?.temperature;
         const gpuStyle = getTempStyle(gpuTempObj);
 

@@ -38,16 +38,52 @@ impl Plan {
     }
 }
 
-const BACKUP_MAGIC: &[u8; 8] = b"DHDKBK01";
+const BACKUP_MAGIC_V1: &[u8; 8] = b"DHDKBK01";
+/// v2 adds the disk identity (GPT disk GUID or MBR signature) after the size, so a backup is not restored
+/// onto a different disk that just happens to have the same size.
+const BACKUP_MAGIC: &[u8; 8] = b"DHDKBK02";
+const ID_NONE: u32 = 0;
+const ID_MBR: u32 = 1;
+const ID_GPT: u32 = 2;
+
+/// Identity of a disk: (kind, 16 bytes). GPT: disk GUID from the primary (or backup) header.
+/// MBR: the 4-byte NT disk signature at 440. `None` when the disk has neither (blank or wiped).
+pub fn disk_identity(dev: &mut dyn BlockDevice) -> Option<(u32, [u8; 16])> {
+    let total = dev.total_sectors();
+    for lba in [1, total.saturating_sub(1)] {
+        if lba == 0 || lba >= total {
+            continue;
+        }
+        if let Ok(s) = read_sectors(dev, lba, 1) {
+            if s.len() >= 72 && &s[..8] == b"EFI PART" {
+                let mut id = [0u8; 16];
+                id.copy_from_slice(&s[56..72]);
+                if id.iter().any(|&b| b != 0) {
+                    return Some((ID_GPT, id));
+                }
+            }
+        }
+    }
+    let s = read_sectors(dev, 0, 1).ok()?;
+    if s.len() >= 512 && s[510] == 0x55 && s[511] == 0xAA && s[440..444].iter().any(|&b| b != 0) {
+        let mut id = [0u8; 16];
+        id[..4].copy_from_slice(&s[440..444]);
+        return Some((ID_MBR, id));
+    }
+    None
+}
 
 /// Saves the current contents of `ranges` (lba, sectors) to `path`.
 pub fn save_backup(dev: &mut dyn BlockDevice, ranges: &[(u64, u64)], path: &str) -> R<u64> {
     let ss = dev.sector_size();
+    let id = disk_identity(dev);
     let mut out = Vec::new();
     out.extend_from_slice(BACKUP_MAGIC);
     out.extend_from_slice(&ss.to_le_bytes());
     out.extend_from_slice(&(ranges.len() as u32).to_le_bytes());
     out.extend_from_slice(&dev.size().to_le_bytes());
+    out.extend_from_slice(&id.map(|i| i.0).unwrap_or(ID_NONE).to_le_bytes());
+    out.extend_from_slice(&id.map(|i| i.1).unwrap_or([0u8; 16]));
     for &(lba, n) in ranges {
         let data = read_sectors(dev, lba, n)?;
         out.extend_from_slice(&lba.to_le_bytes());
@@ -60,15 +96,54 @@ pub fn save_backup(dev: &mut dyn BlockDevice, ranges: &[(u64, u64)], path: &str)
     Ok(out.len() as u64)
 }
 
-pub fn load_backup(path: &str) -> R<(u32, Vec<SectorWrite>)> {
+pub struct Backup {
+    pub sector_size: u32,
+    /// Size in bytes of the disk the backup was taken from.
+    pub disk_size: u64,
+    /// Disk identity at backup time (v2 files only).
+    pub identity: Option<(u32, [u8; 16])>,
+    pub writes: Vec<SectorWrite>,
+}
+
+impl Backup {
+    /// Refuses (`disk_mismatch`) to restore onto a disk other than the one the backup came from: the size must
+    /// match, and when both the backup and the disk carry an identity (GPT GUID / MBR signature) it must match too.
+    /// A disk whose identity is gone (wiped header: the usual reason to restore) is only checked by size.
+    pub fn check_target(&self, dev: &mut dyn BlockDevice) -> R<()> {
+        if self.disk_size != dev.size() {
+            return Err(Fail::new("disk_mismatch", format!("o backup é de um disco de {} bytes; este tem {} bytes", self.disk_size, dev.size())));
+        }
+        if let (Some(a), Some(b)) = (self.identity, disk_identity(dev)) {
+            if a != b {
+                let what = if a.0 == ID_GPT || b.0 == ID_GPT { "GUID do GPT" } else { "assinatura do MBR" };
+                return Err(Fail::new("disk_mismatch", format!("o backup é de outro disco ({what} diferente)")));
+            }
+        }
+        Ok(())
+    }
+}
+
+pub fn load_backup(path: &str) -> R<Backup> {
     let mut b = Vec::new();
     fs::File::open(path)?.read_to_end(&mut b)?;
-    if b.len() < 24 || &b[..8] != BACKUP_MAGIC {
+    let v2 = b.len() >= 44 && &b[..8] == BACKUP_MAGIC;
+    if !v2 && (b.len() < 24 || &b[..8] != BACKUP_MAGIC_V1) {
         return Err(Fail::new("bad_backup", "arquivo não é um backup de setores do DarkHub"));
     }
     let ss = parts::u32le(&b, 8);
     let count = parts::u32le(&b, 12) as usize;
+    let disk_size = parts::u64le(&b, 16);
     let mut pos = 24;
+    let mut identity = None;
+    if v2 {
+        let kind = parts::u32le(&b, 24);
+        if kind != ID_NONE {
+            let mut id = [0u8; 16];
+            id.copy_from_slice(&b[28..44]);
+            identity = Some((kind, id));
+        }
+        pos = 44;
+    }
     let mut writes = Vec::new();
     for _ in 0..count {
         if pos + 12 > b.len() {
@@ -83,7 +158,7 @@ pub fn load_backup(path: &str) -> R<(u32, Vec<SectorWrite>)> {
         writes.push(SectorWrite { lba, data: b[pos..pos + len].to_vec(), what: "restauração do backup".into() });
         pos += len;
     }
-    Ok((ss, writes))
+    Ok(Backup { sector_size: ss, disk_size, identity, writes })
 }
 
 /// Backs up every sector the plan touches, then writes and flushes.

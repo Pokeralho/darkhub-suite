@@ -261,13 +261,14 @@ Ao arrastar uma janela até a borda ela não se encaixa nem maximiza sozinha, e 
 
 ### `darkhub:tweak:numLockOnStartup`
 
-**Num Lock ligado ao iniciar** · risk: low · also runs a DarkHub command
+**Num Lock ligado ao iniciar** · risk: low
 
 Liga o Num Lock no seu usuário e também na tela de login, para digitar PIN numérico pelo teclado numérico. Em alguns PCs a BIOS também precisa estar com Num Lock ligado.
 
 | Key | Value name | Writes |
 |---|---|---|
 | `HKCU\Control Panel\Keyboard` | `InitialKeyboardIndicators` | REG_SZ = 2 |
+| `HKU\.DEFAULT\Control Panel\Keyboard` | `InitialKeyboardIndicators` | REG_SZ = 2 |
 
 ## Privacy
 

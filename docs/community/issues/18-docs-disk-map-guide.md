@@ -7,7 +7,7 @@ labels: good first issue, documentation
 
 The Disk map (route `spacesniffer`) is one of the most used tools: a native multi-threaded scanner, a live treemap,
 categories (system, programs, games, junk...), filters and reports. The only user documentation is one line in the
-README and `docs/UserManual.md`, which is 16 lines long and does not mention it.
+README, which does not mention it.
 
 ## What to do
 
@@ -22,7 +22,7 @@ Write `docs/guides/disk-map.md`, in plain English, for someone who has never use
 6. Two screenshots (`npm run shot -- spacesniffer` with `npm run dev` running gives the layout; a real scan screenshot
    is better).
 
-Then link the guide from `docs/UserManual.md`.
+Then link the guide from the README.
 
 ## Files to look at
 
@@ -38,5 +38,5 @@ must exist on the screen.
 ## Definition of done
 
 - [ ] `docs/guides/disk-map.md` with the six parts above
-- [ ] Linked from `docs/UserManual.md`
+- [ ] Linked from the README
 - [ ] Labels match the en-US interface text

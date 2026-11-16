@@ -40,6 +40,9 @@ export default function DiskMap() {
   const [info, setInfo] = useState<DiskMapInfo | null>(null);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [confirmTrash, setConfirmTrash] = useState(false);
+  // Drives without a usable Recycle Bin: an explicit "delete for good", step 1 = offer, step 2 = type the name.
+  const [permanent, setPermanent] = useState<{ id: string; name: string; step: 1 | 2 } | null>(null);
+  const [typedName, setTypedName] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [version, setVersion] = useState(0);
@@ -54,14 +57,23 @@ export default function DiskMap() {
 
   const active = Boolean(status?.active);
   const running = Boolean(status?.running);
+  const unsupported = Boolean((status as any)?.unsupported);
 
   // Drives + an existing scan (it lives in the main process, so it survives navigating away).
   useEffect(() => {
     api()?.status().then((s) => setStatus(s)).catch(() => {});
-    api()?.drives().then((r) => setDrives(r?.ok ? r.drives || [] : [])).catch(() => setDrives([]));
+    api()?.drives().then((r) => {
+      if (!r) { setDrives([]); return; }
+      if ((r as any).unsupported) {
+        setDrives([]);
+        return;
+      }
+      setDrives(r.ok ? r.drives || [] : []);
+      if (!r.ok && (r as any).error) setNotice({ ok: false, text: (r as any).error });
+    }).catch(() => setDrives([]));
     const off = api()?.onProgress((s) => setStatus(s));
     return () => { off?.(); };
-  }, []);
+  }, [t]);
 
   // Debounced filter: the whole tree is filtered in the main process.
   useEffect(() => { const h = setTimeout(() => setFilter(filterText.trim()), 250); return () => clearTimeout(h); }, [filterText]);
@@ -89,6 +101,8 @@ export default function DiskMap() {
 
   useEffect(() => {
     setConfirmTrash(false);
+    setPermanent((p) => (p && p.id === selected?.id ? p : null));
+    setTypedName('');
     if (!selected || !['dir', 'file'].includes(selected.kind)) { setInfo(null); return; }
     api()?.info({ id: selected.id, filter }).then((r) => setInfo(r?.ok ? r.info || null : null)).catch(() => setInfo(null));
   }, [selected, filter, version]);
@@ -173,7 +187,20 @@ export default function DiskMap() {
   const trash = async () => {
     if (!selected) return;
     const freed = selected.size;
-    const r = await act(() => api()!.trash({ id: selected.id }), `${labelFor(selected)}: ${t('diskmap.trashed', 'moved to the Recycle Bin')} (${formatBytes(freed)})`);
+    const r = await act(async () => {
+      const res = await api()!.trash({ id: selected.id });
+      return res?.noRecycle ? { ...res, error: t(`diskmap.noRecycle.${res.noRecycle}`, res.error) } : res;
+    }, `${labelFor(selected)}: ${t('diskmap.trashed', 'moved to the Recycle Bin')} (${formatBytes(freed)})`);
+    if (r?.ok) { setSelected(null); setVersion((v) => v + 1); }
+    else if (r?.noRecycle && r.noRecycle !== 'unknown' && info) setPermanent({ id: selected.id, name: info.path.split(/[\\/]/).filter(Boolean).pop() || '', step: 1 });
+    setConfirmTrash(false);
+  };
+
+  const deleteForGood = async () => {
+    if (!selected || !permanent || typedName !== permanent.name) return;
+    const freed = selected.size;
+    const r = await act(() => api()!.deletePermanent({ id: selected.id, confirmName: typedName }), `${labelFor(selected)}: ${t('diskmap.deleted', 'deleted for good')} (${formatBytes(freed)})`);
+    setPermanent(null); setTypedName('');
     if (r?.ok) { setSelected(null); setVersion((v) => v + 1); }
   };
 
@@ -325,11 +352,16 @@ export default function DiskMap() {
               <h2 className="dh-section-title">{t('diskmap.pick.title', 'What do you want to analyse?')}</h2>
               <p className="mt-1 dh-help">{t('diskmap.pick.help', 'A whole drive also shows its free space and what the scan could not see (system files, restore points).')}</p>
             </div>
-            <button onClick={pickFolder} className="dh-btn shrink-0"><FolderOpen size={14} />{t('diskmap.pickFolder', 'Choose a folder')}</button>
+            <button onClick={pickFolder} disabled={unsupported} className="dh-btn shrink-0" title={unsupported ? ((status as any)?.error || t('diskmap.unsupported', 'O mapa de disco está disponível apenas no Windows.')) : undefined}><FolderOpen size={14} />{t('diskmap.pickFolder', 'Choose a folder')}</button>
           </div>
           {drives === null ? (
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-label={t('diskmap.loading', 'Loading')}>
               {[0, 1, 2].map((i) => <div key={i} className="h-[74px] rounded-xl bg-zinc-900 animate-pulse" />)}
+            </div>
+          ) : unsupported ? (
+            <div className="dh-card p-4 text-[12.5px] text-zinc-300">
+              <div className="font-medium text-zinc-100">{t('diskmap.unsupportedTitle', 'Indisponível nesta plataforma')}</div>
+              <p className="mt-1 dh-help">{(status as any)?.error || t('diskmap.unsupported', 'O mapa de disco está disponível apenas no Windows.')}</p>
             </div>
           ) : drives.length === 0 ? (
             <p className="text-[12.5px] text-zinc-500">{t('diskmap.noDrives', 'No drive found. Choose a folder instead.')}</p>
@@ -530,7 +562,30 @@ export default function DiskMap() {
                 <button onClick={() => act(() => api()!.open({ id: info.id }))} className="dh-btn dh-btn-sm justify-start"><ExternalLink size={14} />{info.kind === 'dir' ? t('diskmap.openFolder', 'Open folder') : t('diskmap.openFile', 'Open file')}</button>
                 <button onClick={() => act(() => api()!.reveal({ id: info.id }))} className="dh-btn dh-btn-sm justify-start"><FolderOpen size={14} />{t('diskmap.reveal', 'Show in Explorer')}</button>
                 <button onClick={() => { navigator.clipboard?.writeText(info.path); setNotice({ ok: true, text: t('diskmap.copied', 'Path copied.') }); }} className="dh-btn dh-btn-sm justify-start"><Clipboard size={14} />{t('diskmap.copy', 'Copy path')}</button>
-                {!info.isRoot ? (
+                {!info.isRoot && permanent?.id === info.id ? (
+                  <div className="mt-1 space-y-2 border-l-2 border-red-500 pl-3 py-1">
+                    {permanent.step === 1 ? (
+                      <>
+                        <p className="text-[12px] text-red-200 inline-flex items-start gap-1.5"><AlertTriangle size={14} className="shrink-0 mt-px" />{t('diskmap.permanentOffer', 'This item cannot go to a Recycle Bin. You can delete it for good, with no way to undo.')}</p>
+                        <div className="flex gap-1.5">
+                          <button onClick={() => setPermanent({ ...permanent, step: 2 })} className="dh-btn dh-btn-sm dh-btn-danger">{t('diskmap.permanentNext', 'Delete for good...')}</button>
+                          <button onClick={() => setPermanent(null)} className="dh-btn dh-btn-sm dh-btn-ghost">{t('diskmap.cancel', 'Cancel')}</button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-[12px] text-red-200">{t('diskmap.permanentType', 'Last check: this cannot be undone. Type the name to confirm:')} <span className="font-mono select-all text-zinc-100">{permanent.name}</span> <span className="font-mono">({formatBytes(info.size)})</span></p>
+                        <input autoFocus className="dh-input w-full font-mono text-[12px]" value={typedName} onChange={(e) => setTypedName(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' && typedName === permanent.name) void deleteForGood(); }}
+                          aria-label={t('diskmap.permanentTypeLabel', 'Item name')} spellCheck={false} />
+                        <div className="flex gap-1.5">
+                          <button onClick={deleteForGood} disabled={busy || typedName !== permanent.name} className="dh-btn dh-btn-sm dh-btn-danger">{t('diskmap.permanentYes', 'Delete for good')}</button>
+                          <button onClick={() => { setPermanent(null); setTypedName(''); }} className="dh-btn dh-btn-sm dh-btn-ghost">{t('diskmap.cancel', 'Cancel')}</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : !info.isRoot ? (
                   confirmTrash ? (
                     <div className="mt-1 space-y-2 border-l-2 border-red-400 pl-3 py-1">
                       <p className="text-[12px] text-red-200 inline-flex items-start gap-1.5"><AlertTriangle size={14} className="shrink-0 mt-px" />{t('diskmap.trashConfirm', 'Move to the Recycle Bin?')} <span className="font-mono">{formatBytes(info.size)}</span></p>

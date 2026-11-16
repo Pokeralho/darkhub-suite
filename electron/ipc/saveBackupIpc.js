@@ -15,7 +15,11 @@ export function registerSaveBackupIPC({ app, ipcMain, BrowserWindow, dialog, she
   // installed games: Steam libraries plus everything in the DarkHub Library
   const getInstalledGames = async () => {
     const out = []
-    try { for (const g of await steam.getInstalledSteamGames()) out.push({ name: g.name, appId: g.appId, installDir: g.installDir }) } catch { /* no Steam */ }
+    try {
+      // <root> in the manifest is the Steam folder (Steam Cloud saves live in <root>/userdata/<storeUserId>/...)
+      const steamRoot = steam.getSteamPath()
+      for (const g of await steam.getInstalledSteamGames()) out.push({ name: g.name, appId: g.appId, installDir: g.installDir, libraryRoot: steamRoot })
+    } catch { /* no Steam */ }
     try {
       for (const g of (await loadLibrary(app)).games || []) {
         const dir = g.workingDir || (g.exePath ? path.dirname(g.exePath) : null)

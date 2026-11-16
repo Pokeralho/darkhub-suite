@@ -1,6 +1,7 @@
 // Overlay settings and the rows it shows. Pure.
 import { normalizePower, POWER_DEFAULTS } from './powerModel.js'
 import { metric, provTag, railTone, RAIL_IDS } from './lhmModel.js'
+import { pickPrimaryGpu } from '../../hal/models/gpuMatch.js'
 
 export const METRICS = ['fps', 'low1', 'frametime', 'graph', 'cpu', 'cpuTemp', 'gpu', 'gpuTemp', 'vram', 'gpuClock', 'ram', 'cpuPower', 'latency']
 export const LAYOUTS = ['compact', 'advanced', 'oc', 'custom']
@@ -59,7 +60,8 @@ const n = (x, d = 0) => (Number.isFinite(Number(x)) ? Number(x).toFixed(d) : 'â€
 
 /** Pulls the overlay's numbers out of a HardwareService snapshot. */
 export function readSensors(snap) {
-  const gpu = snap?.gpu?.values?.gpus?.[0] || null
+  // hybrid laptops / multi-GPU: the discrete card, not whatever adapter happens to be listed first
+  const gpu = pickPrimaryGpu(snap?.gpu?.values?.gpus)
   return {
     cpu: v(snap?.cpu?.values?.currentLoad),
     cores: Array.isArray(snap?.cpu?.values?.coresLoad) ? snap.cpu.values.coresLoad.map(v).filter((x) => Number.isFinite(Number(x))) : null,

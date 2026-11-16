@@ -127,7 +127,7 @@ export function registerNetworkIPC() {
   // Needs administrator (the old non-elevated netsh calls failed without elevation); asks UAC and requires a reboot.
   ipcMain.handle('network:resetTcp', async () => {
     if (process.platform !== 'win32') {
-      return { ok: false, output: 'Redefinição de pilha TCP/IP não suportada automaticamente no Linux. Verifique NetworkManager/rotas manualmente.' };
+      return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', output: 'Redefinição de pilha TCP/IP não suportada automaticamente no Linux. Verifique NetworkManager/rotas manualmente.' };
     }
     try { return await NetLatencyService.resetStack(); }
     catch (err) { return { ok: false, output: err?.message ?? String(err) }; }

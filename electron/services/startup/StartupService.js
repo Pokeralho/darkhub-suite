@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { runPowerShellJson } from '../PowerShellRunner.js'
 import Elevation from '../optimizer/ElevationHelper.js'
-import { psQuote } from '../optimizer/OptimizerUtils.js'
+import { psQuote, isProtectedService } from '../optimizer/OptimizerUtils.js'
 import { decodeApproved, encodeApproved, exeFromCommand, parseBootEvents, impactFor, sensitivity } from './startupModel.js'
 
 const APPROVED = 'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved'
@@ -113,17 +113,32 @@ New-ItemProperty -LiteralPath $k -Name ${psQuote(item.key)} -PropertyType Binary
     throw new Error('Tipo desconhecido')
   }
 
-  async setEnabled(item, enabled) {
-    if (!item) return { ok: false, error: 'Item inválido' }
-    if (process.platform !== 'win32') return this._setEnabledLinux(item, enabled)
+  /**
+   * `requested` comes from the renderer: only its id is trusted. The item (kind, key, hive, taskPath, scope...) is
+   * looked up again in a fresh list(), so a forged item cannot point the elevated script anywhere else.
+   */
+  async setEnabled(requested, enabled) {
+    const id = typeof requested?.id === 'string' ? requested.id : ''
+    if (!id) return { ok: false, error: 'Item inválido' }
+    const listed = await this.list()
+    if (!listed.ok) return { ok: false, error: listed.error }
+    const item = listed.items.find((i) => i.id === id)
+    if (!item) return { ok: false, error: 'Item não encontrado na inicialização (a lista mudou; atualize).' }
+    if (process.platform !== 'win32') return this._setEnabledLinux(item, Boolean(enabled))
     if (!['run', 'folder', 'task', 'service'].includes(item.kind)) return { ok: false, error: 'Item inválido' }
-    const script = this._toggleScript(item, Boolean(enabled))
+    const want = Boolean(enabled)
+    if (item.kind === 'service' && !want && isProtectedService(item.key)) {
+      return { ok: false, error: `"${item.name}" é um serviço essencial do Windows e não pode ser tirado da inicialização por aqui.` }
+    }
+    const from = item.enabled !== false
+    if (from === want) return { ok: true, unchanged: true }
+    const script = this._toggleScript(item, want)
     // machine-wide items need admin: runMarked runs directly when DarkHub is elevated, otherwise asks UAC
     const r = item.scope === 'machine'
       ? await Elevation.runMarked(script, 60000)
       : await runPowerShellJson(`${script}\n'{"ok":true}'`, { timeoutMs: 30000, fallback: null }).then((x) => (x.data?.ok ? { ok: true } : { ok: false, error: x.stderr || 'falhou' }))
     if (!r.ok) return { ok: false, error: r.error || 'Falha ao alterar' }
-    this._record({ id: item.id, name: item.name, kind: item.kind, item: { kind: item.kind, key: item.key, hive: item.hive, sub: item.sub, taskPath: item.taskPath, scope: item.scope, name: item.name, id: item.id }, from: !enabled, to: Boolean(enabled) })
+    this._record({ id: item.id, name: item.name, kind: item.kind, item: { kind: item.kind, key: item.key, hive: item.hive, sub: item.sub, taskPath: item.taskPath, scope: item.scope, name: item.name, id: item.id }, from, to: want })
     return { ok: true }
   }
 

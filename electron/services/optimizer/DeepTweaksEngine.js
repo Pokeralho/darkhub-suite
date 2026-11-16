@@ -377,9 +377,10 @@ function buildPublicTweaks() {
       title: 'Desativar túnel Teredo',
       description: 'Desliga o Teredo (túnel IPv6 sobre IPv4) pela política oficial do Windows, sem mexer no resto do IPv6. Remove uma interface de rede extra que alguns jogos usam por engano. O chat em grupo do Xbox/Game Bar usa Teredo: se ele parar, desfaça.',
       rows: [['HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\TCPIP\\v6Transition', 'Teredo_State', SZ, 'Disabled', null]],
+      // netsh reports failure only through its exit code: without the check a refused change still counted as done
       commands: {
-        apply: "& netsh.exe interface teredo set state disabled | Out-Null",
-        revert: "& netsh.exe interface teredo set state default | Out-Null"
+        apply: "& netsh.exe interface teredo set state disabled | Out-Null\r\nif ($LASTEXITCODE -ne 0) { throw ('netsh teredo set state disabled falhou (codigo ' + $LASTEXITCODE + ')') }",
+        revert: "& netsh.exe interface teredo set state default | Out-Null\r\nif ($LASTEXITCODE -ne 0) { throw ('netsh teredo set state default falhou (codigo ' + $LASTEXITCODE + ')') }"
       }
     }),
 
@@ -630,11 +631,12 @@ Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks' -Name LegacyBootMen
       id: 'tweak:numLockOnStartup', category: 'customization',
       title: 'Num Lock ligado ao iniciar',
       description: 'Liga o Num Lock no seu usuário e também na tela de login, para digitar PIN numérico pelo teclado numérico. Em alguns PCs a BIOS também precisa estar com Num Lock ligado.',
-      rows: [['HKCU\\Control Panel\\Keyboard', 'InitialKeyboardIndicators', SZ, '2', '0']],
-      commands: {
-        apply: "Set-ItemProperty -LiteralPath 'Registry::HKEY_USERS\\.DEFAULT\\Control Panel\\Keyboard' -Name InitialKeyboardIndicators -Value '2' -Type String -ErrorAction Stop",
-        revert: "Set-ItemProperty -LiteralPath 'Registry::HKEY_USERS\\.DEFAULT\\Control Panel\\Keyboard' -Name InitialKeyboardIndicators -Value '2147483648' -Type String -ErrorAction Stop"
-      }
+      // the login screen (.DEFAULT) is a normal snapshotted row, so the revert restores what it really had (it was
+      // hard-coded to 2147483648); that value is now only the fallback when there is no snapshot
+      rows: [
+        ['HKCU\\Control Panel\\Keyboard', 'InitialKeyboardIndicators', SZ, '2', '0'],
+        ['HKU\\.DEFAULT\\Control Panel\\Keyboard', 'InitialKeyboardIndicators', SZ, '2', '2147483648']
+      ]
     }),
     defineTweak({
       id: 'tweak:rdpUnsignedNoWarning', category: 'system', risk: 'medium', securityRelated: true,
@@ -1146,7 +1148,7 @@ class DeepTweaksEngine {
     return this._exclusive(() => this._restoreDefsUnlocked(defs, eventSender, opts));
   }
 
-  async _restoreDefsUnlocked(defs, eventSender, { requireSnapshot = false, runLabel = 'darkHubRevert', fallbackFor = null } = {}) {
+  async _restoreDefsUnlocked(defs, eventSender, { requireSnapshot = false, runLabel = 'darkHubRevert', fallbackFor = null, extraCommand = '' } = {}) {
     const runId = `${runLabel}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     eventSender('optimizer:runEvent', { runId, type: 'run-start', total: defs.length, concurrency: 1, startedAt: Date.now() });
     const results = defs.map((d) => ({ id: d.id, ok: false, error: '', verified: false, usedSnapshot: false }));
@@ -1192,6 +1194,8 @@ class DeepTweaksEngine {
       const script = typeof d.commands.revert === 'function' ? d.commands.revert(snap) : d.commands.revert;
       if (script) cmds.push({ di, script });
     });
+    // another engine's restore step riding in the same elevated run (one UAC prompt); its output comes back in stdout
+    if (extraCommand) cmds.push({ di: -1, script: extraCommand });
     const opResults = await this.runRegistryOps(ops, cmds);
     const errors = new Map();
     opResults.forEach((r, i) => { if (!r?.ok) errors.set(owner[i], r?.message || 'falha ao restaurar'); });
@@ -1231,12 +1235,13 @@ class DeepTweaksEngine {
     return this._finishRun(eventSender, runId, defs, results, notes, batchStdout);
   }
 
-  async revertTweaks(idsInput, eventSender = () => {}) {
+  /** opts.extraCommand: a PowerShell block run in the same elevated batch (its output is in the returned stdout). */
+  async revertTweaks(idsInput, eventSender = () => {}, { extraCommand = '' } = {}) {
     if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' };
     const ids = (Array.isArray(idsInput) ? idsInput : []).filter((i) => typeof i === 'string');
     const defs = ids.map((id) => this.getDefinition(id)).filter(Boolean);
     if (defs.length === 0) return { ok: false, error: 'Nenhum tweak válido selecionado' };
-    const run = await this._restoreDefs(defs, eventSender);
+    const run = await this._restoreDefs(defs, eventSender, { extraCommand });
     const out = this._summarize('revertido(s)', defs, run);
     Logger.auditOptimizer({ type: 'tweaks-revert', ids: defs.map((d) => d.id), ok: out.ok, error: out.error });
     return out;

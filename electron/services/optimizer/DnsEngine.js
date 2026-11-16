@@ -4,6 +4,7 @@ import ElevationHelper from './ElevationHelper.js';
 import DeepTweaksEngine from './DeepTweaksEngine.js';
 import { runPowerShell } from '../PowerShellRunner.js';
 import { isValidIpv4, medianFinite, psQuote } from './OptimizerUtils.js';
+import { PS_SELECT_PRIMARY_ADAPTER } from './activeAdapterPs.js';
 
 /** Well known public resolvers whose operator is identifiable. Anything else is flagged as "not verified" in the UI. */
 export const DNS_PRESETS = [
@@ -131,7 +132,7 @@ class DnsEngine {
     if (process.platform !== 'win32') return null;
     const ps = `
 $ErrorActionPreference='Stop'
-$a = Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | Sort-Object -Property LinkSpeed -Descending | Select-Object -First 1
+${PS_SELECT_PRIMARY_ADAPTER}
 if ($null -eq $a) { 'null' } else { [pscustomobject]@{ name = $a.Name; guid = $a.InterfaceGuid } | ConvertTo-Json -Compress }`;
     return this._psJson(ps, 15000);
   }

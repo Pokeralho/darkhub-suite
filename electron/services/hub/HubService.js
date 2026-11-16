@@ -228,7 +228,21 @@ export class HubService {
     }
 
     const record = { pkg, risk: v.risk, steps: r.steps, installedAt: new Date().toISOString(), tweaksAdded: [], tasks: [], changeSet: null, opsApplied: [], source }
-    const undo = async () => { try { await this._remove(record) } catch { /* best effort */ } }
+    // Rolls back what was applied so far. When something cannot be undone the record is kept as 'partial' (so the
+    // user can retry the removal later) and the errors are appended to the failure message.
+    const undo = async (reason) => {
+      let errors
+      try { errors = await this._remove(record) } catch (e) { errors = [e?.message ?? String(e)] }
+      if (!errors?.length) return ''
+      const st = this._load()
+      st.packages[pkg.id] = { ...record, status: 'partial', installError: reason, undoErrors: errors }
+      this._save(st)
+      return ` Não foi possível desfazer tudo (o pacote ficou como parcial; remova-o para tentar de novo): ${errors.join('; ')}`
+    }
+    const failed = async (error) => {
+      const extra = await undo(error)
+      return extra ? { ok: false, partial: true, error: error + extra } : { ok: false, error }
+    }
     const notes = []
 
     // 1) DarkHub tweaks: only the ones not already on, so removing the package does not undo the user's own choices
@@ -249,7 +263,7 @@ export class HubService {
       const id = `hub:${pkg.id}`
       const commands = stopServices.length ? { apply: stopServices.map((n) => `Stop-Service -Name ${psQuote(n)} -Force -ErrorAction SilentlyContinue`).join('\n') } : undefined
       const res = await this.tweaks.applyChangeSet({ id, title: textOf(pkg.name, 'pt-BR'), changes, commands })
-      if (!res?.ok) { await undo(); return { ok: false, error: `Registro/serviços: ${res?.error || 'falha'}` } }
+      if (!res?.ok) return failed(`Registro/serviços: ${res?.error || 'falha'}`)
       record.changeSet = { id, changes }
     }
 
@@ -264,7 +278,7 @@ export class HubService {
       const present = record.tasks.filter((t) => t.existed)
       if (present.length) {
         const res = await ElevationHelper.runMarked(taskApplyScript(present), 120000)
-        if (!res.ok) { await undo(); return { ok: false, error: `Tarefas: ${res.error}` } }
+        if (!res.ok) return failed(`Tarefas: ${res.error}`)
       }
     }
 
@@ -276,10 +290,10 @@ export class HubService {
       for (const s of ops) {
         const b = builtins.get(s.id)
         const op = this.optimizer?.operations.get(b.opId)
-        if (!op) { await undo(); return { ok: false, error: `Operação indisponível: ${s.id}` } }
+        if (!op) return failed(`Operação indisponível: ${s.id}`)
         if (b.reversible && status[b.opId] === true) continue
         const res = await op.execute()
-        if (opFailed(res)) { await undo(); return { ok: false, error: `${b.title}: ${res?.error || res?.message || 'falhou'}` } }
+        if (opFailed(res)) return failed(`${b.title}: ${res?.error || res?.message || 'falhou'}`)
         if (b.reversible) record.opsApplied.push(s.id)
         if (res?.requiresReboot) notes.push(`${b.title}: reinicie o Windows para concluir.`)
       }

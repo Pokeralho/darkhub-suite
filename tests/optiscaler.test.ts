@@ -85,3 +85,41 @@ describe('OptiScaler ini patch against the real OptiScaler 0.9.4 ini', () => {
     expect(off).toMatch(/\nFGOutput=nofg/);
   });
 });
+
+describe('OptiScaler restore while files are in use', () => {
+  it('reports a partial restore, keeps the tracking json and skips the Library update', async () => {
+    const os = await import('node:os');
+    const { vi } = await import('vitest');
+    const { registerOptiScalerIPC } = await import('../electron/optiscalerManager.js');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-opti-restore-'));
+    for (const f of ['OptiScaler.ini', 'nvngx.ini', 'DarkHubOptiScaler.json']) fs.writeFileSync(path.join(dir, f), 'x');
+    const handlers: Record<string, Function> = {};
+    const upserts: any[] = [];
+    registerOptiScalerIPC({
+      app: { getPath: () => path.join(dir, 'userData'), isPackaged: false },
+      ipcMain: { handle: (c: string, fn: Function) => { handlers[c] = fn; } },
+      getLibraryStore: async () => ({ loadLibrary: async () => ({ games: [{ id: 'g1', exePath: path.join(dir, 'game.exe') }] }), upsertGame: async (_a: any, g: any) => { upserts.push(g); } })
+    });
+    const realUnlink = fs.promises.unlink;
+    const spy = vi.spyOn(fs.promises, 'unlink').mockImplementation(async (p: any) => {
+      if (String(p).endsWith('nvngx.ini')) throw Object.assign(new Error('busy'), { code: 'EBUSY' });
+      return realUnlink(p);
+    });
+    try {
+      const r = await handlers['optiscaler:restoreBackup'](null, { targetDir: dir, gameId: 'g1' });
+      expect(r).toMatchObject({ ok: false, partial: true });
+      expect(r.failed.map((f: any) => path.basename(f.path))).toEqual(['nvngx.ini']);
+      expect(fs.existsSync(path.join(dir, 'DarkHubOptiScaler.json'))).toBe(true);
+      expect(upserts).toHaveLength(0);
+    } finally {
+      spy.mockRestore();
+    }
+    // game closed: the second attempt finishes and only then drops the tracking json
+    const r2 = await handlers['optiscaler:restoreBackup'](null, { targetDir: dir, gameId: 'g1' });
+    expect(r2.ok).toBe(true);
+    expect(fs.existsSync(path.join(dir, 'DarkHubOptiScaler.json'))).toBe(false);
+    expect(fs.existsSync(path.join(dir, 'nvngx.ini'))).toBe(false);
+    expect(upserts).toHaveLength(1);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});

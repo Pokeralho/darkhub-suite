@@ -318,9 +318,8 @@ export function createFramePacerOverlay() {
 
   overlayWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
 
-  if (!FramePacerEngine.isRunning) {
-    FramePacerEngine.start()
-  }
+  // Opening the overlay only shows metrics: it never starts the limiter (that would cap every game at the default
+  // target behind the user's back). While the limiter is stopped the overlay keeps its "--" placeholders.
 
   const win = overlayWindow
   const metricsHandler = (metrics) => {
