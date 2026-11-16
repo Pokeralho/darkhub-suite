@@ -2,6 +2,7 @@ import ElevationHelper from './ElevationHelper.js';
 import DeepTweaksEngine from './DeepTweaksEngine.js';
 import { runCommand, runPowerShell } from '../PowerShellRunner.js';
 import { psQuote } from './OptimizerUtils.js';
+import { planNetworkReset, readNetworkFacts, networkResetLines } from '../network/networkResetSafety.js';
 import { PS_SELECT_PRIMARY_ADAPTER } from './activeAdapterPs.js';
 import { partitionShared, claimShared, releaseShared } from './sharedOwners.js';
 
@@ -119,16 +120,18 @@ $ErrorActionPreference='Stop'
 
   async cleanNetwork() {
     if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
-    const script = `
-$ErrorActionPreference = 'Continue'
-& ipconfig.exe /flushdns | Out-Null
-& netsh.exe winsock reset
-if ($LASTEXITCODE -ne 0) { throw 'netsh winsock reset falhou' }
-& netsh.exe int ip reset
-`;
+    // a fixed IP, manual DNS, a VPN or a remote session would be lost by `netsh int ip reset`: read them first
+    const plan = planNetworkReset(await readNetworkFacts());
+    if (plan.blocked) return { ok: false, skipped: true, error: plan.blocked };
+    const [flush, winsock, ...rest] = networkResetLines(plan);
+    const script = [
+      "$ErrorActionPreference = 'Continue'", flush, winsock,
+      "if ($LASTEXITCODE -ne 0) { throw 'netsh winsock reset falhou' }", ...rest
+    ].join('\r\n');
     const { code, stderr } = await ElevationHelper.runElevatedPowerShell(script);
     if (code !== 0) return { ok: false, error: stderr || 'Falha ao redefinir a pilha de rede (UAC cancelado?)' };
-    return { ok: true, msg: 'Winsock e pilha TCP/IP redefinidos e cache DNS limpo. É NECESSÁRIO REINICIAR o Windows para concluir.', requiresReboot: true };
+    const what = plan.skipIpReset ? 'Winsock redefinido e cache DNS limpo' : 'Winsock e pilha TCP/IP redefinidos e cache DNS limpo';
+    return { ok: true, msg: [`${what}. É NECESSÁRIO REINICIAR o Windows para concluir.`, ...plan.notes].join(' '), notes: plan.notes, requiresReboot: true };
   }
 
   _eeeReadScript(names) {

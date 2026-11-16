@@ -3,7 +3,8 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import ElevationHelper from './ElevationHelper.js';
 import Logger from '../../services/LoggerService.js';
-import { runPowerShell } from '../PowerShellRunner.js';
+import { runPowerShell, runPowerShellJson } from '../PowerShellRunner.js';
+import { buildMoreTweaks, candidateChanges, factsFromProbe, resolveTweak, FACTS_SCRIPT } from './MoreTweaks.js';
 import {
   buildRegistryReadScript,
   buildRegistryScript,
@@ -52,6 +53,8 @@ function defineTweak(def) {
     dflt === null || dflt === undefined ? { key, name, deleteValue: true } : { key, name, type, data: String(dflt) }
   ));
   delete out.rows;
+  out.templateChanges = out.changes;
+  out.templateRevert = out.revertChanges;
   // command scripts always run in the elevated batch
   out.requiresAdmin = def.requiresAdmin ?? (Boolean(def.commands) || out.changes.some((c) => !isUserHiveKey(c.key)));
   out.risk = def.risk || 'low';
@@ -414,7 +417,7 @@ if (-not (Test-Path -LiteralPath (Split-Path $db))) { throw 'A Microsoft Store n
 if (-not (Test-Path -LiteralPath $db)) { New-Item -ItemType File -Path $db -Force | Out-Null }
 & icacls.exe $db /deny '*S-1-1-0:(W)' | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "icacls falhou ($LASTEXITCODE)" }
-New-Item -Path 'HKCU:\\Software\\DarkHub\\Tweaks' -Force | Out-Null
+if (-not (Test-Path -LiteralPath 'HKCU:\\Software\\DarkHub\\Tweaks')) { New-Item -Path 'HKCU:\\Software\\DarkHub\\Tweaks' -Force | Out-Null }
 New-ItemProperty -Path 'HKCU:\\Software\\DarkHub\\Tweaks' -Name StoreSearchBlocked -PropertyType DWord -Value 1 -Force | Out-Null`,
         revert: `$db = Join-Path $env:LOCALAPPDATA 'Packages\\Microsoft.WindowsStore_8wekyb3d8bbwe\\LocalState\\store.db'
 if (Test-Path -LiteralPath $db) { & icacls.exe $db /remove:d '*S-1-1-0' | Out-Null; if ($LASTEXITCODE -ne 0) { throw "icacls falhou ($LASTEXITCODE)" } }
@@ -507,7 +510,7 @@ if ($was -ne 'Disabled') {
 }
 $now = (Get-WindowsReservedStorageState -ErrorAction Stop).ReservedStorageState
 if ($now -ne 'Disabled') { throw "O Windows manteve o estado $now (provavelmente ha uma atualizacao pendente)." }
-New-Item -Path 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks' -Force | Out-Null
+if (-not (Test-Path -LiteralPath 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks')) { New-Item -Path 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks' -Force | Out-Null }
 New-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks' -Name ReservedStorageOff -PropertyType DWord -Value 1 -Force | Out-Null
 New-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks' -Name ReservedStorageWasOn -PropertyType DWord -Value ([int]($was -ne 'Disabled')) -Force | Out-Null`,
         revert: `$k = 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks'
@@ -557,7 +560,7 @@ Remove-ItemProperty -Path $k -Name ReservedStorageOff, ReservedStorageWasOn -Err
         apply: `& bcdedit.exe /set '{current}' bootmenupolicy legacy | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "bcdedit falhou ($LASTEXITCODE)" }
 if (-not ((& bcdedit.exe /enum '{current}') -match 'bootmenupolicy\\s+Legacy')) { throw 'O BCD nao manteve bootmenupolicy=Legacy.' }
-New-Item -Path 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks' -Force | Out-Null
+if (-not (Test-Path -LiteralPath 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks')) { New-Item -Path 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks' -Force | Out-Null }
 New-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks' -Name LegacyBootMenu -PropertyType DWord -Value 1 -Force | Out-Null`,
         revert: `& bcdedit.exe /set '{current}' bootmenupolicy standard | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "bcdedit falhou ($LASTEXITCODE)" }
@@ -647,9 +650,13 @@ Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\DarkHub\\Tweaks' -Name LegacyBootMen
         ['HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\Terminal Services\\Client', 'RedirectionWarningDialogVersion', DW, 1, null],
         ['HKCU\\Software\\Microsoft\\Terminal Server Client', 'RdpLaunchConsentAccepted', DW, 1, null]
       ]
-    })
+    }),
+    ...buildMoreTweaks(defineTweak)
   ];
 }
+
+/** Definitions whose rows or availability depend on this machine (see MoreTweaks.js). */
+const isMachineDependent = (d) => Boolean(d.gpu || d.serviceTargets || d.dynamicRows || d.onlyExistingKeys || d.minBuild || d.maxBuild);
 
 /** Internal groups: same machinery (snapshot/verify/undo) but not shown in the tweak list. */
 function buildInternalGroups() {
@@ -725,7 +732,16 @@ $f = [uint32](Get-ItemProperty -LiteralPath 'HKCU:\\Control Panel\\Accessibility
 $s = New-Object DhStickyKeys
 $s.cbSize = 8
 $s.dwFlags = $f
-if (-not [DhSpi2]::SystemParametersInfo(0x003B, 8, [ref]$s, 3)) { throw 'SPI_SETSTICKYKEYS falhou' }`
+if (-not [DhSpi2]::SystemParametersInfo(0x003B, 8, [ref]$s, 3)) { throw 'SPI_SETSTICKYKEYS falhou' }`,
+  keyboard: `
+$sig = @'
+using System; using System.Runtime.InteropServices;
+public static class DhSpi3 { [DllImport("user32.dll", SetLastError=true)] public static extern bool SystemParametersInfo(uint a, uint b, IntPtr c, uint d); }
+'@
+Add-Type -TypeDefinition $sig -ErrorAction Stop
+$k = Get-ItemProperty -LiteralPath 'HKCU:\\Control Panel\\Keyboard'
+if (-not [DhSpi3]::SystemParametersInfo(0x0017, [uint32]$k.KeyboardDelay, [IntPtr]::Zero, 3)) { throw 'SPI_SETKEYBOARDDELAY falhou' }
+if (-not [DhSpi3]::SystemParametersInfo(0x000B, [uint32]$k.KeyboardSpeed, [IntPtr]::Zero, 3)) { throw 'SPI_SETKEYBOARDSPEED falhou' }`
 };
 
 class DeepTweaksEngine {
@@ -758,12 +774,54 @@ class DeepTweaksEngine {
   listTweaks() {
     // IPC-safe copies: `commands.revert` is a function (tweak:disableHibernation) and Electron's structured clone
     // throws on functions, which made `optimizer:deepTweaksList` reject and the UI show no registry tweak at all.
-    return this.deepTweaks.map(({ commands, ...rest }) => (commands ? { ...rest, hasCommands: true } : rest));
+    return this.deepTweaks.map(({ commands, dynamicRows, templateChanges, templateRevert, ...rest }) => (commands ? { ...rest, hasCommands: true } : rest));
+  }
+
+  /**
+   * Reads this machine's facts once (Windows build, RAM, display adapters, which service/logger keys exist) and
+   * resolves the rows of machine-dependent tweaks. Tweaks that do not apply get applicable=false and are hidden.
+   */
+  ensureResolved() {
+    if (process.platform !== 'win32') return Promise.resolve(null);
+    if (!this._resolving) {
+      this._resolving = this._resolveMachine().catch((e) => {
+        Logger.warn('DeepTweaksEngine', 'Falha ao detectar o hardware para os ajustes específicos', e);
+        this._resolving = null;
+        return null;
+      });
+    }
+    return this._resolving;
+  }
+
+  async _resolveMachine() {
+    const r = await runPowerShellJson(FACTS_SCRIPT, { timeoutMs: 30000, trim: true, allowNonZero: true });
+    const facts = factsFromProbe(r.data);
+    const dyn = this.deepTweaks.filter(isMachineDependent);
+    const cand = dyn.flatMap((d) => candidateChanges(d, facts));
+    const readMap = cand.length ? (await this.readEntries(cand)) || new Map() : new Map();
+    for (const d of dyn) this.applyResolution(d, resolveTweak(d, facts, readMap), facts);
+    this.facts = facts;
+    return facts;
+  }
+
+  /** Stores a resolution on the definition (exposed for tests). */
+  applyResolution(d, res, facts = {}) {
+    d.applicable = res.applicable;
+    d.unavailableReason = res.applicable ? undefined : res.reason;
+    if (!(d.gpu || d.serviceTargets || d.dynamicRows || d.onlyExistingKeys)) return;
+    d.changes = res.changes;
+    const kept = new Set(res.changes.map((c) => regEntryId(c.key, c.name)));
+    if (res.revertChanges) d.revertChanges = res.revertChanges;
+    else if (d.dynamicRows) {
+      d.revertChanges = d.dynamicRows(facts).map(([key, name, type, , dflt]) => (
+        dflt === null || dflt === undefined ? { key, name, deleteValue: true } : { key, name, type, data: String(dflt) }));
+    } else if (d.serviceTargets) d.revertChanges = []; // only the snapshot knows each service's previous start type
+    else d.revertChanges = (d.templateRevert || []).filter((c) => kept.has(regEntryId(c.key, c.name)));
   }
 
   /** Ids of the safe, low-risk, reversible tweaks that make up the "recommended" selection. */
   getRecommendedIds() {
-    return pickRecommendedTweaks(this.deepTweaks).map((t) => t.id);
+    return pickRecommendedTweaks(this.deepTweaks.filter((t) => t.applicable !== false)).map((t) => t.id);
   }
 
   getDefinition(id) {
@@ -913,6 +971,13 @@ class DeepTweaksEngine {
     return true;
   }
 
+  /** Best-effort tweaks are judged only on the rows Windows accepted (recorded in the snapshot). */
+  _writtenRows(d) {
+    if (!d.bestEffort) return null;
+    const applied = this.deepTweaksUndoStore.get(d.id)?.applied;
+    return Array.isArray(applied) && applied.length ? applied : null;
+  }
+
   // ------------------------------------------------------------------ status
   _evalDefStatus(def, readMap, changesOverride = null) {
     const changes = (changesOverride || def.changes || []).filter((c) => !c.deleteKey);
@@ -930,6 +995,7 @@ class DeepTweaksEngine {
   /** Real state read from the registry: a tweak is active only if EVERY value matches. */
   async checkTweaksStatus() {
     if (process.platform !== 'win32') return { ok: true, status: {}, partial: {} };
+    await this.ensureResolved();
     const defs = [...this.deepTweaks, ...this.internalGroups];
     // dynamic groups (e.g. adapter specific network keys) are evaluated from what was applied
     const dynamic = [];
@@ -948,7 +1014,7 @@ class DeepTweaksEngine {
     const status = {};
     const partial = {};
     for (const d of all) {
-      const r = this._evalDefStatus(d, map);
+      const r = this._evalDefStatus(d, map, this._writtenRows(d));
       status[d.id] = r.active;
       if (r.partial) partial[d.id] = true;
     }
@@ -1018,19 +1084,24 @@ class DeepTweaksEngine {
     // 2) registry writes (HKCU direct) + machine writes and command scripts in ONE elevated script
     const ops = [];
     const owner = [];
+    const rowOf = [];
     const cmds = [];
     defs.forEach((d, di) => {
       if (results[di].error) return;
-      for (const c of d.changes || []) { ops.push(c.deleteKey ? { key: c.key, deleteKey: true } : { ...c }); owner.push(di); }
+      for (const c of d.changes || []) { ops.push(c.deleteKey ? { key: c.key, deleteKey: true } : { ...c }); owner.push(di); rowOf.push(c); }
       if (d.commands?.apply) cmds.push({ di, script: typeof d.commands.apply === 'function' ? d.commands.apply() : d.commands.apply });
     });
     const opResults = await this.runRegistryOps(ops, cmds);
     const writeErrors = new Map();
     const touched = new Set(); // defs for which at least one write/command really went through
+    const refused = new Map(); // best-effort defs: rows Windows refused (protected keys)
     opResults.forEach((r, i) => {
-      if (!r?.ok) writeErrors.set(owner[i], r?.message || 'falha ao escrever no registro');
+      const d = defs[owner[i]];
+      if (!r?.ok && d.bestEffort) { if (!refused.has(owner[i])) refused.set(owner[i], []); refused.get(owner[i]).push(rowOf[i]); }
+      else if (!r?.ok) writeErrors.set(owner[i], r?.message || 'falha ao escrever no registro');
       else touched.add(owner[i]);
     });
+    const writtenFor = (d, di) => (refused.has(di) ? (d.changes || []).filter((c) => !refused.get(di).includes(c)) : null);
     for (const [di, r] of opResults.cmdResults) {
       if (!r.ok && !writeErrors.has(di)) writeErrors.set(di, r.message || 'comando falhou');
       if (r.ok) touched.add(di);
@@ -1044,7 +1115,13 @@ class DeepTweaksEngine {
       if (res.error) return;
       if (writeErrors.has(di)) { res.error = writeErrors.get(di); return; }
       if (!afterMap) { res.error = 'Não foi possível verificar o resultado no registro'; return; }
-      const st = this._evalDefStatus(d, afterMap);
+      const written = writtenFor(d, di);
+      if (written && written.length === 0) { res.error = 'O Windows recusou todas as alterações (chaves protegidas).'; return; }
+      if (written) {
+        const names = refused.get(di).map((c) => String(c.key).split('\\').slice(-1)[0]);
+        notes.push(`${d.title || d.id}: ${names.length} item(ns) protegido(s) pelo Windows foram pulados (${names.slice(0, 8).join(', ')}${names.length > 8 ? '...' : ''}).`);
+      }
+      const st = this._evalDefStatus(d, afterMap, written);
       res.verified = st.active;
       if (st.active) res.ok = true;
       else res.error = 'O Windows não manteve o valor (política bloqueada, Tamper Protection ou valor sobrescrito). Nada foi alterado de forma verificável.';
@@ -1056,7 +1133,7 @@ class DeepTweaksEngine {
     defs.forEach((d, di) => {
       if (!results[di].ok && freshSnapshots.has(d.id) && !touched.has(di)) this.deepTweaksUndoStore.delete(d.id);
       else if (results[di].ok && this.deepTweaksUndoStore.has(d.id)) {
-        this.deepTweaksUndoStore.get(d.id).applied = (d.changes || []).filter((c) => !c.deleteKey);
+        this.deepTweaksUndoStore.get(d.id).applied = (writtenFor(d, di) || d.changes || []).filter((c) => !c.deleteKey);
       }
     });
     this.saveUndoStore();
@@ -1099,7 +1176,13 @@ class DeepTweaksEngine {
   async applyTweaks(idsInput, eventSender = () => {}) {
     if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
     const ids = (Array.isArray(idsInput) ? idsInput : []).filter((i) => typeof i === 'string');
-    let defs = ids.map((id) => this.getDefinition(id)).filter(Boolean);
+    await this.ensureResolved();
+    // a tweak that does not exist on this machine (other GPU vendor, Windows build) is never written
+    let defs = ids.map((id) => this.getDefinition(id)).filter((d) => d && d.applicable !== false);
+    const skipped = ids.filter((id) => this.getDefinition(id)?.applicable === false);
+    if (defs.length === 0 && skipped.length) {
+      return { ok: true, skipped, results: [], msg: 'Nenhum dos ajustes selecionados se aplica a este PC (outra GPU, outra versão do Windows ou componente ausente).' };
+    }
     // Alternatives that write the same value (e.g. prefer IPv4 / disable IPv6): the last one selected wins, and one
     // already applied is undone first so its snapshot keeps the user's real original value.
     defs = defs.filter((d, i) => !defs.slice(i + 1).some((later) => (later.conflictsWith || []).includes(d.id)));
@@ -1109,7 +1192,7 @@ class DeepTweaksEngine {
     const run = await this._applyDefs(defs, eventSender);
     const out = this._summarize('aplicado(s)', defs, run);
     Logger.auditOptimizer({ type: 'tweaks-apply', ids: defs.map((d) => d.id), ok: out.ok, error: out.error });
-    return out;
+    return skipped.length ? { ...out, skipped } : out;
   }
 
   /** Applies only the safe, low-risk, reversible tweaks (never VBS, BitLocker, telemetry policies...). */
@@ -1154,7 +1237,8 @@ class DeepTweaksEngine {
       results[di].usedSnapshot = !!snap;
       let defOps = [];
       if (snap) {
-        const changeIds = new Set((d.changes || []).map((c) => regEntryId(c.key, c.name)));
+        const restoreRows = d.bestEffort && Array.isArray(snap.applied) ? snap.applied : (d.changes || []);
+        const changeIds = new Set(restoreRows.map((c) => regEntryId(c.key, c.name)));
         // statusOnly entries are restored by the revert command, not written back
         for (const e of snap.entries || []) {
           if (!changeIds.has(regEntryId(e.key, e.name)) && (d.changes || []).length) continue;
@@ -1229,6 +1313,7 @@ class DeepTweaksEngine {
   async revertTweaks(idsInput, eventSender = () => {}, { extraCommand = '' } = {}) {
     if (process.platform !== 'win32') return { ok: false, error: 'Only Windows' };
     const ids = (Array.isArray(idsInput) ? idsInput : []).filter((i) => typeof i === 'string');
+    await this.ensureResolved();
     const defs = ids.map((id) => this.getDefinition(id)).filter(Boolean);
     if (defs.length === 0) return { ok: false, error: 'Nenhum tweak válido selecionado' };
     const run = await this._restoreDefs(defs, eventSender, { extraCommand });

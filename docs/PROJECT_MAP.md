@@ -103,6 +103,7 @@ Camadas, de cima para baixo:
 2. **Handlers**: `electron/main.js`, canais `optimizer:*` (lista com linha em `docs/map/IPC.md`).
 3. **Catálogo de operações**: `electron/services/optimizer/SystemOptimizerService.js`, `registerOperations()`. Cada item tem `id: 'optimizer:<nome>'`, `name` em português, `category`, `risk`, `execute`/`revert`/`statusFn`. Itens `_tweakOp` só apontam para tweaks de registro (`tweakIds`).
 4. **Tweaks de registro**: `electron/services/optimizer/DeepTweaksEngine.js`, `defineTweak({ id: 'tweak:<nome>', rows: [[chave, valor, tipo, novo, padrão]] })`. Snapshots de "antes" permitem desfazer.
+   Tweaks que dependem da máquina ficam em `electron/services/optimizer/MoreTweaks.js`: GPU por fabricante (`gpu`), faixa de build (`minBuild`/`maxBuild`), linhas calculadas (`dynamicRows`), só chaves existentes (`onlyExistingKeys`) e a lista ampla de serviços (`serviceTargets` + `bestEffort`: chaves protegidas são puladas, só o que foi escrito é verificado e desfeito). `DeepTweaksEngine.ensureResolved()` lê build, RAM e GPUs uma vez por sessão; item com `applicable: false` some da tela e é ignorado ao aplicar (inclusive por pacotes do Hub).
 5. **Engines** (a ação de verdade):
 
 | Engine | Cuida de |

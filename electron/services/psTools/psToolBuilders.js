@@ -8,6 +8,7 @@
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { psQuote } from '../optimizer/OptimizerUtils.js'
+import { oneDriveRootOf } from '../cloudSync.js'
 
 const require = createRequire(import.meta.url)
 export const TOOL_SCHEMA = require('./toolSchema.json')
@@ -368,6 +369,10 @@ DhOut $rows`,
   cleanOldFiles: (v) => {
     if (v.folder !== '%TEMP%' && isDangerousCleanupRoot(v.folder)) {
       return { error: 'Por segurança, esta pasta não pode ser limpa (raiz do disco, Windows, Arquivos de Programas ou pasta do perfil).' }
+    }
+    // deleting in OneDrive deletes in the cloud and on every PC; checking an online-only file would also download it
+    if (v.folder !== '%TEMP%' && oneDriveRootOf(v.folder)) {
+      return { error: 'Esta pasta fica no OneDrive: apagar aqui apaga também na nuvem e em todos os seus PCs, e conferir arquivos que estão só na nuvem faria o download deles. Limpe pelo site ou app do OneDrive.' }
     }
     return {
       script: `${PRELUDE}

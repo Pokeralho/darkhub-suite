@@ -8,6 +8,7 @@ import { ScanModel } from './ScanModel.js';
 import { parseFilter } from './filter.js';
 import { runPowerShell } from '../PowerShellRunner.js';
 import { psQuote } from '../optimizer/OptimizerUtils.js';
+import { oneDriveRootOf } from '../cloudSync.js';
 
 const TAG_COLORS = new Set(['red', 'yellow', 'green', 'blue']);
 
@@ -255,6 +256,8 @@ export class DiskScanService {
     const p = this._pathOf(id);
     if (!p) return { ok: false, error: 'Item não encontrado.' };
     if (String(confirmName ?? '') !== path.basename(p)) return { ok: false, error: 'Digite o nome exato do item para confirmar.' };
+    // a permanent delete in OneDrive is synced: the item disappears from the cloud and from every PC of the person
+    if (oneDriveRootOf(p)) return { ok: false, error: 'Este item fica no OneDrive: apagar de vez aqui apaga também na nuvem e em todos os seus PCs. Use "Mover para a Lixeira" ou apague pelo OneDrive.' };
     const size = Number(this.model.info(id, this._filter(''))?.size) || 0;
     const why = recycleVerdict(await this.recycleProbe(p), size);
     if (!why || why === 'unknown') return { ok: false, error: 'Este item pode ir para a Lixeira: use "Mover para a Lixeira".' };

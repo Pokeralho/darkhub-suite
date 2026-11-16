@@ -7,7 +7,7 @@ and when the package is removed it only undoes the tweaks the package turned on 
 
 Tweaks marked **official only** touch security and are refused in community packages.
 
-66 tweaks.
+92 tweaks.
 
 ## Interface and Explorer
 
@@ -270,6 +270,48 @@ Liga o Num Lock no seu usuário e também na tela de login, para digitar PIN num
 | `HKCU\Control Panel\Keyboard` | `InitialKeyboardIndicators` | REG_SZ = 2 |
 | `HKU\.DEFAULT\Control Panel\Keyboard` | `InitialKeyboardIndicators` | REG_SZ = 2 |
 
+### `darkhub:tweak:fasterMenus`
+
+**Menus e inicialização do Explorer mais rápidos** · risk: low
+
+Menus abrem sem o atraso de 400 ms e os programas da inicialização não esperam o atraso artificial que o Explorer aplica depois do login. Vale após sair e entrar na sessão.
+
+| Key | Value name | Writes |
+|---|---|---|
+| `HKCU\Control Panel\Desktop` | `MenuShowDelay` | REG_SZ = 0 |
+| `HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize` | `StartupDelayInMSec` | REG_DWORD = 0 |
+
+### `darkhub:tweak:hideStartRecommended`
+
+**Ocultar a seção "Recomendados" do Iniciar** · risk: low · restarts Explorer
+
+Esconde a lista de arquivos recentes e apps sugeridos no menu Iniciar do Windows 11. Em algumas edições o Windows só respeita a política na versão Education/SE; nesse caso a seção continua lá e o DarkHub avisa que o valor não foi mantido.
+
+| Key | Value name | Writes |
+|---|---|---|
+| `HKCU\Software\Policies\Microsoft\Windows\Explorer` | `HideRecommendedSection` | REG_DWORD = 1 |
+| `HKLM\SOFTWARE\Policies\Microsoft\Windows\Explorer` | `HideRecommendedSection` | REG_DWORD = 1 |
+
+### `darkhub:tweak:hideMeetNow`
+
+**Ocultar o botão "Reunir agora" da barra de tarefas** · risk: low · restarts Explorer
+
+Remove o ícone do Skype "Reunir agora" da bandeja do Windows 10.
+
+| Key | Value name | Writes |
+|---|---|---|
+| `HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer` | `HideSCAMeetNow` | REG_DWORD = 1 |
+
+### `darkhub:tweak:disableWidgets`
+
+**Desativar Widgets / Notícias e Interesses** · risk: low · restarts Explorer
+
+Desliga o painel de Widgets do Windows 11 (e Notícias e Interesses no Windows 10) pela política oficial. O processo de widgets deixa de rodar em segundo plano.
+
+| Key | Value name | Writes |
+|---|---|---|
+| `HKLM\SOFTWARE\Policies\Microsoft\Dsh` | `AllowNewsAndInterests` | REG_DWORD = 0 |
+
 ## Privacy
 
 ### `darkhub:tweak:disableTelemetry`
@@ -452,6 +494,70 @@ Esconde o botão "Experimentar o novo Outlook" e bloqueia a migração automáti
 | `HKCU\Software\Policies\Microsoft\Office\16.0\Outlook\Options\General` | `DoNewOutlookAutoMigration` | REG_DWORD = 0 |
 | `HKCU\Software\Policies\Microsoft\Office\16.0\Outlook\Preferences` | `NewOutlookMigrationUserSetting` | REG_DWORD = 0 |
 
+### `darkhub:tweak:telemetryExtended`
+
+**Telemetria: pedidos de feedback, inventário de apps e dados opcionais** · risk: low
+
+Complementa "Reduzir Telemetria": sem pedidos de avaliação do Windows, sem inventário de programas (AppCompat), sem nome do dispositivo nem dados do Edge na telemetria, sem reconhecimento de fala online e sem registrar quais apps você abre (a lista "Mais usados" do Iniciar fica vazia).
+
+| Key | Value name | Writes |
+|---|---|---|
+| `HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection` | `DoNotShowFeedbackNotifications` | REG_DWORD = 1 |
+| `HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection` | `AllowCommercialDataPipeline` | REG_DWORD = 0 |
+| `HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection` | `AllowDeviceNameInTelemetry` | REG_DWORD = 0 |
+| `HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection` | `MicrosoftEdgeDataOptIn` | REG_DWORD = 0 |
+| `HKCU\Software\Microsoft\Siuf\Rules` | `NumberOfSIUFInPeriod` | REG_DWORD = 0 |
+| `HKCU\Software\Policies\Microsoft\Windows\EdgeUI` | `DisableMFUTracking` | REG_DWORD = 1 |
+| `HKLM\SOFTWARE\Policies\Microsoft\Windows\AppCompat` | `DisableInventory` | REG_DWORD = 1 |
+| `HKLM\SOFTWARE\Policies\Microsoft\Windows\AppCompat` | `AITEnable` | REG_DWORD = 0 |
+| `HKCU\Software\Policies\Microsoft\Assistance\Client\1.0` | `NoExplicitFeedback` | REG_DWORD = 1 |
+| `HKLM\SOFTWARE\Policies\Microsoft\Assistance\Client\1.0` | `NoActiveHelp` | REG_DWORD = 1 |
+| `HKCU\Software\Microsoft\Speech_OneCore\Settings\OnlineSpeechPrivacy` | `HasAccepted` | REG_DWORD = 0 |
+| `HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced` | `Start_TrackProgs` | REG_DWORD = 0 |
+
+### `darkhub:tweak:disableTelemetryTasks`
+
+**Desativar tarefas agendadas de telemetria** · risk: low · also runs a DarkHub command
+
+Desativa as tarefas que coletam inventário de compatibilidade e dados do Programa de Aperfeiçoamento (Compatibility Appraiser, ProgramDataUpdater, CEIP Consolidator, UsbCeip, Feedback DmClient e outras). Só as tarefas que estavam ligadas são desativadas, e Desfazer liga exatamente essas de volta.
+
+### `darkhub:tweak:disableAutoLoggers`
+
+**Desativar sessões de log de diagnóstico no boot (AutoLogger)** · risk: low · needs restart · also runs a DarkHub command
+
+Impede que o Windows inicie, a cada boot, as sessões de rastreamento ETW de telemetria e diagnóstico (Diagtrack-Listener, SQMLogger, DiagLog, WdiContextLog, WiFiSession e outras). Economiza escrita em disco. Em troca, o Monitor de Confiabilidade e alguns solucionadores de problemas de rede/Wi-Fi ficam com menos informação. Vale após reiniciar.
+
+### `darkhub:tweak:disableFindMyDevice`
+
+**Desativar "Localizar meu dispositivo"** · risk: medium · **official only**
+
+Desliga o envio periódico da localização do PC para a conta Microsoft. Em notebooks, você perde a opção de localizar ou bloquear o aparelho pela internet se ele for perdido ou roubado.
+
+| Key | Value name | Writes |
+|---|---|---|
+| `HKLM\SOFTWARE\Policies\Microsoft\FindMyDevice` | `AllowFindMyDevice` | REG_DWORD = 0 |
+
+### `darkhub:tweak:disableClickToDo`
+
+**Desativar o Click to Do (IA do Windows 11)** · risk: low
+
+Desliga o Click to Do, que analisa o conteúdo da tela com IA local (Windows 11 24H2 ou mais novo, PCs Copilot+). Só aparece nas versões do Windows que têm o recurso.
+
+| Key | Value name | Writes |
+|---|---|---|
+| `HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI` | `DisableClickToDo` | REG_DWORD = 1 |
+| `HKCU\Software\Policies\Microsoft\Windows\WindowsAI` | `DisableClickToDo` | REG_DWORD = 1 |
+
+### `darkhub:tweak:disableSettingsAccountAds`
+
+**Sem propagandas do Microsoft 365 e da conta no app Configurações** · risk: low
+
+Remove os avisos de "conta" e as ofertas do Microsoft 365, OneDrive e Game Pass que aparecem no topo do app Configurações.
+
+| Key | Value name | Writes |
+|---|---|---|
+| `HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent` | `DisableConsumerAccountStateContent` | REG_DWORD = 1 |
+
 ## Gaming
 
 ### `darkhub:tweak:disableGameDvr`
@@ -521,6 +627,76 @@ Desliga o MPO do DWM (OverlayTestMode=5, correção documentada pela NVIDIA). Re
 | Key | Value name | Writes |
 |---|---|---|
 | `HKLM\SOFTWARE\Microsoft\Windows\Dwm` | `OverlayTestMode` | REG_DWORD = 5 |
+
+### `darkhub:tweak:fastKeyboardRepeat`
+
+**Repetição de teclado mais rápida** · risk: low
+
+Atraso de repetição no mínimo e velocidade de repetição no máximo (Painel de Controle > Teclado). Vale na hora.
+
+| Key | Value name | Writes |
+|---|---|---|
+| `HKCU\Control Panel\Keyboard` | `KeyboardDelay` | REG_SZ = 0 |
+| `HKCU\Control Panel\Keyboard` | `KeyboardSpeed` | REG_SZ = 31 |
+
+### `darkhub:tweak:disableAccessibilityHotkeys`
+
+**Desativar atalhos de Teclas de Alternância e Teclas de Filtragem** · risk: low
+
+Complementa o ajuste das Teclas de Aderência: segurar Num Lock por 5 s (Teclas de Alternância) ou Shift direito por 8 s (Teclas de Filtragem) deixa de abrir avisos no meio do jogo. Os recursos continuam disponíveis em Acessibilidade. Vale após sair e entrar na sessão.
+
+| Key | Value name | Writes |
+|---|---|---|
+| `HKCU\Control Panel\Accessibility\ToggleKeys` | `Flags` | REG_SZ = 58 |
+| `HKCU\Control Panel\Accessibility\Keyboard Response` | `Flags` | REG_SZ = 122 |
+
+### `darkhub:tweak:amdDisableUlps`
+
+**AMD: desativar ULPS (economia de energia profunda)** · risk: medium · needs restart
+
+Impede que a placa AMD entre no estado de energia ultrabaixo. Resolve telas pretas, travamentos ao acordar e oscilação de clock em CrossFire/multimonitor. A placa consome um pouco mais em repouso. Vale após reiniciar.
+
+### `darkhub:tweak:amdDisablePowerGating`
+
+**AMD: desativar power gating e estados dinâmicos** · risk: medium · needs restart
+
+Mantém os blocos da GPU AMD sempre energizados e sem troca dinâmica de estado de energia, o que reduz picos de latência ao mudar de carga. Mais consumo e temperatura em repouso. Vale após reiniciar.
+
+### `darkhub:tweak:amdDisableClockGating`
+
+**AMD: desativar clock gating do codificador de vídeo** · risk: medium · needs restart
+
+Deixa o codificador/decodificador de vídeo da AMD (VCE/UVD) sempre ligado. Pode eliminar engasgos no início de gravações e streams. Consome um pouco mais em repouso. Vale após reiniciar.
+
+### `darkhub:tweak:amdDisableAspm`
+
+**AMD: desativar ASPM do PCIe na placa** · risk: medium · needs restart
+
+Desliga a economia de energia do link PCIe da placa AMD (estados L0s/L1), evitando a latência de "acordar" o barramento. Vale após reiniciar.
+
+### `darkhub:tweak:nvidiaDisableDynamicPstate`
+
+**NVIDIA: desativar P-states dinâmicos** · risk: medium · needs restart
+
+Mantém a placa NVIDIA no estado de desempenho máximo em vez de baixar o clock entre cenas. Reduz quedas de frametime ao alternar cargas. A placa fica mais quente e consome mais em repouso. Vale após reiniciar.
+
+### `darkhub:tweak:nvidiaDisableAsyncPstates`
+
+**NVIDIA: desativar P-states assíncronos** · risk: medium · needs restart
+
+Impede que memória e núcleo da placa NVIDIA troquem de estado de energia separadamente, o que pode causar micro-engasgos. Vale após reiniciar.
+
+### `darkhub:tweak:intelDisableAsyncFlips`
+
+**Intel: desativar async flips** · risk: medium · needs restart
+
+Desliga a troca assíncrona de quadros do driver gráfico Intel, que em alguns jogos causa tearing ou cintilação. Vale após reiniciar.
+
+### `darkhub:tweak:intelDisableAdaptiveVsync`
+
+**Intel: desativar V-Sync adaptativo do driver** · risk: medium · needs restart
+
+Impede o driver Intel de ligar e desligar o V-Sync sozinho conforme o FPS, deixando o controle com o jogo. Vale após reiniciar.
 
 ## Storage
 
@@ -671,6 +847,38 @@ Remove o aviso adicionado pela Microsoft em 2025 ao abrir arquivos de Área de T
 | `HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client` | `RedirectionWarningDialogVersion` | REG_DWORD = 1 |
 | `HKCU\Software\Microsoft\Terminal Server Client` | `RdpLaunchConsentAccepted` | REG_DWORD = 1 |
 
+### `darkhub:tweak:longerUpdatePause`
+
+**Permitir pausar o Windows Update por mais tempo** · risk: low
+
+Aumenta o limite do botão "Pausar atualizações" em Configurações (o padrão é 5 semanas). As atualizações continuam ativas: nada é pausado até você escolher pausar.
+
+| Key | Value name | Writes |
+|---|---|---|
+| `HKLM\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings` | `FlightSettingsMaxPauseDays` | REG_DWORD = 7300 |
+
+### `darkhub:tweak:svchostGrouping`
+
+**Agrupar serviços em menos processos svchost** · risk: low · needs restart
+
+Com mais de 3,5 GB de RAM o Windows roda cada serviço num svchost.exe separado (dezenas de processos). Este ajuste usa o tamanho da sua RAM como limite, e o Windows volta a agrupar os serviços: menos processos e um pouco menos de memória. Se um serviço travar, os outros do mesmo grupo caem junto. Vale após reiniciar.
+
+### `darkhub:tweak:webdavLargeFiles`
+
+**WebDAV: permitir arquivos maiores que 50 MB** · risk: low
+
+Pastas de rede WebDAV (Nextcloud, SharePoint mapeado) recusam arquivos acima de 50 MB por padrão. Sobe o limite para o máximo (4 GB). Só aparece se o cliente WebDAV estiver instalado. Vale após reiniciar o serviço WebClient ou o PC.
+
+| Key | Value name | Writes |
+|---|---|---|
+| `HKLM\SYSTEM\CurrentControlSet\Services\WebClient\Parameters` | `FileSizeLimitInBytes` | REG_DWORD = 4294967295 |
+
+### `darkhub:tweak:servicesManual`
+
+**Serviços do Windows em modo Manual (lista ampla)** · risk: medium · needs restart
+
+Coloca cerca de 160 serviços pouco usados em "Manual" (iniciam só quando algum programa precisa) e desativa uns 10 obsoletos (Fax, Registro Remoto, Demo de varejo...). Nunca reativa um serviço que você desligou e não mexe em impressão, compartilhamento de pastas, notificações, Windows Update nem no agente SSH. Serviços protegidos pelo Windows são pulados. Cada valor anterior é guardado e Desfazer restaura exatamente. Vale após reiniciar.
+
 ## Network
 
 ### `darkhub:tweak:preferIPv4`
@@ -725,6 +933,26 @@ Faz o Windows usar a suspensão S3 (CPU desligada, só a RAM alimentada) em vez 
 | Key | Value name | Writes |
 |---|---|---|
 | `HKLM\SYSTEM\CurrentControlSet\Control\Power` | `PlatformAoAcOverride` | REG_DWORD = 0 |
+
+### `darkhub:tweak:disablePowerThrottling`
+
+**Desativar o Power Throttling (limitação de apps em segundo plano)** · risk: low · needs restart
+
+O Windows reduz a CPU de programas em segundo plano para economizar energia (EcoQoS). Desligar ajuda quem grava, renderiza ou faz stream com o jogo em primeiro plano. Em notebooks a bateria dura menos.
+
+| Key | Value name | Writes |
+|---|---|---|
+| `HKLM\SYSTEM\CurrentControlSet\Control\Power\PowerThrottling` | `PowerThrottlingOff` | REG_DWORD = 1 |
+
+### `darkhub:tweak:usbNoPowerDrainRecovery`
+
+**USB: não desligar a porta após sobrecarga de energia** · risk: medium · needs restart
+
+Quando um dispositivo USB puxa corrente demais, o Windows desliga a porta e tenta recuperá-la, o que pode desconectar headsets, DACs e controles que têm picos de consumo. Use só se um dispositivo seu cai sozinho com o aviso "Falha de sobretensão na porta USB".
+
+| Key | Value name | Writes |
+|---|---|---|
+| `HKLM\SYSTEM\CurrentControlSet\Control\USB\AutomaticSurpriseRemoval` | `AttemptRecoveryFromUsbPowerDrain` | REG_DWORD = 0 |
 
 # Operations
 

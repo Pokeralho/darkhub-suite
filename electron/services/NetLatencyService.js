@@ -8,6 +8,7 @@ import ElevationHelper from './optimizer/ElevationHelper.js';
 import DeepTweaksEngine from './optimizer/DeepTweaksEngine.js';
 import { runCommand, runPowerShell } from './PowerShellRunner.js';
 import { psQuote, parseDhSnapLines } from './optimizer/OptimizerUtils.js';
+import { planNetworkReset, readNetworkFacts, networkResetLines } from './network/networkResetSafety.js';
 
 export const SAFE_HOST_RE = /^[A-Za-z0-9_.:-]{1,253}$/;
 
@@ -479,13 +480,15 @@ Write-Output ('DHAFT|ecn|' + [string](Get-NetTCPSetting -SettingName InternetCus
   /** netsh winsock reset + int ip reset (elevated). Not reversible; needs a reboot. */
   async resetStack() {
     if (process.platform !== 'win32') return { ok: false, output: 'Only Windows supported' };
-    const r = await this._runMarked(`& netsh.exe winsock reset
-DhCheck 'netsh winsock reset'
-& netsh.exe int ip reset | Out-Null
-& ipconfig.exe /flushdns | Out-Null`, 120000);
+    // a fixed IP, manual DNS, a VPN or a remote session would be lost by `netsh int ip reset`: read them first
+    const plan = planNetworkReset(await readNetworkFacts());
+    if (plan.blocked) return { ok: false, skipped: true, output: plan.blocked };
+    const [flush, winsock, ...rest] = networkResetLines(plan);
+    const r = await this._runMarked([winsock, "DhCheck 'netsh winsock reset'", ...rest, flush].join('\r\n'), 120000);
     const output = r.out.replace(/^DH(DONE|FAIL).*$/gm, '').trim();
     if (!r.ok) return { ok: false, output: `${output}\n${r.error}`.trim() };
-    return { ok: true, requiresReboot: true, output: `${output}\n\nWinsock e TCP/IP redefinidos. REINICIE o Windows para concluir.`.trim() };
+    const what = plan.skipIpReset ? 'Winsock redefinido (TCP/IP preservado)' : 'Winsock e TCP/IP redefinidos';
+    return { ok: true, requiresReboot: true, notes: plan.notes, output: [output, `${what}. REINICIE o Windows para concluir.`, ...plan.notes].filter(Boolean).join('\n\n') };
   }
 }
 

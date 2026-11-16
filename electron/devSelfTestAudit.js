@@ -164,7 +164,7 @@ export async function runAuditScenarios(call, step) {
   const bb = `HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\BitBucket\\Volume\\${volGuid}`
   const prev = ps(`(Get-ItemProperty -LiteralPath ${psq(bb)} -ErrorAction SilentlyContinue).MaxCapacity`)
   try {
-    ps(`New-Item -Path ${psq(bb)} -Force | Out-Null; Set-ItemProperty -LiteralPath ${psq(bb)} -Name MaxCapacity -Value 2 -Type DWord`)
+    ps(`if (-not (Test-Path -LiteralPath ${psq(bb)})) { New-Item -Path ${psq(bb)} -Force | Out-Null }; Set-ItemProperty -LiteralPath ${psq(bb)} -Name MaxCapacity -Value 2 -Type DWord`)
     C = `${C}-b`
     makeTree(C)
     big(path.join(C, 'grande.bin'), 8)
