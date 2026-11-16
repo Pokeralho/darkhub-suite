@@ -6,6 +6,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-11-16
+
+### Added
+- **Optimizer, 26 new tweaks** that only show up where they apply (Windows build, GPU vendor, installed component):
+  extended telemetry and telemetry scheduled tasks, boot-time diagnostic log sessions, Click to Do, Find my device,
+  Widgets, Start "Recommended", Microsoft 365 ads in Settings, longer Windows Update pause, faster menus, keyboard
+  repeat, Toggle/Filter Keys shortcuts, svchost grouping, WebDAV file size, Power Throttling, USB power-surge
+  shutdown, and AMD/NVIDIA/Intel driver power settings.
+- **Windows services in Manual mode** (wide list): about 160 rarely used services start only on demand and about 10
+  obsolete ones are disabled. Never re-enables a service you turned off, skips the ones Windows protects, and leaves
+  printing, folder sharing, notifications, Windows Update and the SSH agent alone. Undo restores every value.
+- **DarkPacer, experimental Vulkan low-latency layer** (Reflex / Anti-Lag 2 style pacing for AMD and Intel), off by
+  default; turning it off removes everything it installed.
+
+### Fixed
+- Several tweaks and the latency tools recreated registry keys empty: applying one could erase another tweak's
+  record, the compatibility settings of every program, every app's GPU preference or a network adapter's TCP/IP
+  settings.
+- Network reset no longer erases a fixed IP or manually set DNS servers, and refuses to run during a remote desktop
+  session or with a VPN connected.
+- "Start with Windows" refuses to create an administrator task for a copy of DarkHub in a folder other programs can
+  change (for example the portable version in Downloads); an existing unsafe task is removed.
+- Old-files cleanup and the disk map's "delete for good" refuse OneDrive folders, where deleting also deletes in the
+  cloud and on every PC.
+
 ## [0.9.1] - 2026-11-15
 
 ### Added
