@@ -50,7 +50,7 @@ export class AiUpscaler {
     this.queue = Promise.resolve()
   }
 
-  exe() { return path.join(this.dir, 'realesrgan-ncnn-vulkan.exe') }
+  exe() { return path.join(this.dir, process.platform === 'win32' ? 'realesrgan-ncnn-vulkan.exe' : 'realesrgan-ncnn-vulkan') }
   available() { return fs.existsSync(this.exe()) && fs.existsSync(path.join(this.dir, 'models', `${MODELS.photo}.param`)) }
 
   async sharp() {

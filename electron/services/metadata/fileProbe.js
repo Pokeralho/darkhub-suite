@@ -155,6 +155,7 @@ function extMatches(type, ext) {
 const ATTR = { readOnly: 0x1, hidden: 0x2, system: 0x4, archive: 0x20 }
 
 function runPs(script, env) {
+  if (process.platform !== 'win32') return Promise.reject(new Error('PowerShell is not available on this platform'))
   return new Promise((resolve, reject) => {
     execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], {
       windowsHide: true, timeout: 20000, maxBuffer: 4 * 1024 * 1024, env: { ...process.env, ...env }
