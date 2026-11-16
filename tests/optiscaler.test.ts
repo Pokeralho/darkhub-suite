@@ -46,10 +46,19 @@ describe('OptiScaler Manager - FSR 4.1.1b RDNA 2 (the3rdparty1917) Integration',
     expect(typeof handlers['optiscaler:apply']).toBe('function');
     expect(typeof handlers['optiscaler:analyze']).toBe('function');
 
+    if (process.platform !== 'win32') {
+      const os = await import('node:os');
+      const listRes = await handlers['optiscaler:listBackups'](null, { targetDir: os.tmpdir() });
+      expect(listRes.ok).toBe(true);
+      expect(listRes.unsupported).toBe(true);
+      expect(Array.isArray(listRes.backups)).toBe(true);
+      return;
+    }
+
     // Test non-existent folder gracefully returns ok: true, backups: []
-    const listRes = await handlers['optiscaler:listBackups'](null, { targetDir: 'C:\\NonExistentPath_Test' });
-    expect(listRes.ok).toBe(true);
-    expect(Array.isArray(listRes.backups)).toBe(true);
+    const listResWin = await handlers['optiscaler:listBackups'](null, { targetDir: 'C:\\NonExistentPath_Test' });
+    expect(listResWin.ok).toBe(true);
+    expect(Array.isArray(listResWin.backups)).toBe(true);
   });
 });
 
@@ -91,6 +100,17 @@ describe('OptiScaler restore while files are in use', () => {
     const os = await import('node:os');
     const { vi } = await import('vitest');
     const { registerOptiScalerIPC } = await import('../electron/optiscalerManager.js');
+    if (process.platform !== 'win32') {
+      const handlers: Record<string, Function> = {};
+      registerOptiScalerIPC({
+        app: { getPath: () => os.tmpdir(), isPackaged: false },
+        ipcMain: { handle: (c: string, fn: Function) => { handlers[c] = fn; } },
+        getLibraryStore: async () => ({ loadLibrary: async () => ({ games: [] }), upsertGame: async () => {} })
+      });
+      const r = await handlers['optiscaler:restoreBackup'](null, { targetDir: os.tmpdir(), gameId: 'g1' });
+      expect(r).toMatchObject({ ok: false, unsupported: true });
+      return;
+    }
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-opti-restore-'));
     for (const f of ['OptiScaler.ini', 'nvngx.ini', 'DarkHubOptiScaler.json']) fs.writeFileSync(path.join(dir, f), 'x');
     const handlers: Record<string, Function> = {};
