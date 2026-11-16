@@ -134,3 +134,4 @@ vendor/imagetools/
 
 # planning material for module replicas (third-party screenshots): local only
 replica/
+native_lowlatency/build/

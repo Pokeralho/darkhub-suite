@@ -1,0 +1,24 @@
+#ifndef LAYER_HH_
+#define LAYER_HH_
+
+#include <vulkan/vk_platform.h>
+#include <vulkan/vulkan.hpp>
+
+// The purpose of this file is to expose a header entry point for our layer.
+
+extern "C" {
+
+VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL LowLatency_GetInstanceProcAddr(
+    VkInstance instance, const char* const pname) noexcept;
+
+VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL
+LowLatency_GetDeviceProcAddr(VkDevice device, const char* pName) noexcept;
+}
+
+namespace low_latency {
+
+static constexpr auto LAYER_NAME = "VK_LAYER_KORTHOS_LowLatency";
+
+}
+
+#endif

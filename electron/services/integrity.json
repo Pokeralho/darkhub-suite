@@ -29,6 +29,7 @@
   "hwsensors/System.Runtime.CompilerServices.Unsafe.dll": "08cbd7278b66f1e68425a82d4b97181a4130d93e3dd91831407aba7212ccdacf",
   "hwsensors/System.Security.AccessControl.dll": "ff14c5f628b9a6798d173aefbba0a43d61e66f715108e2576ac0d3dfab9071d0",
   "hwsensors/System.Security.Principal.Windows.dll": "b4d8e15adc235d0e858e39b5133e5d00a4baa8c94f4f39e3b5e791b0f9c0c806",
-  "hwsensors/System.Threading.AccessControl.dll": "5e3a3902f04f840c0fc1f9c2f249f804f6cfdf7901b2e06778bc2a4603ae4694"
+  "hwsensors/System.Threading.AccessControl.dll": "5e3a3902f04f840c0fc1f9c2f249f804f6cfdf7901b2e06778bc2a4603ae4694",
+  "lowlatency/VkLayer_KORTHOS_LowLatency.dll": "f16607445f96652fdf06abd439e710398d3152a384e777c8fdda22ec475b8e7a"
  }
 }

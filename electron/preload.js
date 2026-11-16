@@ -567,6 +567,8 @@ const darkhubApi = {
     setOverlayClickThrough: (enabled) => ipcRenderer.invoke('framepacer:setOverlayClickThrough', enabled),
     setOverlayConfig: (config) => ipcRenderer.invoke('framepacer:setOverlayConfig', config),
     getOverlayStatus: () => ipcRenderer.invoke('framepacer:getOverlayStatus'),
+    lowLatencyStatus: () => ipcRenderer.invoke('lowlatency:getStatus'),
+    lowLatencyApply: (mode) => ipcRenderer.invoke('lowlatency:apply', mode),
     onMetrics: (callback) => {
       const listener = (_event, metrics) => callback(metrics);
       ipcRenderer.on('framepacer:metrics', listener);

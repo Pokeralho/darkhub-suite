@@ -52,7 +52,7 @@ A rota é o `id` usado em `src/App.tsx` (switch `renderPage`) e no menu (`src/la
 |---|---|---|
 | `optimizer` | `src/pages/Optimizer.tsx` | `electron/services/optimizer/*` (ver seção Otimizador) |
 | `ultra-latency` | `src/pages/UltraLowLatency.tsx` | `electron/latencyGuardian.js`, `electron/services/NativeLatencyClient.js`, `DarkHub.LatencyEngine.cs` |
-| `darkpacer` / `framepacer` | `src/pages/FramePacer.tsx` | `electron/services/FramePacerEngine.js`, `FramePacerOverlay.js`, `DarkHub.FrameLimiter.cs`, `native_pacer/` (Rust) |
+| `darkpacer` / `framepacer` | `src/pages/FramePacer.tsx` | `electron/services/FramePacerEngine.js`, `FramePacerOverlay.js`, `DarkHub.FrameLimiter.cs`, `native_pacer/` (Rust), card experimental `VulkanLowLatencyCard.tsx` → `LowLatencyLayerService.js` + `native_lowlatency/` (layer Vulkan C++, `npm run build:lowlatency`) |
 | `optiscaler` | `src/pages/OptiScalerManager.tsx` | `electron/optiscalerManager.js` |
 | `dlss5` | `src/pages/Dlss5Manager.tsx` | `electron/services/dlss5/Dlss5Service.js` |
 | `dll-injector` | `src/pages/DllInjector.tsx` | `electron/main.js` (`injector:*`) → `electron/DarkHub.Injector.ps1` |

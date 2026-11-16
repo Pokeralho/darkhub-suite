@@ -62,6 +62,7 @@ import ServicesEngine from './services/optimizer/ServicesEngine.js'
 import DnsEngine from './services/optimizer/DnsEngine.js'
 import StorageEngine from './services/optimizer/StorageEngine.js'
 import FramePacerEngine from './services/FramePacerEngine.js'
+import LowLatencyLayer from './services/LowLatencyLayerService.js'
 import { registerRealtimeIPC } from './ipc/realtimeIpc.js'
 import { registerCodeRunnerIPC } from './ipc/codeRunnerIpc.js'
 import { registerStartupIPC } from './ipc/startupIpc.js'
@@ -1815,6 +1816,15 @@ ipcMain.handle('framepacer:setOverlayConfig', async (_event, config) => {
 
 ipcMain.handle('framepacer:getOverlayStatus', async () => {
   return getOverlayStatus()
+})
+
+// Experimental Vulkan low-latency layer (Reflex / Anti-Lag 2 for AMD and Intel in Vulkan games)
+ipcMain.handle('lowlatency:getStatus', async () => {
+  return LowLatencyLayer.getStatus()
+})
+
+ipcMain.handle('lowlatency:apply', async (_event, mode) => {
+  return LowLatencyLayer.apply(typeof mode === 'string' ? mode : '')
 })
 
 // Concede acesso a arquivos que o usuário arrastou (drag-and-drop) para a
