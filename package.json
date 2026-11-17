@@ -219,6 +219,12 @@
     ],
     "linux": {
       "icon": "build/icon.png",
+      "extraResources": [
+        {
+          "from": "build/icon.png",
+          "to": "assets/icon.png"
+        }
+      ],
       "category": "Utility",
       "target": [
         "AppImage",

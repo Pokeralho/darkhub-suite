@@ -446,18 +446,20 @@ function showMainWindow() {
 }
 
 function ensureTray() {
-  if (tray || process.platform === 'darwin') return
+  if (tray) return true
+  if (process.platform === 'darwin') return false
   // Tray support varies by Linux desktop environment; create it when an icon is available but don't fail boot.
   const iconPath = getAppIconPath()
   if (!iconPath) {
     log.warn('Tray icon not found; background tray skipped')
-    return
+    return false
   }
 
+  let created = null
   try {
-    tray = new Tray(iconPath)
-    tray.setToolTip('DarkHub')
-    tray.setContextMenu(Menu.buildFromTemplate([
+    created = new Tray(iconPath)
+    created.setToolTip('DarkHub')
+    created.setContextMenu(Menu.buildFromTemplate([
       {
         label: 'Abrir DarkHub',
         click: () => showMainWindow()
@@ -470,16 +472,24 @@ function ensureTray() {
         }
       }
     ]))
-    tray.on('double-click', () => showMainWindow())
+    created.on('double-click', () => showMainWindow())
+    tray = created
+    return true
   } catch (err) {
+    try { created?.destroy?.() } catch {}
     tray = null
     log.warn('[tray] unavailable on this platform/environment:', err?.message ?? String(err))
+    return false
   }
 }
 
+// Returns whether the window was actually hidden. On macOS the dock is a valid way back, so no
+// tray is required there. On Windows/Linux a working tray must exist before we hide the window,
+// otherwise the user loses the only way back into the app.
 function hideWindowToBackground(win) {
-  ensureTray()
-  win.hide()
+  if (process.platform !== 'darwin' && !ensureTray()) return false
+  if (win && !win.isDestroyed()) win.hide()
+  return true
 }
 
 // "Lixo (estimado)" on the dashboard: what the temp cleaner would remove (StorageEngine walks the same folders with
@@ -575,6 +585,13 @@ function createMainWindow() {
   win.on('close', (event) => {
     if (appIsQuitting) return
     if (!closeToTrayEnabled) {
+      appIsQuitting = true
+      return
+    }
+    // Only stay resident in the background when a tray was really created, except on macOS where
+    // the dock restores the window. On Linux the icon may be missing from the package (or
+    // appindicator unsupported); hiding then strands the window forever.
+    if (process.platform !== 'darwin' && !ensureTray()) {
       appIsQuitting = true
       return
     }
@@ -3871,9 +3888,9 @@ app.whenReady().then(async () => {
   ipcMain.handle('window:close', (e) => {
     const win = BrowserWindow.fromWebContents(e.sender)
     if (!win) return
-    // Honour the "close to tray" setting for the custom title-bar button too; win.close() goes
-    // through the 'close' handler, which quits when the setting is off.
-    if (closeToTrayEnabled) hideWindowToBackground(win)
+    // Honour "close to tray" only with a working tray; otherwise let win.close() run the 'close'
+    // handler, which ends the app when there is no way to restore the window from the background.
+    if (closeToTrayEnabled && (process.platform === 'darwin' || ensureTray())) hideWindowToBackground(win)
     else win.close()
   })
 
