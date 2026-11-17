@@ -4,6 +4,16 @@ function trimOut(v) {
   return String(v ?? '').trim()
 }
 
+// `cpupower frequency-info -p` prints `governor "powersave"` (optionally after
+// `:` or `=`). Require a quoted value so prose such as "no governor here" is
+// never mistaken for a captured governor.
+const GOVERNOR_RE = /governor\s*(?:=|:)?\s*["']([A-Za-z0-9_-]+)["']/i
+
+function governorFrom(v) {
+  const m = trimOut(v).match(GOVERNOR_RE)
+  return m ? m[1] : null
+}
+
 export function isLinux() {
   return process.platform === 'linux'
 }
@@ -44,19 +54,27 @@ export async function linuxSetPerformancePower(runCommand) {
     return { ok: false, status: 'unsupported', platform: process.platform, reason: 'linux-only' }
   }
 
+  // Fail closed: only mutate a provider whose previous value we actually captured.
+  // A mutation with no capturable "prev" could never be restored safely.
   // 1) powerprofilesctl
   try {
     const cur = await runCommand('powerprofilesctl', ['get'], { timeoutMs: 8000 })
     if (cur && cur.code === 0) {
       const prev = trimOut(cur.stdout) || null
-      const set = await runCommand('powerprofilesctl', ['set', 'performance'], { timeoutMs: 12000 })
-      if (set && set.code === 0) {
-        const check = await runCommand('powerprofilesctl', ['get'], { timeoutMs: 8000 }).catch(() => null)
-        const nowProfile = trimOut(check?.stdout)
-        const verified = nowProfile === 'performance'
-        return { ok: true, status: verified ? 'ok' : 'unverified', prev: { method: 'powerprofilesctl', profile: prev }, method: 'powerprofilesctl', verified }
+      if (prev) {
+        const set = await runCommand('powerprofilesctl', ['set', 'performance'], { timeoutMs: 12000 })
+        if (set && set.code === 0) {
+          const check = await runCommand('powerprofilesctl', ['get'], { timeoutMs: 8000 }).catch(() => null)
+          const nowProfile = trimOut(check?.stdout)
+          const verified = check && check.code === 0 && nowProfile === 'performance'
+          if (!verified) {
+            return { ok: false, status: 'failed', prev: { method: 'powerprofilesctl', profile: prev }, method: 'powerprofilesctl', verified: false, error: 'Falha ao verificar o perfil de desempenho após a mudança', observed: nowProfile || null }
+          }
+          return { ok: true, status: 'ok', prev: { method: 'powerprofilesctl', profile: prev }, method: 'powerprofilesctl', verified: true }
+        }
+        // set failed (permissions?) - fall through to cpupower
       }
-      // set failed (permissions?) - fall through to cpupower
+      // no capturable prev - fall through to cpupower (never mutate blindly)
     }
   } catch {}
 
@@ -64,35 +82,63 @@ export async function linuxSetPerformancePower(runCommand) {
   try {
     const info = await runCommand('cpupower', ['frequency-info', '-p'], { timeoutMs: 8000 })
     if (info && info.code === 0) {
-      const prevOut = trimOut(info.stdout)
-      const govMatch = prevOut.match(/governor\s+"?([A-Za-z0-9_-]+)"?/i)
-      const prevGovernor = govMatch ? govMatch[1] : null
-      const set = await runCommand('cpupower', ['frequency-set', '-g', 'performance'], { timeoutMs: 12000 })
-      if (set && set.code === 0) {
-        const check = await runCommand('cpupower', ['frequency-info', '-p'], { timeoutMs: 8000 }).catch(() => null)
-        const nowOut = trimOut(check?.stdout)
-        const nowGov = (nowOut.match(/governor\s+"?([A-Za-z0-9_-]+)"?/i) || [])[1]
-        const verified = nowGov === 'performance'
-        return { ok: true, status: verified ? 'ok' : 'unverified', prev: { method: 'cpupower', governor: prevGovernor }, method: 'cpupower', verified }
+      const prevGovernor = governorFrom(info.stdout)
+      if (prevGovernor) {
+        const set = await runCommand('cpupower', ['frequency-set', '-g', 'performance'], { timeoutMs: 12000 })
+        if (set && set.code === 0) {
+          const check = await runCommand('cpupower', ['frequency-info', '-p'], { timeoutMs: 8000 }).catch(() => null)
+          const nowGov = governorFrom(check?.stdout)
+          const verified = check && check.code === 0 && nowGov === 'performance'
+          if (!verified) {
+            return { ok: false, status: 'failed', prev: { method: 'cpupower', governor: prevGovernor }, method: 'cpupower', verified: false, error: 'Falha ao verificar o governor após a mudança', observed: nowGov || null }
+          }
+          return { ok: true, status: 'ok', prev: { method: 'cpupower', governor: prevGovernor }, method: 'cpupower', verified: true }
+        }
+        return { ok: false, status: 'failed', prev: { method: 'cpupower', governor: prevGovernor }, error: trimOut(set?.stderr || set?.stdout) || 'cpupower set failed' }
       }
-      return { ok: false, status: 'failed', prev: { method: 'cpupower', governor: prevGovernor }, error: trimOut(set?.stderr || set?.stdout) || 'cpupower set failed' }
+      // no capturable governor - never mutate blindly
     }
   } catch {}
 
-  return { ok: false, status: 'unsupported', reason: 'unavailable', error: 'Nenhum provedor de perfil de energia disponível (powerprofilesctl/cpupower).' }
+  return { ok: false, status: 'unsupported', reason: 'unavailable', error: 'Nenhum provedor de perfil de energia com estado restaurável disponível (powerprofilesctl/cpupower).' }
 }
 
+/**
+ * Restore the previously captured power profile / CPU governor.
+ *
+ * Never reports ok unless the restore command exited 0 AND a read-back shows
+ * the target value. Non-zero exit codes, thrown commands and failed read-backs
+ * are propagated as failures so callers cannot silently claim a safe restore.
+ */
 export async function linuxRestorePerformancePower(runCommand, prev) {
   if (process.platform !== 'linux') return { ok: false, status: 'unsupported' }
   if (!prev || typeof prev !== 'object') return { ok: false, status: 'skipped', reason: 'no-prev' }
   try {
     if (prev.method === 'powerprofilesctl' && prev.profile) {
-      await runCommand('powerprofilesctl', ['set', String(prev.profile)], { timeoutMs: 12000 })
-      return { ok: true, status: 'ok' }
+      const target = String(prev.profile)
+      const set = await runCommand('powerprofilesctl', ['set', target], { timeoutMs: 12000 })
+      if (!set || set.code !== 0) {
+        return { ok: false, status: 'failed', error: trimOut(set?.stderr || set?.stdout) || `powerprofilesctl restore exited with code ${set?.code}` }
+      }
+      const check = await runCommand('powerprofilesctl', ['get'], { timeoutMs: 8000 }).catch(() => null)
+      const observed = trimOut(check?.stdout)
+      if (!check || check.code !== 0 || observed !== target) {
+        return { ok: false, status: 'failed', error: 'Falha ao verificar a restauração do perfil de energia', observed: observed || null }
+      }
+      return { ok: true, status: 'ok', method: 'powerprofilesctl', profile: target }
     }
     if (prev.method === 'cpupower' && prev.governor) {
-      await runCommand('cpupower', ['frequency-set', '-g', String(prev.governor)], { timeoutMs: 12000 })
-      return { ok: true, status: 'ok' }
+      const target = String(prev.governor)
+      const set = await runCommand('cpupower', ['frequency-set', '-g', target], { timeoutMs: 12000 })
+      if (!set || set.code !== 0) {
+        return { ok: false, status: 'failed', error: trimOut(set?.stderr || set?.stdout) || `cpupower restore exited with code ${set?.code}` }
+      }
+      const check = await runCommand('cpupower', ['frequency-info', '-p'], { timeoutMs: 8000 }).catch(() => null)
+      const observed = governorFrom(check?.stdout)
+      if (!check || check.code !== 0 || observed !== target) {
+        return { ok: false, status: 'failed', error: 'Falha ao verificar a restauração do governor de CPU', observed: observed || null }
+      }
+      return { ok: true, status: 'ok', method: 'cpupower', governor: target }
     }
   } catch (e) {
     return { ok: false, status: 'failed', error: String(e?.message ?? e) }
@@ -101,36 +147,28 @@ export async function linuxRestorePerformancePower(runCommand, prev) {
 }
 
 /**
- * Best-effort process priority raise via renice (and ionice if available).
- * Returns structured result; does not throw.
+ * Linux process-priority boosting is intentionally DISABLED (fail closed).
+ *
+ * `renice`/`ionice` mutate kernel scheduling state for a PID. A safe
+ * lifecycle would require all of the following, and any one of them can fail:
+ *   1. capture the prior nice / ionice values;
+ *   2. prove the PID still refers to the same process when restoring
+ *      (PIDs are recycled, so a stale PID could hit an unrelated process);
+ *   3. read the values back to confirm both the change and the rollback.
+ * There is no way to guarantee a safe restore, so we never mutate at all and
+ * report `unsupported` instead of ever claiming success. This keeps a hot-CPU
+ * user from being left with an untracked, unrecoverable priority change.
  */
 export async function linuxBoostProcessPriority(runCommand, pid) {
   if (process.platform !== 'linux') {
     return { ok: false, status: 'unsupported', platform: process.platform, reason: 'linux-only' }
   }
-  const p = Number(pid)
-  if (!Number.isFinite(p) || p <= 0) return { ok: false, status: 'skipped', reason: 'no-pid', error: 'Jogo não detectado em execução' }
-  const applied = { renice: null, ionice: null }
-  let ok = false
-  try {
-    const r = await runCommand('renice', ['-n', '-10', '-p', String(Math.trunc(p))], { timeoutMs: 8000 })
-    if (r && r.code === 0) {
-      applied.renice = { status: 'ok' }
-      ok = true
-    } else {
-      applied.renice = { status: 'failed', error: trimOut(r?.stderr || r?.stdout) || `renice exited with code ${r?.code}` }
-    }
-  } catch (e) {
-    applied.renice = { status: 'failed', error: String(e?.message ?? e) }
+  return {
+    ok: false,
+    status: 'unsupported',
+    reason: 'no-safe-restore',
+    error: 'Ajuste de prioridade (renice/ionice) desabilitado no Linux: não é possível capturar/restaurar o estado anterior com segurança (PID pode ser reutilizado).'
   }
-  // ionice is best-effort, failure does not fail the whole op
-  try {
-    const io = await runCommand('ionice', ['-c', '2', '-n', '0', '-p', String(Math.trunc(p))], { timeoutMs: 8000 })
-    applied.ionice = io && io.code === 0 ? { status: 'ok' } : { status: 'skipped', error: trimOut(io?.stderr || io?.stdout) || 'ionice unavailable/failed' }
-  } catch (e) {
-    applied.ionice = { status: 'skipped', error: String(e?.message ?? e) }
-  }
-  return ok ? { ok: true, status: 'ok', applied } : { ok: false, status: applied.renice?.status || 'failed', error: applied.renice?.error || 'Falha ao ajustar prioridade', applied }
 }
 
 /**
@@ -208,7 +246,7 @@ export function buildLatencyCapabilities() {
       tweaks: {
         powerPlanHigh: { supported: 'partial', note: 'powerprofilesctl/cpupower (best-effort)' },
         timerResolution05: { supported: false, reason: 'windows-only' },
-        processPriorityHigh: { supported: 'partial', note: 'renice/ionice (best-effort)' },
+        processPriorityHigh: { supported: false, reason: 'no-safe-restore', note: 'renice/ionice desabilitados: sem captura/restauração segura do estado anterior (PID pode ser reutilizado)' },
         disableFullscreenOptimizations: { supported: false, reason: 'windows-only' },
         disableMouseAcceleration: { supported: false, reason: 'windows-only' },
         gpuHighPerformance: { supported: false, reason: 'windows-only' },

@@ -915,6 +915,7 @@ public static class NtTimer {
     const isWin = process.platform === 'win32'
     const isLin = process.platform === 'linux'
     const exePath = String(config.gameExePath || '').trim()
+    let restoreError = null
 
     if (isWin) {
       try {
@@ -953,11 +954,24 @@ public static class NtTimer {
         if (state.undo?.tcpStack?.optimized) await restoreGlobalTcpStack()
       } catch {}
     } else if (isLin) {
-      // Best-effort Linux restores (only for ops we applied)
-      try {
-        if (state.undo?.powerPlan) await linuxRestorePerformancePower(runCommand, state.undo.powerPlan)
-      } catch {}
-      // renice/ionice are not "restored" to previous values (not tracked) — release claim only
+      // Linux restores: never swallow a failure. A restore that exits non-zero
+      // or fails its read-back must be reported, never treated as success.
+      const restoreErrors = []
+      if (state.undo?.powerPlan) {
+        try {
+          const res = await linuxRestorePerformancePower(runCommand, state.undo.powerPlan)
+          if (res && res.ok === false && res.status !== 'skipped') {
+            restoreErrors.push(res.error || `Falha ao restaurar o perfil de energia (${res.status || 'failed'})`)
+          }
+        } catch (e) {
+          restoreErrors.push(String(e?.message ?? e))
+        }
+      }
+      if (restoreErrors.length) {
+        restoreError = restoreErrors.join('; ')
+        state.lastError = restoreError
+      }
+      // renice/ionice boosting is disabled on Linux (no safe restore): nothing was applied.
     }
 
     ManagedProcessRegistry.releaseAllBy(PROCESS_OWNER)
@@ -967,7 +981,7 @@ public static class NtTimer {
     state.game = null
     config.enabled = false
     await saveConfig().catch(() => {})
-    return { ok: true, status: state }
+    return { ok: !restoreError, status: state, ...(restoreError ? { error: restoreError } : {}) }
   }
 
   function unregisterHotkey() {
