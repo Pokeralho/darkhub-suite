@@ -22,6 +22,12 @@ pub fn is_reparse(md: &Metadata) -> bool {
 /// The root itself may be a junction (e.g. %TEMP% moved to a RAM disk).
 pub fn check_links(env: &Env, dir: &Path) -> Result<(), String> {
     let Some(root) = env.matched_root(dir) else { return Ok(()) }; // check_rule already refuses it
+    #[cfg(not(windows))]
+    {
+        // Resolve the matched root's symlink before any deletion: a temp root that is a link to
+        // `$HOME` or `/` (or was retargeted after the rule was built) must refuse the whole clean.
+        env.check_root_target(Path::new(&root))?;
+    }
     let mut cur = dir.to_path_buf();
     while norm(&cur).len() > root.len() {
         if let Ok(md) = fs::symlink_metadata(&cur) {

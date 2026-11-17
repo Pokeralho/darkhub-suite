@@ -28,6 +28,98 @@ const PROTECTED_DIRS: &[&str] = &[
     "crypto", "systemcertificates", "vault", "darkhub", "darkos", "start menu",
 ];
 
+/// Resolve `.`/`..` lexically, without touching the disk.
+#[cfg(not(windows))]
+fn lexical_clean(p: &Path) -> PathBuf {
+    use std::path::Component;
+    let mut out = PathBuf::new();
+    for c in p.components() {
+        match c {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                out.pop();
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
+}
+
+/// Canonicalize as far as the disk allows: resolve symlinks on the longest existing prefix and
+/// append the remaining (not-yet-existing) segments literally. `std::fs::canonicalize` fails for a
+/// path that does not exist yet, which is common while validating rules; this always yields a
+/// stable absolute path so a symlinked TMPDIR cannot hide its real target from the checks below.
+#[cfg(not(windows))]
+fn canonical_or_lexical(p: &Path) -> PathBuf {
+    if let Ok(c) = std::fs::canonicalize(p) {
+        return c;
+    }
+    let mut out = PathBuf::from("/");
+    let mut tail: Vec<std::ffi::OsString> = Vec::new();
+    let mut missing = false;
+    for comp in p.components() {
+        let seg = comp.as_os_str();
+        if seg.is_empty() || seg == std::ffi::OsStr::new("/") {
+            continue;
+        }
+        if missing {
+            tail.push(seg.to_os_string());
+            continue;
+        }
+        let candidate = out.join(seg);
+        match std::fs::symlink_metadata(&candidate) {
+            Ok(md) if md.file_type().is_symlink() => match std::fs::canonicalize(&candidate) {
+                Ok(c) => out = c,
+                Err(_) => {
+                    missing = true;
+                    tail.push(seg.to_os_string());
+                }
+            },
+            Ok(_) => out = candidate,
+            Err(_) => {
+                missing = true;
+                tail.push(seg.to_os_string());
+            }
+        }
+    }
+    for seg in tail {
+        out.push(seg);
+    }
+    lexical_clean(&out)
+}
+
+/// Whether a canonicalized Unix path is safe to use as a cleaning root at all. Unsafe values are
+/// never turned into a root (and therefore never gain `whole_ok`): the filesystem root, `$HOME`,
+/// any ancestor of `$HOME`, and any ancestor of a well-known personal/system tree are rejected.
+/// `/tmp`, `/var/tmp`, a user temp below `$HOME`, and a validated XDG cache all pass, since none of
+/// them contain the home or a system tree.
+#[cfg(not(windows))]
+fn unix_root_ok(candidate: &Path, home: Option<&Path>) -> bool {
+    let canon = canonical_or_lexical(candidate);
+    if canon == Path::new("/") {
+        return false;
+    }
+    // $HOME itself or one of its ancestors (e.g. `/`, `/home`).
+    if let Some(h) = home.map(canonical_or_lexical) {
+        if h.starts_with(&canon) {
+            return false;
+        }
+    }
+    // A root that contains personal/system trees: canonical path is an ancestor of a known
+    // top-level location (so `/home` and `/var` are refused, but `/var/tmp` and `/tmp` are fine).
+    const TOP: &[&str] = &[
+        "home", "root", "Users", "etc", "usr", "var", "bin", "sbin", "lib", "lib64", "opt", "boot",
+        "dev", "proc", "sys", "srv", "mnt", "media", "run",
+    ];
+    for seg in TOP {
+        let sensitive = Path::new("/").join(seg);
+        if sensitive.exists() && sensitive.starts_with(&canon) {
+            return false;
+        }
+    }
+    true
+}
+
 impl Env {
     pub fn from_process() -> Env {
         #[cfg(windows)]
@@ -224,19 +316,45 @@ impl Env {
     #[cfg(not(windows))]
     fn roots_unix(&self) -> Vec<Root> {
         let mut r = Vec::new();
-        let mut add = |p: Option<PathBuf>, whole_ok: bool| {
-            if let Some(p) = p {
-                r.push(Root { path: norm(&p), whole_ok });
+        let home = self.one("home").map(|p| canonical_or_lexical(p.as_path()));
+        let mut add = |p: &Path| {
+            let n = norm(p);
+            if !r.iter().any(|x: &Root| x.path == n) {
+                // Only paths that passed unix_root_ok are ever added: an arbitrary TMPDIR/TEMP/TMP
+                // that points at `/`, `$HOME`, an ancestor of home or a system tree never reaches
+                // this point, so untrusted env values cannot be promoted to `whole_ok`.
+                r.push(Root { path: n, whole_ok: true });
             }
         };
-        // Temp-like and cache folders may be cleaned (user-selected targets only).
+        // System temp (`/tmp`, `/var/tmp`) and user temp variables are validated the same way;
+        // a validated temp root is safe to empty.
         for k in ["temp", "tmp", "tmpdir", "var_tmp"] {
             for p in self.vars.get(k).into_iter().flatten() {
-                add(Some(p.clone()), true);
+                if unix_root_ok(p, home.as_deref()) {
+                    add(p);
+                }
             }
         }
-        add(self.one("xdg_cache_home").cloned(), true);
+        // XDG cache home is handled separately: it is a cache, so a validated value may be emptied,
+        // but `/` or `$HOME` are refused just like for the temp variables.
+        if let Some(cache) = self.one("xdg_cache_home") {
+            if unix_root_ok(cache, home.as_deref()) {
+                add(cache);
+            }
+        }
         r
+    }
+
+    /// Re-check the resolved target of a matched root right before cleaning (Unix). A symlink may
+    /// have been created or retargeted after the rule was validated; resolving it here prevents a
+    /// clean from being redirected into `$HOME` or `/`.
+    #[cfg(not(windows))]
+    pub fn check_root_target(&self, root: &Path) -> Result<(), String> {
+        let home = self.one("home").map(|p| canonical_or_lexical(p.as_path()));
+        if !unix_root_ok(root, home.as_deref()) {
+            return Err("raiz temporária resolve para local protegido".into());
+        }
+        Ok(())
     }
 
     /// Ok(()) when `dir` may be cleaned with these patterns; Err(reason) otherwise.

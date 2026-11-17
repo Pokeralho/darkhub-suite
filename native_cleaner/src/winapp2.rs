@@ -7,6 +7,28 @@ use crate::util::{has_wild, wild_match};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
+/// Exclusion paths are stored normalized for the current platform (`norm`), so they must be
+/// compared with that platform's separator. Hard-coding `\` made every exclusion silently fail on
+/// Unix, where `norm` uses `/`. On Windows `norm` lowercases both sides, keeping matching
+/// case-insensitive there.
+#[cfg(windows)]
+const SEP: char = '\\';
+#[cfg(not(windows))]
+const SEP: char = '/';
+
+/// Whether `path` is `base` itself or lies underneath it, using the platform separator.
+fn under_dir(base: &str, path: &str) -> bool {
+    if path == base {
+        return true;
+    }
+    let prefix = if base.ends_with(SEP) {
+        base.to_string()
+    } else {
+        format!("{base}{SEP}")
+    };
+    path.starts_with(&prefix)
+}
+
 pub const BUILTIN: &str = r#"
 [Temporários do usuário]
 DhId=user-temp
@@ -178,10 +200,10 @@ impl Target {
     pub fn excluded(&self, file: &Path) -> bool {
         let f = norm(file);
         self.excludes.iter().any(|e| match &e.pattern {
-            None => f == e.dir || f.starts_with(&format!("{}\\", e.dir)),
+            None => under_dir(&e.dir, &f),
             Some(p) => {
-                let (dir, name) = f.rsplit_once('\\').unwrap_or(("", &f));
-                (dir == e.dir || dir.starts_with(&format!("{}\\", e.dir))) && wild_match(p, name)
+                let (dir, name) = f.rsplit_once(SEP).unwrap_or(("", &f));
+                under_dir(&e.dir, dir) && wild_match(p, name)
             }
         })
     }
