@@ -19,7 +19,9 @@ function copy(src, dest) {
 
 if (process.platform === 'win32') {
   const env = { ...process.env, RUSTFLAGS: [process.env.RUSTFLAGS, '-C target-feature=+crt-static'].filter(Boolean).join(' ') }
-  run('cargo', ['build', '--release', '--manifest-path', manifest], { env, shell: process.platform === 'win32' })
+  // Do not use a shell here: the manifest path may contain spaces and shell
+  // metacharacters in a Windows checkout.
+  run('cargo', ['build', '--release', '--manifest-path', manifest], { env })
   const src = path.join(root, 'native_cleaner', 'target', 'release', 'DarkHub_Cleaner.exe')
   const dest = path.join(root, 'electron', 'services', 'DarkHub.Cleaner.exe')
   copy(src, dest)
