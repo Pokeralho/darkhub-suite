@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-11-18
+
+### Added
+- **AutoClicker, Priority Point Sequencer `(X, Y)`**: mark multiple targets directly on any monitor (`#1`, `#2`, `#3`...
+  with live path preview and undo), reorder priority, customize click button (`left`, `right`, `middle`, `double`),
+  travel time and post-click delay, and run them in a continuous or counted loop with smooth quadratic-Bezier +
+  cubic-ease-in-out cursor movement and automatic loop closure back to `#1`.
+- **AutoClicker, TinyTask-compatible Macro Recorder & Player (`.rec`)**: native 250 Hz keyboard and mouse recording
+  and sub-millisecond `WaitableTimer` playback in `DarkHub.ClickEngine.exe`, speed multipliers from `0.5x` to `100x`
+  Turbo (with mouse-move coalescing), independent non-consuming global hotkeys, hardware emergency stop (`Pause` /
+  `ScrollLock`) with automatic panic key/button release, binary `.rec` import/export, extraction from compiled TinyTask
+  `.exe` files, and standalone `.exe` compilation.
+
 ## [0.9.2] - 2026-11-16
 
 ### Added
