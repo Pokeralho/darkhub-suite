@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import path from 'node:path'
 import Dlss5Service from '../services/dlss5/Dlss5Service.js'
 import { SaveBackupService } from '../services/saves/SaveBackupService.js'
@@ -65,6 +66,10 @@ export function registerSaveBackupIPC({ app, ipcMain, BrowserWindow, dialog, she
   })
   handle('saves:openFolder', async ({ name }) => {
     const dir = name ? svc._gameDir(String(name)) : svc.settings().backupRoot
+    // openPath runs files: only ever hand it a real folder (backupRoot comes from a settings file)
+    let isDir = false
+    try { isDir = fs.statSync(dir).isDirectory() } catch { /* missing */ }
+    if (!isDir) return { ok: false, error: 'Pasta não encontrada' }
     await shell.openPath(dir)
     return { ok: true }
   })

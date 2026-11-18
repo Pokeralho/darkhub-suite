@@ -21,7 +21,7 @@ export const CLAMAV = Object.freeze({
 export function parseClamscan(stdout) {
   const out = []
   for (const line of String(stdout || '').split(/\r?\n/)) {
-    const m = FOUND_RE.exec(line.trim())
+    const m = FOUND_RE.exec(line.trimEnd()) // trimEnd: a file name may start with spaces
     if (m) out.push({ file: m[1], signature: m[2] })
   }
   return out
@@ -118,7 +118,9 @@ export class ClamAv {
     if (!clamscan || !this.hasDatabase()) return { error: 'ClamAV not ready', detections: [] }
     const r = await run(clamscan, [`--database=${this.db}`, '--infected', '--no-summary', '--stdout', '--max-filesize=512M', '--max-scansize=1024M', ...files], { timeoutMs: 10 * 60000 })
     const detections = parseClamscan(r.stdout)
-    // exit 1 = something found, 0 = clean, 2 = error (detections listed before an error still count)
-    return r.code === 2 && !detections.length ? { error: (r.stderr || 'clamscan error').trim().slice(-300), detections } : { detections }
+    // exit 1 = something found, 0 = clean; anything else (2 = error, null = timeout/killed) means some files may never have
+    // been scanned: detections listed before the error still count, but nothing else in the batch can be called clean
+    if (r.code === 0 || r.code === 1) return { detections }
+    return { error: (r.stderr || 'clamscan error (code ' + r.code + ')').trim().slice(-300), detections }
   }
 }

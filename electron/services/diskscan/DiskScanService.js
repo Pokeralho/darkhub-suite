@@ -19,6 +19,26 @@ function defaultExe() {
 
 const csvCell = (v) => `"${String(v).replace(/"/g, '""')}"`;
 
+const normDir = (p) => path.win32.resolve(String(p)).replace(/[\\/]+$/, '').toLowerCase();
+const isUnder = (t, r) => t === r || t.startsWith(`${r}\\`);
+/**
+ * Why `p` must never be deleted from the disk map (we run as Administrator), or null. Blocks volume roots, the Windows,
+ * Program Files and ProgramData trees, the Users folder and each profile in it, the app's own folder, and any ancestor of those.
+ */
+export function protectedPathReason(p, env = process.env) {
+  const t = normDir(p);
+  if (/^[a-z]:$/.test(t) || /^\\\\[^\\]+\\[^\\]+$/.test(t)) return 'root';
+  const sysDrive = (env.SystemDrive || 'C:').toLowerCase();
+  const users = normDir(`${sysDrive}\\Users`);
+  const trees = [env.SystemRoot || env.windir || `${sysDrive}\\Windows`, env.ProgramFiles, env['ProgramFiles(x86)'], env.ProgramW6432, env.ProgramData]
+    .filter(Boolean).map(normDir);
+  for (const r of trees) if (isUnder(t, r) || isUnder(r, t)) return 'system';
+  for (const r of [users, env.USERPROFILE, path.dirname(process.execPath)].filter(Boolean).map(normDir)) if (isUnder(r, t)) return 'system';
+  if (path.win32.dirname(t) === users) return 'system'; // a whole profile folder (C:\Users\<name>)
+  return null;
+}
+const PROTECTED_MSG = 'Pasta do sistema, raiz de disco ou pasta de usuário: o DarkHub não apaga isso daqui.';
+
 export function formatSize(bytes) {
   if (!(bytes > 0)) return '0 B';
   const u = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
@@ -236,6 +256,7 @@ export class DiskScanService {
     if (id === 'd0') return { ok: false, error: 'A pasta analisada não pode ser enviada para a Lixeira daqui.' };
     const p = this._pathOf(id);
     if (!p) return { ok: false, error: 'Item não encontrado.' };
+    if (protectedPathReason(p)) return { ok: false, error: PROTECTED_MSG };
     // Electron's trashItem runs without Windows' dialog: where the Recycle Bin cannot take the item (no bin on the drive,
     // bin turned off, item bigger than the bin) Windows deletes it for good instead of asking. Refuse those cases.
     const size = Number(this.model.info(id, this._filter(''))?.size) || 0;
@@ -255,6 +276,7 @@ export class DiskScanService {
     if (id === 'd0') return { ok: false, error: 'A pasta analisada não pode ser apagada daqui.' };
     const p = this._pathOf(id);
     if (!p) return { ok: false, error: 'Item não encontrado.' };
+    if (protectedPathReason(p)) return { ok: false, error: PROTECTED_MSG };
     if (String(confirmName ?? '') !== path.basename(p)) return { ok: false, error: 'Digite o nome exato do item para confirmar.' };
     // a permanent delete in OneDrive is synced: the item disappears from the cloud and from every PC of the person
     if (oneDriveRootOf(p)) return { ok: false, error: 'Este item fica no OneDrive: apagar de vez aqui apaga também na nuvem e em todos os seus PCs. Use "Mover para a Lixeira" ou apague pelo OneDrive.' };
@@ -262,13 +284,13 @@ export class DiskScanService {
     const why = recycleVerdict(await this.recycleProbe(p), size);
     if (!why || why === 'unknown') return { ok: false, error: 'Este item pode ir para a Lixeira: use "Mover para a Lixeira".' };
     // fs.rm removes links/junctions themselves, never what they point to
-    const rm = () => fs.rmSync(p, { recursive: true, force: false, maxRetries: 2 });
+    const rm = () => fs.promises.rm(p, { recursive: true, force: false, maxRetries: 2 });
     try {
-      try { rm(); } catch (e0) {
+      try { await rm(); } catch (e0) {
         // read-only files (a FAT32 stick refuses them with EPERM): clear the attribute without following links, retry once
         if (e0?.code !== 'EPERM' && e0?.code !== 'EACCES') throw e0;
         clearReadOnly(p);
-        rm();
+        await rm();
       }
     } catch (e) {
       if (fs.existsSync(p)) return { ok: false, partial: true, error: `O Windows recusou (${e?.code || e?.message}). Parte do conteúdo pode ter sido apagada: analise de novo para atualizar o mapa.` };

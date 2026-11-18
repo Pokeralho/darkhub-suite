@@ -1,7 +1,6 @@
 // DarkOS installation media: lists USB drives, checks an ISO against the SHA-256 the site publishes and writes it to
 // a drive (MBR + FAT32, boots on UEFI and BIOS PCs; install.wim over 4 GB is split). The work runs in usb-media.ps1.
 import fs from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { spawn } from 'node:child_process'
@@ -31,10 +30,9 @@ export class UsbMediaService {
   }
 
   _script() {
-    // the script may sit inside app.asar, where PowerShell cannot read it: run a copy from TEMP
-    const copy = path.join(os.tmpdir(), 'darkhub-usb-media.ps1')
-    fs.writeFileSync(copy, fs.readFileSync(SCRIPT))
-    return copy
+    // run it from app.asar.unpacked (asarUnpack electron/services/darkos/*.ps1), inside the install folder that only
+    // administrators can change; a copy in %TEMP% could be swapped by any user process before the elevated run reads it
+    return SCRIPT.replace(/app\.asar(?![.\w])/, 'app.asar.unpacked')
   }
 
   _run(args, onLine) {

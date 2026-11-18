@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 // @ts-ignore - plain JS module
-import { SaveBackupService, templatePrefix } from '../electron/services/saves/SaveBackupService.js'
+import { SaveBackupService, templatePrefix, regFileOnlyHkcu } from '../electron/services/saves/SaveBackupService.js'
 
 // A fake game whose saves live in a temp "Documents" folder; the manifest index is written directly (no download).
 function setup() {
@@ -110,4 +110,21 @@ describe('SaveBackupService', () => {
     expect(old.targets[0].dest).toBeNull()
     fs.rmSync(root, { recursive: true, force: true })
   }, 30000)
+})
+
+describe('regFileOnlyHkcu', () => {
+  const write = (text: string) => {
+    const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'reg-')), 'x.reg')
+    fs.writeFileSync(f, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, 'utf16le')]))
+    return f
+  }
+  const BS = String.fromCharCode(92)
+  const key = (k: string) => k.split('/').join(BS)
+  it('accepts an export that only touches HKCU', () => {
+    expect(regFileOnlyHkcu(write(`Windows Registry Editor Version 5.00\r\n\r\n[${key('HKEY_CURRENT_USER/Software/Game')}]\r\n"a"=dword:00000001\r\n`))).toBe(true)
+  })
+  it('refuses a file that also writes HKLM, and an empty one', () => {
+    expect(regFileOnlyHkcu(write(`[${key('HKEY_CURRENT_USER/Software/Game')}]\r\n[${key('HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/Windows/CurrentVersion/Run')}]\r\n"x"="evil.exe"\r\n`))).toBe(false)
+    expect(regFileOnlyHkcu(write('Windows Registry Editor Version 5.00\r\n'))).toBe(false)
+  })
 })

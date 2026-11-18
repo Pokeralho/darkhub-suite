@@ -7,7 +7,7 @@ import { parseFilter, matchFile, classOf } from '../electron/services/diskscan/f
 // @ts-ignore plain JS module
 import { ScanModel } from '../electron/services/diskscan/ScanModel.js';
 // @ts-ignore plain JS module
-import { DiskScanService, recycleVerdict } from '../electron/services/diskscan/DiskScanService.js';
+import { DiskScanService, recycleVerdict, protectedPathReason } from '../electron/services/diskscan/DiskScanService.js';
 import { squarify, layoutTree, hitTest } from '../src/pages/SpaceSniffer/treemap';
 
 const win32 = process.platform === 'win32' ? it : it.skip;
@@ -180,4 +180,17 @@ describe('disk scan service (real helper)', () => {
     expect(svc.view({ id: 'd0' }).tree.size).toBe(1000);
     fs.rmSync(root, { recursive: true, force: true });
   }, 30000);
+});
+
+describe('disk map protected paths', () => {
+  const w = (s: string) => s.replace(/\//g, '\\');
+  const env = { SystemDrive: 'C:', SystemRoot: w('C:/Windows'), ProgramFiles: w('C:/Program Files'), 'ProgramFiles(x86)': w('C:/Program Files (x86)'), ProgramData: w('C:/ProgramData'), USERPROFILE: w('C:/Users/Ana') };
+  it('refuses system trees, roots, profiles and their ancestors', () => {
+    for (const p of ['C:/', 'D:/', 'C:/Windows', 'c:/windows/System32/drivers', 'C:/Program Files/App', 'C:/ProgramData', 'C:/Users', 'C:/Users/Ana', 'C:/Users/Outro', '//srv/share'])
+      expect(protectedPathReason(w(p), env), p).not.toBeNull();
+  });
+  it('allows ordinary folders', () => {
+    for (const p of ['C:/Users/Ana/Downloads/iso', 'D:/Jogos/velho', 'E:/pasta', 'C:/Windows.old2'])
+      expect(protectedPathReason(w(p), env), p).toBeNull();
+  });
 });

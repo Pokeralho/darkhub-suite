@@ -142,6 +142,22 @@ describe('scanners', () => {
       prot.stop();
     }
   }, 15000);
+  it('never marks a batch clean when clamscan aborted with an error', async () => {
+    const dir = tmp();
+    const cfg = { folders: [dir], clamav: true, autoQuarantine: false, maxFileMb: 50, allowHashes: [] as string[] };
+    let calls = 0;
+    const clamav = { status: () => ({ database: true }), scan: async () => { calls++; return { error: 'Can\'t allocate memory', detections: [] }; } };
+    const prot = new RealtimeProtection({ getConfig: () => cfg, getHashDb: () => new HashDb([]), clamav, quarantine: new Quarantine(path.join(tmp(), 'q')) });
+    prot.start();
+    try {
+      fs.writeFileSync(path.join(dir, 'a.exe'), crypto.randomBytes(1024));
+      await waitFor(() => calls > 0, 12000);
+      await new Promise((r) => setTimeout(r, 50));
+      expect((prot as any).clean.size).toBe(0);
+    } finally {
+      prot.stop();
+    }
+  }, 15000);
 });
 
 describe('freshclam config', () => {

@@ -141,12 +141,23 @@ function Start-DarkHubInstall {
         }
         Write-Host "[+] Package verified: SHA-512 matches the release ($fileSizeMB MB)." -ForegroundColor Green
     } else {
-        Write-Host "[~] Release has no latest.yml to verify against; continuing ($fileSizeMB MB)." -ForegroundColor DarkYellow
+        # fail closed: a blocked or missing latest.yml must never mean "run an unverified installer as Administrator"
+        Remove-Item $tempInstaller -Force -ErrorAction SilentlyContinue
+        Write-Host "[!] Error: could not read the SHA-512 published with the release (latest.yml), so the download cannot be verified. Aborted." -ForegroundColor Red
+        Write-Host "[!] Download manually from: https://github.com/$repo/releases" -ForegroundColor Yellow
+        return
     }
 
     # 4. Silent installation
     Write-Host "[*] Installing DarkHub Suite v$Version silently..." -ForegroundColor Yellow
-    $proc = Start-Process -FilePath $tempInstaller -ArgumentList "/S" -WindowStyle Hidden -Wait -PassThru -RedirectStandardOutput $outLog -RedirectStandardError $errLog
+    # the setup requires Administrator: -Verb RunAs goes through ShellExecute (UAC prompt when needed). Redirecting
+    # stdout/stderr would force CreateProcess, which fails with error 740 from a non-elevated PowerShell.
+    try {
+        $proc = Start-Process -FilePath $tempInstaller -ArgumentList "/S" -Verb RunAs -Wait -PassThru
+    } catch {
+        Write-Host "[!] Error: the installer needs Administrator rights (UAC was declined or failed): $($_.Exception.Message)" -ForegroundColor Red
+        return
+    }
 
     Start-Sleep -Milliseconds 500
     if ($proc -and $proc.ExitCode -ne 0) {

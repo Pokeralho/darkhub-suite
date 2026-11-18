@@ -163,12 +163,13 @@ export class RealtimeProtection extends EventEmitter {
     const batch = this.clamBatch.splice(0)
     if (!batch.length) return
     const res = await this.clamav.scan(batch.map((b) => b.file))
-    if (res.error) { this.#record('error', 'clamav', { error: res.error, files: batch.length }); return }
+    // on error, report it but still act on what was listed; files without a verdict stay uncached (rescanned next time)
+    if (res.error) this.#record('error', 'clamav', { error: res.error, files: batch.length })
     const found = new Map(res.detections.map((d) => [path.normalize(d.file).toLowerCase(), d.signature]))
     for (const b of batch) {
       const sig = found.get(path.normalize(b.file).toLowerCase())
       if (sig && !this.getConfig().allowHashes.includes(b.sha256)) await this.#detected({ file: b.file, sha256: b.sha256, size: b.size, engine: 'clamav', name: sig })
-      else this.#markClean(b.key)
+      else if (!res.error) this.#markClean(b.key)
     }
   }
 

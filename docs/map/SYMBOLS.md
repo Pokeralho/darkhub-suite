@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-16T13:20:02. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-18T09:52:19. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -15,6 +15,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `browser-extension/popup.js`
 
 `t`:75, `el`:81, `send`:92, `state`:96, `render`:100, `refresh`:105, `startPolling`:192, `stopPolling`:195
+
+## `electron/assets/points/points.js`
+
+`resize`:21, `send`:29, `updateUi`:33, `drawCurvedSegment`:51, `draw`:69
 
 ## `electron/assets/region/region.js`
 
@@ -194,7 +198,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ipc/saveBackupIpc.js`
 
-`getSaveBackupService`:9, `registerSaveBackupIPC`:12, `broadcast`:13, `getInstalledGames`:16, `handle`:35
+`getSaveBackupService`:10, `registerSaveBackupIPC`:13, `broadcast`:14, `getInstalledGames`:17, `handle`:36
 
 ## `electron/ipc/shareIpc.js`
 
@@ -234,7 +238,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/main.js`
 
-`getSystemInformation`:134, `get`:140, `getSharp`:149, `getOcrWorker`:158, `getExiftool`:178, `getFfmpegPath`:186, `getLibraryStore`:218, `safeRegister`:225, `getYtDlpTools`:266, `isDev`:271, `normalizeAccessPath`:295, `isPathInside`:305, `grantFilePath`:311, `grantDirectoryPath`:316, `hasFileAccessGrant`:321, `assertOutputDirGranted`:333, `assertFileAccessGranted`:339, `assertFileAccessGrantedMany`:348, `psSingleQuote`:354, `loadRuntimeConfig`:358, `isAllowedExternalProtocol`:368, `getAllowedExternalUrl`:372, `openAllowedExternalUrlDetached`:382, `isEmbeddedExternalProtocol`:393, `handleEmbeddedExternalNavigation`:397, `isTrustedAppNavigation`:409, `getAppIconPath`:419, `showMainWindow`:434, `ensureTray`:447, `hideWindowToBackground`:474, `computeJunkEstimate`:482, `work`:492, `createMainWindow`:517, `kickWindowsPaint`:582, `showWhenReady`:654, `eventSender`:739, `measureLatency`:766, `getActiveAdapterName`:796, `getMainCpuLoad`:1033, `broadcastLibraryEvent`:1177, `scoreExecutable`:1253, `key`:1258, `scanDirectoryForBestExe`:1279, `walk`:1282, `findPgeBat`:1436, `launchPgeBat`:1456, `setFramePacerLive`:1537, `auditStartupTask`:1571, `isStartupTaskEnabled`:1584, `setStartupTask`:1594, `refreshLiveCounts`:1722, `sendEvent`:1991, `buildArgs`:2159, `vaultFilePath`:2435, `setVaultAutoLockMinutes`:2443, `clearVaultAutoLock`:2450, `scheduleVaultAutoLock`:2457, `touchVault`:2466, `vaultFileExists`:2470, `readVaultFile`:2479, `writeVaultFile`:2484, `withVaultWriteLock`:2500, `lockVault`:2511, `removeVaultBackups`:2520, `ensureUnlocked`:2529, `loadVaultUsingWrapper`:2534, `persistVaultData`:2556, `getSecurityScoreV2`:2958, `add`:2963, `isValidHostname`:3140, `getClickEnginePath`:3283, `autoClickerCall`:3309, `isValidWingetId`:3390, `installGithubReleaseMsi`:3402, `installFromOfficialUrl`:3430, `progress`:3466, `runWinget`:3491, `runDeferredStartup`:3573
+`getSystemInformation`:135, `get`:141, `getSharp`:150, `getOcrWorker`:159, `getExiftool`:179, `getFfmpegPath`:187, `getLibraryStore`:219, `safeRegister`:226, `getYtDlpTools`:267, `isDev`:272, `normalizeAccessPath`:296, `isPathInside`:306, `grantFilePath`:312, `grantDirectoryPath`:317, `hasFileAccessGrant`:322, `assertOutputDirGranted`:334, `assertFileAccessGranted`:340, `assertFileAccessGrantedMany`:349, `psSingleQuote`:355, `loadRuntimeConfig`:359, `isAllowedExternalProtocol`:369, `getAllowedExternalUrl`:373, `openAllowedExternalUrlDetached`:383, `isEmbeddedExternalProtocol`:394, `handleEmbeddedExternalNavigation`:398, `isTrustedAppNavigation`:410, `getAppIconPath`:420, `showMainWindow`:435, `ensureTray`:448, `hideWindowToBackground`:475, `computeJunkEstimate`:483, `work`:493, `createMainWindow`:518, `kickWindowsPaint`:583, `showWhenReady`:655, `eventSender`:740, `measureLatency`:767, `getActiveAdapterName`:797, `getMainCpuLoad`:1034, `broadcastLibraryEvent`:1178, `scoreExecutable`:1254, `key`:1259, `scanDirectoryForBestExe`:1280, `walk`:1283, `findPgeBat`:1437, `launchPgeBat`:1457, `setFramePacerLive`:1538, `auditStartupTask`:1572, `isStartupTaskEnabled`:1585, `setStartupTask`:1595, `refreshLiveCounts`:1723, `sendEvent`:1992, `buildArgs`:2160, `vaultFilePath`:2436, `setVaultAutoLockMinutes`:2444, `clearVaultAutoLock`:2451, `scheduleVaultAutoLock`:2458, `touchVault`:2467, `vaultFileExists`:2471, `readVaultFile`:2480, `writeVaultFile`:2485, `withVaultWriteLock`:2501, `lockVault`:2512, `removeVaultBackups`:2521, `ensureUnlocked`:2530, `loadVaultUsingWrapper`:2535, `persistVaultData`:2557, `getSecurityScoreV2`:2959, `add`:2964, `isValidHostname`:3141, `getClickEnginePath`:3284, `autoClickerCall`:3310, `isValidWingetId`:3443, `installGithubReleaseMsi`:3455, `installFromOfficialUrl`:3483, `progress`:3519, `runWinget`:3544, `runDeferredStartup`:3626
 
 ## `electron/networkIPC.js`
 
@@ -246,7 +250,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:185, `listener`:196, `handler`:235, `handler`:298, `handler`:317, `handler`:327, `handler`:345, `handler`:357, `listener`:400, `handler`:452, `handler`:478, `handler`:484, `handler`:490, `handler`:496, `listener`:505, `listener`:516, `handler`:541, `listener`:554, `listener`:573, `handler`:642, `handler`:666, `handler`:681, `listener`:705, `listener`:734, `listener`:769, `listener`:796, `handler`:837
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:185, `listener`:196, `handler`:235, `handler`:298, `handler`:317, `handler`:327, `handler`:345, `handler`:357, `listener`:400, `handler`:464, `handler`:490, `handler`:496, `handler`:502, `handler`:508, `listener`:517, `listener`:528, `handler`:553, `listener`:566, `listener`:585, `handler`:654, `handler`:678, `handler`:693, `listener`:717, `listener`:746, `listener`:781, `listener`:808, `handler`:849
 
 ## `electron/services/CodeRunner.js`
 
@@ -262,7 +266,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/DarkHub.ClickEngine.cs`
 
-`ClickEngine`:8 _class_, `INPUT`:11 _class_, `MOUSEINPUT`:18 _class_, `SendInput`:29, `mouse_event`:32, `OpenInputDesktop`:35, `SetThreadDesktop`:38, `CloseDesktop`:41, `GetAsyncKeyState`:44, `timeBeginPeriod`:47, `timeEndPeriod`:50, `CreateWaitableTimerExW`:53, `SetWaitableTimer`:56, `WaitForSingleObject`:59, `CloseHandle`:62, `SendMouseButtonDown`:88, `SendMouseButtonUp`:110, `ReleaseAllButtons`:132, `PerformClick`:143, `WorkerLoop`:176, `RunClickLoop`:208, `ParseVkKey`:267, `ParseHotkey`:321, `Down`:340, `ModsDown`:342, `HotkeyListenerLoop`:352, `StartClicking`:389, `StopClicking`:417, `Cleanup`:431, `SetHotkey`:442, `Arm`:452, `Main`:464
+`ClickEngine`:11 _class_, `INPUT`:14 _class_, `INPUTUNION`:21 _class_, `MOUSEINPUT`:30 _class_, `KEYBDINPUT`:41 _class_, `POINT`:51 _class_, `MacroRecord`:57 _class_, `SendInput`:67, `mouse_event`:70, `keybd_event`:73, `MapVirtualKeyA`:76, `GetCursorPos`:79, `SetCursorPos`:82, `GetSystemMetrics`:85, `GetForegroundWindow`:88, `GetWindowThreadProcessId`:91, `SetProcessDPIAware`:94, `OpenInputDesktop`:97, `SetThreadDesktop`:100, `CloseDesktop`:103, `GetAsyncKeyState`:106, `timeBeginPeriod`:109, `timeEndPeriod`:112, `CreateWaitableTimerExW`:115, `SetWaitableTimer`:118, `WaitForSingleObject`:121, `CloseHandle`:124, `EmitJson`:193, `AttachInputDesktop`:201, `WaitPreciseMs`:217, `SendMouseButtonDown`:262, `SendMouseButtonUp`:281, `SendMouseMoveAbsolute`:300, `IsExtendedVk`:337, `SendKeyTransition`:345, `ReleaseAllButtons`:374, `ReleaseAllKeysAndButtons`:385, `PerformClick`:402, `WorkerLoop`:434, `RunClickLoop`:451, `GetMacroDurationMs`:507, `SaveRecFile`:515, `ReadRecFile`:538, `IsHotkeyKey`:573, `RecordWorkerLoop`:581, `MacroPlayWorkerLoop`:752, `ParseVkKey`:915, `ParseHotkey`:968, `Down`:986, `ModsDown`:988, `HotkeyListenerLoop`:998, `StopMacroInternalUnlocked`:1068, `StartMacroRecording`:1081, `StopMacroRecording`:1110, `StartMacroPlayback`:1125, `StopMacroPlayback`:1161, `StartClicking`:1177, `StopClicking`:1204, `Cleanup`:1218, `SetHotkey`:1230, `SetMacroHotkeys`:1239, `Arm`:1251, `DecodeB64Utf8`:1263, `Main`:1276
 
 ## `electron/services/DarkHub.DiskScan.cs`
 
@@ -358,7 +362,15 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/autoclicker/AutoClickerService.js`
 
-`clampSettings`:12, `AutoClickerService`:20 _class_, `load`:31, `save`:40, `state`:47, `_emit`:51, `_send`:53, `_setRunning`:55, `_ensureEngine`:62, `arm`:91, `start`:95, `stop`:105, `toggle`:113, `setHotkey`:116, `dispose`:128
+`clampSettings`:21, `clampMacroSettings`:32, `encodePathB64`:44, `AutoClickerService`:48 _class_, `_hasAnyHotkey`:81, `_refreshWorkingRecSummary`:85, `load`:104, `save`:138, `macroState`:158, `state`:167, `_emit`:179, `_send`:181, `_setRunning`:183, `_syncMacroToEngine`:190, `_handleEngineMessage`:201, `_ensureEngine`:268, `arm`:306, `start`:310, `stop`:320, `toggle`:327, `setHotkey`:330, `macroSetConfig`:348, `macroRecordStart`:390, `macroRecordStop`:412, `macroPlayStart`:417, `macroPlayStop`:433, `macroLoadFromPath`:441, `macroSaveToPath`:497, `macroCompileExe`:515, `macroClear`:535, `_compileWaypointsIntoWorkingRec`:559, `waypointsSave`:601, `waypointsAddPicked`:616, `waypointsPlay`:637, `dispose`:648
+
+## `electron/services/autoclicker/PointPicker.js`
+
+`computeVirtualScreenBounds`:12, `makePointPicker`:32, `finish`:81
+
+## `electron/services/autoclicker/recCodec.js`
+
+`decodeTinyTaskSpeed`:26, `encodeTinyTaskSpeed`:33, `findTinyTaskBaseAnchor`:41, `inspectTinyTaskExeBuffer`:49, `parseRecBuffer`:83, `serializeRecBuffer`:162, `compileTinyTaskExe`:184, `normalizeWaypoint`:216, `easeInOutCubic`:238, `appendGlideFrames`:242, `buttonCodes`:298, `compileWaypointsToEvents`:308
 
 ## `electron/services/benchmark/BenchmarkService.js`
 
@@ -434,7 +446,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/darkos/UsbMediaService.js`
 
-`parseLine`:14, `usableDisks`:20, `UsbMediaService`:24 _class_, `_script`:33, `_run`:40, `listDisks`:59, `findIsos`:67, `allowIso`:81, `hashIso`:88, `write`:108, `cancel`:123
+`parseLine`:13, `usableDisks`:19, `UsbMediaService`:23 _class_, `_script`:32, `_run`:38, `listDisks`:57, `findIsos`:65, `allowIso`:79, `hashIso`:86, `write`:106, `cancel`:121
 
 ## `electron/services/darkos/darkosRelease.js`
 
@@ -446,7 +458,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/diskscan/DiskScanService.js`
 
-`defaultExe`:15, `csvCell`:20, `formatSize`:22, `RECYCLE_PROBE`:30, `recycleVerdict`:57, `clearReadOnly`:67, `DiskScanService`:75 _class_, `_filter`:87, `drives`:95, `status`:108, `emit`:141, `cancel`:172, `view`:183, `info`:204, `setTag`:209, `_pathOf`:214, `open`:220, `reveal`:227, `trash`:235, `deletePermanent`:254, `rm`:265, `recycleProbe`:282, `pathOf`:287, `exportTo`:290, `write`:295
+`defaultExe`:15, `csvCell`:20, `normDir`:22, `isUnder`:23, `protectedPathReason`:28, `formatSize`:42, `RECYCLE_PROBE`:50, `recycleVerdict`:77, `clearReadOnly`:87, `DiskScanService`:95 _class_, `_filter`:107, `drives`:115, `status`:128, `emit`:161, `cancel`:192, `view`:203, `info`:224, `setTag`:229, `_pathOf`:234, `open`:240, `reveal`:247, `trash`:255, `deletePermanent`:275, `rm`:287, `recycleProbe`:304, `pathOf`:309, `exportTo`:312, `write`:317
 
 ## `electron/services/diskscan/ScanModel.js`
 
@@ -726,7 +738,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/realtime/RealtimeProtection.js`
 
-`isScanCandidate`:26, `sha256File`:32, `RealtimeProtection`:39 _class_, `running`:55, `start`:57, `stop`:72, `status`:82, `scanNow`:87, `record`:91, `changed`:99, `settle`:108, `enqueue`:122, `drain`:129, `scanOne`:139, `flushClam`:160, `markClean`:175, `detected`:180
+`isScanCandidate`:26, `sha256File`:32, `RealtimeProtection`:39 _class_, `running`:55, `start`:57, `stop`:72, `status`:82, `scanNow`:87, `record`:91, `changed`:99, `settle`:108, `enqueue`:122, `drain`:129, `scanOne`:139, `flushClam`:160, `markClean`:176, `detected`:181
 
 ## `electron/services/realtime/realtimeConfig.js`
 
@@ -758,7 +770,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/saves/SaveBackupService.js`
 
-`sha256File`:18, `run`:22, `safeName`:25, `templatePrefix`:29, `SaveBackupService`:31 _class_, `settings`:43, `setSettings`:54, `_env`:61, `_ensureIndex`:83, `_collect`:125, `_gameDir`:139, `versions`:141, `scan`:150, `_match`:168, `backup`:175, `_rotate`:225, `previewRestore`:233, `_gameRunning`:249, `restore`:256, `removeVersion`:286, `backupAll`:293, `onGameClosed`:303
+`sha256File`:18, `run`:22, `safeName`:25, `templatePrefix`:29, `regFileOnlyHkcu`:32, `SaveBackupService`:46 _class_, `settings`:58, `setSettings`:69, `_env`:76, `_ensureIndex`:98, `_collect`:140, `_gameDir`:154, `versions`:156, `scan`:165, `_match`:183, `backup`:190, `_rotate`:240, `previewRestore`:248, `_gameRunning`:264, `restore`:271, `removeVersion`:307, `backupAll`:314, `onGameClosed`:324
 
 ## `electron/services/saves/manifestIndexer.js`
 
@@ -1206,7 +1218,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/components/monitor/WallCalibration.tsx`
 
-`Step`:10 _type_, `Sample`:11 _type_, `fmt`:13, `ReadingInput`:16 _component_, `field`:25, `Stability`:57 _component_, `WallCalibration`:74 _component_, `ov`:91, `gb`:92, `tick`:101, `capture`:119, `reset`:125, `captureIdle`:127, `confirmIdle`:133, `startLoad`:140, `stopLoad`:161, `confirmLoad`:175, `save`:187, `errText`:200, `date`:201
+`Step`:10 _type_, `Sample`:11 _type_, `fmt`:13, `ReadingInput`:16 _component_, `field`:25, `Stability`:57 _component_, `WallCalibration`:74 _component_, `ov`:92, `gb`:93, `tick`:102, `capture`:121, `reset`:130, `captureIdle`:132, `confirmIdle`:138, `startLoad`:145, `stopLoad`:166, `confirmLoad`:180, `save`:192, `errText`:205, `date`:206
 
 ## `src/components/network/LatencyLab.tsx`
 
@@ -1470,7 +1482,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/AutoClicker.tsx`
 
-`AutoClicker`:11 _component_, `refresh`:39, `handleStart`:94, `handleStop`:111, `handleSaveHotkey`:125, `registerTestClick`:141, `handleResetTester`:152, `runSelfDiagnostic`:160
+`MacroViewState`:13 _type_, `WaypointItem`:28 _type_, `formatClockMs`:39, `AutoClicker`:47 _component_, `applyMacroPayload`:101, `refresh`:130, `handleStart`:200, `handleStop`:217, `handleSaveHotkey`:231, `syncMacroConfig`:249, `persistWaypoints`:268, `handlePickPointsOnScreen`:283, `handleAddManualPoint`:301, `updateWaypointField`:317, `moveWaypointPriority`:323, `removeWaypoint`:332, `clearAllWaypoints`:337, `handleWaypointsPlayToggle`:342, `handleMacroRecordToggle`:371, `handleMacroPlayToggle`:393, `handleMacroOpen`:419, `handleMacroSave`:439, `handleMacroCompile`:456, `handleMacroClear`:473, `registerTestClick`:485, `handleResetTester`:496, `runSelfDiagnostic`:503
 
 ## `src/pages/Benchmark.tsx`
 
@@ -1704,6 +1716,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `svc`:45
 
+## `tests/autoclickerMacro.test.ts`
+
+`buildSyntheticTinyTaskStub`:23
+
 ## `tests/benchWorkerReal.test.ts`
 
 `run`:11, `best`:19
@@ -1746,7 +1762,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `tests/diskMap.test.ts`
 
-`file`:15, `ok`:18, `build`:61
+`file`:15, `ok`:18, `build`:61, `w`:186
 
 ## `tests/diskRescue.test.ts`
 
@@ -1906,7 +1922,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `tests/saveBackup.test.ts`
 
-`setup`:10
+`setup`:10, `write`:116, `key`:122
 
 ## `tests/savePaths.test.ts`
 
