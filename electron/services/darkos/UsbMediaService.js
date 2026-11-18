@@ -42,6 +42,8 @@ export class UsbMediaService {
       const p = spawn('powershell.exe', full, { windowsHide: true })
       let buf = ''
       let err = ''
+      p.stdout.setEncoding?.('utf8') // stream decoding: no U+FFFD when a multibyte char is split across chunks
+      p.stderr.setEncoding?.('utf8')
       p.stdout.on('data', (d) => {
         buf += d.toString('utf8')
         let i

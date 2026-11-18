@@ -20,8 +20,10 @@ import {
   derivePasswordFromRecoveryWords,
   encryptVaultData,
   generateRecoveryWords,
+  recoveryDeriveOrder,
   unwrapVaultKeyWithPassword,
-  wrapVaultKeyWithPassword
+  wrapVaultKeyWithPassword,
+  wrapVaultKeyWithRecoveryWords
 } from './vaultCrypto.js'
 import { registerNetworkIPC } from './networkIPC.js'
 import { registerOptiScalerIPC } from './optiscalerManager.js'
@@ -765,9 +767,10 @@ ipcMain.handle('optimizer:getAuditLog', async (_event, payload) => {
 })
 
 async function measureLatency(host = '1.1.1.1', timeoutMs = 900) {
-  const safeHost = String(host || '1.1.1.1').trim()
-  if (!/^[A-Za-z0-9_.:-]{1,253}$/.test(safeHost)) {
-    return { ok: false, host: safeHost, latencyMs: null, error: 'invalid_host' }
+  const { safeHost: checkHost } = await import('./services/network/hostValidation.js')
+  const safeHost = checkHost(String(host || '1.1.1.1'))
+  if (safeHost === null) {
+    return { ok: false, host: String(host ?? '').trim().slice(0, 253), latencyMs: null, error: 'invalid_host' }
   }
 
   const waitMs = Math.max(300, Math.min(5000, Number(timeoutMs) || 900))
@@ -1764,7 +1767,7 @@ ipcMain.handle('system:getLiveStats', async () => {
 
 ipcMain.handle('injector:inject', async (_event, payload) => {
   try {
-    const { processName, dllPath } = payload;
+    const { processName, dllPath } = payload ?? {};
     if (!processName || !dllPath) return { ok: false, error: 'Processo ou DLL invalidos' };
     if (typeof processName !== 'string' || typeof dllPath !== 'string') {
       return { ok: false, error: 'Processo ou DLL invalidos' };
@@ -1772,6 +1775,12 @@ ipcMain.handle('injector:inject', async (_event, payload) => {
     if (!/\.dll$/i.test(dllPath.trim())) {
       return { ok: false, error: 'O caminho informado não aponta para um arquivo .dll' };
     }
+    // Windows' protected processes and anti-cheat services are never targets (services/injectPolicy.js)
+    const { injectTargetRefusal } = await import('./services/injectPolicy.js');
+    const refused = injectTargetRefusal(processName);
+    if (refused) return { ok: false, error: refused };
+    // Only a DLL the user picked in the file dialog (DllInjector "Procurar"): the renderer cannot name an arbitrary file.
+    assertFileAccessGranted(dllPath, 'DLL');
 
     // As paths might have spaces AND contain single quotes; escapamos com
     // psSingleQuote (que dobra aspas simples: ' -> '') em vez de
@@ -2510,11 +2519,20 @@ let vaultUnlockedVia = null
 let vaultKeyGen = 0
 
 function lockVault() {
+  const oldKey = vaultKey
   vaultUnlocked = false
   vaultKey = null
   vaultData = null
   vaultUnlockedVia = null
   clearVaultAutoLock()
+  // Wipe the data key from memory. Not at once: a save already queued (persistVaultData) or a recovery wrapper being
+  // built (scrypt) captured this Buffer before the lock and still has to use it, and a zeroed key would seal the vault
+  // with zeros. After the queued writes drain plus a grace period nothing can still hold it.
+  if (Buffer.isBuffer(oldKey)) {
+    vaultWriteChain.then(() => {
+      setTimeout(() => { if (vaultKey !== oldKey) oldKey.fill(0) }, 60_000).unref?.()
+    })
+  }
 }
 
 /** Removes vault.dhv.bak-* copies: they hold the previous key wrapped with the previous password. */
@@ -2599,8 +2617,7 @@ ipcMain.handle('vault:init', async (_event, payload) => {
   const masterWrapper = await wrapVaultKeyWithPassword(newVaultKey, masterPassword, buildKdf())
 
   const recoveryWords = generateRecoveryWords(undefined, 16)
-  const recoveryPassword = derivePasswordFromRecoveryWords(recoveryWords.join(' '))
-  const recoveryWrapper = await wrapVaultKeyWithPassword(newVaultKey, recoveryPassword, buildKdf())
+  const recoveryWrapper = await wrapVaultKeyWithRecoveryWords(newVaultKey, recoveryWords.join(' '), buildKdf())
 
   const file = {
     version: VAULT_VERSION,
@@ -2637,8 +2654,34 @@ ipcMain.handle('vault:unlockWithRecoveryWords', async (_event, payload) => {
   if (!(await vaultFileExists())) return { ok: false, error: 'Vault not initialized' }
   try {
     // Generated words are lowercase: accept any case and stray spaces.
-    const recoveryPassword = derivePasswordFromRecoveryWords(words.trim().toLowerCase())
-    await loadVaultUsingWrapper('recovery', recoveryPassword)
+    const normalized = words.trim().toLowerCase()
+    const file = await readVaultFile()
+    // Older vaults sealed the recovery wrapper with a truncated hash (derivation v1); newer ones are marked v2.
+    let opened = 0
+    let lastErr = null
+    for (const v of recoveryDeriveOrder(file?.wrappers?.recovery)) {
+      try {
+        await loadVaultUsingWrapper('recovery', derivePasswordFromRecoveryWords(normalized, v))
+        opened = v
+        break
+      } catch (err) { lastErr = err }
+    }
+    if (!opened) throw lastErr ?? new Error('Vault wrapper missing')
+    // A v1 wrapper opened: reseal it with the full-strength derivation of the same words (they stay valid).
+    if (opened === 1 && Buffer.isBuffer(vaultKey)) {
+      const key = vaultKey
+      const gen = vaultKeyGen
+      try {
+        const upgraded = await wrapVaultKeyWithRecoveryWords(key, normalized, buildKdf())
+        await withVaultWriteLock(async () => {
+          if (vaultKeyGen !== gen) return
+          const latest = await readVaultFile()
+          await writeVaultFile({ ...latest, wrappers: { ...(latest.wrappers ?? {}), recovery: upgraded } })
+        })
+      } catch (err) {
+        log.warn(`[vault] recovery wrapper upgrade skipped: ${err?.message || err}`)
+      }
+    }
     return { ok: true }
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) }
@@ -2765,9 +2808,8 @@ ipcMain.handle('vault:changeMasterPassword', async (_event, payload) => {
     // The recovery wrapper is rebuilt too, so new recovery words are issued.
     const newKey = crypto.randomBytes(32)
     const recoveryWords = generateRecoveryWords(undefined, 16)
-    const recoveryPassword = derivePasswordFromRecoveryWords(recoveryWords.join(' '))
     const masterWrapper = await wrapVaultKeyWithPassword(newKey, newPassword, buildKdf())
-    const recoveryWrapper = await wrapVaultKeyWithPassword(newKey, recoveryPassword, buildKdf())
+    const recoveryWrapper = await wrapVaultKeyWithRecoveryWords(newKey, recoveryWords.join(' '), buildKdf())
     const next = {
       ...file,
       wrappers: { master: masterWrapper, recovery: recoveryWrapper },
@@ -2791,8 +2833,7 @@ ipcMain.handle('vault:regenerateRecoveryWords', async () => {
   const key = vaultKey
   const gen = vaultKeyGen
   const recoveryWords = generateRecoveryWords(undefined, 16)
-  const recoveryPassword = derivePasswordFromRecoveryWords(recoveryWords.join(' '))
-  const recoveryWrapper = await wrapVaultKeyWithPassword(key, recoveryPassword, buildKdf())
+  const recoveryWrapper = await wrapVaultKeyWithRecoveryWords(key, recoveryWords.join(' '), buildKdf())
   return withVaultWriteLock(async () => {
     if (vaultKeyGen !== gen) return { ok: false, error: 'Vault key changed, try again' }
     const file = await readVaultFile()
@@ -3460,13 +3501,15 @@ async function installGithubReleaseMsi(repo, progress) {
   if (!asset) throw new Error(`a versão ${rel?.tag_name ?? '?'} não tem instalador .msi para Windows ${arch}`)
   const sha256 = assetSha256(asset)
   if (!sha256) throw new Error('o GitHub não publicou o hash SHA-256 do instalador; instalação recusada')
-  const dir = path.join(app.getPath('temp'), 'darkhub-setup')
-  await fs.mkdir(dir, { recursive: true })
-  const dest = path.join(dir, path.basename(String(asset.name)))
-  progress(`[GitHub] Baixando ${asset.name} (${rel.tag_name}, ${Math.round((asset.size || 0) / 1048576)} MB)...`)
-  await downloadToFile(asset.browser_download_url, dest, { expectedSha256: sha256, timeoutMs: 600000 })
-  progress(`[GitHub] Hash SHA-256 conferido. Instalando...`)
+  // msiexec runs elevated: stage the file where only Administrators/SYSTEM can write, never in the user's %TEMP%
+  const { createSecureStagingDir, assertUnchanged } = await import('./services/secureStaging.js')
+  const staging = await createSecureStagingDir({ prefix: 'setup-' })
+  const dest = staging.file(path.basename(String(asset.name)))
   try {
+    progress(`[GitHub] Baixando ${asset.name} (${rel.tag_name}, ${Math.round((asset.size || 0) / 1048576)} MB)...`)
+    await downloadToFile(asset.browser_download_url, dest, { expectedSha256: sha256, timeoutMs: 600000 })
+    progress(`[GitHub] Hash SHA-256 conferido. Instalando...`)
+    assertUnchanged(dest, sha256)
     const code = await new Promise((resolve) => {
       const p = spawn('msiexec.exe', ['/i', dest, '/qn', '/norestart'], { windowsHide: true })
       p.on('close', resolve)
@@ -3474,7 +3517,7 @@ async function installGithubReleaseMsi(repo, progress) {
     })
     if (code !== 0 && code !== 3010) throw new Error(`msiexec terminou com código ${code}`)
   } finally {
-    await fs.rm(dest, { force: true }).catch(() => {})
+    await staging.cleanup()
   }
 }
 
@@ -3484,24 +3527,29 @@ async function installFromOfficialUrl(id, progress) {
   const show = await runCommand('winget', ['show', '--id', id, '--exact', '--source', 'winget', '--accept-source-agreements', '--disable-interactivity'], { timeoutMs: 60000 })
   const info = parseWingetShow(show.stdout)
   if (!info.url || !isFetchableUrl(info.url)) throw new Error('sem endereço oficial de download no catálogo')
-  const dir = path.join(app.getPath('temp'), 'darkhub-setup')
-  await fs.mkdir(dir, { recursive: true })
   const ext = info.type === 'msi' || info.type === 'wix' ? '.msi' : '.exe'
-  const file = path.join(dir, `${id.replace(/[^\w.-]/g, '_')}${ext}`)
+  if (!silentInstall(info.type, 'x' + ext)) throw new Error(`o instalador (${info.type || '?'}) não tem modo silencioso conhecido; baixe pelo site do fabricante`)
+  // the installer runs elevated: stage it where only Administrators/SYSTEM can write (no swap between the signature
+  // check and the launch), and re-check its hash right before starting it
+  const { createSecureStagingDir, assertUnchanged } = await import('./services/secureStaging.js')
+  const staging = await createSecureStagingDir({ prefix: 'setup-' })
+  const file = staging.file(`${id.replace(/[^\w.-]/g, '_')}${ext}`)
   const plan = silentInstall(info.type, file)
-  if (!plan) throw new Error(`o instalador (${info.type || '?'}) não tem modo silencioso conhecido; baixe pelo site do fabricante`)
   try {
     const res = await fetch(info.url, { redirect: 'follow', headers: { 'user-agent': 'DarkHubSuite' } })
     if (!res.ok) throw new Error(`download HTTP ${res.status}`)
     if (new URL(res.url).protocol !== 'https:') throw new Error('o download saiu do HTTPS')
     const size = Number(res.headers.get('content-length') || 0)
     if (size > 4 * 1024 ** 3) throw new Error('instalador grande demais')
-    await fs.writeFile(file, Buffer.from(await res.arrayBuffer()))
+    const bytes = Buffer.from(await res.arrayBuffer())
+    const sha256 = crypto.createHash('sha256').update(bytes).digest('hex')
+    await fs.writeFile(file, bytes, { flag: 'wx' })
     const sig = await runPowerShell(`$s = Get-AuthenticodeSignature -LiteralPath ${psSingleQuote(file)}; Write-Output ("$($s.Status)|$($s.SignerCertificate.Subject)")`, { timeoutMs: 60000, trim: true })
     const [status, subject = ''] = String(sig.stdout || '').split('|')
     if (status !== 'Valid') throw new Error(`assinatura digital inválida (${status || 'sem assinatura'}); instalação recusada`)
     if (!signerMatches(subject, info.publisher)) throw new Error(`assinado por "${subject}", não por ${info.publisher}; instalação recusada`)
     progress(`[AppStore] Assinatura válida de ${info.publisher}. Instalando...`)
+    assertUnchanged(file, sha256)
     const code = await new Promise((resolve) => {
       const p = spawn(plan.cmd, plan.args, { windowsHide: true })
       p.on('close', resolve)
@@ -3509,7 +3557,7 @@ async function installFromOfficialUrl(id, progress) {
     })
     if (![0, 3010, 1641].includes(code)) throw new Error(`o instalador terminou com código ${code}`)
   } finally {
-    await fs.rm(file, { force: true }).catch(() => {})
+    await staging.cleanup()
   }
 }
 

@@ -87,7 +87,13 @@ void DeviceClock::calibrate() {
 
 void DeviceClock::do_calibration(const std::stop_token stoken) {
     while (!stoken.stop_requested()) {
-        this->calibrate();
+        // calibrate() throws on a Vulkan error (e.g. device lost). An
+        // exception escaping a std::jthread body calls std::terminate and
+        // takes the game down, so keep the previous calibration instead.
+        try {
+            this->calibrate();
+        } catch (...) {
+        }
         auto lock = std::shared_lock{this->mutex};
         this->cv.wait_for(lock, stoken, CALIBRATION_PERIOD,
                           [&] { return stoken.stop_requested(); });

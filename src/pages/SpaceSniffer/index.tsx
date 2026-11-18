@@ -6,6 +6,7 @@ import {
 } from '../../components/icons';
 import PageHeader from '../../components/ui/PageHeader';
 import { useI18n } from '../../i18n/I18nProvider';
+import { visibleInterval } from '../../utils/visibleInterval';
 import TreemapCanvas, { CLASS_COLOR, TAG_COLOR } from './TreemapCanvas';
 import { formatBytes } from './treemap';
 import { CATEGORIES, CATEGORY_COLOR, DiskCategory, categoryFill, classifyPath, joinPath } from './diskCategories';
@@ -84,8 +85,7 @@ export default function DiskMap() {
   useEffect(() => { if (active) loadView(); }, [active, loadView, version, areaTick]);
   useEffect(() => {
     if (!running) return;
-    const h = setInterval(loadView, 1000);
-    return () => clearInterval(h);
+    return visibleInterval(loadView, 1000);
   }, [running, loadView]);
   const wasRunning = useRef(false);
   useEffect(() => { if (wasRunning.current && !running) loadView(); wasRunning.current = running; }, [running, loadView]);
@@ -95,7 +95,12 @@ export default function DiskMap() {
     setPermanent((p) => (p && p.id === selected?.id ? p : null));
     setTypedName('');
     if (!selected || !['dir', 'file'].includes(selected.kind)) { setInfo(null); return; }
-    api()?.info({ id: selected.id, filter }).then((r) => setInfo(r?.ok ? r.info || null : null)).catch(() => setInfo(null));
+    // Holding an arrow key fires many selections: only the latest answer may land.
+    let cancelled = false;
+    api()?.info({ id: selected.id, filter })
+      .then((r) => { if (!cancelled) setInfo(r?.ok ? r.info || null : null); })
+      .catch(() => { if (!cancelled) setInfo(null); });
+    return () => { cancelled = true; };
   }, [selected, filter, version]);
 
   const onSize = useCallback((w: number, h: number) => {
@@ -269,8 +274,15 @@ export default function DiskMap() {
 
   // Keyboard: Backspace / Alt+Up up, Alt+Left back, Alt+Right forward, Up/Down walk the list,
   // Enter opens, Delete asks to trash, Escape clears, Ctrl+1..4 tags.
+  // The listener is added once; it reads the latest render's handler through a ref.
+  const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const onKey = (e: KeyboardEvent) => keyHandlerRef.current(e);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  {
+    keyHandlerRef.current = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !active) return;
       if (e.key === 'Backspace' || (e.altKey && e.key === 'ArrowUp')) { e.preventDefault(); goUp(); }
@@ -294,9 +306,7 @@ export default function DiskMap() {
       else if (e.key === 'Escape') { setSelected(null); setConfirmTrash(false); setHighlight(null); }
       else if (e.ctrlKey && /^[1-4]$/.test(e.key) && selected) { e.preventDefault(); setTag(TAGS[Number(e.key) - 1]); }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
+  }
 
   const scanned = status?.done;
 

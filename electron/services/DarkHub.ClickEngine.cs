@@ -1097,7 +1097,7 @@ namespace DarkHub.Native
                 ReleaseAllKeysAndButtons();
                 macroEvents = new List<MacroRecord>();
                 macroMode = 1;
-                macroThread = new Thread(RecordWorkerLoop)
+                macroThread = new Thread(RunWithTimer(RecordWorkerLoop))
                 {
                     IsBackground = true,
                     Priority = ThreadPriority.Highest
@@ -1148,7 +1148,7 @@ namespace DarkHub.Native
                 macroMode = 2;
                 uint dur = GetMacroDurationMs(macroEvents);
                 int cnt = macroEvents.Count;
-                macroThread = new Thread(MacroPlayWorkerLoop)
+                macroThread = new Thread(RunWithTimer(MacroPlayWorkerLoop))
                 {
                     IsBackground = true,
                     Priority = ThreadPriority.Highest
@@ -1189,7 +1189,7 @@ namespace DarkHub.Native
                 {
                     if (workerThread != null && workerThread.IsAlive) workerThread.Join(500);
                     isRunning = true;
-                    workerThread = new Thread(WorkerLoop)
+                    workerThread = new Thread(RunWithTimer(WorkerLoop))
                     {
                         IsBackground = true,
                         Priority = ThreadPriority.Highest
@@ -1215,15 +1215,62 @@ namespace DarkHub.Native
             }
         }
 
+        // 1 ms timer resolution only while a clicking / recording / playback worker is alive: the daemon itself runs
+        // 24/7 for the global hotkeys and must not keep the whole system at 1 ms while idle. Reference-counted, one
+        // acquire + one release per worker thread (RunWithTimer), and force-released on exit.
+        private static readonly object timerLock = new object();
+        private static int timerRefs = 0;
+
+        private static void AcquireTimerPeriod()
+        {
+            lock (timerLock)
+            {
+                timerRefs++;
+                if (timerRefs == 1 && timerPeriodActive == 0)
+                {
+                    try { if (timeBeginPeriod(1) == 0) timerPeriodActive = 1; } catch {}
+                }
+            }
+        }
+
+        private static void ReleaseTimerPeriod()
+        {
+            lock (timerLock)
+            {
+                if (timerRefs <= 0) return; // already force-released by Cleanup
+                timerRefs--;
+                if (timerRefs == 0 && timerPeriodActive == 1)
+                {
+                    try { timeEndPeriod(1); } catch {}
+                    timerPeriodActive = 0;
+                }
+            }
+        }
+
+        private static ThreadStart RunWithTimer(ThreadStart body)
+        {
+            return delegate
+            {
+                AcquireTimerPeriod();
+                try { body(); }
+                finally { ReleaseTimerPeriod(); }
+            };
+        }
+
         private static void Cleanup()
         {
             exitRequested = true;
             isRunning = false;
             macroMode = 0;
             ReleaseAllKeysAndButtons();
-            if (Interlocked.Exchange(ref timerPeriodActive, 0) == 1)
+            lock (timerLock)
             {
-                timeEndPeriod(1);
+                timerRefs = 0;
+                if (timerPeriodActive == 1)
+                {
+                    try { timeEndPeriod(1); } catch {}
+                    timerPeriodActive = 0;
+                }
             }
         }
 
@@ -1275,8 +1322,8 @@ namespace DarkHub.Native
 
         public static void Main(string[] args)
         {
+            Console.OutputEncoding = new UTF8Encoding(false);
             try { SetProcessDPIAware(); } catch {}
-            if (timeBeginPeriod(1) == 0) timerPeriodActive = 1;
             AppDomain.CurrentDomain.ProcessExit += (s, e) => Cleanup();
             Console.CancelKeyPress += (s, e) => Cleanup();
 

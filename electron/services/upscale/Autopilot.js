@@ -64,7 +64,10 @@ export class Autopilot {
     fs.rmSync(dir, { recursive: true, force: true })
     fs.mkdirSync(dir, { recursive: true })
     // bsdtar (Windows 10 1803+) reads zip and does not follow absolute or ../ paths out of the target
-    cp.execFileSync(SYSTEM_TAR, ['-xf', zip, '-C', dir], { windowsHide: true, timeout: 120000 })
+    // async: unpacking can take up to 2 min and must not freeze the main process
+    await new Promise((resolve, reject) => {
+      cp.execFile(SYSTEM_TAR, ['-xf', zip, '-C', dir], { windowsHide: true, timeout: 120000 }, (err) => (err ? reject(err) : resolve()))
+    })
     fs.rmSync(zip, { force: true })
     if (!findExe(dir)) throw new Error('package unpacked but the executable was not found')
     for (const old of fs.readdirSync(this.root)) if (old !== rel.tag && /^v[\d.]+$/.test(old)) fs.rmSync(path.join(this.root, old), { recursive: true, force: true })

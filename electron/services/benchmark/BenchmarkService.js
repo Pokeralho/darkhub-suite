@@ -69,6 +69,7 @@ export class BenchmarkService {
       this.child = child
       let buf = ''
       let out = null
+      child.stdout.setEncoding?.('utf8') // stream decoding: no U+FFFD when a multibyte char is split across chunks
       child.stdout.on('data', (d) => {
         buf += d
         let i

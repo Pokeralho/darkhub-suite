@@ -2,8 +2,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import React from 'react'
 import { I18nProvider, useI18n } from '../src/i18n/I18nProvider'
+import { addStringsForTests } from '../src/i18n/store'
 
-// 'hub.title' and 'ovle.padding' exist only in the en-US dictionary; their pt-BR text is the inline default.
+// pt-BR and en-US now ship the same keys: this one exists only in en-US, to exercise the fallback chain.
+addStringsForTests('en-US', { 'test.onlyEnglish': 'Only in English' })
+
+// 'hub.title' and 'ovle.padding': the pt-BR inline default matches the pt-BR dictionary.
 const tFor = (lang: string) => {
   localStorage.setItem('darkhub.lang', lang)
   const { result } = renderHook(() => useI18n(), { wrapper: ({ children }) => <I18nProvider>{children}</I18nProvider> })
@@ -29,7 +33,7 @@ describe('t() fallback', () => {
 
   it('pt-BR without an inline default falls back to en-US, then the key', () => {
     const t = tFor('pt-BR')
-    expect(t('hub.title')).toBe('Presets & modules')
+    expect(t('test.onlyEnglish')).toBe('Only in English')
     expect(t('no.such.key')).toBe('no.such.key')
   })
 

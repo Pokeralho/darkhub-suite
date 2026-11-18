@@ -108,6 +108,25 @@ describe('quarantine', () => {
     expect(q.list()).toHaveLength(0);
     expect(() => q.remove('../../etc')).toThrow();
   });
+  it('refuses a file that changed since the scan and keeps it in place', async () => {
+    const dir = tmp();
+    const file = path.join(dir, 'tool.exe');
+    fs.writeFileSync(file, crypto.randomBytes(2048));
+    const q = new Quarantine(path.join(dir, 'q'));
+    await expect(q.add(file, { sha256: sha(Buffer.from('what was scanned')) })).rejects.toThrow(/changed/);
+    expect(fs.existsSync(file)).toBe(true);
+    expect(fs.readdirSync(path.join(dir, 'q'))).toEqual([]);
+  });
+  it('refuses to restore a planted entry into a system folder', async () => {
+    const dir = tmp();
+    const q = new Quarantine(dir);
+    const id = '0123456789abcdef';
+    fs.writeFileSync(path.join(dir, `${id}.q`), 'x');
+    const target = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'evil.dll');
+    fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify({ id, originalPath: target, key: 'ab'.repeat(32), at: 1 }));
+    await expect(q.restore(id)).rejects.toThrow(/system folder/);
+    expect(fs.existsSync(target)).toBe(false);
+  });
 });
 
 describe('scanners', () => {

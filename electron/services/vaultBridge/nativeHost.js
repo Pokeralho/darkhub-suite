@@ -7,6 +7,7 @@ import crypto from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { NATIVE_HOST_NAME } from './protocol.js'
+import { integrityError } from '../binaryIntegrity.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -93,7 +94,13 @@ export class NativeHostRegistry {
 
   async #defaultFindBundledExe() {
     const { exes, source } = bundledHostCandidates()
-    for (const p of exes) if (fs.existsSync(p)) return p
+    for (const p of exes) {
+      if (!fs.existsSync(p)) continue
+      // the copy registered with the browsers must be the shipped host (an installed app refuses a changed one)
+      const tampered = integrityError([HOST_EXE_NAME])
+      if (tampered) throw new Error(tampered)
+      return p
+    }
     // Not shipped (e.g. build:native not run): compile it from the bundled C# source with the in-box .NET compiler.
     const csc = path.join(process.env.WINDIR || 'C:\\Windows', 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe')
     if (!fs.existsSync(csc) || !fs.existsSync(source)) return null

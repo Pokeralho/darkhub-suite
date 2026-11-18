@@ -3,6 +3,7 @@ import { RefreshCw, Code } from '../components/icons';
 import ExtensionFrame from '../components/ExtensionFrame';
 import { useI18n } from '../i18n/I18nProvider';
 import { parseExtPage, textIn, useExtensions } from '../lib/extensions';
+import { visibleInterval } from '../utils/visibleInterval';
 
 /** A screen contributed by an extension, full height, with a console for extensions under development. */
 export default function ExtensionPage({ page, onNavigate }: { page: string; onNavigate: (p: string) => void }) {
@@ -17,8 +18,10 @@ export default function ExtensionPage({ page, onNavigate }: { page: string; onNa
 
   useEffect(() => {
     if (logs === null || !ext) return;
-    const id = window.setInterval(() => window.darkhub?.ext?.logs({ id: ext.id }).then((r) => setLogs(r.items)), 1000);
-    return () => window.clearInterval(id);
+    return visibleInterval(async () => {
+      const r = await window.darkhub?.ext?.logs({ id: ext.id });
+      if (r) setLogs(r.items);
+    }, 1000);
   }, [logs, ext]);
 
   if (!target) return null;

@@ -1,5 +1,5 @@
 # DarkOS.Recovery.psm1 - DarkOS change catalog / manifest / recovery engine
-# ModuleVersion: 4   (bump on every behaviour change: DarkHub runs the newest of installed vs bundled)
+# ModuleVersion: 5   (bump on every behaviour change: DarkHub runs the newest of installed vs bundled)
 # Windows PowerShell 5.1, ASCII only. Shared by first-boot provisioning and DarkHub Suite.
 # Every system interaction goes through a backend table ($script:DK.Backend). The "Real" backend
 # touches the system; the "Fake" backend (DryRun) keeps an in-memory state persisted to
@@ -485,11 +485,16 @@ function New-DkRealBackend {
         # kind = the value's real registry type, so a revert recreates it as it was (not with the catalog type);
         # raw = the unexpanded text of an ExpandString (Get-ItemProperty returns it already expanded).
         $kind = $null; $raw = $prop.Value
+        $rk = $null
         try {
             $rk = Get-Item -LiteralPath $full -ErrorAction Stop
             $kind = [string]$rk.GetValueKind($Name)
             if ($kind -eq 'ExpandString') { $raw = $rk.GetValue($Name, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) }
         } catch { $kind = $null; $raw = $prop.Value }
+        finally {
+            # an open RegistryKey handle into the loaded Default-user hive makes 'reg.exe unload' fail
+            if ($null -ne $rk) { try { $rk.Dispose() } catch { } }
+        }
         return @{ value = $prop.Value; kind = $kind; raw = $raw }
     }
     $b['RegSet'] = {

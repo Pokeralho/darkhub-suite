@@ -22,7 +22,10 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
+    env:
+      # passed through the environment, never pasted into a script (a crafted tag would run as code)
+      TAG: ${{ inputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,7 +35,7 @@ jobs:
         shell: pwsh
         run: |
           $v = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          if ("v$v" -ne '${{ inputs.tag }}') { throw "tag ${{ inputs.tag }} does not match package.json $v" }
+          if ("v$v" -ne $env:TAG) { throw "tag $($env:TAG) does not match package.json $v" }
           "VERSION=$v" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
 
       - uses: actions/setup-node@v4
@@ -82,8 +85,14 @@ jobs:
           RUSTFLAGS: -C target-feature=+crt-static
       - run: Copy-Item native_gpubench/target/release/DarkHub_GpuBench.exe electron/services/DarkHub.GpuBench.exe -Force
         shell: pwsh
+      # Vulkan low-latency layer (C++, MSVC + CMake from the runner's Visual Studio)
+      - run: call native_lowlatency\build-windows.cmd
+        shell: cmd
       # Real-ESRGAN AI upscaler shipped in resources/realesrgan (pinned release, SHA-256 checked)
       - run: npm run build:upscaler
+      # vendor/ is gitignored: without these the release ships without the Office/RAW/DDS converters
+      - run: npm run build:libreoffice
+      - run: npm run build:imagetools
       - run: npm run build:renderer
       # the helpers were just rebuilt from source: their hashes are the ones the installed app will check
       - run: node scripts/gen-integrity.mjs
@@ -112,7 +121,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = '${{ inputs.tag }}'
+          $tag = $env:TAG
           gh release view $tag 2>$null
           if ($LASTEXITCODE -ne 0) { gh release create $tag --draft --title "DarkHub Suite $tag" --notes "Built by GitHub Actions. Verify with: gh attestation verify <file> --repo ${{ github.repository }}" }
           gh release upload $tag (Get-ChildItem out).FullName --clobber

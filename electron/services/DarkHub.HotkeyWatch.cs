@@ -130,6 +130,7 @@ namespace DarkHub
 
         public static void Main(string[] args)
         {
+            Console.OutputEncoding = new System.Text.UTF8Encoding(false); // the app decodes stdout as UTF-8
             var t = new Thread(Watch) { IsBackground = true };
             t.Start();
             string line;

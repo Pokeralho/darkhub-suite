@@ -2,6 +2,8 @@ import os from 'node:os';
 import { app, ipcMain } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
+import { execFile } from 'node:child_process';
 import Logger from './LoggerService.js';
 import { runPowerShell as runPowerShellShared } from './PowerShellRunner.js';
 import ElevationHelper from './optimizer/ElevationHelper.js';
@@ -457,6 +459,39 @@ class SecurityService {
     };
   }
 
+  /**
+   * Replaces the hosts file atomically: a temp file in the same (admin-only) folder, then a rename over it. Never via
+   * %TEMP%, which unelevated programs of the same user can write to. Without admin rights the content travels inside
+   * the elevated script itself (base64), so there is still no user-writable file in between.
+   */
+  async _writeHosts(hostsPath, content) {
+    const dir = path.dirname(hostsPath);
+    const tmp = path.join(dir, `hosts.darkhub-${process.pid}-${crypto.randomBytes(6).toString('hex')}.tmp`);
+    try {
+      fs.writeFileSync(tmp, content, { encoding: 'utf8', flag: 'wx' });
+      try { fs.chmodSync(hostsPath, 0o666); } catch { /* not read-only, or missing */ }
+      fs.renameSync(tmp, hostsPath);
+    } catch (e) {
+      try { fs.unlinkSync(tmp); } catch { /* never created */ }
+      if (e?.code !== 'EPERM' && e?.code !== 'EACCES') throw e;
+      const q = (s) => `'${String(s).replace(/'/g, "''")}'`;
+      const b64 = Buffer.from(content, 'utf8').toString('base64');
+      const script = `
+        $ErrorActionPreference = 'Stop'
+        $b = [Convert]::FromBase64String('${b64}')
+        $t = Join-Path ${q(dir)} ('hosts.darkhub-' + [guid]::NewGuid().ToString('N') + '.tmp')
+        [IO.File]::WriteAllBytes($t, $b)
+        try { Set-ItemProperty -LiteralPath ${q(hostsPath)} -Name IsReadOnly -Value $false -ErrorAction SilentlyContinue } catch {}
+        Move-Item -LiteralPath $t -Destination ${q(hostsPath)} -Force
+      `;
+      const { code, stderr } = await ElevationHelper.runElevatedPowerShell(script);
+      if (code !== 0) throw new Error(stderr || 'Falha ao atualizar arquivo hosts');
+    }
+    await new Promise((resolve) => {
+      execFile(path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'ipconfig.exe'), ['/flushdns'], { windowsHide: true, timeout: 15000 }, () => resolve());
+    });
+  }
+
   async enablePhishingShield() {
     if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' };
     try {
@@ -478,17 +513,7 @@ class SecurityService {
       const newBlock = `\n\n# DarkHub Anti-Phishing Shield - BEGIN\n${blockRules}\n# DarkHub Anti-Phishing Shield - END\n`;
 
       const finalContent = cleanHosts + newBlock;
-      const tmpFile = path.join(os.tmpdir(), `hosts_shield_${process.pid}_${Date.now()}.tmp`);
-      fs.writeFileSync(tmpFile, finalContent, 'utf8');
-
-      const script = `
-        $ErrorActionPreference = 'Stop'
-        Copy-Item -LiteralPath '${tmpFile.replace(/'/g, "''")}' -Destination '${hostsPath.replace(/'/g, "''")}' -Force
-        Remove-Item -LiteralPath '${tmpFile.replace(/'/g, "''")}' -Force -ErrorAction SilentlyContinue
-        ipconfig /flushdns
-      `;
-      const { code, stderr } = await ElevationHelper.runElevatedPowerShell(script);
-      if (code !== 0) return { ok: false, error: stderr || 'Falha ao atualizar arquivo hosts' };
+      await this._writeHosts(hostsPath, finalContent);
       this._writeShieldPref(true);
 
       return {
@@ -509,17 +534,7 @@ class SecurityService {
       const currentHosts = fs.readFileSync(hostsPath, 'utf8');
       const cleanHosts = currentHosts.replace(/# DarkHub Anti-Phishing Shield - BEGIN[\s\S]*?# DarkHub Anti-Phishing Shield - END/g, '').trim();
 
-      const tmpFile = path.join(os.tmpdir(), `hosts_shield_clean_${process.pid}_${Date.now()}.tmp`);
-      fs.writeFileSync(tmpFile, cleanHosts + '\n', 'utf8');
-
-      const script = `
-        $ErrorActionPreference = 'Stop'
-        Copy-Item -LiteralPath '${tmpFile.replace(/'/g, "''")}' -Destination '${hostsPath.replace(/'/g, "''")}' -Force
-        Remove-Item -LiteralPath '${tmpFile.replace(/'/g, "''")}' -Force -ErrorAction SilentlyContinue
-        ipconfig /flushdns
-      `;
-      const { code, stderr } = await ElevationHelper.runElevatedPowerShell(script);
-      if (code !== 0) return { ok: false, error: stderr };
+      await this._writeHosts(hostsPath, cleanHosts + '\n');
       this._writeShieldPref(false);
 
       return { ok: true, msg: 'Escudo Anti-Phishing desativado e arquivo hosts restaurado.' };

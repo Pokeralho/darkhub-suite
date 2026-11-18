@@ -2,6 +2,10 @@ import React, { useEffect, useRef, useState } from 'react'
 import { visibleInterval } from '../utils/visibleInterval'
 import { Zap, X } from './icons'
 
+/** Fired on window by screens that change the latency config (e.g. turning the widget on). */
+export const LATENCY_CONFIG_EVENT = 'darkhub:latency-config'
+const GUARDIAN_IDLE_POLL_MS = 15000
+
 export default function GuardianWidget() {
   const [enabled, setEnabled] = useState(false)
   const [ultraOn, setUltraOn] = useState(false)
@@ -96,12 +100,22 @@ export default function GuardianWidget() {
 
   useEffect(() => {
     refresh()
-    const stopPolling = visibleInterval(refresh, 1500)
     return () => {
-      stopPolling()
       if (alertTimerRef.current) window.clearTimeout(alertTimerRef.current)
     }
   }, [])
+
+  // Live metrics every 1.5 s only while the widget is shown; when it is off, a slow check (plus the
+  // config-changed event from the Ultra Low Latency screen) is enough to notice it being turned on.
+  useEffect(() => {
+    const stopPolling = visibleInterval(refresh, enabled ? 1500 : GUARDIAN_IDLE_POLL_MS)
+    const onConfig = () => { void refresh() }
+    window.addEventListener(LATENCY_CONFIG_EVENT, onConfig)
+    return () => {
+      stopPolling()
+      window.removeEventListener(LATENCY_CONFIG_EVENT, onConfig)
+    }
+  }, [enabled])
 
   if (!enabled) return null
 

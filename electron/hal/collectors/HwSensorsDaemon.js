@@ -91,6 +91,9 @@ class HwSensorsDaemon extends EventEmitter {
     // stdin stays open: the helper exits by itself when DarkHub closes it (or dies).
     const child = cp.spawn(HWSENSORS_EXE, ['1000'], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     this.process = child;
+    // decode as a stream: a multibyte UTF-8 char split across chunks must not become U+FFFD
+    child.stdout.setEncoding?.('utf8');
+    child.stderr.setEncoding?.('utf8');
     child.stdout.on('data', (data) => {
       this.buffer += data.toString('utf8');
       const lines = this.buffer.split('\n');

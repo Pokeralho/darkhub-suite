@@ -8,14 +8,35 @@ function fromB64(s) {
   return Buffer.from(String(s), 'base64')
 }
 
-export function derivePasswordFromRecoveryWords(words) {
+/** Recovery wrappers made from now on: full SHA-256 of the words. Stored as `derive: 2` on the wrapper. */
+export const RECOVERY_DERIVE_VERSION = 2
+
+/**
+ * The internal password a recovery wrapper is sealed with. Version 1 (vaults created before RECOVERY_DERIVE_VERSION)
+ * kept only 12 base64 chars of the hash (72 bits); it stays so those wrappers still open. Version 2 keeps all of it.
+ */
+export function derivePasswordFromRecoveryWords(words, version = 1) {
   const normalized = String(words ?? '')
     .trim()
     .replace(/\s+/g, ' ')
   const list = normalized.length ? normalized.split(' ') : []
   const seed = list.join('')
   const hash = crypto.createHash('sha256').update(seed, 'utf8').digest()
-  return toB64(hash).slice(0, 12)
+  return version >= 2 ? toB64(hash) : toB64(hash).slice(0, 12)
+}
+
+/**
+ * Derivation versions to try for a stored recovery wrapper, most likely first: the one it is marked with, then the
+ * other (a wrapper rewritten by an older build or by the KDF upgrade may have lost the marker).
+ */
+export function recoveryDeriveOrder(wrapper) {
+  return wrapper?.derive === RECOVERY_DERIVE_VERSION ? [RECOVERY_DERIVE_VERSION, 1] : [1, RECOVERY_DERIVE_VERSION]
+}
+
+/** A recovery wrapper for `vaultKey`, sealed with the current derivation and marked with its version. */
+export async function wrapVaultKeyWithRecoveryWords(vaultKey, words, kdf) {
+  const wrapper = await wrapVaultKeyWithPassword(vaultKey, derivePasswordFromRecoveryWords(words, RECOVERY_DERIVE_VERSION), kdf)
+  return { ...wrapper, derive: RECOVERY_DERIVE_VERSION }
 }
 
 export function generateRecoveryWords(wordList, count = 16) {

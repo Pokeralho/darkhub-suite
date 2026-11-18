@@ -17,7 +17,9 @@ const CLAM_CHECK_MS = 6 * 3600 * 1000
 export function registerRealtimeIPC({ app, ipcMain, dialog, BrowserWindow, Notification, logger } = {}) {
   const dataRoot = path.join(process.env.ProgramData || 'C:\\ProgramData', 'DarkHub')
   const store = new ConfigStore(path.join(app.getPath('userData'), 'realtime.json'), os.homedir())
-  const quarantine = new Quarantine(path.join(dataRoot, 'Quarantine'))
+  const quarantine = new Quarantine(path.join(dataRoot, 'Quarantine'), {
+    lockDown: async () => process.platform === 'win32' && (await import('../services/optimizer/ElevationHelper.js')).default.isElevated()
+  })
   const clamav = new ClamAv(dataRoot)
 
   // Known-bad hashes: the EICAR test signature plus the community rules; rebuilt only when the rules change.
@@ -77,14 +79,20 @@ export function registerRealtimeIPC({ app, ipcMain, dialog, BrowserWindow, Notif
   }
 
   // Windows' own antivirus: when it runs, DarkHub's protection complements it instead of replacing it.
-  let defender = { at: 0, running: null }
+  // Asked asynchronously (sc.exe can take seconds and this runs on the main thread): status() returns the last known
+  // answer and refreshes it in the background at most once a minute.
+  let defender = { at: 0, running: null, pending: null }
+  const refreshDefender = () => (defender.pending ||= new Promise((resolve) => {
+    cp.execFile('sc.exe', ['query', 'WinDefend'], { encoding: 'utf8', windowsHide: true, timeout: 3000 }, (err, out) => {
+      defender = { at: Date.now(), running: !err && /RUNNING/.test(String(out)), pending: null }
+      resolve(defender.running)
+    })
+  }))
   const defenderRunning = () => {
-    if (Date.now() - defender.at < 60000) return defender.running
-    let running = null
-    try { running = /RUNNING/.test(cp.execFileSync('sc.exe', ['query', 'WinDefend'], { encoding: 'utf8', windowsHide: true, timeout: 3000 })) } catch { running = false }
-    defender = { at: Date.now(), running }
-    return running
+    if (Date.now() - defender.at >= 60000) void refreshDefender()
+    return defender.running
   }
+  void refreshDefender()
 
   const handle = (channel, fn) => ipcMain.handle(channel, async (_e, payload) => {
     try { return await fn(payload ?? {}) } catch (err) {

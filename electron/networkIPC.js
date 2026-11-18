@@ -4,15 +4,8 @@ import os from 'os';
 import { runCommand } from './services/PowerShellRunner.js';
 import NetLatencyService from './services/NetLatencyService.js';
 
-const SAFE_HOST_RE = /^[A-Za-z0-9_.:-]{1,253}$/;
-
-function assertSafeHost(host) {
-  const h = String(host ?? '').trim();
-  if (!SAFE_HOST_RE.test(h)) {
-    throw new Error('Host inválido: apenas letras, números, pontos, dois-pontos, hífen e underscore são permitidos.');
-  }
-  return h;
-}
+// shared validator: also refuses a leading "-" (ping/tracert would read it as an option)
+import { assertSafeHost } from './services/network/hostValidation.js';
 
 async function runCmd(command, args = []) {
   try {

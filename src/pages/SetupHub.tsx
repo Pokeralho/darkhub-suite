@@ -235,6 +235,7 @@ const CATEGORY_KEYS: Record<string, string> = {
   'Vídeo, Animação & Efeitos': 'setuphub.cat.video',
   'Áudio & Música': 'setuphub.cat.audio',
   '3D, CAD & Engenharia': 'setuphub.cat.cad',
+  'Nuvem & Sincronização': 'setuphub.cat.cloud',
   'Comunicação': 'setuphub.cat.communication',
   'Desenvolvimento': 'setuphub.cat.dev'
 };
@@ -341,7 +342,7 @@ const SetupHub = ({ onNavigate }: { onNavigate?: (page: string) => void } = {}) 
   const handleInstallApps = async () => {
     if (selectedApps.length === 0) return;
     setInstalling(true);
-    setInstallLogs(['Iniciando instalação em lote via Winget...']);
+    setInstallLogs([t('setuphub.log.start', 'Iniciando instalação em lote via Winget...')]);
 
     try {
       if (window.darkhub?.setup?.installWinget) {
@@ -350,15 +351,19 @@ const SetupHub = ({ onNavigate }: { onNavigate?: (page: string) => void } = {}) 
           setInstallLogs(prev => [...prev, log]);
         });
 
-        const res = await window.darkhub.setup.installWinget(selectedApps);
-        if (res?.ok) {
-          setInstallLogs(prev => [...prev, 'Instalação concluída com sucesso!']);
-        } else {
-          setInstallLogs(prev => [...prev, `[ERRO] ${res?.error || 'Falha na instalação'}`]);
+        try {
+          const res = await window.darkhub.setup.installWinget(selectedApps);
+          if (res?.ok) {
+            setInstallLogs(prev => [...prev, t('setuphub.log.done', 'Instalação concluída com sucesso!')]);
+          } else {
+            setInstallLogs(prev => [...prev, `[ERRO] ${res?.error || t('setuphub.log.failed', 'Falha na instalação')}`]);
+          }
+        } finally {
+          // Always drop the progress listener, also when installWinget throws.
+          try { cleanup?.(); } catch { /* ignore */ }
         }
-        cleanup();
       } else {
-        setInstallLogs(prev => [...prev, '[ERRO] Função de instalação não exposta no preload.']);
+        setInstallLogs(prev => [...prev, `[ERRO] ${t('setuphub.log.noApi', 'Função de instalação não exposta no preload.')}`]);
       }
     } catch (e: any) {
       setInstallLogs(prev => [...prev, `[EXCEÇÃO] ${e.message}`]);

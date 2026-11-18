@@ -38,11 +38,41 @@ export function compareSemver(a, b) {
   return x.pre < y.pre ? -1 : 1
 }
 
+/**
+ * What an extension's new version asks for beyond what the user approved for the installed one: permissions and
+ * network origins not in the old manifest. Empty lists mean the new set is a subset and may replace it silently.
+ */
+export function permissionGrowth(prevPkg, nextPkg) {
+  const list = (v) => (Array.isArray(v) ? v.map(String) : [])
+  const had = new Set(list(prevPkg?.permissions))
+  const hadNet = new Set(list(prevPkg?.network))
+  return {
+    permissions: [...new Set(list(nextPkg?.permissions))].filter((p) => !had.has(p)),
+    network: [...new Set(list(nextPkg?.network))].filter((o) => !hadNet.has(o))
+  }
+}
+export const hasGrowth = (g) => Boolean(g && (g.permissions.length || g.network.length))
+export const describeGrowth = (g) => [...g.permissions.map((p) => `permissão "${p}"`), ...g.network.map((o) => `acesso a ${o}`)].join(', ')
+
+/**
+ * Asks the user (approval dialog in the DarkHub window) before an extension replaces itself with one that wants more.
+ * Returns null when it may proceed, or the refusal ({ ok:false, code:'permissions_changed', added }).
+ */
+export async function approveGrowth({ approve, prevPkg, nextPkg, preview, client = 'DarkHub', label }) {
+  const added = permissionGrowth(prevPkg, nextPkg)
+  if (!hasGrowth(added)) return null
+  const what = describeGrowth(added)
+  const ok = approve ? await approve({ client, title: `${label || nextPkg?.id} pede o que não tinha antes: ${what}`, preview }).catch(() => false) : false
+  if (ok === true) return null
+  return { ok: false, code: 'permissions_changed', added, error: `A nova versão pede o que a instalada não tinha (${what}) e não foi aprovada; a versão atual foi mantida.` }
+}
+
 export class HubCatalog {
-  /** deps: { app, hub (HubService), fetch } */
-  constructor({ app, hub, fetchImpl = globalThis.fetch }) {
+  /** deps: { app, hub (HubService), fetch, approve(request) -> Promise<boolean> (asks the user, see hubIpc) } */
+  constructor({ app, hub, fetchImpl = globalThis.fetch, approve = null }) {
     this.app = app
     this.hub = hub
+    this.approve = approve
     this.fetch = fetchImpl
     this.file = path.join(app.getPath('userData'), 'hub', 'server.json')
   }
@@ -169,8 +199,13 @@ export class HubCatalog {
     const check = await this.hub.inspect(dl.text, 'pt-BR', { official: dl.tier === 'official' })
     if (!check.ok) return { ok: false, error: check.errors?.map((e) => e.message).join('; ') || 'pacote inválido' }
     if (!check.applicable) return { ok: false, error: `A nova versão não é para este PC (${check.notFor}).` }
-    // an extension is swapped in place: its saved data survives the update
+    // an extension is swapped in place: its saved data survives the update. New permissions or network origins
+    // were never approved: ask first, and keep the installed version when the user says no.
     if (current.pkg.type === 'extension') {
+      let next = null
+      try { next = JSON.parse(String(dl.text).replace(/^﻿/, '')) } catch { return { ok: false, error: 'pacote inválido' } }
+      const refused = await approveGrowth({ approve: this.approve, prevPkg: current.pkg, nextPkg: next, preview: check, label: `${check.pkg?.name || id} v${dl.version}` })
+      if (refused) return refused
       const r = await this.hub.install(dl.text, { official: dl.tier === 'official', source: { hub: dl.hub, tier: dl.tier, version: dl.version, sha256: dl.sha256 }, replace: true })
       return r.ok ? { ...r, updatedFrom: current.pkg.version } : r
     }

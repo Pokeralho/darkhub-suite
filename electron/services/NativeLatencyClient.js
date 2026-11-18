@@ -4,13 +4,29 @@ import fs from 'node:fs'
 import { spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { fileURLToPath } from 'node:url'
+import { integrityError } from './binaryIntegrity.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+/** A timed-out request whose reply never came within this grace means the engine is wedged: restart it. */
+const WEDGED_GRACE_MS = 15000
+/** Too many abandoned slots in the FIFO also means the engine stopped keeping up. */
+const MAX_ABANDONED = 16
+
+/**
+ * Client of DarkHub.LatencyEngine.exe. The protocol has no correlation id: the engine answers exactly one line per
+ * request line, in order, so replies are matched FIFO. A request that times out keeps its slot (marked abandoned)
+ * so its late reply is consumed and dropped instead of being handed to the next caller. Each slot is bound to the
+ * process it was written to: a reply from a new engine never resolves a request sent to the old one.
+ */
 class NativeLatencyClient extends EventEmitter {
-  constructor() {
+  constructor({ spawnImpl = spawn, exePath = null, existsSync = fs.existsSync, integrityCheck = integrityError } = {}) {
     super()
+    this._spawn = spawnImpl
+    this._exePath = exePath
+    this._exists = existsSync
+    this._integrity = integrityCheck
     this.process = null
     this.pendingCallbacks = []
     this.isReady = false
@@ -18,6 +34,7 @@ class NativeLatencyClient extends EventEmitter {
   }
 
   getExecutablePath() {
+    if (this._exePath) return this._exePath
     const isPackaged = process.resourcesPath && !process.defaultApp
     if (isPackaged) {
       const unpacked = path.join(process.resourcesPath, 'app.asar.unpacked', 'electron', 'services', 'DarkHub.LatencyEngine.exe')
@@ -36,12 +53,13 @@ class NativeLatencyClient extends EventEmitter {
     if (this.process && !this.process.killed) return true
 
     const exePath = this.getExecutablePath()
-    if (!fs.existsSync(exePath)) {
+    if (!this._exists(exePath)) {
       return false
     }
+    if (this._integrity(['DarkHub.LatencyEngine.exe'], { log: (m) => console.warn('[NativeLatencyClient]', m) })) return false
 
     try {
-      const proc = spawn(exePath, [], {
+      const proc = this._spawn(exePath, [], {
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe']
       })
@@ -51,14 +69,15 @@ class NativeLatencyClient extends EventEmitter {
       // Without these listeners a spawn failure (EACCES/ENOENT) or a write to a
       // dead daemon (EPIPE) surfaces as an unhandled 'error' event.
       proc.on('error', () => {
+        this._rejectPendingOf(proc, new Error('LatencyEngine process error'))
         if (this.process !== proc) return
         this.process = null
         this.isReady = false
-        this._rejectAllPending(new Error('LatencyEngine process error'))
       })
       proc.stdin.on('error', () => {})
 
       let buffer = ''
+      proc.stdout.setEncoding?.('utf8') // stream decoding: no U+FFFD when a multibyte char is split across chunks
       proc.stdout.on('data', (chunk) => {
         buffer += chunk.toString('utf8')
         const lines = buffer.split('\n')
@@ -72,10 +91,13 @@ class NativeLatencyClient extends EventEmitter {
             if (msg.event === 'ready') {
               this.isReady = true
               this.emit('ready', msg)
-            } else if (this.pendingCallbacks.length > 0) {
-              const cb = this.pendingCallbacks.shift()
-              clearTimeout(cb.timer)
-              if (!cb.abandoned) cb.resolve(msg)
+            } else {
+              const idx = this.pendingCallbacks.findIndex((c) => c.proc === proc)
+              if (idx !== -1) {
+                const [cb] = this.pendingCallbacks.splice(idx, 1)
+                clearTimeout(cb.timer)
+                if (!cb.abandoned) cb.resolve(msg)
+              }
             }
           } catch (e) {
 
@@ -86,12 +108,13 @@ class NativeLatencyClient extends EventEmitter {
       proc.stderr.on('data', () => {})
 
       proc.on('exit', () => {
+        // its requests can never be answered now, whoever owns this.process
+        this._rejectPendingOf(proc, new Error('LatencyEngine process exited'))
         // A newer daemon may already exist (dispose + ensureRunning); only
         // clear state owned by this process.
         if (this.process !== proc) return
         this.process = null
         this.isReady = false
-        this._rejectAllPending(new Error('LatencyEngine process exited'))
       })
 
       return true
@@ -109,29 +132,49 @@ class NativeLatencyClient extends EventEmitter {
     }
   }
 
+  _rejectPendingOf(proc, err) {
+    const mine = this.pendingCallbacks.filter((c) => c.proc === proc)
+    if (!mine.length) return
+    this.pendingCallbacks = this.pendingCallbacks.filter((c) => c.proc !== proc)
+    for (const cb of mine) {
+      clearTimeout(cb.timer)
+      if (!cb.abandoned) cb.reject(err)
+    }
+  }
+
+  /** Kills a wedged engine: its pending requests are rejected now and the next command starts a fresh one. */
+  _restart(proc, reason) {
+    this._rejectPendingOf(proc, new Error(reason))
+    if (this.process === proc) { this.process = null; this.isReady = false }
+    try { proc.kill() } catch {}
+  }
+
   sendCommand(payload, timeoutMs = 4000) {
     return new Promise((resolve, reject) => {
       if (!this.ensureRunning()) {
         return reject(new Error('DarkHub.LatencyEngine.exe not available'))
       }
 
-      const entry = { resolve, reject, timer: null, abandoned: false }
+      const proc = this.process
+      const entry = { resolve, reject, timer: null, abandoned: false, proc }
       entry.timer = setTimeout(() => {
         // Keep the slot in the FIFO so a late reply is discarded instead of
         // being delivered to the next caller.
-        if (!entry.abandoned) {
-          entry.abandoned = true
-          reject(new Error('LatencyEngine command timed out'))
-        }
-        const abandoned = this.pendingCallbacks.filter((c) => c.abandoned).length
-        if (abandoned > 16 && this.process) {
-          try { this.process.kill() } catch {}
-        }
+        entry.abandoned = true
+        reject(new Error('LatencyEngine command timed out'))
+        const abandoned = this.pendingCallbacks.filter((c) => c.proc === proc && c.abandoned).length
+        if (abandoned > MAX_ABANDONED) { this._restart(proc, 'LatencyEngine stopped answering'); return }
+        // no late reply at all within the grace: the engine is stuck on this request (or lost it) and every later
+        // reply would be shifted, so restart it instead of waiting for more timeouts
+        entry.timer = setTimeout(() => {
+          if (this.pendingCallbacks.includes(entry)) this._restart(proc, 'LatencyEngine stopped answering')
+        }, WEDGED_GRACE_MS)
+        entry.timer.unref?.()
       }, timeoutMs)
 
       this.pendingCallbacks.push(entry)
       try {
-        this.process.stdin.write(JSON.stringify(payload) + '\n')
+        proc.stdin.write(JSON.stringify(payload) + '\n')
       } catch (err) {
         clearTimeout(entry.timer)
         const idx = this.pendingCallbacks.indexOf(entry)
@@ -254,6 +297,7 @@ class NativeLatencyClient extends EventEmitter {
   }
 }
 
+export { NativeLatencyClient }
 export const nativeLatencyClient = new NativeLatencyClient()
 
 // Windows does not terminate children with the parent; make sure the daemon

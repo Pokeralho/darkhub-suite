@@ -276,6 +276,84 @@ fn guard_refuses_system_disk_and_unconfirmed_writes() {
     assert_eq!(Target::parse("disk:0"), Target::Disk(0));
 }
 
+#[test]
+fn target_parse_normalises_win32_device_prefixes() {
+    for s in [r"\\?\PhysicalDrive0", r"\\.\PHYSICALDRIVE0", r"//./physicaldrive0", r"\??\PhysicalDrive0", r"\\?\GLOBALROOT\Device\Harddisk0\Partition0", " disk:0 "] {
+        assert_eq!(Target::parse(s), Target::Disk(0), "{s}");
+    }
+    assert_eq!(Target::parse(r"\\?\physicaldrive12"), Target::Disk(12));
+    // Volumes / other devices are not disks: they stay Image and must be refused for writing.
+    for s in [r"\\.\C:", r"\\?\c:\", r"\\?\Volume{0b1c2d3e-0000-0000-0000-100000000000}", r"\\?\Volume{0b1c2d3e-0000-0000-0000-100000000000}\", r"\\?\GLOBALROOT\Device\HarddiskVolume3", r"\\.\Tape0", r"//?/globalroot/device/harddisk0/partition1", r"\\?\PhysicalDriveX"] {
+        assert!(matches!(Target::parse(s), Target::Image(_)), "{s}");
+        assert!(crate::device::is_raw_device_path(s), "{s}");
+        assert_eq!(guard_write(&Target::parse(s), Some(0), &[]).unwrap_err().code, "bad_target", "{s}");
+        assert!(FileDevice::open(s, true, 512).is_err(), "{s}");
+        assert!(FileDevice::create(s, 512, 512).is_err(), "{s}");
+    }
+    // Long-path spellings of ordinary files stay allowed.
+    for s in [r"\\?\C:\imgs\disk.img", r"\\?\Volume{0b1c2d3e-0000-0000-0000-100000000000}\a.img", r"\\?\UNC\srv\share\a.img", r"D:\x.img", "x.raw"] {
+        assert!(!crate::device::is_raw_device_path(s), "{s}");
+    }
+}
+
+#[test]
+fn file_device_refuses_non_regular_files() {
+    let d = tmp("dir");
+    fs::create_dir_all(&d).unwrap();
+    assert!(FileDevice::open(d.to_str().unwrap(), false, 512).is_err());
+    assert!(FileDevice::open("NUL", true, 512).is_err());
+}
+
+#[test]
+fn exfat_vbr_rejects_invalid_shifts() {
+    let mut s = vec![0u8; 512];
+    s[3..11].copy_from_slice(b"EXFAT   ");
+    s[510] = 0x55;
+    s[511] = 0xAA;
+    s[0x48..0x50].copy_from_slice(&1000u64.to_le_bytes());
+    s[108] = 12;
+    s[109] = 3;
+    assert_eq!(parts::detect_vbr(&s, 0, 512).unwrap().sectors, 8000);
+    for (bps, spc) in [(63u8, 0u8), (64, 0), (8, 0), (13, 0), (12, 14), (255, 255)] {
+        s[108] = bps;
+        s[109] = spc;
+        assert!(parts::detect_vbr(&s, 0, 512).is_none(), "shift {bps}/{spc}");
+    }
+    // Huge size field must not overflow.
+    s[108] = 12;
+    s[109] = 0;
+    s[0x48..0x50].copy_from_slice(&u64::MAX.to_le_bytes());
+    assert_eq!(parts::detect_vbr(&s, 0, 512).unwrap().sectors, u64::MAX);
+}
+
+#[test]
+fn carve_measure_survives_wrapping_mp4_and_ff_runs() {
+    crate::util::reset_cancel();
+    let p = tmp("hostile.img");
+    let mut img = vec![0u8; 1 << 20];
+    // ftyp box, then a box with a 64-bit size that would wrap `p` back to 0.
+    let mut mp4 = Vec::new();
+    mp4.extend_from_slice(&20u32.to_be_bytes());
+    mp4.extend_from_slice(b"ftypisom\0\0\0\0isom");
+    mp4.extend_from_slice(&1u32.to_be_bytes());
+    mp4.extend_from_slice(b"mdat");
+    mp4.extend_from_slice(&(u64::MAX - 19).to_be_bytes());
+    img[..mp4.len()].copy_from_slice(&mp4);
+    // JPEG header followed by erased-flash 0xFF bytes up to the end of the image.
+    let j = 4096;
+    img[j..j + 3].copy_from_slice(&[0xFF, 0xD8, 0xFF]);
+    img[j + 3..].fill(0xFF);
+    fs::write(&p, &img).unwrap();
+    let mut dev = open(&p, false, 512);
+    let mut src = carve::Src::new(&mut dev);
+    let mp4_sig = carve::SIGS.iter().find(|s| s.ext == "mp4").unwrap();
+    let jpg_sig = carve::SIGS.iter().find(|s| s.ext == "jpg").unwrap();
+    // Terminates; the ftyp box alone (20 bytes) is what remains measurable.
+    let r = carve::measure(&mut src, mp4_sig, 0, u64::MAX);
+    assert!(r.is_none() || r.unwrap().0 <= img.len() as u64);
+    assert!(carve::measure(&mut src, jpg_sig, j as u64, 64 * 1024).is_none());
+}
+
 fn jpeg() -> Vec<u8> {
     let mut j = vec![0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10];
     j.extend_from_slice(b"JFIF\0\x01\x01\0\0\x01\0\x01\0\0");

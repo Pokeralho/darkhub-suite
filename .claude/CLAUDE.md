@@ -27,6 +27,8 @@ Os números de linha podem estar desatualizados por alguns commits; confirme com
 ## Regras do projeto
 
 - Toda função nova passa por: serviço → handler IPC → `electron/preload.js` + `src/global.d.ts` → tela → i18n (pt-BR **e** en-US) → teste.
+- Textos novos vão em `src/i18n/locales/pt-BR/<x>.ts` **e** `src/i18n/locales/en-US/<x>.ts` (só o idioma ativo carrega no início; os `*Messages.ts` são apenas wrappers). `tests/i18nLocales.test.ts` cobra a paridade.
+- Binários nativos alterados: rode `npm run integrity` (o app empacotado recusa helper com hash diferente).
 - PowerShell embutido: escape com os helpers de `electron/services/optimizer/OptimizerUtils.js`. Prefira `execFile`/`spawn` com array de argumentos a strings de shell.
 - `DarkOS.Recovery.psm1`: compatível com PowerShell 5.1 e só ASCII. **Suba o `# ModuleVersion: N` (linha 2) a cada mudança de comportamento**: o app usa o mais novo entre o módulo instalado em `C:\ProgramData\DarkOS\bin` e o embutido.
 - Recursos exclusivos do DarkOS devem degradar com elegância no Windows comum (`darkos:isDarkOS`).

@@ -321,9 +321,26 @@ fn absolute(p: &str) -> Option<PathBuf> {
 /// The file a path refers to is missing, and its drive is present (a disconnected USB drive is not "dead").
 fn missing(p: &Path, wow: bool) -> bool {
     let s = p.to_string_lossy().to_string();
-    let p = if wow { PathBuf::from(s.replace("\\System32\\", "\\SysWOW64\\").replace("\\system32\\", "\\SysWOW64\\")) } else { p.to_path_buf() };
+    let p = if wow { PathBuf::from(wow_path(&s)) } else { p.to_path_buf() };
     let drive_ok = s.get(..3).is_some_and(|d| Path::new(d).exists());
-    drive_ok && !p.exists()
+    // `exists()` follows links and is false for reparse points it cannot resolve, such as the MSIX app execution
+    // aliases in %LOCALAPPDATA%\Microsoft\WindowsApps: the entry itself being there is enough.
+    drive_ok && !p.exists() && std::fs::symlink_metadata(&p).is_err()
+}
+
+/// What a 32-bit program sees for `path`: `\System32\` (any case, e.g. `C:\WINDOWS\SYSTEM32\`) is `\SysWOW64\`.
+pub(crate) fn wow_path(path: &str) -> String {
+    const NEEDLE: &str = "\\system32\\";
+    let low = path.to_ascii_lowercase(); // ASCII-only lowering keeps byte offsets identical
+    let mut out = String::with_capacity(path.len());
+    let mut last = 0;
+    for (i, _) in low.match_indices(NEEDLE) {
+        out.push_str(&path[last..i]);
+        out.push_str("\\SysWOW64\\");
+        last = i + NEEDLE.len();
+    }
+    out.push_str(&path[last..]);
+    out
 }
 
 /// The program a Run/App Paths command line points to, when it is an absolute path we can judge.

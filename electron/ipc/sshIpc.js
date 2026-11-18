@@ -174,12 +174,18 @@ export function registerSshIPC({ app, ipcMain, BrowserWindow, safeStorage, shell
 
   // ---- terminal sessions ----
   const senders = new WeakSet()
+  const sftpOwned = new WeakMap() // webContents -> Set<sftpId> (SFTP sessions and their edit-locally watchers)
   const senderFor = (event) => {
     const wc = event.sender
     if (!senders.has(wc)) {
       senders.add(wc)
       // a closed/reloaded window takes its sessions with it
-      const drop = () => { manager.disconnectBySender((send) => send.wc === wc); serial.closeBySender((send) => send.wc === wc) }
+      const drop = () => {
+        manager.disconnectBySender((send) => send.wc === wc)
+        serial.closeBySender((send) => send.wc === wc)
+        const ids = sftpOwned.get(wc)
+        if (ids) { for (const id of ids) { try { sftp.close(id) } catch { /* closed */ } } ids.clear() }
+      }
       wc.once('destroyed', drop)
       wc.on('did-start-navigation', (_e, _url, isInPlace, isMainFrame) => { if (isMainFrame && !isInPlace) drop() })
     }
@@ -221,13 +227,27 @@ export function registerSshIPC({ app, ipcMain, BrowserWindow, safeStorage, shell
   })
 
   // ---- SFTP ----
-  handle('ssh:sftp:open', async (p) => ok(await sftp.open(p)))
+  handle('ssh:sftp:open', async (p, event) => {
+    const r = await sftp.open(p)
+    const wc = event?.sender
+    if (wc) {
+      senderFor(event) // registers the destroyed/navigation cleanup for this window
+      let ids = sftpOwned.get(wc)
+      if (!ids) { ids = new Set(); sftpOwned.set(wc, ids) }
+      ids.add(String(p.sftpId))
+    }
+    return ok(r)
+  })
   handle('ssh:sftp:listLocal', async (p) => ok(await sftp.listLocal(p.dirPath)))
   handle('ssh:sftp:listRemote', async (p) => ok(await sftp.listRemote(p.sftpId, p.remotePath)))
   handle('ssh:sftp:transfer', async (p) => sftp.transfer(p))
   handle('ssh:sftp:cancelTransfer', (p) => ok({ cancelled: sftp.cancelTransfer(String(p.transferId ?? '')) }))
   handle('ssh:sftp:fsOp', async (p) => sftp.fsOp(p))
-  handle('ssh:sftp:close', (p) => ok({ closed: sftp.close(String(p.sftpId ?? '')) }))
+  handle('ssh:sftp:close', (p, event) => {
+    const id = String(p.sftpId ?? '')
+    if (event?.sender) sftpOwned.get(event.sender)?.delete(id)
+    return ok({ closed: sftp.close(id) })
+  })
   handle('ssh:sftp:readText', async (p) => ok(await sftp.readText(p)))
   handle('ssh:sftp:writeText', async (p) => ok(await sftp.writeText(p)))
   handle('ssh:sftp:stat', async (p) => ok(await sftp.stat(p)))

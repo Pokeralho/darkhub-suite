@@ -1,13 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   DownloadCloud, CheckCircle2, AlertCircle, X, ShieldCheck,
   RefreshCw, FileCode, Check, ChevronDown, DarkHubMark, Power
 } from './icons';
 import ReleaseNotes from './ReleaseNotes';
+import { useI18n } from '../i18n/I18nProvider';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 type UpdateStage = 'idle' | 'checking' | 'available' | 'downloading' | 'verifying' | 'downloaded' | 'error';
 
+/** Delay before the overlay subscribes: keeps the updater out of the startup critical path. */
+export const UPDATER_INIT_DELAY_MS = 4000;
+
 export default function UpdaterOverlay() {
+  const { t } = useI18n();
   const [stage, setStage] = useState<UpdateStage>('idle');
   const [updateInfo, setUpdateInfo] = useState<any>(null);
   const [progress, setProgress] = useState(0);
@@ -56,17 +62,23 @@ export default function UpdaterOverlay() {
           break;
         case 'error':
           setStage('error');
-          setErrorMsg(payload.message || 'Falha ao processar atualização.');
+          setErrorMsg(payload.message || t('updater.err.generic', 'Falha ao processar atualização.'));
           break;
         default:
           break;
       }
     };
 
+    // initUpdater is async and runs after a delay: the effect cleanup must still reach the
+    // listener it registers (and stop a pending init from subscribing after unmount).
+    let disposed = false;
+    let unsubscribe: (() => void) | null = null;
+
     const initUpdater = async () => {
       if (window.darkhub?.updater) {
         try {
           const status = await window.darkhub.updater.getStatus();
+          if (disposed) return;
           if (status) {
             if (status.state && status.state !== 'idle') {
               setStage(status.state);
@@ -76,8 +88,9 @@ export default function UpdaterOverlay() {
               }
             }
           }
-          const unsubscribe = window.darkhub.updater.onEvent(handleEvent);
-          return () => unsubscribe();
+          const off = window.darkhub.updater.onEvent(handleEvent);
+          if (disposed) off?.();
+          else unsubscribe = off;
         } catch (e) {
           console.error('[UpdaterOverlay] Failed to initialize:', e);
         }
@@ -85,11 +98,23 @@ export default function UpdaterOverlay() {
     };
 
     const timer = setTimeout(() => {
-      initUpdater();
-    }, 4000);
+      void initUpdater();
+    }, UPDATER_INIT_DELAY_MS);
 
-    return () => clearTimeout(timer);
+    return () => {
+      disposed = true;
+      clearTimeout(timer);
+      try { unsubscribe?.(); } catch { /* ignore */ }
+      unsubscribe = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const busy = stage === 'downloading' || stage === 'verifying';
+  const isOpen = visible && !!updateInfo;
+  // Escape dismisses like the close button; not while a download/verification is running.
+  useDialogA11y(dialogRef, isOpen, busy ? undefined : () => setVisible(false));
 
   const handleStartDownload = async () => {
     setErrorMsg(null);
@@ -99,7 +124,7 @@ export default function UpdaterOverlay() {
       if (window.darkhub?.updater) {
         const res = await window.darkhub.updater.download();
         if (!res?.ok) {
-          setErrorMsg(res?.error || 'Falha ao iniciar download.');
+          setErrorMsg(res?.error || t('updater.err.download', 'Falha ao iniciar download.'));
           setStage('error');
         }
       }
@@ -129,19 +154,19 @@ export default function UpdaterOverlay() {
   else if (stage === 'downloaded') activeStep = 3;
 
   const steps = [
-    { title: 'Versão', desc: `v${updateInfo.version}` },
-    { title: 'Download', desc: stage === 'downloading' ? `${progress}%` : (activeStep > 1 ? 'Concluído' : 'Aguardando') },
-    { title: 'Integridade', desc: stage === 'verifying' ? 'Validando...' : (activeStep > 2 ? 'Verificado' : 'Pendente') },
-    { title: 'Instalar', desc: activeStep === 3 ? 'Pronto' : 'Pendente' }
+    { title: t('updater.step.version', 'Versão'), desc: `v${updateInfo.version}` },
+    { title: t('updater.step.download', 'Download'), desc: stage === 'downloading' ? `${progress}%` : (activeStep > 1 ? t('updater.state.done', 'Concluído') : t('updater.state.waiting', 'Aguardando')) },
+    { title: t('updater.step.integrity', 'Integridade'), desc: stage === 'verifying' ? t('updater.state.validating', 'Validando...') : (activeStep > 2 ? t('updater.state.verified', 'Verificado') : t('updater.state.pending', 'Pendente')) },
+    { title: t('updater.step.install', 'Instalar'), desc: activeStep === 3 ? t('updater.state.ready', 'Pronto') : t('updater.state.pending', 'Pendente') }
   ];
 
   return (
     <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/75 animate-in p-4" role="dialog" aria-modal="true" aria-labelledby="dh-updater-title">
-      <div className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl dh-raised overflow-hidden relative animate-in slide-in-from-bottom-2">
+      <div ref={dialogRef} className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl dh-raised overflow-hidden relative animate-in slide-in-from-bottom-2">
         {stage !== 'downloading' && stage !== 'verifying' && (
           <button
             onClick={() => setVisible(false)}
-            aria-label="Fechar"
+            aria-label={t('updater.close', 'Fechar')}
             className="absolute top-3 right-3 dh-btn dh-btn-ghost dh-btn-sm w-7 px-0 justify-center"
           >
             <X size={14} />
@@ -164,15 +189,15 @@ export default function UpdaterOverlay() {
             <div className="min-w-0">
               <h2 id="dh-updater-title" className="text-[15px] font-semibold text-zinc-50 tracking-[-0.01em]">
                 {stage === 'downloaded'
-                  ? 'Atualização Pronta para Instalar!'
+                  ? t('updater.title.ready', 'Atualização pronta para instalar')
                   : stage === 'verifying'
-                  ? 'Validando Integridade do Binário...'
+                  ? t('updater.title.verifying', 'Validando integridade do binário...')
                   : stage === 'downloading'
-                  ? 'Baixando Pacote Oficial...'
-                  : 'Atualização do DarkHub Disponível'}
+                  ? t('updater.title.downloading', 'Baixando pacote oficial...')
+                  : t('updater.title.available', 'Atualização do DarkHub disponível')}
               </h2>
               <p className="mt-0.5 text-[12px] text-zinc-500">
-                Nova Versão Oficial <span className="font-mono text-zinc-300">v{updateInfo.version}</span>
+                {t('updater.newVersion', 'Nova versão oficial')} <span className="font-mono text-zinc-300">v{updateInfo.version}</span>
               </p>
             </div>
           </div>
@@ -198,7 +223,7 @@ export default function UpdaterOverlay() {
           {(stage === 'downloading' || stage === 'verifying') && (
             <div className="space-y-1.5">
               <div className="flex justify-between gap-3 text-[11.5px] font-mono">
-                <span className="text-zinc-500 truncate">{sizes || 'Baixando pacotes...'}</span>
+                <span className="text-zinc-500 truncate">{sizes || t('updater.downloadingPackages', 'Baixando pacotes...')}</span>
                 <span className="text-zinc-300 shrink-0">{progress}%{speed ? <span className="text-zinc-500"> · {speed}</span> : null}</span>
               </div>
               <div
@@ -223,10 +248,10 @@ export default function UpdaterOverlay() {
               >
                 <span className="flex items-center gap-1.5 font-medium">
                   <FileCode size={14} className="text-zinc-500" />
-                  Novidades e Notas da Versão
+                  {t('updater.notes', 'Novidades e notas da versão')}
                 </span>
                 <span className="inline-flex items-center gap-1 text-[12px] text-zinc-500">
-                  {showChangelog ? 'Ocultar' : 'Ver Detalhes'}
+                  {showChangelog ? t('updater.hide', 'Ocultar') : t('updater.details', 'Ver detalhes')}
                   <ChevronDown size={14} className={`transition-transform duration-150 ease-out ${showChangelog ? 'rotate-180' : ''}`} />
                 </span>
               </button>
@@ -250,11 +275,11 @@ export default function UpdaterOverlay() {
             {stage === 'available' && (
               <>
                 <button type="button" onClick={() => setVisible(false)} className="dh-btn dh-btn-ghost">
-                  Lembrar Mais Tarde
+                  {t('updater.later', 'Lembrar mais tarde')}
                 </button>
                 <button type="button" onClick={handleStartDownload} className="dh-btn dh-btn-primary">
                   <DownloadCloud size={14} />
-                  Baixar e Atualizar Agora
+                  {t('updater.downloadNow', 'Baixar e atualizar agora')}
                 </button>
               </>
             )}
@@ -262,14 +287,14 @@ export default function UpdaterOverlay() {
             {stage === 'downloaded' && (
               <button type="button" onClick={handleApplyInstall} className="dh-btn dh-btn-primary w-full justify-center">
                 <Power size={14} />
-                Reiniciar e Aplicar Atualização
+                {t('updater.restartApply', 'Reiniciar e aplicar atualização')}
               </button>
             )}
 
             {stage === 'error' && (
               <button type="button" onClick={handleStartDownload} className="dh-btn">
                 <RefreshCw size={14} />
-                Tentar Novamente
+                {t('updater.retry', 'Tentar novamente')}
               </button>
             )}
           </div>

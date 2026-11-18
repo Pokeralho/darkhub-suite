@@ -10,6 +10,7 @@ import PartitionManager from '../components/recovery/PartitionManager';
 import { api, ErrorLine, fmtBytes, JobProgress, rescueError, type ProgressEv } from '../components/recovery/rescueUtils';
 import { AlertTriangle, CheckCircle, FolderOpen, Gauge, HardDrive, Loader2, RefreshCw, Save, Search, ShieldCheck, Upload, Wrench } from '../components/icons';
 import { useI18n } from '../i18n/I18nProvider';
+import { visibleInterval } from '../utils/visibleInterval';
 
 type Tab = 'health' | 'partitions' | 'guard' | 'editor' | 'carve' | 'clone' | 'boot';
 type Guard = { title: string; plan: RescuePlanResult['plan']; apply: (confirmDisk?: number) => Promise<{ ok: boolean; error?: string; result?: RescuePlanResult['result'] }> };
@@ -149,10 +150,11 @@ function OrphanJob() {
   useEffect(() => {
     if (!kind) return undefined;
     const off = api()?.onProgress((e) => { if (e.kind === kind && e.event === 'progress') setEv(e); });
-    const timer = window.setInterval(() => {
-      void api()?.status().then((s) => { if (!s?.running || s.kind !== kind) { setKind(null); setEv(null); } });
+    const stop = visibleInterval(async () => {
+      const s = await api()?.status();
+      if (!s?.running || s.kind !== kind) { setKind(null); setEv(null); }
     }, 2000);
-    return () => { off?.(); window.clearInterval(timer); };
+    return () => { off?.(); stop(); };
   }, [kind]);
 
   if (!kind) return null;

@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { OvlCanvas, OvlPreview } from '../../global';
+import { sanitizeImportedCss } from './sanitizeCss';
 
 // Same base rules as electron/assets/overlay/overlay.html, so the preview matches the in-game overlay.
 const BASE = `
@@ -76,7 +77,7 @@ export default function OverlayStage({ preview, mode, background, onDrag, select
     if (!host || !preview) return;
     const root = host.shadowRoot || host.attachShadow({ mode: 'open' });
     const screen = mode === 'screen';
-    root.innerHTML = `<style>${BASE}</style><style>${preview.css.replace(/<\/style/gi, '')}</style>`
+    root.innerHTML = `<style>${BASE}</style><style>${sanitizeImportedCss(preview.css)}</style>`
       + `<div id="stage" style="${screen ? `width:1920px;height:1080px;transform:scale(${fit});transform-origin:top left;` : 'padding:24px;min-height:120px;'}background:${BACKGROUNDS[background] || BACKGROUNDS.dark}">`
       + `<div id="box" class="custom${screen ? ' drag' : ''}${selectedId ? ' sel-hint' : ''}">${preview.html}</div></div>`;
     const box = root.getElementById('box') as HTMLDivElement;

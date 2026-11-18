@@ -4,6 +4,7 @@ import { I18nProvider } from './i18n/I18nProvider';
 import UpdaterOverlay from './components/UpdaterOverlay';
 import HubApproval from './components/hub/HubApproval';
 import ErrorBoundary from './components/ErrorBoundary';
+import { withNamespace } from './i18n/store';
 
 // Every page is a separate chunk: only the shell (layout, i18n, updater) is in the startup bundle.
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -37,11 +38,11 @@ const DllInjector = lazy(() => import('./pages/DllInjector'));
 const FramePacer = lazy(() => import('./pages/FramePacer'));
 const Home = lazy(() => import('./pages/Home'));
 const SpaceSniffer = lazy(() => import('./pages/SpaceSniffer'));
-const DiskRescue = lazy(() => import('./pages/DiskRescue'));
+const DiskRescue = lazy(withNamespace('recovery', () => import('./pages/DiskRescue')));
 const Cleaner = lazy(() => import('./pages/Cleaner'));
 const Maintenance = lazy(() => import('./pages/Maintenance'));
 const UsbControl = lazy(() => import('./pages/UsbControl'));
-const SshClient = lazy(() => import('./pages/SshClient'));
+const SshClient = lazy(withNamespace('ssh', () => import('./pages/SshClient')));
 const Kakugan = lazy(() => import('./pages/Kakugan'));
 const OverlayEditor = lazy(() => import('./pages/OverlayEditor'));
 const Presets = lazy(() => import('./pages/Presets'));
@@ -58,7 +59,7 @@ const IconSheet = import.meta.env.DEV ? lazy(() => import('./components/icons/Ic
 const pageFromHash = () => (typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '').replace(/[^\w-]/g, '') : '') || 'home';
 const DarkOSCenter = lazy(() => import('./pages/DarkOSCenter'));
 const DriverCenter = lazy(() => import('./pages/DriverCenter'));
-const PowerShellTools = lazy(() => import('./pages/PowerShellTools'));
+const PowerShellTools = lazy(withNamespace('psTools', () => import('./pages/PowerShellTools')));
 
 const PageLoading = () => (
   // Skeleton shaped like a page header + content (no spinner): the layout does not jump when the chunk lands.

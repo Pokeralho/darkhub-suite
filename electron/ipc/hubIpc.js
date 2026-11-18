@@ -4,8 +4,8 @@ import { HubService } from '../services/hub/HubService.js'
 import { MAX_PACKAGE_BYTES } from '../services/hub/hubModel.js'
 import DeepTweaksEngine from '../services/optimizer/DeepTweaksEngine.js'
 import SystemOptimizerService from '../services/optimizer/SystemOptimizerService.js'
-import { HubCatalog } from '../services/hub/HubCatalog.js'
-import { HubMcp } from '../services/hub/HubMcp.js'
+import { HubCatalog, approveGrowth } from '../services/hub/HubCatalog.js'
+import { HubMcp, isLocalFolderPath } from '../services/hub/HubMcp.js'
 import { ExtensionHost } from '../services/hub/ExtensionHost.js'
 import { packExtensionFolder } from '../services/hub/extensionPack.js'
 import HardwareService from '../services/HardwareService.js'
@@ -22,7 +22,8 @@ const PKG_ID = /^[a-z0-9][a-z0-9-]{1,38}\.[a-z0-9][a-z0-9-]{1,62}$/
  */
 export function registerHubIPC({ app, ipcMain, dialog, BrowserWindow, logger, getMainWindow, showMainWindow } = {}) {
   const svc = new HubService({ app, tweaks: DeepTweaksEngine, optimizer: SystemOptimizerService })
-  const catalog = new HubCatalog({ app, hub: svc })
+  // approve is defined below (it needs send/focus); the catalog only calls it later, from an update
+  const catalog = new HubCatalog({ app, hub: svc, approve: (req) => approve(req) })
   const send = (payload) => { const w = getMainWindow?.(); if (w && !w.isDestroyed()) w.webContents.send('hub:event', payload) }
   const focus = () => { try { showMainWindow?.() } catch { /* window being created */ } const w = getMainWindow?.(); if (w && !w.isDestroyed()) { if (w.isMinimized()) w.restore(); w.show(); w.focus() } }
 
@@ -50,11 +51,32 @@ export function registerHubIPC({ app, ipcMain, dialog, BrowserWindow, logger, ge
   // development: extensions loaded from a folder, rebuilt and reloaded when a file changes
   const devFile = path.join(app.getPath('userData'), 'hub', 'dev-extensions.json')
   const watchers = new Map() // folder -> { watcher, id }
+  const awaitingApproval = new Set() // folders whose reload waits for the user to approve new permissions
   const readDev = () => { try { return JSON.parse(fs.readFileSync(devFile, 'utf8')) } catch { return [] } }
   const writeDev = (list) => { fs.mkdirSync(path.dirname(devFile), { recursive: true }); fs.writeFileSync(devFile, JSON.stringify(list, null, 1)) }
-  const loadDevFolder = async (folder) => {
+  /**
+   * userAction: the user (or an approved MCP request) is loading this folder now. Automatic reloads (file watcher,
+   * startup, darkhub_extension_reload) must not widen what the extension may do: new permissions or network origins
+   * wait for the user's approval in the window, and without it the installed version stays.
+   */
+  const loadDevFolder = async (folder, { userAction = false } = {}) => {
+    // never a network share: reading one sends this user's NTLM credentials to that server
+    if (!isLocalFolderPath(folder)) return { ok: false, error: 'A pasta da extensão precisa estar num disco local (compartilhamentos de rede não são aceitos).', folder }
     let pkg
     try { pkg = packExtensionFolder(folder) } catch (e) { return { ok: false, error: e.message } }
+    const prev = svc.record(String(pkg?.id || ''))
+    if (!userAction && prev?.pkg?.type === 'extension') {
+      // one question at a time per folder: saves while the dialog is open do not stack more of them
+      if (awaitingApproval.has(folder)) return { ok: false, code: 'permissions_pending', id: pkg.id, folder, error: 'Aguardando sua aprovação das novas permissões no DarkHub.' }
+      const text = JSON.stringify(pkg)
+      const preview = await svc.inspect(text, 'pt-BR').catch(() => null)
+      awaitingApproval.add(folder)
+      let refused
+      try {
+        refused = await approveGrowth({ approve, prevPkg: prev.pkg, nextPkg: pkg, preview: preview?.ok ? preview : null, client: 'DarkHub (desenvolvimento)', label: `A extensão ${pkg.id}` })
+      } finally { awaitingApproval.delete(folder) }
+      if (refused) return { ...refused, id: pkg.id, folder }
+    }
     const r = await svc.install(JSON.stringify(pkg), { source: { dev: folder }, replace: true })
     if (r.ok) send({ type: 'extReload', id: pkg.id })
     return { ...r, id: pkg.id, folder }
@@ -74,7 +96,7 @@ export function registerHubIPC({ app, ipcMain, dialog, BrowserWindow, logger, ge
     } catch (e) { logger?.warn?.('Hub', `watch ${folder}: ${e.message}`) }
   }
   const addDev = async (folder) => {
-    const r = await loadDevFolder(folder)
+    const r = await loadDevFolder(folder, { userAction: true })
     if (!r.ok) return r
     writeDev([...new Set([...readDev(), folder])])
     watchDev(folder)
@@ -155,7 +177,12 @@ export function registerHubIPC({ app, ipcMain, dialog, BrowserWindow, logger, ge
 
   const init = async () => {
     await mcp.init().catch((e) => logger?.error?.('MCP', e?.message || String(e)))
-    for (const folder of readDev()) if (fs.existsSync(folder)) { await loadDevFolder(folder); watchDev(folder) }
+    // not awaited one by one: a reload that asks for new permissions waits for the user and must not hold the others
+    for (const folder of readDev()) {
+      if (!fs.existsSync(folder)) continue
+      watchDev(folder)
+      loadDevFolder(folder).then((r) => { if (!r.ok) send({ type: 'extDevError', folder, error: r.error }) }).catch(() => {})
+    }
   }
   return { openLink, init, extResponse: (request) => host.response(request), stop: () => { for (const w of watchers.values()) w.close(); return mcp.stop() } }
 }

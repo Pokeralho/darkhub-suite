@@ -179,6 +179,9 @@ export function runYtDlp(ytdlpPath, args, { timeoutMs = 0, onProgress = null, tr
     let currentItem = 1
     let totalItems = 1
 
+    // stream decoding: a multibyte UTF-8 char (accented titles) split across chunks must not become U+FFFD
+    child.stdout?.setEncoding?.('utf8')
+    child.stderr?.setEncoding?.('utf8')
     child.stdout?.on('data', (chunk) => {
       const text = chunk.toString()
       stdout += text

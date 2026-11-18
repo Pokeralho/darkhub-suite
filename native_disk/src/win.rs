@@ -337,9 +337,21 @@ pub fn probe_locks(n: u32) -> Value {
 pub struct VolumeLocks {
     _handles: Vec<File>,
     pub warnings: Vec<String>,
+    /// Volumes that could not be locked (something has files open on them).
+    pub busy: Vec<String>,
+}
+
+static FORCE_DISMOUNT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// `--force-dismount`: dismount volumes that refused the lock (open files on them lose their handles).
+/// Off by default: without it a write to a disk with a busy volume is refused.
+pub fn set_force_dismount(v: bool) {
+    FORCE_DISMOUNT.store(v, std::sync::atomic::Ordering::Relaxed);
 }
 
 pub fn lock_volumes(n: u32) -> VolumeLocks {
+    let force = FORCE_DISMOUNT.load(std::sync::atomic::Ordering::Relaxed);
+    let mut busy = Vec::new();
     let mut handles = Vec::new();
     let mut warnings = Vec::new();
     for v in volumes().into_iter().filter(|v| v.extents.iter().any(|e| e.0 == n)) {
@@ -358,15 +370,21 @@ pub fn lock_volumes(n: u32) -> VolumeLocks {
             }
             std::thread::sleep(std::time::Duration::from_millis(200));
         }
+        if !locked && !force {
+            // Never yank a volume out from under open files unless explicitly asked to.
+            busy.push(format!("{} {:?}", v.guid_path, v.mount_points));
+            handles.push(f);
+            continue;
+        }
         if !locked {
-            warnings.push(format!("{} {:?}: em uso, desmontando à força", v.guid_path, v.mount_points));
+            warnings.push(format!("{} {:?}: em uso, desmontando à força (--force-dismount)", v.guid_path, v.mount_points));
         }
         if let Err(e) = ioctl(&f, FSCTL_DISMOUNT_VOLUME, &[], &mut []) {
             warnings.push(format!("{}: falha ao desmontar ({e})", v.guid_path));
         }
         handles.push(f);
     }
-    VolumeLocks { _handles: handles, warnings }
+    VolumeLocks { _handles: handles, warnings, busy }
 }
 
 pub struct PhysicalDisk {
@@ -383,6 +401,14 @@ impl PhysicalDisk {
         // Diagnostics go to stderr so stdout stays one JSON document / NDJSON stream.
         for w in locks.iter().flat_map(|l| &l.warnings) {
             eprintln!("aviso: {w}");
+        }
+        if let Some(l) = locks.as_ref().filter(|l| !l.busy.is_empty()) {
+            // Dropping `locks` releases every lock taken; volumes that locked cleanly and were dismounted are
+            // remounted by Windows on next access. Busy volumes were never dismounted.
+            return Err(io::Error::new(
+                io::ErrorKind::ResourceBusy,
+                format!("volume(s) em uso no disco {n}: {}. Feche os programas que usam essas unidades (ou use --force-dismount).", l.busy.join(", ")),
+            ));
         }
         let file = OpenOptions::new()
             .read(true)
@@ -414,8 +440,14 @@ impl BlockDevice for PhysicalDisk {
                 break;
             }
             let want = (out.len() - done).min(1 << 20).min((self.geo.size - pos) as usize);
-            let b = &mut self.buf.as_mut_slice()[..want];
-            let n = read_full(&self.file, pos, b)?;
+            // FILE_FLAG_NO_BUFFERING needs sector-multiple lengths: read the whole last sector, return the part asked.
+            let ss = self.geo.logical as usize;
+            let io_len = want.div_ceil(ss) * ss;
+            if pos % ss as u64 != 0 || pos + io_len as u64 > self.geo.size {
+                return Err(io::Error::new(io::ErrorKind::InvalidInput, "leitura fora do alinhamento de setor"));
+            }
+            let b = &mut self.buf.as_mut_slice()[..io_len];
+            let n = read_full(&self.file, pos, b)?.min(want);
             out[done..done + n].copy_from_slice(&self.buf.as_slice()[..n]);
             done += n;
             if n < want {
@@ -425,14 +457,27 @@ impl BlockDevice for PhysicalDisk {
         Ok(done)
     }
     fn write_at(&mut self, off: u64, data: &[u8]) -> io::Result<()> {
-        if off + data.len() as u64 > self.geo.size {
+        let ss = self.geo.logical as usize;
+        if off % ss as u64 != 0 {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "escrita fora do alinhamento de setor"));
+        }
+        // The disk size is a whole number of sectors, so the padded last sector is inside it too.
+        if off + (data.len().div_ceil(ss) * ss) as u64 > self.geo.size {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, "escrita além do fim do disco"));
         }
         let mut done = 0usize;
         while done < data.len() {
             let want = (data.len() - done).min(1 << 20);
+            let pos = off + done as u64;
+            let io_len = want.div_ceil(ss) * ss;
+            if io_len != want {
+                // Unaligned tail under FILE_FLAG_NO_BUFFERING: read-modify-write the last sector so the bytes
+                // past `data` keep their contents.
+                let tail = io_len - ss;
+                read_full(&self.file, pos + tail as u64, &mut self.buf.as_mut_slice()[tail..io_len])?;
+            }
             self.buf.as_mut_slice()[..want].copy_from_slice(&data[done..done + want]);
-            write_full(&self.file, off + done as u64, &self.buf.as_slice()[..want])?;
+            write_full(&self.file, pos, &self.buf.as_slice()[..io_len])?;
             done += want;
         }
         Ok(())

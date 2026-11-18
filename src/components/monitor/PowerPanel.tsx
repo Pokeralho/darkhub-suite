@@ -4,6 +4,7 @@ import { useI18n } from '../../i18n/I18nProvider';
 import type { OverlayPower, OverlaySettings, OverlayCost, OverlayHw } from '../../global';
 import PsuCatalogPicker from './PsuCatalogPicker';
 import WallCalibration from './WallCalibration';
+import { visibleInterval } from '../../utils/visibleInterval';
 
 const api = () => window.darkhub?.overlay;
 const f = (x: number | null | undefined, d = 0) => (x == null || !Number.isFinite(x) ? null : x.toFixed(d));
@@ -128,8 +129,7 @@ export default function PowerPanel({ cpuLoad }: { cpuLoad?: number | null }) {
   useEffect(() => {
     void api()?.status().then((r) => { if (r?.ok && r.settings) setS(r.settings); });
     refresh();
-    const id = setInterval(refresh, 1500);
-    return () => clearInterval(id);
+    return visibleInterval(refresh, 1500);
   }, [refresh]);
 
   const set = (patch: Partial<OverlaySettings>) => { void api()?.setSettings(patch).then((r) => { if (r?.ok && r.settings) { setS(r.settings); refresh(); } }); };

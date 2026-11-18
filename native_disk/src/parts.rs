@@ -279,15 +279,24 @@ pub fn detect_vbr(s: &[u8], at_lba: u64, ss: u32) -> Option<Vbr> {
         return None;
     }
     let bps = u16le(s, 11) as u32;
-    let scale = |n: u64| if bps > 0 && bps != ss { n * bps as u64 / ss as u64 } else { n };
+    // Fields come from untrusted disk bytes: widen to u128 so a garbage size can't overflow.
+    let rescale = |n: u64, from: u64| (n as u128 * from as u128 / ss.max(1) as u128).min(u64::MAX as u128) as u64;
+    let scale = |n: u64| if bps > 0 && bps != ss { rescale(n, bps as u64) } else { n };
     if &s[3..11] == b"NTFS    " {
-        let total = u64le(s, 0x28) + 1; // the field excludes the backup boot sector
+        let total = u64le(s, 0x28).saturating_add(1); // the field excludes the backup boot sector
         return Some(Vbr { fs: "NTFS", start_lba: at_lba, sectors: scale(total), label: String::new() });
     }
     if &s[3..11] == b"EXFAT   " {
-        let shift = s[108] as u32; // BytesPerSectorShift
+        // exFAT spec 3.1.14/3.1.15: BytesPerSectorShift is 9..=12 and SectorsPerClusterShift is at most
+        // 25 - BytesPerSectorShift (cluster <= 32 MiB). Anything else is not a valid exFAT boot sector.
+        let shift = s[108] as u32;
+        let spc_shift = s[109] as u32;
+        if !(9..=12).contains(&shift) || spc_shift > 25 - shift {
+            return None;
+        }
         let len = u64le(s, 0x48);
-        let sectors = if (1u64 << shift) as u32 != ss { len * (1u64 << shift) / ss as u64 } else { len };
+        let bytes_ps = 1u64 << shift;
+        let sectors = if bytes_ps as u32 != ss { rescale(len, bytes_ps) } else { len };
         return Some(Vbr { fs: "exFAT", start_lba: at_lba, sectors, label: String::new() });
     }
     if &s[3..11] == b"-FVE-FS-" {

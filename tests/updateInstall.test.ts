@@ -61,6 +61,8 @@ describe('installUpdate', () => {
     try {
       arm('installer');
       const p = svc.installUpdate();
+      // the re-hash streams the file (real I/O): wait for it to reach spawn before moving the fake clock
+      for (let i = 0; i < 500 && !spawnMock.mock.calls.length; i++) await new Promise((r) => setImmediate(r));
       await vi.advanceTimersByTimeAsync(10);
       expect(await p).toEqual({ ok: true });
       await vi.advanceTimersByTimeAsync(600);

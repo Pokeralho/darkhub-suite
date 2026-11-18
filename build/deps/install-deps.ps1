@@ -1,8 +1,7 @@
 # DarkHub Suite: optional components installed by the setup (runs elevated, after the files are copied).
 #   PawnIO  - signed driver used by the advanced sensors (CPU temperature, MSRs, SMBus)
-#   ClamAV  - open-source antivirus used by real-time protection (protection itself stays OFF until the user turns it on)
-# Both come from their official releases, pinned by SHA-256 (keep in sync with electron/services/hwsensors/pawnio.js and
-# electron/services/realtime/ClamAv.js; tests/depsInstaller.test.ts checks it). Never fails the setup: anything missing
+# It comes from its official release, pinned by SHA-256 (keep in sync with electron/services/hwsensors/pawnio.js;
+# tests/depsInstaller.test.ts checks it). ClamAV is installed by the app when protection is turned on. Never fails the setup: anything missing
 # here is installed later by the app itself. ASCII only, Windows PowerShell 5.1.
 param([string]$LogPath = (Join-Path $env:ProgramData 'DarkHub\deps-install.log'))
 $ErrorActionPreference = 'Stop'
@@ -12,7 +11,6 @@ New-Item -ItemType Directory -Force (Split-Path $LogPath) | Out-Null
 function Log([string]$m) { $line = (Get-Date).ToString('s') + ' ' + $m; Add-Content -LiteralPath $LogPath -Value $line; Write-Output $m }
 
 $PawnIO = @{ Version = '2.2.0'; Url = 'https://github.com/namazso/PawnIO.Setup/releases/download/2.2.0/PawnIO_setup.exe'; Sha256 = '1f519a22e47187f70a1379a48ca604981c4fcf694f4e65b734aaa74a9fba3032' }
-$ClamAV = @{ Version = '1.5.4'; Url = 'https://github.com/Cisco-Talos/clamav/releases/download/clamav-1.5.4/clamav-1.5.4.win.x64.msi'; Sha256 = 'a025fa23a4b9d64fce448d5a211afcf30dc26ba6528186e6223d1b945f9d95d6' }
 
 $work = Join-Path $env:TEMP ('darkhub-deps-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force $work | Out-Null
@@ -53,20 +51,9 @@ try {
 } catch { Log ('PawnIO: skipped - ' + $_.Exception.Message + ' (the app installs it later)') }
 
 # ---------------------------------------------------------------- ClamAV
-try {
-  $clam = @($env:ProgramFiles, ${env:ProgramFiles(x86)}) | Where-Object { $_ } | ForEach-Object { Join-Path $_ 'ClamAV\clamscan.exe' } | Where-Object { Test-Path $_ } | Select-Object -First 1
-  if ($clam) {
-    Log ('ClamAV: already installed (' + $clam + ')')
-  } else {
-    Log ('ClamAV ' + $ClamAV.Version + ': downloading (about 215 MB)')
-    $f = Join-Path $work 'clamav.msi'
-    # the MSI is not Authenticode-signed (Cisco publishes a GPG .sig); integrity comes from the pinned SHA-256
-    Get-Verified $ClamAV.Url $ClamAV.Sha256 $f
-    $p = Start-Process -FilePath 'msiexec.exe' -ArgumentList '/i', ('"' + $f + '"'), '/qn', '/norestart' -Wait -PassThru -WindowStyle Hidden
-    if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { throw ('msiexec exit ' + $p.ExitCode) }
-    Log ('ClamAV: installed (exit ' + $p.ExitCode + '); signatures are downloaded by DarkHub in the background')
-  }
-} catch { Log ('ClamAV: skipped - ' + $_.Exception.Message + ' (the app installs it when protection is turned on)') }
+# Not downloaded here any more: real-time protection is off by default and turning it on installs ClamAV and its
+# signatures (electron/ipc/realtimeIpc.js). Doing it in every silent setup/update cost ~215 MB and minutes for nothing.
+Log 'ClamAV: left to the app (installed when real-time protection is turned on)'
 
 Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue
 Log 'DarkHub components setup finished'

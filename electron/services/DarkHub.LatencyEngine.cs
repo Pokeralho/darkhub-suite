@@ -180,7 +180,7 @@ public class DarkHubLatencyEngine
 
     public static void Main(string[] args)
     {
-        Console.OutputEncoding = Encoding.UTF8;
+        Console.OutputEncoding = new UTF8Encoding(false); // no BOM in front of the first JSON line
         Console.InputEncoding = Encoding.UTF8;
 
         try
@@ -627,6 +627,37 @@ public class DarkHubLatencyEngine
         });
     }
 
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetLogicalProcessorInformationEx(int RelationshipType, IntPtr Buffer, ref uint ReturnedLength);
+
+    const int RelationProcessorCore = 0;
+    const int RelationCache = 2;
+    const int RelationAll = 0xFFFF;
+
+    // Reads one GROUP_AFFINITY (KAFFINITY Mask, WORD Group, WORD Reserved[3]) and returns its mask only when it
+    // belongs to processor group 0. Affinity masks handed to SetProcessAffinityMask are per group, so on machines with
+    // more than 64 logical processors only group 0 is considered (the other groups are simply left out).
+    private static ulong Group0Mask(IntPtr entry, int offset, int groupCount)
+    {
+        int stride = IntPtr.Size == 8 ? 16 : 12;
+        ulong mask = 0;
+        if (groupCount < 1) groupCount = 1;
+        for (int g = 0; g < groupCount; g++)
+        {
+            int at = offset + g * stride;
+            ulong m = IntPtr.Size == 8 ? (ulong)Marshal.ReadInt64(entry, at) : (uint)Marshal.ReadInt32(entry, at);
+            ushort group = (ushort)Marshal.ReadInt16(entry, at + IntPtr.Size);
+            if (group == 0) mask |= m;
+        }
+        return mask;
+    }
+
+    // Real topology from GetLogicalProcessorInformationEx:
+    //   - hybrid CPUs (Intel 12th gen+ / Core Ultra): "P-cores" = cores with the highest EfficiencyClass;
+    //   - uniform cores with several L3 caches (dual-CCD Ryzen): the L3 group with the largest cache (the V-Cache
+    //     CCD on X3D parts); on a size tie, the first L3 reported (CCD0) so a game stays on one CCD;
+    //   - otherwise (or if the API fails) every core in group 0.
+    // Output fields are unchanged; "topology_source"/"hybrid"/"l3_groups" are informational additions.
     private static Dictionary<string, object> GetCpuTopologyInternal()
     {
         int logicalCores = Environment.ProcessorCount;
@@ -637,10 +668,93 @@ public class DarkHubLatencyEngine
         }
 
         ulong pCoreMask = allCoresMask;
-        if (logicalCores >= 12)
-        {
+        string source = "fallback";
+        bool hybrid = false;
+        int l3Groups = 0;
 
-            pCoreMask = 0xFFFFUL & allCoresMask;
+        IntPtr buf = IntPtr.Zero;
+        try
+        {
+            uint len = 0;
+            GetLogicalProcessorInformationEx(RelationAll, IntPtr.Zero, ref len);
+            if (len > 0 && len < 16 * 1024 * 1024)
+            {
+                buf = Marshal.AllocHGlobal((int)len);
+                if (GetLogicalProcessorInformationEx(RelationAll, buf, ref len))
+                {
+                    var coreMasks = new List<ulong>();
+                    var coreClasses = new List<int>();
+                    var l3Masks = new List<ulong>();
+                    var l3Sizes = new List<uint>();
+                    int pos = 0;
+                    while (pos + 8 <= (int)len)
+                    {
+                        IntPtr entry = new IntPtr(buf.ToInt64() + pos);
+                        int rel = Marshal.ReadInt32(entry, 0);
+                        int size = Marshal.ReadInt32(entry, 4);
+                        if (size <= 0 || pos + size > (int)len) break;
+                        if (rel == RelationProcessorCore)
+                        {
+                            // PROCESSOR_RELATIONSHIP: Flags@8, EfficiencyClass@9, GroupCount@30, GroupMask[]@32
+                            int eff = Marshal.ReadByte(entry, 9);
+                            int gc = (ushort)Marshal.ReadInt16(entry, 30);
+                            ulong m = Group0Mask(entry, 32, gc);
+                            if (m != 0) { coreMasks.Add(m); coreClasses.Add(eff); }
+                        }
+                        else if (rel == RelationCache)
+                        {
+                            // CACHE_RELATIONSHIP: Level@8, CacheSize@12, Type@16, GroupCount@38 (0 before Win11), GroupMask[]@40
+                            int level = Marshal.ReadByte(entry, 8);
+                            int type = Marshal.ReadInt32(entry, 16);
+                            if (level == 3 && type != 1 /* not instruction */)
+                            {
+                                uint csize = (uint)Marshal.ReadInt32(entry, 12);
+                                int gc = (ushort)Marshal.ReadInt16(entry, 38);
+                                ulong m = Group0Mask(entry, 40, gc);
+                                if (m != 0) { l3Masks.Add(m); l3Sizes.Add(csize); }
+                            }
+                        }
+                        pos += size;
+                    }
+
+                    if (coreMasks.Count > 0)
+                    {
+                        ulong all = 0;
+                        int minEff = int.MaxValue, maxEff = int.MinValue;
+                        for (int i = 0; i < coreMasks.Count; i++)
+                        {
+                            all |= coreMasks[i];
+                            if (coreClasses[i] < minEff) minEff = coreClasses[i];
+                            if (coreClasses[i] > maxEff) maxEff = coreClasses[i];
+                        }
+                        allCoresMask = all;
+                        pCoreMask = all;
+                        source = "uniform";
+                        l3Groups = l3Masks.Count;
+
+                        if (maxEff > minEff)
+                        {
+                            ulong p = 0;
+                            for (int i = 0; i < coreMasks.Count; i++)
+                                if (coreClasses[i] == maxEff) p |= coreMasks[i];
+                            if (p != 0) { pCoreMask = p; hybrid = true; source = "efficiency_class"; }
+                        }
+                        else if (l3Masks.Count > 1)
+                        {
+                            int best = 0;
+                            for (int i = 1; i < l3Masks.Count; i++)
+                                if (l3Sizes[i] > l3Sizes[best]) best = i;
+                            ulong p = l3Masks[best] & all;
+                            if (p != 0) { pCoreMask = p; source = "l3_group"; }
+                        }
+                    }
+                }
+            }
+        }
+        catch { }
+        finally
+        {
+            if (buf != IntPtr.Zero) Marshal.FreeHGlobal(buf);
         }
 
         return new Dictionary<string, object>
@@ -648,7 +762,10 @@ public class DarkHubLatencyEngine
             { "logical_cores", logicalCores },
             { "all_cores_mask_hex", "0x" + allCoresMask.ToString("X") },
             { "p_core_mask_hex", "0x" + pCoreMask.ToString("X") },
-            { "p_core_mask_ulong", pCoreMask }
+            { "p_core_mask_ulong", pCoreMask },
+            { "topology_source", source },
+            { "hybrid", hybrid },
+            { "l3_groups", l3Groups }
         };
     }
 

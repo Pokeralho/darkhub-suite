@@ -1,17 +1,25 @@
 // Quarantine: a detected file is moved into <root>/<id>.q, XOR-ed with a random per-item key so it can neither run nor
 // be picked up again by another scanner, with <id>.json holding where it came from. Restore reverses it exactly.
+//
+// We run as Administrator and <root> lives under ProgramData, whose default ACL lets any user create files in new
+// subfolders. So the folder is locked to Administrators + SYSTEM before use (otherwise a planted <id>.json could make
+// restore() write anywhere as admin), the file added is checked to be the one that was scanned (no swap for a
+// link or another file between detection and quarantine), and restore never writes into system folders.
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import { execFile } from 'node:child_process'
 import { Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
+import { protectedPathReason } from '../diskscan/DiskScanService.js'
 
 const ID_RE = /^[0-9a-f]{16}$/
 
-function xorStream(key) {
+function xorStream(key, hash) {
   let offset = 0
   return new Transform({
     transform(chunk, _enc, done) {
+      hash?.update(chunk)
       const out = Buffer.allocUnsafe(chunk.length)
       for (let i = 0; i < chunk.length; i++) out[i] = chunk[i] ^ key[(offset + i) % key.length]
       offset += chunk.length
@@ -20,27 +28,80 @@ function xorStream(key) {
   })
 }
 
+/** XORs `src` (a path or an open fd) into `dest`; resolves the SHA-256 of what was read. */
 async function transcode(src, dest, key) {
   const tmp = `${dest}.part`
-  await pipeline(fs.createReadStream(src), xorStream(key), fs.createWriteStream(tmp, { flags: 'wx' }))
+  fs.rmSync(tmp, { force: true }) // a .part left by a crash would make the exclusive create below fail forever
+  const hash = crypto.createHash('sha256')
+  const input = typeof src === 'number' ? fs.createReadStream(null, { fd: src, autoClose: false }) : fs.createReadStream(src)
+  try {
+    await pipeline(input, xorStream(key, hash), fs.createWriteStream(tmp, { flags: 'wx' }))
+  } catch (e) {
+    fs.rmSync(tmp, { force: true })
+    throw e
+  }
   fs.renameSync(tmp, dest)
+  return hash.digest('hex')
+}
+
+/** Locks `dir` to Administrators and SYSTEM (owner Administrators, no inherited ACEs). Windows only. */
+export function lockDownDir(dir) {
+  if (process.platform !== 'win32') return Promise.resolve(true)
+  const icacls = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'icacls.exe')
+  const run = (args) => new Promise((resolve) => execFile(icacls, args, { windowsHide: true, timeout: 20000 }, (err) => resolve(!err)))
+  return run([dir, '/setowner', '*S-1-5-32-544'])
+    .then(() => run([dir, '/inheritance:r', '/grant:r', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-18:(OI)(CI)F']))
 }
 
 export class Quarantine {
-  constructor(root) { this.root = root }
+  /**
+   * opts.lockDown: ACL the folder to Administrators + SYSTEM before first use. A boolean or an async predicate: the app
+   * passes "are we elevated?" (a non-elevated dev run would lock itself out, and is no privilege-escalation path anyway).
+   */
+  constructor(root, { lockDown = false } = {}) {
+    this.root = root
+    this.lockDown = lockDown
+    this.ready = null
+  }
+
+  async #ensureRoot() {
+    this.ready ||= (async () => {
+      fs.mkdirSync(this.root, { recursive: true })
+      const lock = typeof this.lockDown === 'function' ? await this.lockDown().catch(() => false) : this.lockDown
+      if (lock && !(await lockDownDir(this.root))) throw new Error('could not secure the quarantine folder')
+    })().catch((e) => { this.ready = null; throw e })
+    return this.ready
+  }
 
   #paths(id) {
     if (!ID_RE.test(id)) throw new Error('invalid quarantine id')
     return { data: path.join(this.root, `${id}.q`), meta: path.join(this.root, `${id}.json`) }
   }
 
-  /** Moves the file into quarantine. If it cannot be removed (in use), nothing is kept and an error is thrown. */
+  /**
+   * Moves the file into quarantine. If it cannot be removed (in use), nothing is kept and an error is thrown.
+   * info.sha256 / info.size (what was scanned): when given, the file must still match them.
+   */
   async add(file, info = {}) {
-    fs.mkdirSync(this.root, { recursive: true })
+    await this.#ensureRoot()
+    const st = fs.lstatSync(file)
+    if (!st.isFile() || st.isSymbolicLink()) throw new Error('not a regular file, not quarantined')
+    const fd = fs.openSync(file, 'r')
     const id = crypto.randomBytes(8).toString('hex')
     const key = crypto.randomBytes(32)
     const p = this.#paths(id)
-    await transcode(file, p.data, key)
+    try {
+      const fst = fs.fstatSync(fd)
+      if (fst.ino !== st.ino || fst.dev !== st.dev) throw new Error('file changed while being quarantined')
+      if (info.size != null && fst.size !== info.size) throw new Error('file changed since it was scanned')
+      const sha = await transcode(fd, p.data, key)
+      if (info.sha256 && sha !== String(info.sha256).toLowerCase()) {
+        fs.rmSync(p.data, { force: true })
+        throw new Error('file changed since it was scanned')
+      }
+    } finally {
+      fs.closeSync(fd)
+    }
     try {
       fs.unlinkSync(file)
     } catch (e) {
@@ -70,8 +131,14 @@ export class Quarantine {
 
   /** Restores to the original path, or next to it with a suffix when a file with that name exists again. */
   async restore(id) {
+    await this.#ensureRoot()
     const p = this.#paths(id)
     const meta = JSON.parse(fs.readFileSync(p.meta, 'utf8'))
+    if (typeof meta.originalPath !== 'string' || !path.isAbsolute(meta.originalPath) || !/^[0-9a-f]{64}$/.test(String(meta.key))) {
+      throw new Error('damaged quarantine entry')
+    }
+    // never write into Windows / Program Files / ProgramData as admin on behalf of a metadata file
+    if (protectedPathReason(meta.originalPath)) throw new Error('refusing to restore into a system folder: restore it manually')
     const { dir, name, ext } = path.parse(meta.originalPath)
     let dest = meta.originalPath
     for (let i = 1; fs.existsSync(dest); i++) dest = path.join(dir, `${name} (restored ${i})${ext}`)

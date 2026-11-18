@@ -38,7 +38,10 @@ void SwapchainMonitor::do_monitor(const std::stop_token stoken) {
         // If we're stopping, signal the semaphore and don't worry about work
         // actually completing. But we MUST drain them, or we get a hang.
         if (stoken.stop_requested()) {
-            pending_signal.semaphore_signal.signal(this->device);
+            try {
+                pending_signal.semaphore_signal.signal(this->device);
+            } catch (...) {
+            }
             continue;
         }
 
@@ -47,18 +50,27 @@ void SwapchainMonitor::do_monitor(const std::stop_token stoken) {
         const auto delay = this->present_delay;
         lock.unlock();
 
-        // Wait for work to complete.
-        for (const auto& submission_span : pending_signal.submission_spans) {
-            if (submission_span) {
-                submission_span->await_completed();
+        // Wait for work to complete. These throw on Vulkan errors (device
+        // lost); nothing may escape this std::jthread body, and the semaphore
+        // must still be signalled so the application never hangs on it.
+        try {
+            for (const auto& submission_span :
+                 pending_signal.submission_spans) {
+                if (submission_span) {
+                    submission_span->await_completed();
+                }
             }
+
+            // Don't need to worry about locking for delay_controller as it's
+            // only accessed here.
+            this->delay_controller.delay(delay);
+        } catch (...) {
         }
 
-        // Don't need to worry about locking for delay_controller as it's only
-        // accessed here.
-        this->delay_controller.delay(delay);
-
-        pending_signal.semaphore_signal.signal(this->device);
+        try {
+            pending_signal.semaphore_signal.signal(this->device);
+        } catch (...) {
+        }
     }
 }
 

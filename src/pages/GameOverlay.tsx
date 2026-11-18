@@ -5,6 +5,7 @@ import HotkeyCapture from '../components/HotkeyCapture';
 import { PowerSettingsForm } from '../components/monitor/PowerPanel';
 import { useI18n } from '../i18n/I18nProvider';
 import type { OverlayStatus, OverlaySettings } from '../global';
+import { visibleInterval } from '../utils/visibleInterval';
 
 const METRICS = ['fps', 'low1', 'frametime', 'graph', 'latency', 'cpu', 'cpuTemp', 'cpuPower', 'gpu', 'gpuTemp', 'vram', 'gpuClock', 'ram'];
 const n = (v: number | null | undefined, d = 0) => (v == null || !Number.isFinite(v) ? '—' : v.toFixed(d));
@@ -45,8 +46,8 @@ export default function GameOverlay({ onNavigate }: { onNavigate?: (page: string
     void api()?.layouts().then((l) => { if (l?.ok) void api()?.setSettings({ labels: Object.fromEntries(l.metrics.map((m) => [`m.${m.key}`, t(`ovle.m.${m.key}`, m.label)])) }); });
     void api()?.processes().then((r) => setProcs(r?.processes ?? []));
     const off = api()?.onEvent((s) => setSt(s));
-    const timer = setInterval(() => { void api()?.status().then((s) => s?.ok && setSt(s)); }, 1000);
-    return () => { off?.(); clearInterval(timer); };
+    const stop = visibleInterval(async () => { const s = await api()?.status(); if (s?.ok) setSt(s); }, 1000);
+    return () => { off?.(); stop(); };
   }, []);
 
   const set = async (patch: Partial<OverlaySettings>) => {

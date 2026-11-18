@@ -1,0 +1,41 @@
+// en-US strings for video (generated from videoMessages.ts; edit here).
+// Keep the same keys in the other language's file.
+const dict: Record<string, string> = {
+  "ytx.more": "More options: format, subtitles, SponsorBlock, chapters, section",
+  "ytx.container": "Container",
+  "ytx.codec": "Video codec",
+  "ytx.codec.best": "Best available",
+  "ytx.codec.h264": "H.264 (plays everywhere: TVs, editors, WhatsApp)",
+  "ytx.codec.av1": "AV1 (smaller and sharper, needs a recent PC)",
+  "ytx.subs": "Download and embed subtitles",
+  "ytx.subLangsHelp": "Comma-separated languages: pt.*, en.*, es",
+  "ytx.autoSubs": "Include auto-generated subtitles",
+  "ytx.chapters": "Chapters",
+  "ytx.chapters.none": "Ignore",
+  "ytx.chapters.embed": "Embed in the file",
+  "ytx.chapters.split": "One file per chapter",
+  "ytx.sb.remove": "Cut from the video",
+  "ytx.sb.mark": "Only mark as chapters",
+  "ytx.sb.sponsor": "Sponsor",
+  "ytx.sb.selfpromo": "Self-promotion",
+  "ytx.sb.interaction": "Like/subscribe reminder",
+  "ytx.sb.intro": "Intro",
+  "ytx.sb.outro": "Outro",
+  "ytx.sb.preview": "Preview/recap",
+  "ytx.sb.music_offtopic": "Non-music section",
+  "ytx.sb.filler": "Filler",
+  "ytx.trim": "Section",
+  "ytx.trimStart": "Start",
+  "ytx.trimEndPh": "end",
+  "ytx.trimEnd": "End",
+  "ytx.rate": "Bandwidth limit",
+  "ytx.ratePh": "no limit",
+  "ytx.rateHelp": "E.g. 5M = 5 MB/s, 800K = 800 KB/s",
+  "ytx.items": "Playlist items",
+  "ytx.skipHelp": "Remembers what was downloaded and skips it next time (great for playlists and channels)",
+  "ytx.skip": "Skip what I already downloaded",
+  "ytx.thumbFile": "Save cover as .jpg",
+  "ytx.desc": "Save description as .txt"
+};
+
+export default dict;

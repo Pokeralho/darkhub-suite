@@ -55,29 +55,38 @@ export function matchGames(index, installed) {
 
 const globToRegex = (seg) => new RegExp(`^${seg.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`, 'i')
 
-/** Expands a Windows pattern with * ? ** into existing files (directories are walked). Capped for safety. */
-export function expandGlob(pattern, { maxFiles = 20000, maxDepth = 12 } = {}) {
+/**
+ * Expands a Windows pattern with * ? ** into existing files (directories are walked). Capped for safety: `**` goes at
+ * most maxGlobDepth folders deep, and symbolic links/junctions met while walking are never descended (a junction
+ * pointing at a parent folder would otherwise loop). A matched path that is itself a link is still followed.
+ */
+export function expandGlob(pattern, { maxFiles = 20000, maxDepth = 12, maxGlobDepth = 8 } = {}) {
   const parts = pattern.split('\\')
   const files = []
   const addTree = (p, depth) => {
     if (files.length >= maxFiles) return
     let st
-    try { st = fs.statSync(p) } catch { return }
+    try {
+      if (depth > 0 && fs.lstatSync(p).isSymbolicLink()) return
+      st = fs.statSync(p)
+    } catch { return }
     if (st.isFile()) { files.push(p); return }
     if (!st.isDirectory() || depth > maxDepth) return
     let names = []
     try { names = fs.readdirSync(p) } catch { return }
     for (const n of names) addTree(path.join(p, n), depth + 1)
   }
-  const walk = (base, i) => {
+  const walk = (base, i, globDepth = 0) => {
     if (files.length >= maxFiles) return
     if (i >= parts.length) { addTree(base, 0); return }
     const seg = parts[i]
     if (seg === '**') {
       walk(base, i + 1)
+      if (globDepth >= maxGlobDepth) return
       let names = []
-      try { names = fs.readdirSync(base, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name) } catch { return }
-      for (const n of names) walk(path.join(base, n), i)
+      // a symlink/junction Dirent reports isSymbolicLink(), not isDirectory(): links are never followed here
+      try { names = fs.readdirSync(base, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.isSymbolicLink()).map((d) => d.name) } catch { return }
+      for (const n of names) walk(path.join(base, n), i, globDepth + 1)
       return
     }
     if (!/[*?]/.test(seg)) { walk(i === 0 ? `${seg}\\` : path.join(base, seg), i + 1); return }

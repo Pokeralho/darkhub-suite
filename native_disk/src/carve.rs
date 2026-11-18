@@ -97,14 +97,18 @@ impl<'a> Src<'a> {
 }
 
 fn jpeg_len(s: &mut Src, start: u64, max: u64) -> Option<u64> {
-    let end_limit = start + max;
+    let end_limit = start.saturating_add(max);
     let mut p = start + 2;
     loop {
-        if p >= end_limit || s.u8(p)? != 0xFF {
+        if p >= end_limit || cancelled() || s.u8(p)? != 0xFF {
             return None;
         }
+        // Fill bytes (FF FF FF ...): bounded by `end_limit`, or erased flash (all 0xFF) would be walked to the end.
         while s.u8(p + 1)? == 0xFF {
             p += 1;
+            if p >= end_limit {
+                return None;
+            }
         }
         let m = s.u8(p + 1)?;
         match m {
@@ -120,6 +124,9 @@ fn jpeg_len(s: &mut Src, start: u64, max: u64) -> Option<u64> {
                 if m == 0xDA {
                     // Entropy-coded data: the next real marker is FF followed by anything but 00 / RSTn.
                     loop {
+                        if cancelled() {
+                            return None;
+                        }
                         let f = s.find(p, end_limit, b"\xFF")?;
                         let n = s.u8(f + 1)?;
                         if n == 0x00 || (0xD0..=0xD7).contains(&n) || n == 0xFF {
@@ -290,6 +297,9 @@ fn mp4_len(s: &mut Src, start: u64, max: u64) -> Option<(u64, &'static str)> {
     let mut p = start;
     let mut has_media = false;
     loop {
+        if cancelled() {
+            return None;
+        }
         let Some(size32) = s.be32(p) else { break };
         let Some(ty) = s.get(p + 4, 4).map(|b| b.to_vec()) else { break };
         if !ty.iter().all(|c| c.is_ascii_alphanumeric() || *c == b' ') {
@@ -297,7 +307,11 @@ fn mp4_len(s: &mut Src, start: u64, max: u64) -> Option<(u64, &'static str)> {
         }
         let size = match size32 {
             0 => break, // "to end of file": unknown here
-            1 => s.get(p + 8, 8).map(|b| u64::from_be_bytes(b.try_into().unwrap()))?,
+            // 64-bit "largesize": the box header alone is 16 bytes, anything smaller can't be real.
+            1 => match s.get(p + 8, 8).map(|b| u64::from_be_bytes(b.try_into().unwrap()))? {
+                n if n < 16 => break,
+                n => n,
+            },
             n if n < 8 => break,
             n => n,
         };
@@ -307,10 +321,12 @@ fn mp4_len(s: &mut Src, start: u64, max: u64) -> Option<(u64, &'static str)> {
         if &ty[..] == b"moov" || &ty[..] == b"mdat" || &ty[..] == b"meta" {
             has_media = true;
         }
-        if p + size - start > max {
+        // checked: a forged 64-bit size would otherwise wrap `p` backwards and loop forever.
+        let Some(next) = p.checked_add(size) else { break };
+        if next - start > max {
             break;
         }
-        p += size;
+        p = next;
     }
     (has_media && p > start).then_some((p - start, ext))
 }
@@ -404,6 +420,10 @@ pub fn carve(target: &Target, out_dir: &str, opts: &CarveOpts, prog: &mut Progre
         }
         hits.sort();
         for (off, i) in hits {
+            if cancelled() {
+                stop = true;
+                break;
+            }
             if off < next_free {
                 continue;
             }
@@ -422,6 +442,10 @@ pub fn carve(target: &Target, out_dir: &str, opts: &CarveOpts, prog: &mut Progre
             let mut stats = ReadStats::new();
             let ss = src.dev.sector_size() as u64;
             while done < len {
+                if cancelled() {
+                    stop = true;
+                    break;
+                }
                 let a = (off + done) / ss * ss;
                 let skip = (off + done - a) as usize;
                 let n = ((len - done) as usize + skip).min(MB as usize).div_ceil(ss as usize) * ss as usize;

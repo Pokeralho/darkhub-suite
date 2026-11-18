@@ -6,6 +6,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import Logger from './LoggerService.js'
+import { integrityError, TAMPERED_MESSAGE } from './binaryIntegrity.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -156,6 +157,13 @@ class FramePacerEngine extends EventEmitter {
   _spawnNativeProcess() {
     try {
       const exePath = this._getExePath()
+      // the limiter injects DarkHub.PacerHook into games (through PacerInject for 32-bit ones): all of them must be the shipped files
+      const tampered = integrityError(['DarkHub.FrameLimiter.exe', 'DarkHub.PacerHook.x64.dll', 'DarkHub.PacerHook.x86.dll', 'DarkHub.PacerInject.x86.exe'], { log: (m) => Logger.warn('FramePacerEngine', m) })
+      if (tampered) {
+        Logger.error('FramePacerEngine', tampered)
+        if (this.isRunning) this._failStop(TAMPERED_MESSAGE)
+        return
+      }
       Logger.info('FramePacerEngine', `Executável nativo: ${exePath}`)
 
       const proc = spawn(exePath, [
@@ -173,6 +181,7 @@ class FramePacerEngine extends EventEmitter {
       proc.stdin?.on('error', () => {})
 
       let buffer = ''
+      proc.stdout.setEncoding?.('utf8') // stream decoding: no U+FFFD when a multibyte char is split across chunks
 
       proc.stdout.on('data', (data) => {
         buffer += data.toString()

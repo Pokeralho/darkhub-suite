@@ -1,0 +1,41 @@
+// pt-BR strings for video (generated from videoMessages.ts; edit here).
+// Keep the same keys in the other language's file.
+const dict: Record<string, string> = {
+  "ytx.more": "Mais opções: formato, legendas, SponsorBlock, capítulos, trecho",
+  "ytx.container": "Contêiner",
+  "ytx.codec": "Codec de vídeo",
+  "ytx.codec.best": "Melhor disponível",
+  "ytx.codec.h264": "H.264 (toca em tudo: TV, editores, WhatsApp)",
+  "ytx.codec.av1": "AV1 (menor e mais nítido, exige PC recente)",
+  "ytx.subs": "Baixar e embutir legendas",
+  "ytx.subLangsHelp": "Idiomas separados por vírgula: pt.*, en.*, es",
+  "ytx.autoSubs": "Incluir legendas automáticas",
+  "ytx.chapters": "Capítulos",
+  "ytx.chapters.none": "Ignorar",
+  "ytx.chapters.embed": "Embutir no arquivo",
+  "ytx.chapters.split": "Um arquivo por capítulo",
+  "ytx.sb.remove": "Cortar do vídeo",
+  "ytx.sb.mark": "Só marcar como capítulo",
+  "ytx.sb.sponsor": "Patrocínio",
+  "ytx.sb.selfpromo": "Autopromoção",
+  "ytx.sb.interaction": "Pedido de like/inscrição",
+  "ytx.sb.intro": "Abertura",
+  "ytx.sb.outro": "Encerramento",
+  "ytx.sb.preview": "Prévia/recapitulação",
+  "ytx.sb.music_offtopic": "Trecho sem música",
+  "ytx.sb.filler": "Enrolação",
+  "ytx.trim": "Trecho",
+  "ytx.trimStart": "Início",
+  "ytx.trimEndPh": "fim",
+  "ytx.trimEnd": "Fim",
+  "ytx.rate": "Limite de banda",
+  "ytx.ratePh": "sem limite",
+  "ytx.rateHelp": "Ex.: 5M = 5 MB/s, 800K = 800 KB/s",
+  "ytx.items": "Itens da playlist",
+  "ytx.skipHelp": "Guarda o que já foi baixado e pula na próxima vez (ótimo para playlists e canais)",
+  "ytx.skip": "Pular o que já baixei",
+  "ytx.thumbFile": "Salvar capa como .jpg",
+  "ytx.desc": "Salvar descrição em .txt"
+};
+
+export default dict;

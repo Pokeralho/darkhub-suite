@@ -139,8 +139,12 @@ export class PortForwardService {
       if (this.active.get(id) !== rt) { rt.conn.close(); throw new TunnelError('CANCELLED', 'stopped while starting') }
       const client = rt.conn.client
       if (rule.kind === 'local') rt.server = await this.listen(rule, (sock) => {
+        // until forwardOut answers nobody else listens on sock: an ECONNRESET in that window would otherwise be an
+        // unhandled 'error' event (uncaughtException in main)
+        sock.on('error', () => sock.destroy())
         client.forwardOut(sock.remoteAddress || '127.0.0.1', sock.remotePort || 0, rule.targetHost, rule.targetPort, (err, stream) => {
           if (err) { sock.destroy(); return }
+          if (sock.destroyed) { try { stream.close?.() ?? stream.end?.() } catch { /* gone */ } return }
           this.track(rt, id, sock, stream)
         })
       })

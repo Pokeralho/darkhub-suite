@@ -125,6 +125,9 @@ interface OptiScalerManagerProps {
 
 export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps = {}) {
   const { t } = useI18n();
+  const LOADER_KEYS: Record<string, string> = { auto: 'auto', 'dxgi.dll': 'dxgi', 'winmm.dll': 'winmm', 'version.dll': 'version', 'd3d12.dll': 'd3d12' };
+  const loaderLabel = (opt: Choice) => (opt.value === 'auto' ? t('optiscaler.ui.loader.auto.label', opt.label) : opt.label);
+  const loaderHint = (opt?: Choice) => (opt?.hint ? t(`optiscaler.ui.loader.${LOADER_KEYS[opt.value] || opt.value}.hint`, opt.hint) : '');
 
   // Games & Selection
   const [games, setGames] = useState<GameItem[]>([]);
@@ -281,23 +284,30 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
     };
   };
 
-  const loadBackups = async (payload = makePayload()) => {
+  // `seq`: when given, the result is dropped if another game was selected meanwhile.
+  const loadBackups = async (payload = makePayload(), seq?: number) => {
     if (!window.darkhub?.optiscaler?.listBackups) return;
+    const stale = () => seq !== undefined && seq !== analyzeSeq.current;
     try {
       const res = await window.darkhub.optiscaler.listBackups(payload);
+      if (stale()) return;
       const list = res?.ok && Array.isArray(res.backups) ? res.backups : [];
       setBackups(list);
       // '' = automatic: the backend restores the oldest snapshot (true originals).
       // Defaulting to list[0] (the newest) restored OptiScaler's own files after a re-apply.
       setSelectedBackupId((prev) => (list.some((b: any) => b.id === prev) ? prev : ''));
     } catch {
+      if (stale()) return;
       setBackups([]);
       setSelectedBackupId('');
     }
   };
 
-  const runAnalyzeForGame = async (gameItem: GameItem) => {
+  const runAnalyzeForGame = async (initialItem: GameItem) => {
     if (!window.darkhub?.optiscaler?.analyze) return;
+    let gameItem = initialItem;
+    // Taken before the exe scan too, so a slow scan of a previous selection cannot win.
+    const seq = ++analyzeSeq.current;
 
     // Use cached analysis for instant UI transition
     if (analysisCache.current[gameItem.id]) {
@@ -310,14 +320,17 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
     if (!resolvedExe && gameItem.installDir && window.darkhub?.dlss5?.scanGame) {
       try {
         const scanRes = await window.darkhub.dlss5.scanGame(gameItem.installDir);
+        if (seq !== analyzeSeq.current) return;
         if (scanRes?.ok && scanRes.exePath) {
-          resolvedExe = scanRes.exePath;
-          gameItem.exePath = scanRes.exePath;
+          const exePath: string = scanRes.exePath;
+          resolvedExe = exePath;
+          // Never mutate state objects: store the resolved exe through setGames.
+          gameItem = { ...gameItem, exePath };
+          setGames((prev) => prev.map((g) => (g.id === gameItem.id ? { ...g, exePath } : g)));
         }
       } catch {}
     }
 
-    const seq = ++analyzeSeq.current;
     setAnalyzing(true);
     try {
       const payload = {
@@ -329,7 +342,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
       analysisCache.current[gameItem.id] = res;
       if (seq !== analyzeSeq.current) return;
       setAnalysis(res);
-      await loadBackups(payload);
+      await loadBackups(payload, seq);
 
       // Auto-tune preset if RDNA 2 GPU is detected
       if (res?.gpu?.amdArchitecture === 'rdna2' && selectedPreset === 'auto') {
@@ -347,8 +360,8 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
     if (!window.darkhub?.dialog?.selectFiles) return;
     try {
       const res = await window.darkhub.dialog.selectFiles({
-        title: 'Selecione o Executável do Jogo (.exe)',
-        filters: [{ name: 'Executáveis (.exe)', extensions: ['exe'] }]
+        title: t('optiscaler.ui.dialog.title', 'Selecione o Executável do Jogo (.exe)'),
+        filters: [{ name: t('optiscaler.ui.dialog.filter', 'Executáveis (.exe)'), extensions: ['exe'] }]
       });
       const file = res?.filePaths?.[0];
       if (file) {
@@ -407,10 +420,10 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
       const payload = makePayload();
       const res = await window.darkhub.optiscaler.createManualBackup(payload);
       if (res?.ok) {
-        setStatus({ ok: true, message: 'Snapshot de backup manual criado com sucesso!' });
+        setStatus({ ok: true, message: t('optiscaler.ui.status.manualOk', 'Snapshot de backup manual criado com sucesso!') });
         await loadBackups(payload);
       } else {
-        setStatus({ ok: false, message: res?.error || 'Falha ao criar backup manual.' });
+        setStatus({ ok: false, message: res?.error || t('optiscaler.ui.status.manualFail', 'Falha ao criar backup manual.') });
       }
     } catch (err: any) {
       setStatus({ ok: false, message: err?.message || String(err) });
@@ -424,10 +437,10 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
       const payload = { ...makePayload(), backupId };
       const res = await window.darkhub.optiscaler.deleteBackup(payload);
       if (res?.ok) {
-        setStatus({ ok: true, message: 'Snapshot de backup removido com sucesso.' });
+        setStatus({ ok: true, message: t('optiscaler.ui.status.deleteOk', 'Snapshot de backup removido com sucesso.') });
         await loadBackups(makePayload());
       } else {
-        setStatus({ ok: false, message: res?.error || 'Falha ao remover snapshot de backup.' });
+        setStatus({ ok: false, message: res?.error || t('optiscaler.ui.status.deleteFail', 'Falha ao remover snapshot de backup.') });
       }
     } catch (err: any) {
       setStatus({ ok: false, message: err?.message || String(err) });
@@ -438,7 +451,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
   const handleApply = async () => {
     if (!window.darkhub?.optiscaler?.apply || busy) return;
     if (!selectedGame && !targetExePath) {
-      setStatus({ ok: false, message: 'Selecione um jogo antes de aplicar.' });
+      setStatus({ ok: false, message: t('optiscaler.ui.status.selectFirst', 'Selecione um jogo antes de aplicar.') });
       return;
     }
 
@@ -451,13 +464,13 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
         setStatus({
           ok: true,
           message: res.skipped
-            ? 'OptiScaler já está instalado e atualizado para este jogo.'
-            : `OptiScaler aplicado com sucesso! Backup de segurança salvo.`
+            ? t('optiscaler.ui.status.alreadyInstalled', 'OptiScaler já está instalado e atualizado para este jogo.')
+            : t('optiscaler.ui.status.applyOk', 'OptiScaler aplicado com sucesso! Backup de segurança salvo.')
         });
         await runAnalyzeForGame(selectedGame!);
         await refreshLibraryAndSteam();
       } else {
-        setStatus({ ok: false, message: res?.error || 'Falha ao aplicar OptiScaler.' });
+        setStatus({ ok: false, message: res?.error || t('optiscaler.ui.status.applyFail', 'Falha ao aplicar OptiScaler.') });
       }
     } catch (err: any) {
       setStatus({ ok: false, message: err?.message || String(err) });
@@ -477,12 +490,12 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
       if (res?.ok) {
         setStatus({
           ok: true,
-          message: res.message || 'Jogo revertido com sucesso para o estado 100% original!'
+          message: res.message || t('optiscaler.ui.status.restoreOk', 'Jogo revertido com sucesso para o estado 100% original!')
         });
         await runAnalyzeForGame(selectedGame!);
         await refreshLibraryAndSteam();
       } else {
-        setStatus({ ok: false, message: res?.error || 'Falha ao restaurar estado original.' });
+        setStatus({ ok: false, message: res?.error || t('optiscaler.ui.status.restoreFail', 'Falha ao restaurar estado original.') });
       }
     } catch (err: any) {
       setStatus({ ok: false, message: err?.message || String(err) });
@@ -507,15 +520,15 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
   const updateRelease = async () => {
     setRelease((x) => ({ ...x, busy: true, error: undefined }));
     const r = await window.darkhub?.optiscaler?.downloadUpdate?.({ url: '' }).catch((e: Error) => ({ ok: false, error: e.message }));
-    setRelease((x) => (r?.ok ? { ...x, busy: false, current: r.version } : { ...x, busy: false, error: r?.error || 'falhou' }));
+    setRelease((x) => (r?.ok ? { ...x, busy: false, current: r.version } : { ...x, busy: false, error: r?.error || t('optiscaler.ui.failed', 'falhou') }));
   };
 
   return (
     <div className="w-full text-zinc-100">
       <PageHeader
-        title="OptiScaler Manager"
+        title={t('optiscaler.title', 'OptiScaler Manager')}
         subtitle={<>
-          Aplicação simplificada de upscalers universais de última geração com preservação e reversão segura para o jogo original.
+          {t('optiscaler.ui.subtitle', 'Aplicação simplificada de upscalers universais de última geração com preservação e reversão segura para o jogo original.')}
           <span className="dh-tag ml-2">fsr 4.1.1b · rdna 2 · xess</span>
         </>}
         actions={<>
@@ -535,10 +548,10 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
             onClick={refreshLibraryAndSteam}
             disabled={loadingGames}
             className="dh-btn"
-            title="Recarregar biblioteca de jogos"
+            title={t('optiscaler.ui.refreshTitle', 'Recarregar biblioteca de jogos')}
           >
             <RefreshCw size={14} className={loadingGames ? 'animate-spin' : ''} />
-            <span>Atualizar</span>
+            <span>{t('optiscaler.ui.refresh', 'Atualizar')}</span>
           </button>
         </>}
       />
@@ -551,7 +564,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
         >
           {status.ok ? <CheckCircle2 size={14} className="shrink-0 mt-[1px]" /> : <AlertTriangle size={14} className="shrink-0 mt-[1px]" />}
           <div className="flex-1 min-w-0 break-words">{status.message}</div>
-          <button type="button" onClick={() => setStatus(null)} className="text-zinc-500 hover:text-zinc-200 shrink-0" aria-label="Fechar">
+          <button type="button" onClick={() => setStatus(null)} className="text-zinc-500 hover:text-zinc-200 shrink-0" aria-label={t('optiscaler.ui.close', 'Fechar')}>
             <X size={14} />
           </button>
         </div>
@@ -562,10 +575,10 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
             <h2 id="opti-library" className="dh-section-title">
-              Biblioteca de Jogos
+              {t('optiscaler.ui.library', 'Biblioteca de Jogos')}
               {games.length > 0 && <span className="ml-2 font-mono text-[11.5px] font-normal text-zinc-500">{games.length}</span>}
             </h2>
-            <p className="dh-help mt-0.5">Selecione o jogo desejado ou adicione outro executável para aplicar o mod.</p>
+            <p className="dh-help mt-0.5">{t('optiscaler.ui.libraryHelp', 'Selecione o jogo desejado ou adicione outro executável para aplicar o mod.')}</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -574,20 +587,20 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Filtrar jogos..."
-                aria-label="Filtrar jogos"
+                placeholder={t('optiscaler.ui.filterPlaceholder', 'Filtrar jogos...')}
+                aria-label={t('optiscaler.ui.filter', 'Filtrar jogos')}
                 className="dh-input pl-8 w-48"
               />
             </div>
             <button type="button" onClick={handleSelectExe} className="dh-btn">
               <Plus size={14} />
-              <span>Outro Executável (.exe)</span>
+              <span>{t('optiscaler.ui.otherExe', 'Outro Executável (.exe)')}</span>
             </button>
           </div>
         </div>
 
         {loadingGames ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3" aria-busy="true" aria-label="Carregando lista de jogos instalados...">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3" aria-busy="true" aria-label={t('optiscaler.ui.loadingGames', 'Carregando lista de jogos instalados...')}>
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="rounded-lg border border-zinc-800/80 overflow-hidden">
                 <div className="h-24 bg-zinc-900 animate-pulse" />
@@ -600,14 +613,14 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
           </div>
         ) : filteredGames.length === 0 ? (
           <div className="py-10 rounded-xl border border-dashed border-zinc-800 flex flex-col items-center gap-3 text-center">
-            <p className="text-[12.5px] text-zinc-400">{games.length === 0 ? t('optiscaler.noGames', 'Nenhum jogo instalado foi detectado.') : 'Nenhum jogo encontrado com o filtro atual.'}</p>
+            <p className="text-[12.5px] text-zinc-400">{games.length === 0 ? t('optiscaler.noGames', 'Nenhum jogo instalado foi detectado.') : t('optiscaler.ui.noMatch', 'Nenhum jogo encontrado com o filtro atual.')}</p>
             <button type="button" onClick={handleSelectExe} className="dh-btn dh-btn-sm">
               <FolderOpen size={13} />
-              Selecionar Executável Manualmente
+              {t('optiscaler.ui.pickManual', 'Selecionar Executável Manualmente')}
             </button>
           </div>
         ) : (
-          <div role="listbox" aria-label="Biblioteca de Jogos" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 max-h-[300px] overflow-y-auto pr-1">
+          <div role="listbox" aria-label={t('optiscaler.ui.library', 'Biblioteca de Jogos')} className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 max-h-[300px] overflow-y-auto pr-1">
             {filteredGames.map((game) => {
               const isSelected = game.id === selectedGameId;
               const hasModActive = Boolean(game.optiscaler?.enabled || game.isApplied);
@@ -658,10 +671,10 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
                         {hasModActive ? (
                           <span className="inline-flex items-center gap-1 text-emerald-300">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                            Ativo
+                            {t('optiscaler.ui.active', 'Ativo')}
                           </span>
                         ) : (
-                          <span className="text-zinc-600">Original</span>
+                          <span className="text-zinc-600">{t('optiscaler.ui.original', 'Original')}</span>
                         )}
                         {game.platform === 'Manual' && (
                           <button
@@ -671,8 +684,8 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
                               handleRemoveManualGame(game.id);
                             }}
                             className="text-zinc-500 hover:text-red-300 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
-                            title="Remover jogo da biblioteca"
-                            aria-label="Remover jogo da biblioteca"
+                            title={t('optiscaler.ui.removeGame', 'Remover jogo da biblioteca')}
+                            aria-label={t('optiscaler.ui.removeGame', 'Remover jogo da biblioteca')}
                           >
                             <Trash2 size={12} />
                           </button>
@@ -697,24 +710,24 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
                 {isInstalledOnGame ? (
                   <span className="inline-flex items-center gap-1.5 text-[12px] text-emerald-300">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    OptiScaler Ativo
+                    {t('optiscaler.ui.optiActive', 'OptiScaler Ativo')}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-500">
                     <ShieldCheck size={13} />
-                    Jogo Original (Limpo)
+                    {t('optiscaler.ui.cleanGame', 'Jogo Original (Limpo)')}
                   </span>
                 )}
               </div>
               <p className="mt-1 text-[11.5px] font-mono text-zinc-500 truncate max-w-3xl" title={effectiveTargetDir}>
-                {effectiveTargetDir || 'Aguardando seleção do executável...'}
+                {effectiveTargetDir || t('optiscaler.ui.waitingExe', 'Aguardando seleção do executável...')}
               </p>
             </div>
 
             <dl className="shrink-0 text-right">
               <dt className="text-[11px] text-zinc-500">GPU</dt>
               <dd className="mt-0.5 text-[12.5px] text-zinc-100">
-                {analysis?.gpu?.model || analysis?.gpu?.vendor || <span className="text-zinc-500">{analyzing ? 'detectando...' : 'n/d'}</span>}
+                {analysis?.gpu?.model || analysis?.gpu?.vendor || <span className="text-zinc-500">{analyzing ? t('optiscaler.ui.detecting', 'detectando...') : t('optiscaler.ui.na', 'n/d')}</span>}
                 {analysis?.gpu?.amdArchitecture ? <span className="ml-1.5 font-mono text-zinc-500">{analysis.gpu.amdArchitecture}</span> : null}
               </dd>
             </dl>
@@ -724,15 +737,15 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
           <div>
             <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
               <div>
-                <h3 className="dh-section-title">Escolha o Modo de Upscaling</h3>
-                <p className="dh-help mt-0.5">Selecione o perfil ideal para a sua placa de vídeo e resolução:</p>
+                <h3 className="dh-section-title">{t('optiscaler.ui.chooseMode', 'Escolha o Modo de Upscaling')}</h3>
+                <p className="dh-help mt-0.5">{t('optiscaler.ui.chooseModeHelp', 'Selecione o perfil ideal para a sua placa de vídeo e resolução:')}</p>
               </div>
               {analysis?.gpu?.amdArchitecture === 'rdna2' && (
-                <span className="text-[11.5px] text-blue-200">RDNA 2 Detectada: FSR 4.1.1b Recomendado</span>
+                <span className="text-[11.5px] text-blue-200">{t('optiscaler.ui.rdnaDetected', 'RDNA 2 Detectada: FSR 4.1.1b Recomendado')}</span>
               )}
             </div>
 
-            <div role="radiogroup" aria-label="Escolha o Modo de Upscaling" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div role="radiogroup" aria-label={t('optiscaler.ui.chooseMode', 'Escolha o Modo de Upscaling')} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {PRESETS.map((preset) => {
                 const isSelected = selectedPreset === preset.id;
                 const IconComponent = preset.icon;
@@ -758,11 +771,11 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
                         </span>
                       </div>
                       <div className="mt-3 text-[13px] font-medium text-zinc-100">{preset.name}</div>
-                      <div className="mt-0.5 dh-tag">{preset.badge}</div>
-                      <p className="mt-2 text-[12px] leading-relaxed text-zinc-400">{preset.description}</p>
+                      <div className="mt-0.5 dh-tag">{t(`optiscaler.ui.preset.${preset.id}.badge`, preset.badge)}</div>
+                      <p className="mt-2 text-[12px] leading-relaxed text-zinc-400">{t(`optiscaler.ui.preset.${preset.id}.description`, preset.description)}</p>
                     </div>
                     <div className="text-[11px] text-zinc-500 pt-2 border-t border-zinc-800/80">
-                      Ideal para: <span className="text-zinc-300">{preset.recommendedFor}</span>
+                      {t('optiscaler.ui.idealFor', 'Ideal para:')} <span className="text-zinc-300">{t(`optiscaler.ui.preset.${preset.id}.recommendedFor`, preset.recommendedFor)}</span>
                     </div>
                   </button>
                 );
@@ -778,13 +791,13 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
                   <Archive size={16} className="text-zinc-400 shrink-0 mt-0.5" />
                   <div className="min-w-0">
                     <h4 className="dh-section-title">
-                      Backup de Segurança do Jogo Original
+                      {t('optiscaler.ui.backupTitle', 'Backup de Segurança do Jogo Original')}
                       <span className="ml-2 font-mono text-[11.5px] font-normal text-zinc-500">
-                        {backups.length} snapshot{backups.length > 1 ? 's' : ''}
+                        {(backups.length > 1 ? t('optiscaler.ui.snapshotMany', '{n} snapshots') : t('optiscaler.ui.snapshotOne', '{n} snapshot')).replace('{n}', String(backups.length))}
                       </span>
                     </h4>
                     <p className="dh-help mt-0.5">
-                      Arquivos originais protegidos. Você pode reverter o jogo ao estado 100% original a qualquer momento.
+                      {t('optiscaler.ui.backupHelp', 'Arquivos originais protegidos. Você pode reverter o jogo ao estado 100% original a qualquer momento.')}
                     </p>
                   </div>
                 </div>
@@ -793,16 +806,16 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
                   onClick={() => handleRestore(selectedBackupId || undefined)}
                   disabled={busy}
                   className="dh-btn shrink-0"
-                  title="Restaura os arquivos originais salvos e limpa todos os loaders do OptiScaler"
+                  title={t('optiscaler.ui.restoreTitle1', 'Restaura os arquivos originais salvos e limpa todos os loaders do OptiScaler')}
                 >
                   <RotateCcw size={14} className={restoring ? 'animate-spin' : ''} />
-                  <span>Restaurar Estado Original</span>
+                  <span>{t('optiscaler.ui.restoreOriginal', 'Restaurar Estado Original')}</span>
                 </button>
               </div>
 
               <div className="pt-3 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-2.5">
                 <label className="flex items-center gap-2 min-w-0">
-                  <span className="dh-label shrink-0">Ponto de Backup:</span>
+                  <span className="dh-label shrink-0">{t('optiscaler.ui.backupPoint', 'Ponto de Backup:')}</span>
                   <select
                     value={selectedBackupId}
                     onChange={(e) => setSelectedBackupId(e.target.value)}
@@ -811,7 +824,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
                     <option value="">{t('optiscaler.backupAuto', 'Automático (originais mais antigos)')}</option>
                     {backups.map((b) => (
                       <option key={b.id} value={b.id}>
-                        {b.id} ({b.filesCount || 0} arquivos salvos)
+                        {t('optiscaler.ui.filesSaved', '{id} ({n} arquivos salvos)').replace('{id}', String(b.id)).replace('{n}', String(b.filesCount || 0))}
                       </option>
                     ))}
                   </select>
@@ -823,10 +836,10 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
                     onClick={handleCreateManualBackup}
                     disabled={busy}
                     className="dh-btn dh-btn-sm"
-                    title="Criar um novo snapshot de backup deste jogo agora"
+                    title={t('optiscaler.ui.newSnapTitle', 'Criar um novo snapshot de backup deste jogo agora')}
                   >
                     <Plus size={13} />
-                    Novo Snapshot
+                    {t('optiscaler.ui.newSnap', 'Novo Snapshot')}
                   </button>
                   {selectedBackupId && (
                     <button
@@ -834,7 +847,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
                       onClick={() => setConfirmAction({ kind: 'deleteBackup', backupId: selectedBackupId })}
                       disabled={busy}
                       className="dh-btn dh-btn-danger dh-btn-sm"
-                      title="Excluir este snapshot de backup"
+                      title={t('optiscaler.ui.delSnapTitle', 'Excluir este snapshot de backup')}
                     >
                       <Trash2 size={13} />
                       {t('optiscaler.deleteBackupBtn', 'Excluir snapshot')}
@@ -848,15 +861,15 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
               <div className="flex items-start gap-3 min-w-0">
                 <ShieldCheck size={16} className="text-zinc-500 shrink-0 mt-0.5" />
                 <div className="min-w-0">
-                  <h4 className="text-[12.5px] font-medium text-zinc-200">Proteção Automática de Backup Ativa</h4>
+                  <h4 className="text-[12.5px] font-medium text-zinc-200">{t('optiscaler.ui.autoProt', 'Proteção Automática de Backup Ativa')}</h4>
                   <p className="dh-help mt-0.5">
-                    O DarkHub cria um backup completo dos seus arquivos originais assim que você clica em Ativar, garantindo reversão 100% segura.
+                    {t('optiscaler.ui.autoProtHelp', 'O DarkHub cria um backup completo dos seus arquivos originais assim que você clica em Ativar, garantindo reversão 100% segura.')}
                   </p>
                 </div>
               </div>
               <button type="button" onClick={handleCreateManualBackup} disabled={busy} className="dh-btn dh-btn-sm shrink-0">
                 <Archive size={13} />
-                <span>Criar Snapshot Manual</span>
+                <span>{t('optiscaler.ui.manualSnap', 'Criar Snapshot Manual')}</span>
               </button>
             </div>
           )}
@@ -870,17 +883,17 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
               className="dh-btn dh-btn-primary h-9 px-4"
             >
               {applying ? <RefreshCw size={14} className="animate-spin" /> : <Rocket size={14} />}
-              <span>{applying ? 'Aplicando Mod com Backup Seguro...' : 'Ativar OptiScaler & Upscaling'}</span>
+              <span>{applying ? t('optiscaler.ui.applying', 'Aplicando Mod com Backup Seguro...') : t('optiscaler.ui.activate', 'Ativar OptiScaler & Upscaling')}</span>
             </button>
             <button
               type="button"
               onClick={() => handleRestore(selectedBackupId || undefined)}
               disabled={busy || (!isInstalledOnGame && backups.length === 0)}
               className="dh-btn h-9 px-4"
-              title="Restaura os arquivos originais e remove todos os arquivos e loaders do OptiScaler"
+              title={t('optiscaler.ui.restoreTitle2', 'Restaura os arquivos originais e remove todos os arquivos e loaders do OptiScaler')}
             >
               <RotateCcw size={14} className={restoring ? 'animate-spin' : ''} />
-              <span>{restoring ? 'Revertendo Arquivos...' : 'Reverter Jogo para Original'}</span>
+              <span>{restoring ? t('optiscaler.ui.reverting', 'Revertendo Arquivos...') : t('optiscaler.ui.revertGame', 'Reverter Jogo para Original')}</span>
             </button>
           </div>
 
@@ -916,7 +929,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
             >
               <span className="flex items-center gap-2">
                 <Settings2 size={14} className="text-zinc-500" />
-                Configurações Avançadas (Loader DLL & Agility SDK)
+                {t('optiscaler.ui.advanced', 'Configurações Avançadas (Loader DLL & Agility SDK)')}
               </span>
               {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
@@ -924,7 +937,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
             {showAdvanced && (
               <div className="pt-2 pb-1 grid grid-cols-1 md:grid-cols-2 gap-5 animate-in">
                 <div>
-                  <label htmlFor="opti-loader" className="dh-label block mb-1.5">Loader DLL de Injeção:</label>
+                  <label htmlFor="opti-loader" className="dh-label block mb-1.5">{t('optiscaler.ui.loaderLabel', 'Loader DLL de Injeção:')}</label>
                   <select
                     id="opti-loader"
                     value={selectedLoader}
@@ -933,17 +946,17 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
                   >
                     {LOADER_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
-                        {opt.label}
+                        {loaderLabel(opt)}
                       </option>
                     ))}
                   </select>
                   <p className="dh-help mt-1.5">
-                    {LOADER_OPTIONS.find((o) => o.value === selectedLoader)?.hint || 'Loader hook para o jogo.'}
+                    {loaderHint(LOADER_OPTIONS.find((o) => o.value === selectedLoader)) || t('optiscaler.ui.loader.fallbackHint', 'Loader hook para o jogo.')}
                   </p>
                 </div>
 
                 <div>
-                  <span className="dh-label block mb-1.5">DirectX 12 Agility SDK:</span>
+                  <span className="dh-label block mb-1.5">{t('optiscaler.ui.agilityLabel', 'DirectX 12 Agility SDK:')}</span>
                   <label className="flex items-start gap-2 text-[12.5px] text-zinc-300 cursor-pointer">
                     <input
                       type="checkbox"
@@ -951,10 +964,10 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
                       onChange={(e) => setIncludeAgilitySdk(e.target.checked)}
                       className="mt-0.5"
                     />
-                    <span>Injetar D3D12_Optiscaler (Apenas para jogos sem D3D12Core nativo)</span>
+                    <span>{t('optiscaler.ui.agilityInject', 'Injetar D3D12_Optiscaler (Apenas para jogos sem D3D12Core nativo)')}</span>
                   </label>
                   <p className="dh-help mt-1.5">
-                    Jogos modernos que já contêm D3D12 nativo mantêm sua própria SDK para evitar o erro <span className="font-mono">0xc0000142</span>.
+                    {t('optiscaler.ui.agilityHelp', 'Jogos modernos que já contêm D3D12 nativo mantêm sua própria SDK para evitar o erro {code}.').split('{code}').flatMap((part, i, arr) => i < arr.length - 1 ? [part, <span key={i} className="font-mono">0xc0000142</span>] : [part])}
                   </p>
                 </div>
               </div>
@@ -963,13 +976,13 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
         </section>
       ) : (
         <div className="py-12 rounded-xl border border-dashed border-zinc-800 flex flex-col items-center text-center gap-3">
-          <h3 className="dh-section-title">Nenhum jogo selecionado</h3>
+          <h3 className="dh-section-title">{t('optiscaler.ui.noGameSel', 'Nenhum jogo selecionado')}</h3>
           <p className="dh-help max-w-md">
-            Clique em qualquer jogo na lista acima ou use o botão &quot;Outro Executável&quot; para escolher a pasta do jogo.
+            {t('optiscaler.ui.noGameSelHelp', 'Clique em qualquer jogo na lista acima ou use o botão "Outro Executável" para escolher a pasta do jogo.')}
           </p>
           <button type="button" onClick={handleSelectExe} className="dh-btn dh-btn-sm mt-1">
             <FolderOpen size={13} />
-            Outro Executável (.exe)
+            {t('optiscaler.ui.otherExe', 'Outro Executável (.exe)')}
           </button>
         </div>
       )}

@@ -6,6 +6,7 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { normalizeHotkey } from './hotkey.js'
+import { integrityError } from '../binaryIntegrity.js'
 
 const WATCHER = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'DarkHub.HotkeyWatch.exe').replace(/app\.asar(?![.\w])/, 'app.asar.unpacked')
 
@@ -20,8 +21,11 @@ export class HotkeyService {
   _watcher() {
     if (this.proc && this.proc.exitCode === null) return this.proc
     if (!fs.existsSync(this.watcherPath)) return null
+    const tampered = integrityError(['DarkHub.HotkeyWatch.exe'], { log: (m) => this.logger?.warn?.('[Hotkeys]', m) })
+    if (tampered) { this.logger?.error?.('[Hotkeys]', tampered); return null }
     const p = spawn(this.watcherPath, [], { windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] })
     let buf = ''
+    p.stdout.setEncoding?.('utf8') // stream decoding: no U+FFFD when a multibyte char is split across chunks
     p.stdout.on('data', (d) => {
       buf += d.toString('utf8')
       let i

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { execFile, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { runPowerShell } from '../PowerShellRunner.js';
+import { integrityError, TAMPERED_MESSAGE } from '../binaryIntegrity.js';
 
 function defaultExe() {
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -67,12 +68,21 @@ export class DiskRecoveryService {
   }
 
   _missing() {
+    if (this._tampered) return { ok: false, code: 'integrity_failed', error: TAMPERED_MESSAGE };
     return { ok: false, code: 'missing_engine', error: 'DarkHub.DiskRescue.exe não foi encontrado (rode npm run build:disk).' };
+  }
+
+  /** Present and (in an installed app) identical to the shipped engine. */
+  _ready() {
+    this._tampered = false;
+    if (!this.available()) return false;
+    if (integrityError(['DarkHub.DiskRescue.exe'])) { this._tampered = true; return false; }
+    return true;
   }
 
   /** Runs a short command and returns its JSON. */
   run(args, { timeoutMs = 60000 } = {}) {
-    if (!this.available()) return Promise.resolve(this._missing());
+    if (!this._ready()) return Promise.resolve(this._missing());
     return new Promise((resolve) => {
       this.execFile(this.exePath, args, { windowsHide: true, timeout: timeoutMs, maxBuffer: 64 << 20 }, (err, stdout, stderr) => {
         let last = null;
@@ -86,7 +96,7 @@ export class DiskRecoveryService {
 
   /** Starts a long command. Events go to `onEvent`; the promise resolves with the final ("done") object. */
   stream(kind, args, onEvent = () => {}) {
-    if (!this.available()) return Promise.resolve(this._missing());
+    if (!this._ready()) return Promise.resolve(this._missing());
     if (this.job) return Promise.resolve({ ok: false, code: 'busy', error: `Já existe uma operação em andamento (${this.job.kind}).` });
     return new Promise((resolve) => {
       const proc = this.spawn(this.exePath, args, { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });

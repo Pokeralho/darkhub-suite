@@ -52,3 +52,6 @@ export function integrityError(prefixes, { enforce = PACKAGED, log, ...opts } = 
   log?.(`integrity check failed: ${detail}`)
   return enforce ? `integrity_failed: ${detail}` : null
 }
+
+/** Message shown when an installed app refuses to start a helper that failed the check. */
+export const TAMPERED_MESSAGE = 'Arquivos do DarkHub foram alterados ou corrompidos (verificação de integridade falhou). Reinstale o DarkHub.'

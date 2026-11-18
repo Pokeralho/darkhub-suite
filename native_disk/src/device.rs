@@ -26,17 +26,84 @@ pub struct FileDevice {
 
 impl FileDevice {
     pub fn open(path: &str, write: bool, sector: u32) -> io::Result<Self> {
+        if write {
+            refuse_raw_device(path)?;
+        }
         let file = OpenOptions::new().read(true).write(write).open(path)?;
-        let size = file.metadata()?.len();
+        let size = regular_file_len(&file)?;
         Ok(Self { file, size, sector })
     }
 
     /// Creates (or truncates) an image file of `size` bytes for writing.
     pub fn create(path: &str, size: u64, sector: u32) -> io::Result<Self> {
+        refuse_raw_device(path)?;
         let file = OpenOptions::new().read(true).write(true).create(true).truncate(true).open(path)?;
+        regular_file_len(&file)?;
         file.set_len(size)?;
         Ok(Self { file, size, sector })
     }
+}
+
+fn not_a_file() -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidInput, "o alvo não é um arquivo de imagem comum (dispositivo/volume recusado; use disk:N)")
+}
+
+fn refuse_raw_device(path: &str) -> io::Result<()> {
+    if is_raw_device_path(path) {
+        return Err(not_a_file());
+    }
+    Ok(())
+}
+
+/// Size of an opened image, refusing anything that is not a regular file (volume / disk / pipe / console
+/// handles reached through `\\.\`, `\\?\GLOBALROOT\`, `NUL`, `COM1`...): those never go through `guard_write`.
+fn regular_file_len(f: &File) -> io::Result<u64> {
+    let md = f.metadata().map_err(|_| not_a_file())?;
+    if !md.is_file() {
+        return Err(not_a_file());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::AsRawHandle;
+        use windows_sys::Win32::Storage::FileSystem::{GetFileType, FILE_TYPE_DISK};
+        if unsafe { GetFileType(f.as_raw_handle() as _) } != FILE_TYPE_DISK {
+            return Err(not_a_file());
+        }
+    }
+    Ok(md.len())
+}
+
+/// Lowercases and turns `/` into `\` so every Win32 spelling of a device path compares equal.
+fn norm(s: &str) -> String {
+    s.trim().replace('/', "\\").to_ascii_lowercase()
+}
+
+/// Strips a Win32 device / NT namespace prefix (`\\.\`, `\\?\`, `\??\`, any case or slash direction).
+fn strip_ns_prefix(l: &str) -> Option<&str> {
+    [r"\\.\", r"\\?\", r"\??\"].iter().find_map(|p| l.strip_prefix(p))
+}
+
+/// True for paths that name a device or a whole volume rather than a file: `\\.\C:`, `\\?\Volume{..}`,
+/// `\\?\GLOBALROOT\Device\..`, `\\.\PhysicalDrive0`, `\\.\Tape0`... `\\?\C:\dir\img.bin`,
+/// `\\?\Volume{..}\dir\img.bin` and `\\?\UNC\..` are file paths and stay allowed.
+pub fn is_raw_device_path(s: &str) -> bool {
+    let l = norm(s);
+    let Some(rest) = strip_ns_prefix(&l) else { return false };
+    if rest.starts_with(r"unc\") {
+        return false;
+    }
+    let b = rest.as_bytes();
+    if b.len() >= 2 && b[0].is_ascii_alphabetic() && b[1] == b':' {
+        // `X:` / `X:\` is the volume itself; anything longer is a path inside it.
+        return rest[2..].trim_end_matches('\\').is_empty();
+    }
+    if let Some(v) = rest.strip_prefix("volume{") {
+        return match v.find('}') {
+            Some(i) => v[i + 1..].trim_end_matches('\\').is_empty(),
+            None => true,
+        };
+    }
+    true
 }
 
 #[cfg(windows)]
@@ -140,12 +207,21 @@ pub enum Target {
 }
 
 impl Target {
+    /// `disk:N`, `\\.\PhysicalDriveN`, `\\?\PhysicalDriveN`, `\??\PhysicalDriveN` and
+    /// `\\?\GLOBALROOT\Device\HarddiskN\Partition0` (any case, `/` or `\`) all name physical disk N, so they
+    /// all go through `guard_write`. Other device paths stay `Image` and are refused for writing by `FileDevice`.
     pub fn parse(s: &str) -> Target {
-        let l = s.trim().to_ascii_lowercase();
-        let num = l
-            .strip_prefix(r"\\.\physicaldrive")
+        let l = norm(s);
+        let ns = strip_ns_prefix(&l);
+        let num = ns
+            .and_then(|r| r.strip_prefix("physicaldrive"))
+            .or_else(|| {
+                let r = ns?.strip_prefix(r"globalroot\device\harddisk")?;
+                let (n, tail) = r.split_once('\\')?;
+                (tail.trim_end_matches('\\') == "partition0").then_some(n)
+            })
             .or_else(|| l.strip_prefix("disk:"))
-            .and_then(|n| n.parse::<u32>().ok());
+            .and_then(|n| n.trim_end_matches('\\').parse::<u32>().ok());
         match num {
             Some(n) => Target::Disk(n),
             None => Target::Image(s.trim().to_string()),

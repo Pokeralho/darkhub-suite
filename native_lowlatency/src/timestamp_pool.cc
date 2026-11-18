@@ -71,9 +71,43 @@ TimestampPool::QueryChunk::CommandBuffersOwner::~CommandBuffersOwner() {
 
 TimestampPool::QueryChunk::~QueryChunk() {}
 
+TimestampPool::TimelineSemaphoreOwner::TimelineSemaphoreOwner(
+    const QueueContext& queue_context)
+    : queue_context(queue_context) {
+
+    const auto& device_context = this->queue_context.device;
+
+    const auto stci = VkSemaphoreTypeCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+        .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
+        .initialValue = 0,
+    };
+    const auto sci = VkSemaphoreCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+        .pNext = &stci,
+    };
+    THROW_NOT_VKSUCCESS(device_context.vtable.CreateSemaphore(
+        device_context.device, &sci, nullptr, &this->semaphore));
+}
+
+TimestampPool::TimelineSemaphoreOwner::~TimelineSemaphoreOwner() {
+    const auto& device_context = this->queue_context.device;
+    device_context.vtable.DestroySemaphore(device_context.device,
+                                           this->semaphore, nullptr);
+}
+
 TimestampPool::TimestampPool(QueueContext& queue_context)
     : queue_context(queue_context),
+      timeline(std::make_unique<TimelineSemaphoreOwner>(queue_context)),
       reaper_worker(std::bind_front(&TimestampPool::do_reaper, this)) {}
+
+const VkSemaphore& TimestampPool::get_timeline_semaphore() const {
+    return *this->timeline;
+}
+
+std::uint64_t TimestampPool::next_timeline_value() {
+    return this->timeline_counter.fetch_add(1, std::memory_order_relaxed) + 1;
+}
 
 std::shared_ptr<TimestampPool::Handle> TimestampPool::acquire() {
     const auto lock = std::scoped_lock{this->mutex};
@@ -111,8 +145,16 @@ std::shared_ptr<TimestampPool::Handle> TimestampPool::acquire() {
         this->cv.notify_one();
     };
 
-    return std::shared_ptr<Handle>(new Handle(*this, query_chunk, query_index),
-                                   reaper_deleter);
+    // If recording the command buffers fails, give the index back instead of
+    // leaking it, then let the caller fall back to an uninstrumented submit.
+    auto handle = std::unique_ptr<Handle>{};
+    try {
+        handle = std::make_unique<Handle>(*this, query_chunk, query_index);
+    } catch (...) {
+        query_chunk.free_indices.insert(query_index);
+        throw;
+    }
+    return std::shared_ptr<Handle>(handle.release(), reaper_deleter);
 }
 
 TimestampPool::Handle::Handle(TimestampPool& timestamp_pool,
@@ -166,14 +208,67 @@ void TimestampPool::do_reaper(const std::stop_token stoken) {
         // Allow more to go on the queue while we wait for it to finish.
         lock.unlock();
         // Only wait if the timestamp commands actually made it to the GPU.
-        if (handle_ptr->was_submitted.load(std::memory_order_relaxed)) {
-            handle_ptr->await_end();
+        // The command buffers must have left the pending state before the
+        // index (and with it the buffers) can be reset by a new Handle, so
+        // wait for the whole submission, not just the end timestamp.
+        if (handle_ptr->was_submitted.load(std::memory_order_acquire)) {
+            this->await_completion(*handle_ptr, stoken);
         }
 
         // Lock our mutex, allow the queue to use it again and delete it.
         lock.lock();
-        handle_ptr->query_chunk.free_indices.insert(handle_ptr->query_index);
+        try {
+            handle_ptr->query_chunk.free_indices.insert(
+                handle_ptr->query_index);
+        } catch (...) {
+            // Out of memory: leak this index rather than kill the process
+            // (an exception must never leave a std::jthread body).
+        }
         delete handle_ptr;
+    }
+}
+
+void TimestampPool::await_completion(
+    const Handle& handle, const std::stop_token& stoken) const noexcept {
+
+    const auto& device_context = this->queue_context.device;
+    const auto& vtable = device_context.vtable;
+    const auto wait_semaphores = vtable.WaitSemaphoresKHR
+                                     ? vtable.WaitSemaphoresKHR
+                                     : vtable.WaitSemaphores;
+
+    if (!wait_semaphores) {
+        // Should not happen (timeline semaphores are required), but the end
+        // timestamp is still the best signal we have.
+        try {
+            handle.await_end();
+        } catch (...) {
+        }
+        return;
+    }
+
+    const auto semaphore = this->get_timeline_semaphore();
+    const auto value = handle.completion_value;
+    const auto swi = VkSemaphoreWaitInfo{
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+        .semaphoreCount = 1,
+        .pSemaphores = &semaphore,
+        .pValues = &value,
+    };
+
+    constexpr auto WAIT_SLICE_NS = std::uint64_t{100'000'000}; // 100 ms
+    for (;;) {
+        const auto result =
+            wait_semaphores(device_context.device, &swi, WAIT_SLICE_NS);
+        // Success, or an error such as device lost: nothing left to wait on.
+        if (result != VK_TIMEOUT) {
+            return;
+        }
+        // The device is being destroyed. The app must have idled it first,
+        // so don't hang the destroy if the value never arrives.
+        if (stoken.stop_requested()) {
+            return;
+        }
     }
 }
 

@@ -150,6 +150,9 @@ class SlowSensorDaemon extends EventEmitter {
       { windowsHide: true }
     );
 
+    // decode as a stream: a multibyte UTF-8 char split across chunks must not become U+FFFD
+    this.process.stdout.setEncoding?.('utf8');
+    this.process.stderr.setEncoding?.('utf8');
     this.process.stdout.on('data', (data) => {
       this.buffer += data.toString('utf8');
       const chunks = this.buffer.split('\n');

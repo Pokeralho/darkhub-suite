@@ -45,6 +45,9 @@ function run(file, args, { timeoutMs, lowPriority = true } = {}) {
     }
     if (lowPriority) { try { os.setPriority(child.pid, os.constants.priority.PRIORITY_LOW) } catch { /* best effort */ } }
     const timer = setTimeout(() => { try { child.kill() } catch { /* gone */ } }, timeoutMs)
+    // decode as streams: a file name with accents split across two chunks must not turn into U+FFFD
+    child.stdout.setEncoding?.('utf8')
+    child.stderr.setEncoding?.('utf8')
     child.stdout.on('data', (d) => { if (stdout.length < 4e6) stdout += d })
     child.stderr.on('data', (d) => { if (stderr.length < 1e5) stderr += d })
     child.on('error', (e) => { clearTimeout(timer); resolve({ code: -1, stdout, stderr: String(e.message) }) })

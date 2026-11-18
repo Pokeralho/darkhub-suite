@@ -9,6 +9,7 @@ import { parseFilter } from './filter.js';
 import { runPowerShell } from '../PowerShellRunner.js';
 import { psQuote } from '../optimizer/OptimizerUtils.js';
 import { oneDriveRootOf } from '../cloudSync.js';
+import { integrityError, TAMPERED_MESSAGE } from '../binaryIntegrity.js';
 
 const TAG_COLORS = new Set(['red', 'yellow', 'green', 'blue']);
 
@@ -144,6 +145,7 @@ export class DiskScanService {
     try { st = fs.statSync(target); } catch { return { ok: false, error: 'A pasta não existe ou não pode ser lida.' }; }
     if (!st.isDirectory()) return { ok: false, error: 'Escolha uma pasta ou unidade.' };
     if (!fs.existsSync(this.exePath)) return { ok: false, error: 'DarkHub.DiskScan.exe não foi encontrado.' };
+    if (integrityError(['DarkHub.DiskScan.exe'])) return { ok: false, error: TAMPERED_MESSAGE };
     this.cancel();
 
     const rootPath = /^[A-Za-z]:\\?$/.test(target) ? `${target.slice(0, 2)}\\` : target;

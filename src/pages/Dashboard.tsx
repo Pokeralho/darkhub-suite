@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import ExtensionFrame from '../components/ExtensionFrame';
 import { textIn, useExtensions } from '../lib/extensions';
 import {
@@ -14,6 +14,7 @@ import { useJunkScanner } from '../hooks/useJunkScanner';
 import { useRecentActivity, ActivityType } from '../hooks/useRecentActivity';
 import { Sparkline } from '../components/library/Sparkline';
 import { useSensorHistory } from '../hooks/useSensorHistory';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 const formatBytes = (bytes: number | null | undefined) => {
   if (bytes == null || isNaN(bytes)) return '0 B';
@@ -67,25 +68,27 @@ const MetricCell = ({ icon: Icon, label, hint, title, onClick, children, sub, as
   sub?: React.ReactNode;
   aside?: React.ReactNode;
 }) => (
-  <div
-    role="button"
-    tabIndex={0}
-    title={title}
-    onClick={onClick}
-    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(); } }}
-    className="group relative min-w-0 bg-zinc-950 hover:bg-zinc-900/70 px-4 py-3 cursor-pointer outline-none focus-visible:bg-zinc-900/70 transition-colors"
-  >
-    <div className="flex items-center justify-between gap-2 text-[11.5px] text-zinc-500">
+  // Not a role="button" wrapper: the cell may hold its own button (aside), and interactive controls must not nest.
+  // A transparent full-cell button sits underneath the content; the aside sits above it and stays clickable.
+  <div className="group relative min-w-0 bg-zinc-950 hover:bg-zinc-900/70 focus-within:bg-zinc-900/70 px-4 py-3 transition-colors">
+    <button
+      type="button"
+      title={title}
+      aria-label={title ? `${label}: ${title}` : label}
+      onClick={onClick}
+      className="absolute inset-0 w-full h-full cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400/60"
+    />
+    <div className="relative pointer-events-none flex items-center justify-between gap-2 text-[11.5px] text-zinc-500">
       <span className="flex items-center gap-1.5 min-w-0">
         <Icon size={14} className="shrink-0 text-zinc-500 group-hover:text-blue-300 transition-colors" />
         <span className="truncate">{label}</span>
       </span>
-      {aside ?? (hint ? (
-        <span className="shrink-0 text-[11px] text-blue-300 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity">{hint}</span>
+      {aside ? <span className="pointer-events-auto relative z-10">{aside}</span> : (hint ? (
+        <span className="shrink-0 text-[11px] text-blue-300 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">{hint}</span>
       ) : null)}
     </div>
-    <div className="mt-2 font-mono text-[20px] leading-none tabular-nums whitespace-nowrap">{children}</div>
-    <div className="mt-2 h-4 text-[11px] text-zinc-500 font-mono truncate">{sub}</div>
+    <div className="relative pointer-events-none mt-2 font-mono text-[20px] leading-none tabular-nums whitespace-nowrap">{children}</div>
+    <div className="relative pointer-events-none mt-2 h-4 text-[11px] text-zinc-500 font-mono truncate">{sub}</div>
   </div>
 );
 
@@ -100,6 +103,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const { junk, loading: junkLoading, refresh: refreshJunk } = useJunkScanner() as any;
   const { activities, push: addActivity } = useRecentActivity() as any;
   const [securityOpen, setSecurityOpen] = useState(false);
+  const securityDialogRef = useRef<HTMLDivElement>(null);
+  useDialogA11y(securityDialogRef, securityOpen, () => setSecurityOpen(false));
   const [isCleaningJunk, setIsCleaningJunk] = useState(false);
   const [isOptimizingRam, setIsOptimizingRam] = useState(false);
   const [cleanFeedback, setCleanFeedback] = useState<string | null>(null);
@@ -467,7 +472,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           aside={
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); refreshJunk?.(true); }}
+              onClick={() => { refreshJunk?.(true); }}
               disabled={junkLoading}
               title="Recalcular lixo e caches residuais"
               aria-label="Recalcular lixo e caches residuais"
@@ -602,6 +607,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       {securityOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-in" onClick={() => setSecurityOpen(false)}>
           <div
+            ref={securityDialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="dash-sec-title"

@@ -5,6 +5,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { normalizeHotkey } from '../hotkeys/hotkey.js'
+import { integrityError } from '../binaryIntegrity.js'
 import {
   parseRecBuffer,
   serializeRecBuffer,
@@ -269,12 +270,15 @@ export class AutoClickerService {
     if (this.proc && this.proc.exitCode === null) return true
     const exe = this.enginePath()
     if (!exe || !fs.existsSync(exe)) return false
+    const tampered = integrityError(['DarkHub.ClickEngine.exe'], { log: (m) => this.logger?.warn?.('[AutoClicker]', m) })
+    if (tampered) { this.logger?.error?.('[AutoClicker]', tampered); return false }
     if (this.workingRecFile) {
       try { fs.mkdirSync(path.dirname(this.workingRecFile), { recursive: true }) } catch {}
     }
     const p = spawn(exe, [], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
     this.proc = p
     let buf = ''
+    p.stdout.setEncoding?.('utf8') // stream decoding: no U+FFFD when a multibyte char is split across chunks
     p.stdout.on('data', (d) => {
       buf += d.toString('utf8')
       let i

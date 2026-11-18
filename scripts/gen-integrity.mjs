@@ -8,13 +8,27 @@ import { fileURLToPath } from 'node:url'
 
 const services = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'electron', 'services')
 const BINARY = /\.(exe|dll|config)$/i
+// not shipped (package.json build.files excludes it): optiscalerManager downloads it on demand, pinned to GitHub's hash
+const NOT_SHIPPED = new Set(['fsr4_rdna2'])
+
+/** Every native file shipped under electron/services, in any subfolder (e.g. hwsensors/, lowlatency/), as 'sub/name'. */
+export function listBinaries(dir = services) {
+  const out = []
+  const walk = (rel) => {
+    const entries = fs.readdirSync(path.join(dir, rel), { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+    for (const e of entries) {
+      const child = rel ? `${rel}/${e.name}` : e.name
+      if (e.isDirectory()) { if (!(rel === '' && NOT_SHIPPED.has(e.name))) walk(child) }
+      else if (e.isFile() && BINARY.test(e.name)) out.push(child)
+    }
+  }
+  walk('')
+  return out.sort()
+}
 
 export function collect(dir = services) {
   const files = {}
-  const add = (rel) => { files[rel] = crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, rel))).digest('hex') }
-  for (const name of fs.readdirSync(dir).sort()) if (BINARY.test(name)) add(name)
-  for (const name of fs.readdirSync(path.join(dir, 'hwsensors')).sort()) if (BINARY.test(name)) add(`hwsensors/${name}`)
-  for (const name of fs.readdirSync(path.join(dir, 'lowlatency')).sort()) if (BINARY.test(name)) add(`lowlatency/${name}`)
+  for (const rel of listBinaries(dir)) files[rel] = crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, ...rel.split('/')))).digest('hex')
   return files
 }
 

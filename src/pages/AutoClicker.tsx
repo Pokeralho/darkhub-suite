@@ -97,6 +97,11 @@ export default function AutoClicker() {
   }, [intervalMs]);
 
   const initialLoadRef = useRef(true);
+  // The user changed interval/button but has not (re)started the engine yet: the 1 s poll and the
+  // change events must not overwrite those fields with the engine's current values.
+  const settingsDirtyRef = useRef(false);
+  const editIntervalMs = (v: number) => { settingsDirtyRef.current = true; setIntervalMs(v); };
+  const editButton = (v: 'left' | 'right' | 'middle' | 'double') => { settingsDirtyRef.current = true; setButton(v); };
 
   const applyMacroPayload = (m: any, adoptSettings: boolean) => {
     if (!m || typeof m !== 'object') return;
@@ -137,8 +142,8 @@ export default function AutoClicker() {
         setRunning(Boolean(res.running));
         const adoptEngineState = wasFirst || Boolean(res.running);
         const engine = res?.state ?? res?.settings;
-        if (adoptEngineState && engine?.intervalMs) setIntervalMs(Number(engine.intervalMs));
-        if (adoptEngineState && engine?.button) setButton(engine.button);
+        if (adoptEngineState && !settingsDirtyRef.current && engine?.intervalMs) setIntervalMs(Number(engine.intervalMs));
+        if (adoptEngineState && !settingsDirtyRef.current && engine?.button) setButton(engine.button);
         if (res?.state?.isNative !== undefined) setIsNative(Boolean(res.state.isNative));
         setHotkey(typeof res?.hotkey === 'string' ? res.hotkey : '');
         if (res?.macro) {
@@ -164,8 +169,8 @@ export default function AutoClicker() {
     if (window.darkhub?.autoclicker?.onChanged) {
       unsub = window.darkhub.autoclicker.onChanged((data: any) => {
         setRunning(Boolean(data?.running));
-        if (data?.state?.intervalMs) setIntervalMs(Number(data.state.intervalMs));
-        if (data?.state?.button) setButton(data.state.button);
+        if (!settingsDirtyRef.current && data?.state?.intervalMs) setIntervalMs(Number(data.state.intervalMs));
+        if (!settingsDirtyRef.current && data?.state?.button) setButton(data.state.button);
         if (data?.state?.isNative !== undefined) setIsNative(Boolean(data.state.isNative));
         if (data?.macro) {
           applyMacroPayload(data.macro, data.macro.mode !== 'idle');
@@ -180,7 +185,7 @@ export default function AutoClicker() {
       window.darkhub.autoclicker.setTabActive(true).catch(() => {});
     }
 
-    const cpsInterval = setInterval(() => {
+    const stopCps = visibleInterval(() => {
       const now = Date.now();
       timestampsRef.current = timestampsRef.current.filter(ts => now - ts <= 1000);
       setTestCps(timestampsRef.current.length);
@@ -188,7 +193,7 @@ export default function AutoClicker() {
 
     return () => {
       stopPolling();
-      clearInterval(cpsInterval);
+      stopCps();
       if (visualTimerRef.current) clearTimeout(visualTimerRef.current);
       unsub?.();
       if (window.darkhub?.autoclicker?.setTabActive) {
@@ -204,6 +209,7 @@ export default function AutoClicker() {
     try {
       const res = await window.darkhub.autoclicker.start({ intervalMs, button });
       if (res?.ok) {
+        settingsDirtyRef.current = false;
         setRunning(true);
         setStatus('AutoClicker ativo em segundo plano! Motor nativo C# engajado.');
       } else {
@@ -508,6 +514,7 @@ export default function AutoClicker() {
 
     try {
       await window.darkhub.autoclicker.start({ intervalMs, button });
+      settingsDirtyRef.current = false;
       setRunning(true);
       setStatus('Executando Prova Real automatizada por 3 segundos... Deixe o cursor na tela.');
 
@@ -884,7 +891,7 @@ export default function AutoClicker() {
                       type="button"
                       role="radio"
                       aria-checked={button === item.id}
-                      onClick={() => setButton(item.id as any)}
+                      onClick={() => editButton(item.id as any)}
                       className={`px-3 py-2.5 rounded-lg border text-left transition-colors duration-150 ${
                         button === item.id
                           ? 'border-blue-400/60 bg-blue-500/[0.06] text-zinc-50'
@@ -911,7 +918,7 @@ export default function AutoClicker() {
                     max={1000}
                     step={1}
                     value={intervalMs}
-                    onChange={(e) => setIntervalMs(Number(e.target.value))}
+                    onChange={(e) => editIntervalMs(Number(e.target.value))}
                     className="flex-1"
                   />
                   <input
@@ -919,7 +926,7 @@ export default function AutoClicker() {
                     min={1}
                     max={10000}
                     value={intervalMs}
-                    onChange={(e) => setIntervalMs(Math.max(1, Number(e.target.value)))}
+                    onChange={(e) => editIntervalMs(Math.max(1, Number(e.target.value)))}
                     className="dh-input w-24 font-mono text-center"
                     aria-label={t('autoclicker.intervalLabel', 'Intervalo entre Cliques (ms):')}
                   />
@@ -935,7 +942,7 @@ export default function AutoClicker() {
                     <button
                       key={p.ms}
                       type="button"
-                      onClick={() => setIntervalMs(p.ms)}
+                      onClick={() => editIntervalMs(p.ms)}
                       aria-pressed={intervalMs === p.ms}
                       className={`h-7 px-2 rounded-md text-[11px] border transition-colors duration-150 ${
                         intervalMs === p.ms

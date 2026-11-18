@@ -11,10 +11,13 @@ const script = fs.readFileSync('build/deps/install-deps.ps1', 'utf8')
 
 describe('setup components script (build/deps/install-deps.ps1)', () => {
   it('pins the same versions and hashes as the app', () => {
-    for (const dep of [PAWNIO, CLAMAV]) {
-      expect(script).toContain(dep.url)
-      expect(script).toContain(dep.sha256)
-    }
+    expect(script).toContain(PAWNIO.url)
+    expect(script).toContain(PAWNIO.sha256)
+  })
+
+  it('leaves ClamAV to the app (protection is off by default; no 215 MB download in every setup)', () => {
+    expect(script).not.toContain(CLAMAV.url)
+    expect(script).not.toMatch(/msiexec/i)
   })
 
   it('is ASCII only (Windows PowerShell 5.1 reads BOM-less files as ANSI)', () => {

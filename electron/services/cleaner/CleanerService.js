@@ -8,6 +8,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { integrityError, TAMPERED_MESSAGE } from '../binaryIntegrity.js';
 
 export const WINAPP2_URL = 'https://content.thewebatom.net/files/winapp2.ini';
 const WINAPP2_MAX = 16 << 20;
@@ -42,8 +43,9 @@ export function validateWinapp2(buf) {
 }
 
 export class CleanerService {
-  constructor({ exePath = defaultExe(), dataDir, backupDir = null, execFileImpl = execFile, fetchImpl = globalThis.fetch, extraArgs = [] } = {}) {
+  constructor({ exePath = defaultExe(), dataDir, backupDir = null, execFileImpl = execFile, fetchImpl = globalThis.fetch, extraArgs = [], checkIntegrity = () => integrityError(['DarkHub.Cleaner.exe']) } = {}) {
     this.exePath = exePath;
+    this.checkIntegrity = checkIntegrity;
     this.dataDir = dataDir || path.join(os.tmpdir(), 'DarkHub-Cleaner');
     this.backupDirPref = backupDir;
     this.execFile = execFileImpl;
@@ -72,6 +74,7 @@ export class CleanerService {
 
   run(args, { timeoutMs = 120000 } = {}) {
     if (!this.available()) return Promise.resolve({ ok: false, code: 'missing_engine', error: 'DarkHub.Cleaner.exe não foi encontrado (rode npm run build:cleaner).' });
+    if (this.checkIntegrity?.()) return Promise.resolve({ ok: false, code: 'integrity_failed', error: TAMPERED_MESSAGE });
     return new Promise((resolve) => {
       this.execFile(this.exePath, [...args, ...this.extraArgs], { windowsHide: true, timeout: timeoutMs, maxBuffer: 256 << 20 }, (err, stdout, stderr) => {
         const line = String(stdout || '').trim().split(/\r?\n/).filter((l) => l.startsWith('{')).pop();

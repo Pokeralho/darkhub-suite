@@ -1,6 +1,7 @@
 // Child-process helpers shared by the converters: argument arrays only (never a shell string), whole-tree kill on
 // cancel, optional below-normal priority so long encodes do not make the PC sluggish.
 import { spawn } from 'node:child_process'
+import { StringDecoder } from 'node:string_decoder'
 import os from 'node:os'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -36,8 +37,10 @@ export function run(command, args, opts = {}) {
     const maxOut = opts.maxStdout ?? 512 * 1024 * 1024
     let err = ''
     let timer = null
+    child.stderr.setEncoding?.('utf8') // stream decoding: no U+FFFD when a multibyte char is split across chunks
+    const outText = opts.onStdout ? new StringDecoder('utf8') : null // stdout stays binary; only the callback gets text
     child.stdout.on('data', (b) => {
-      if (opts.onStdout) { try { opts.onStdout(b.toString('utf8')) } catch {} }
+      if (opts.onStdout) { try { const t = outText.write(b); if (t) opts.onStdout(t) } catch {} }
       if (outLen < maxOut) { out.push(b); outLen += b.length }
     })
     child.stderr.on('data', (b) => { if (err.length < 256 * 1024) err += b.toString('utf8') })

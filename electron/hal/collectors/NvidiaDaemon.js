@@ -54,6 +54,9 @@ class NvidiaDaemon extends EventEmitter {
     }
 
     this.process = child;
+    // decode as a stream: a multibyte UTF-8 char split across chunks must not become U+FFFD
+    child.stdout.setEncoding?.('utf8');
+    child.stderr.setEncoding?.('utf8');
 
     child.stdout.on('data', (data) => {
       this.buffer += data.toString('utf8');

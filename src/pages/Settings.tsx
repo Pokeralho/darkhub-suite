@@ -4,7 +4,7 @@ import { visibleInterval } from '../utils/visibleInterval';
 import { Loader2, ShieldCheck, Save, RefreshCw, Download, CheckCircle2, AlertTriangle, FileCode } from '../components/icons'
 import PageHeader from '../components/ui/PageHeader'
 import { useI18n } from '../i18n/I18nProvider'
-import type { SupportedLang } from '../i18n/messages'
+import type { SupportedLang } from '../i18n/languages'
 
 export default function SettingsPage() {
   const { lang, setLang, t, languages, customLanguages, importCustomTranslation } = useI18n()

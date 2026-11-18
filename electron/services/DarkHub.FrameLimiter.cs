@@ -567,12 +567,21 @@ class DarkHubFrameLimiter
         };
         using (Process p = Process.Start(psi))
         {
-            string outLine = p.StandardOutput.ReadToEnd();
+            // Read both pipes asynchronously: a synchronous ReadToEnd() would block until the helper exits and make
+            // the 10 s timeout below meaningless (and an unread stderr could fill up and stall the helper).
+            var outBuf = new StringBuilder();
+            p.OutputDataReceived += (s, e) => { if (e.Data != null) lock (outBuf) outBuf.AppendLine(e.Data); };
+            p.ErrorDataReceived += (s, e) => { };
+            p.BeginOutputReadLine();
+            p.BeginErrorReadLine();
             if (!p.WaitForExit(10000))
             {
                 try { p.Kill(); } catch { }
                 return InjectResult.Fail("helper_timeout", "x86 helper did not finish");
             }
+            p.WaitForExit(); // flushes the async readers after a timed WaitForExit returned true
+            string outLine;
+            lock (outBuf) outLine = outBuf.ToString();
             string code = JsonStr(outLine, "code");
             string msg = JsonStr(outLine, "message");
             if (p.ExitCode == 0 && code == "ok") return InjectResult.Success("x86", msg);
@@ -825,6 +834,9 @@ class DarkHubFrameLimiter
 
     static string Fd(double v, int d)
     {
+        // NaN/Infinity are not JSON: one bad sample would make the whole telemetry line unparseable. The JS readers
+        // treat these fields as plain numbers (falling back with `|| 0`), so a non-finite value is reported as 0.
+        if (double.IsNaN(v) || double.IsInfinity(v)) return "0";
         return Math.Round(v, d).ToString(INV);
     }
 
@@ -938,6 +950,7 @@ class DarkHubFrameLimiter
 
     static void Main(string[] args)
     {
+        Console.OutputEncoding = new UTF8Encoding(false); // JS reads stdout as UTF-8 (game names can be non-ASCII)
         Thread.CurrentThread.CurrentCulture = INV;
         Thread.CurrentThread.CurrentUICulture = INV;
 
