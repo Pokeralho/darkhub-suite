@@ -27,7 +27,7 @@ jobs:
       # passed through the environment, never pasted into a script (a crafted tag would run as code)
       TAG: ${{ inputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag }}
 
