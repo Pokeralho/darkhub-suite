@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-11-18
+
+### Changed
+- **Native Optimizer registry engine**: Optimizer tweaks are now read and written by a new native helper
+  (`DarkHub.SysOps.exe`, Rust) that talks to the Windows registry directly instead of generating PowerShell scripts.
+  Checking the status of every tweak went from 0.4-1.2 s to about 25 ms, and applying or undoing a batch takes a few
+  milliseconds. The helper only accepts a closed list of registry operations (no command execution), always uses the
+  64-bit view, refuses hive roots and top-level keys, and is checked against `integrity.json` before it runs. If it is
+  missing, fails the check or misbehaves, the Optimizer falls back to the previous PowerShell path automatically.
+  Undo points saved by earlier versions keep working.
+
 ## [0.9.4] - 2026-11-18
 
 ### Security
