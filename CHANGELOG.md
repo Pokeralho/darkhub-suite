@@ -6,6 +6,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-11-18
+
+### Security
+- **Hardened Electron build**: ASAR integrity validation and `onlyLoadAppFromAsar` on, `NODE_OPTIONS` and `--inspect`
+  off. A tampered `app.asar` or native helper is refused (every helper is checked against `integrity.json` before it
+  starts or is injected).
+- **Elevated file handling**: installers and elevated scripts go through an Administrators-only staging folder and are
+  re-hashed right before running; quarantine folder locked to Administrators/SYSTEM, only quarantines the exact file
+  that was scanned and never restores into system folders; ClamAV no longer marks unscanned files clean after an error.
+- **Destructive actions guarded**: the disk map refuses system folders, drive roots and user profiles; save-backup
+  restore only imports `.reg` files that touch `HKEY_CURRENT_USER`; DiskRescue refuses raw volume/device paths; the
+  cleaner never shreds through hard links or junctions; the DLL injector refuses system and anti-cheat processes.
+- **Other**: Hub extensions must be re-approved when an update asks for more permissions; full-strength vault recovery
+  phrases (old vaults still open and are upgraded); browser extension ignores cross-site frames; `install.ps1` stops
+  when it cannot verify the download.
+
+### Fixed
+- **Recycle Bin orphans**: the disk map can delete items that are already inside `$Recycle.Bin` and shows where they
+  came from; the cleaner finds and removes orphaned items Windows lost track of (invisible in Explorer).
+- **Native stability**: frame limiter hook no longer crashes a game when unloaded; Vulkan low-latency layer handles
+  hybrid-GPU enumeration and never throws across the driver boundary; GPU benchmark checks tearing support; disk
+  recovery carving can no longer hang, writes unaligned tails correctly and never force-dismounts a busy volume.
+- **CPU affinity**: the latency engine reads the real CPU topology (P-cores on hybrid Intel, the V-Cache or first CCD on
+  Ryzen) instead of guessing.
+- **Ultra Low Latency**: settings are reverted on the next start if the app closed while Ultra was on; Nagle, DNS (DHCP
+  aware), TCP and RSC are restored exactly.
+- **SSH/SFTP**: no crash when a tunnel client resets, files renamed only after they are closed, symlink loops skipped,
+  no leaked handles on failed transfers.
+- **Accented user names**: elevation no longer hangs for 3 minutes on profiles like `C:\Users\João`.
+- **Interface**: listener leaks, the Ultra Low Latency hotkey field no longer traps Tab, accessible dialogs, live
+  language switch on every screen, 478 missing translations and several screens translated.
+
+### Changed
+- **Smaller and lighter**: about 40% less JavaScript before the first screen, SSH screen 5x smaller, `app.asar` 17 MB
+  smaller; the FSR4 RDNA2 DLL is downloaded only when used; the setup no longer downloads ClamAV (installed when
+  real-time protection is turned on).
+- **Idle use**: background timers, sensors, pings and the 1 ms timer only run while something needs them.
+- **Installer**: closes every DarkHub helper before updating and removes the Vulkan layer on uninstall.
+
 ## [0.9.3] - 2026-11-18
 
 ### Added
