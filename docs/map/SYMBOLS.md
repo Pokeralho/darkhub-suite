@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-18T17:23:01. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-18T20:02:22. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -618,7 +618,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/optimizer/DeepTweaksEngine.js`
 
-`defineTweak`:49, `buildPublicTweaks`:66, `isMachineDependent`:660, `buildInternalGroups`:663, `snapshotNumber`:707, `DeepTweaksEngine`:748 _class_, `_exclusive`:768, `listTweaks`:775, `ensureResolved`:785, `_resolveMachine`:797, `applyResolution`:809, `getRecommendedIds`:824, `getDefinition`:828, `loadUndoStore`:833, `saveUndoStore`:844, `saveExtra`:858, `getExtra`:862, `clearExtra`:865, `readEntries`:872, `runRegistryOps`:899, `exec`:910, `nativeWrite`:923, `_entriesFor`:961, `_buildSnapshot`:968, `captureSnapshot`:981, `_writtenRows`:991, `_evalDefStatus`:998, `checkTweaksStatus`:1012, `restartExplorer`:1041, `runLiveAction`:1054, `_applyDefsUnlocked`:1074, `writtenFor`:1120, `_finishRun`:1169, `_summarize`:1180, `_restoreDefsUnlocked`:1240
+`defineTweak`:49, `buildPublicTweaks`:66, `isMachineDependent`:665, `buildInternalGroups`:668, `snapshotNumber`:712, `DeepTweaksEngine`:753 _class_, `_exclusive`:773, `listTweaks`:780, `ensureResolved`:790, `_resolveMachine`:802, `applyResolution`:814, `getRecommendedIds`:829, `getDefinition`:833, `loadUndoStore`:838, `saveUndoStore`:849, `saveExtra`:863, `getExtra`:867, `clearExtra`:870, `readEntries`:877, `runRegistryOps`:904, `exec`:915, `nativeWrite`:928, `_entriesFor`:966, `_buildSnapshot`:973, `captureSnapshot`:986, `_writtenRows`:996, `_evalDefStatus`:1003, `checkTweaksStatus`:1017, `restartExplorer`:1046, `runLiveAction`:1059, `_applyDefsUnlocked`:1079, `writtenFor`:1125, `_finishRun`:1174, `_summarize`:1185, `_restoreDefsUnlocked`:1245
 
 ## `electron/services/optimizer/DefenderControlEngine.js`
 
@@ -662,7 +662,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/optimizer/SysOps.js`
 
-`defaultExe`:18, `checkIntegrity`:26, `setEngine`:30, `getEngine`:33, `_configure`:38, `available`:44, `request`:56, `changeToOp`:82, `readRegistry`:92, `writeRegistry`:106
+`defaultExe`:18, `checkIntegrity`:26, `setEngine`:31, `getEngine`:34, `_configure`:39, `integrityVerdict`:48, `available`:58, `request`:70, `changeToOp`:97, `readRegistry`:107, `writeRegistry`:121
 
 ## `electron/services/optimizer/SystemEngine.js`
 

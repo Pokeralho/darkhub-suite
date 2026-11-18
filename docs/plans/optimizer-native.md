@@ -2,7 +2,10 @@
 
 Status (2026-11-18): **fases 0 e 1 feitas** (crate `native_sysops/`, `SysOps.js`, leitura e escrita do registro no
 `DeepTweaksEngine`, testes de paridade em `tests/sysops.test.ts`). Medido nesta máquina: status dos tweaks (157 valores)
-de 414–1217 ms para 23 ms; gravar 40 valores de ~350 ms para 16 ms. Falta: rodada na VM, fases 2 a 6.
+de 414–1217 ms para 23 ms; gravar 40 valores de ~350 ms para 16 ms. Rodada 45 na VM (setup 0.9.5 instalado, processo
+elevado, integridade cobrada): 289 valores reais lidos igual ao PowerShell (2666 ms → 41 ms), 81/82 tweaks aplicados
+(270 escritas pelo helper, 64 em HKLM), desfazer sem nenhuma diferença, helper adulterado recusado com volta ao PS.
+Sai na 0.9.5. Falta: fases 2 a 6.
 Também usam o helper, sem mudança no código deles: `HubService` e `AppManagerEngine` (passam por `readEntries` /
 `runRegistryOps`). Ainda em PowerShell: `security/hardeningCatalog.js`, que monta os próprios scripts de registro.
 

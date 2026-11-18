@@ -422,7 +422,12 @@ if (-not (Test-Path -LiteralPath 'HKCU:\\Software\\DarkHub\\Tweaks')) { New-Item
 New-ItemProperty -Path 'HKCU:\\Software\\DarkHub\\Tweaks' -Name StoreSearchBlocked -PropertyType DWord -Value 1 -Force | Out-Null`,
         revert: `$db = Join-Path $env:LOCALAPPDATA 'Packages\\Microsoft.WindowsStore_8wekyb3d8bbwe\\LocalState\\store.db'
 if (Test-Path -LiteralPath $db) { & icacls.exe $db /remove:d '*S-1-1-0' | Out-Null; if ($LASTEXITCODE -ne 0) { throw "icacls falhou ($LASTEXITCODE)" } }
-Remove-ItemProperty -Path 'HKCU:\\Software\\DarkHub\\Tweaks' -Name StoreSearchBlocked -ErrorAction SilentlyContinue`
+Remove-ItemProperty -Path 'HKCU:\\Software\\DarkHub\\Tweaks' -Name StoreSearchBlocked -ErrorAction SilentlyContinue
+# the marker keys were created by the apply step: remove them again when nothing else is left in them
+foreach ($k in 'HKCU:\\Software\\DarkHub\\Tweaks', 'HKCU:\\Software\\DarkHub') {
+  $i = Get-Item -LiteralPath $k -ErrorAction SilentlyContinue
+  if ($i -and $i.ValueCount -eq 0 -and $i.SubKeyCount -eq 0) { Remove-Item -LiteralPath $k -ErrorAction SilentlyContinue }
+}`
       }
     }),
     defineTweak({

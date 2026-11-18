@@ -25,6 +25,7 @@ let engine = String(process.env.DARKHUB_OPTIMIZER_ENGINE || 'native').toLowerCas
 let execFileImpl = execFile;
 let checkIntegrity = () => integrityError(['DarkHub.SysOps.exe'], { log: (m) => Logger.warn('SysOps', m) });
 let warned = false;
+let announced = false;
 
 /** 'native' (default) or 'powershell'. */
 export function setEngine(name) {
@@ -41,10 +42,23 @@ export function _configure({ exe, exec, integrity } = {}) {
   if (integrity !== undefined) checkIntegrity = integrity;
 }
 
+// The integrity verdict is cached per file state (path, size, mtime): hashing on every call would add work to each
+// registry read, and a replaced file changes size or mtime, which runs the check again.
+let integrityCache = { stamp: '', fn: null, error: null };
+function integrityVerdict() {
+  let st;
+  try { st = fs.statSync(exePath); } catch { return 'missing'; }
+  const stamp = `${exePath}|${st.size}|${st.mtimeMs}`;
+  if (integrityCache.stamp !== stamp || integrityCache.fn !== checkIntegrity) {
+    integrityCache = { stamp, fn: checkIntegrity, error: checkIntegrity?.() || null };
+  }
+  return integrityCache.error;
+}
+
 export function available() {
   if (engine !== 'native' || process.platform !== 'win32') return false;
-  if (!fs.existsSync(exePath)) return false;
-  const tampered = checkIntegrity?.();
+  const tampered = integrityVerdict();
+  if (tampered === 'missing') return false;
   if (tampered) {
     if (!warned) { warned = true; Logger.warn('SysOps', `helper refused, using PowerShell: ${tampered}`); }
     return false;
@@ -66,6 +80,7 @@ function request(body, { timeoutMs = 60000 } = {}) {
           resolve(null);
           return;
         }
+        if (!announced) { announced = true; Logger.info('SysOps', `native registry engine active (${exePath})`); }
         resolve(res);
       });
     } catch (e) {

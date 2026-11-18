@@ -165,6 +165,17 @@ describe.skipIf(!ready)('DarkHub.SysOps.exe (native Optimizer registry engine)',
     expect(SysOps.available()).toBe(true);
   });
 
+  it('hashes the helper once per file state, not on every call', () => {
+    let calls = 0;
+    try {
+      SysOps._configure({ integrity: () => { calls++; return null; } });
+      for (let i = 0; i < 5; i++) expect(SysOps.available()).toBe(true);
+      expect(calls).toBe(1);
+    } finally {
+      SysOps._configure({ integrity: () => null });
+    }
+  });
+
   it('refuses a helper that fails the integrity check', async () => {
     try {
       SysOps._configure({ integrity: () => 'integrity_failed: DarkHub.SysOps.exe (mismatch)' });
