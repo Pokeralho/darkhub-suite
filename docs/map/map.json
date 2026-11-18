@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-18T14:27:27",
+ "generated_at": "2026-11-18T17:23:01",
  "bridge": "darkhub",
  "preload": "electron/preload.js",
  "features": [
@@ -15166,7 +15166,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 69,
+   "line": 70,
    "calls": [
     "registro: TaskbarAl"
    ]
@@ -15177,7 +15177,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 75,
+   "line": 76,
    "calls": [
     "registro: TaskbarEndTask"
    ]
@@ -15188,7 +15188,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 81,
+   "line": 82,
    "calls": [
     "registro: SearchboxTaskbarMode"
    ]
@@ -15199,7 +15199,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 87,
+   "line": 88,
    "calls": [
     "registro: ShowTaskViewButton"
    ]
@@ -15210,7 +15210,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 93,
+   "line": 94,
    "calls": [
     "registro: ShowCopilotButton"
    ]
@@ -15221,7 +15221,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 99,
+   "line": 100,
    "calls": [
     "registro: ShowSecondsInSystemClock"
    ]
@@ -15232,7 +15232,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 107,
+   "line": 108,
    "calls": []
   },
   {
@@ -15241,7 +15241,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 114,
+   "line": 115,
    "calls": [
     "registro: LaunchTo"
    ]
@@ -15252,7 +15252,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 120,
+   "line": 121,
    "calls": [
     "registro: HideFileExt"
    ]
@@ -15263,7 +15263,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 126,
+   "line": 127,
    "calls": [
     "registro: Hidden, ShowSuperHidden"
    ]
@@ -15274,7 +15274,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 132,
+   "line": 133,
    "calls": [
     "registro: UseCompactMode"
    ]
@@ -15285,7 +15285,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 138,
+   "line": 139,
    "calls": []
   },
   {
@@ -15294,7 +15294,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 153,
+   "line": 154,
    "calls": []
   },
   {
@@ -15303,7 +15303,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 160,
+   "line": 161,
    "calls": [
     "registro: SystemUsesLightTheme, AppsUseLightTheme, EnableTransparency"
    ]
@@ -15314,7 +15314,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 170,
+   "line": 171,
    "calls": [
     "registro: DisallowShaking"
    ]
@@ -15325,7 +15325,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 176,
+   "line": 177,
    "calls": [
     "registro: DisableAcrylicBackgroundOnLogon"
    ]
@@ -15336,7 +15336,7 @@
    "category": "privacy",
    "risk": "medium",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 184,
+   "line": 185,
    "calls": [
     "registro: AllowTelemetry, CEIPEnable"
    ]
@@ -15347,7 +15347,7 @@
    "category": "privacy",
    "risk": "medium",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 194,
+   "line": 195,
    "calls": [
     "registro: DisableAIDataAnalysis, AllowCloudSearch, BingSearchEnabled, DisableSearchBoxSuggestions, TurnOffWindowsCopilot"
    ]
@@ -15358,7 +15358,7 @@
    "category": "privacy",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 208,
+   "line": 209,
    "calls": [
     "registro: AllowCortana"
    ]
@@ -15369,7 +15369,7 @@
    "category": "privacy",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 214,
+   "line": 215,
    "calls": [
     "registro: EnableActivityFeed, PublishUserActivities, UploadUserActivities"
    ]
@@ -15380,7 +15380,7 @@
    "category": "privacy",
    "risk": "medium",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 220,
+   "line": 221,
    "calls": [
     "registro: DisableLocation"
    ]
@@ -15391,7 +15391,7 @@
    "category": "privacy",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 227,
+   "line": 228,
    "calls": [
     "registro: DODownloadMode"
    ]
@@ -15402,7 +15402,7 @@
    "category": "privacy",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 233,
+   "line": 234,
    "calls": [
     "registro: Disabled"
    ]
@@ -15413,7 +15413,7 @@
    "category": "privacy",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 239,
+   "line": 240,
    "calls": [
     "registro: SystemPaneSuggestionsEnabled, SoftLandingEnabled, RotatingLockScreenEnabled, RotatingLockScreenOverlayEnabled, SubscribedContent-338388Enabled, SubscribedContent-338389Enabled, SubscribedContent-353694Enabled, SubscribedContent-353696Enabled, Enabled, TailoredExperiencesWithDiagnosticDataEnabled"
    ]
@@ -15424,7 +15424,7 @@
    "category": "gaming",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 254,
+   "line": 255,
    "calls": [
     "registro: AppCaptureEnabled, GameDVR_Enabled"
    ]
@@ -15435,7 +15435,7 @@
    "category": "gaming",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 263,
+   "line": 264,
    "calls": [
     "registro: NetworkThrottlingIndex, SystemResponsiveness, Priority, Scheduling Category, SFIO Priority"
    ]
@@ -15446,7 +15446,7 @@
    "category": "gaming",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 275,
+   "line": 276,
    "calls": [
     "registro: MouseSpeed, MouseThreshold1, MouseThreshold2"
    ]
@@ -15457,7 +15457,7 @@
    "category": "gaming",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 285,
+   "line": 286,
    "calls": [
     "registro: Flags"
    ]
@@ -15468,7 +15468,7 @@
    "category": "gaming",
    "risk": "high",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 291,
+   "line": 292,
    "calls": [
     "registro: EnableVirtualizationBasedSecurity, Enabled"
    ]
@@ -15479,7 +15479,7 @@
    "category": "storage",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 302,
+   "line": 303,
    "calls": []
   },
   {
@@ -15488,7 +15488,7 @@
    "category": "storage",
    "risk": "medium",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 314,
+   "line": 315,
    "calls": [
     "registro: PreventDeviceEncryption"
    ]
@@ -15499,7 +15499,7 @@
    "category": "system",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 320,
+   "line": 321,
    "calls": [
     "registro: HiberbootEnabled"
    ]
@@ -15510,7 +15510,7 @@
    "category": "system",
    "risk": "medium",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 326,
+   "line": 327,
    "calls": [
     "registro: RealTimeIsUniversal"
    ]
@@ -15521,7 +15521,7 @@
    "category": "system",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 333,
+   "line": 334,
    "calls": [
     "registro: GlobalUserDisabled, LetAppsRunInBackground"
    ]
@@ -15532,7 +15532,7 @@
    "category": "system",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 342,
+   "line": 343,
    "calls": [
     "registro: BackgroundModeEnabled, StartupBoostEnabled, HideFirstRunExperience"
    ]
@@ -15543,7 +15543,7 @@
    "category": "gaming",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 358,
+   "line": 359,
    "calls": [
     "registro: OverlayTestMode"
    ]
@@ -15554,7 +15554,7 @@
    "category": "network",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 366,
+   "line": 367,
    "calls": [
     "registro: DisabledComponents"
    ]
@@ -15565,7 +15565,7 @@
    "category": "network",
    "risk": "medium",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 372,
+   "line": 373,
    "calls": [
     "registro: DisabledComponents"
    ]
@@ -15576,7 +15576,7 @@
    "category": "network",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 379,
+   "line": 380,
    "calls": [
     "registro: Teredo_State"
    ]
@@ -15587,7 +15587,7 @@
    "category": "power",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 392,
+   "line": 393,
    "calls": [
     "registro: DCSettingIndex, ACSettingIndex"
    ]
@@ -15598,7 +15598,7 @@
    "category": "power",
    "risk": "medium",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 401,
+   "line": 402,
    "calls": [
     "registro: PlatformAoAcOverride"
    ]
@@ -15609,7 +15609,7 @@
    "category": "privacy",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 410,
+   "line": 411,
    "calls": []
   },
   {
@@ -15618,7 +15618,7 @@
    "category": "privacy",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 428,
+   "line": 429,
    "calls": [
     "registro: DisableNotificationCenter, ToastEnabled"
    ]
@@ -15629,7 +15629,7 @@
    "category": "privacy",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 437,
+   "line": 438,
    "calls": [
     "registro: PreventDeviceMetadataFromNetwork"
    ]
@@ -15640,7 +15640,7 @@
    "category": "privacy",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 443,
+   "line": 444,
    "calls": [
     "registro: DisableCoInstallers"
    ]
@@ -15651,7 +15651,7 @@
    "category": "privacy",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 462,
+   "line": 463,
    "calls": [
     "registro: DisableWpbtExecution"
    ]
@@ -15662,7 +15662,7 @@
    "category": "privacy",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 468,
+   "line": 469,
    "calls": [
     "registro: BraveRewardsDisabled, BraveWalletDisabled, BraveVPNDisabled, BraveAIChatEnabled, BraveNewsDisabled, BraveTalkDisabled, TorDisabled, BraveStatsPingEnabled, BraveP3AEnabled, MetricsReportingEnabled, UrlKeyedAnonymizedDataCollectionEnabled, SafeBrowsingExtendedReportingEnabled"
    ]
@@ -15673,7 +15673,7 @@
    "category": "privacy",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 482,
+   "line": 483,
    "calls": [
     "registro: UseNewOutlook, HideNewOutlookToggle, DoNewOutlookAutoMigration, NewOutlookMigrationUserSetting"
    ]
@@ -15684,7 +15684,7 @@
    "category": "storage",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 495,
+   "line": 496,
    "calls": [
     "registro: 01"
    ]
@@ -15695,7 +15695,7 @@
    "category": "storage",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 501,
+   "line": 502,
    "calls": []
   },
   {
@@ -15704,7 +15704,7 @@
    "category": "system",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 528,
+   "line": 529,
    "calls": [
     "registro: LongPathsEnabled"
    ]
@@ -15715,7 +15715,7 @@
    "category": "system",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 534,
+   "line": 535,
    "calls": [
     "registro: EnablePeriodicBackup"
    ]
@@ -15726,7 +15726,7 @@
    "category": "system",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 540,
+   "line": 541,
    "calls": [
     "registro: DisplayParameters, DisableEmoticon"
    ]
@@ -15737,7 +15737,7 @@
    "category": "system",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 549,
+   "line": 550,
    "calls": [
     "registro: VerboseStatus"
    ]
@@ -15748,7 +15748,7 @@
    "category": "system",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 555,
+   "line": 556,
    "calls": []
   },
   {
@@ -15757,7 +15757,7 @@
    "category": "system",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 571,
+   "line": 572,
    "calls": [
     "registro: NtpServer"
    ]
@@ -15768,7 +15768,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 583,
+   "line": 584,
    "calls": [
     "registro: System.IsPinnedToNameSpaceTree"
    ]
@@ -15779,7 +15779,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 592,
+   "line": 593,
    "calls": [
     "registro: FolderType"
    ]
@@ -15790,7 +15790,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 598,
+   "line": 599,
    "calls": [
     "registro: EnabledState"
    ]
@@ -15801,7 +15801,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 604,
+   "line": 605,
    "calls": [
     "registro: NoLockScreen"
    ]
@@ -15812,7 +15812,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 610,
+   "line": 611,
    "calls": [
     "registro: SettingsPageVisibility"
    ]
@@ -15823,7 +15823,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 616,
+   "line": 617,
    "calls": [
     "registro: IsBatteryPercentageEnabled"
    ]
@@ -15834,7 +15834,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 622,
+   "line": 623,
    "calls": [
     "registro: DynamicScrollbars"
    ]
@@ -15845,7 +15845,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 628,
+   "line": 629,
    "calls": [
     "registro: WindowArrangementActive"
    ]
@@ -15856,7 +15856,7 @@
    "category": "customization",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 634,
+   "line": 635,
    "calls": [
     "registro: InitialKeyboardIndicators"
    ]
@@ -15867,7 +15867,7 @@
    "category": "system",
    "risk": "medium",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 645,
+   "line": 646,
    "calls": [
     "registro: RedirectionWarningDialogVersion, RdpLaunchConsentAccepted"
    ]
@@ -15878,7 +15878,7 @@
    "category": "system",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 664,
+   "line": 665,
    "calls": [
     "registro: Win32PrioritySeparation, DisablePagingExecutive"
    ]
@@ -15889,7 +15889,7 @@
    "category": "visuals",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 673,
+   "line": 674,
    "calls": [
     "registro: VisualFXSetting, UserPreferencesMask, MinAnimate, EnableAeroPeek, TaskbarAnimations, ListviewAlphaSelect, ListviewShadow"
    ]
@@ -15900,7 +15900,7 @@
    "category": "security",
    "risk": "high",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 689,
+   "line": 690,
    "calls": [
     "registro: DisableAntiSpyware, DisableRealtimeMonitoring"
    ]
@@ -15911,7 +15911,7 @@
    "category": "gaming",
    "risk": "",
    "file": "electron/services/optimizer/DeepTweaksEngine.js",
-   "line": 698,
+   "line": 699,
    "calls": [
     "registro: HwSchMode"
    ]
@@ -16267,7 +16267,7 @@
    "file": "electron/services/optimizer/SystemOptimizerService.js",
    "line": 198,
    "calls": [
-    "-> tweak:disableTelemetry (electron/services/optimizer/DeepTweaksEngine.js:184)"
+    "-> tweak:disableTelemetry (electron/services/optimizer/DeepTweaksEngine.js:185)"
    ]
   },
   {
@@ -16278,7 +16278,7 @@
    "file": "electron/services/optimizer/SystemOptimizerService.js",
    "line": 207,
    "calls": [
-    "-> tweak:disableLocation (electron/services/optimizer/DeepTweaksEngine.js:220)"
+    "-> tweak:disableLocation (electron/services/optimizer/DeepTweaksEngine.js:221)"
    ]
   },
   {
@@ -16289,7 +16289,7 @@
    "file": "electron/services/optimizer/SystemOptimizerService.js",
    "line": 215,
    "calls": [
-    "-> tweak:disableActivityHistory (electron/services/optimizer/DeepTweaksEngine.js:214)"
+    "-> tweak:disableActivityHistory (electron/services/optimizer/DeepTweaksEngine.js:215)"
    ]
   },
   {
@@ -16300,7 +16300,7 @@
    "file": "electron/services/optimizer/SystemOptimizerService.js",
    "line": 223,
    "calls": [
-    "-> tweak:disableCortana (electron/services/optimizer/DeepTweaksEngine.js:208)"
+    "-> tweak:disableCortana (electron/services/optimizer/DeepTweaksEngine.js:209)"
    ]
   },
   {
@@ -16311,7 +16311,7 @@
    "file": "electron/services/optimizer/SystemOptimizerService.js",
    "line": 231,
    "calls": [
-    "-> tweak:disableAiAndAds (electron/services/optimizer/DeepTweaksEngine.js:194)"
+    "-> tweak:disableAiAndAds (electron/services/optimizer/DeepTweaksEngine.js:195)"
    ]
   },
   {
@@ -16322,7 +16322,7 @@
    "file": "electron/services/optimizer/SystemOptimizerService.js",
    "line": 239,
    "calls": [
-    "-> tweak:blockAdsAndSuggestions (electron/services/optimizer/DeepTweaksEngine.js:239)"
+    "-> tweak:blockAdsAndSuggestions (electron/services/optimizer/DeepTweaksEngine.js:240)"
    ]
   },
   {
@@ -16333,7 +16333,7 @@
    "file": "electron/services/optimizer/SystemOptimizerService.js",
    "line": 249,
    "calls": [
-    "-> tweak:disableGameDvr (electron/services/optimizer/DeepTweaksEngine.js:254)"
+    "-> tweak:disableGameDvr (electron/services/optimizer/DeepTweaksEngine.js:255)"
    ]
   },
   {
@@ -16357,7 +16357,7 @@
    "calls": [
     "NetworkEngine.optimizeGameRoute",
     "NetworkEngine.revertGameRoute",
-    "-> tweak:mmcssGames (electron/services/optimizer/DeepTweaksEngine.js:263)"
+    "-> tweak:mmcssGames (electron/services/optimizer/DeepTweaksEngine.js:264)"
    ]
   },
   {
@@ -16383,8 +16383,8 @@
    "calls": [
     "SystemEngine.applyHardcoreGamerMode",
     "SystemEngine.revertHardcoreGamerMode",
-    "-> tweak:disableVBS (electron/services/optimizer/DeepTweaksEngine.js:291)",
-    "-> tweak:disableHibernation (electron/services/optimizer/DeepTweaksEngine.js:302)"
+    "-> tweak:disableVBS (electron/services/optimizer/DeepTweaksEngine.js:292)",
+    "-> tweak:disableHibernation (electron/services/optimizer/DeepTweaksEngine.js:303)"
    ]
   },
   {
@@ -16397,7 +16397,7 @@
    "calls": [
     "VisualsEngine.disableVisualEffects",
     "VisualsEngine.revertVisualEffects",
-    "-> group:visualEffects (electron/services/optimizer/DeepTweaksEngine.js:673)"
+    "-> group:visualEffects (electron/services/optimizer/DeepTweaksEngine.js:674)"
    ]
   },
   {
@@ -16408,7 +16408,7 @@
    "file": "electron/services/optimizer/SystemOptimizerService.js",
    "line": 340,
    "calls": [
-    "-> tweak:classicContextMenu (electron/services/optimizer/DeepTweaksEngine.js:107)"
+    "-> tweak:classicContextMenu (electron/services/optimizer/DeepTweaksEngine.js:108)"
    ]
   },
   {
@@ -16419,10 +16419,10 @@
    "file": "electron/services/optimizer/SystemOptimizerService.js",
    "line": 349,
    "calls": [
-    "-> tweak:taskbarAlignLeft (electron/services/optimizer/DeepTweaksEngine.js:69)",
-    "-> tweak:hideSearchBox (electron/services/optimizer/DeepTweaksEngine.js:81)",
-    "-> tweak:hideTaskViewButton (electron/services/optimizer/DeepTweaksEngine.js:87)",
-    "-> tweak:taskbarEndTask (electron/services/optimizer/DeepTweaksEngine.js:75)"
+    "-> tweak:taskbarAlignLeft (electron/services/optimizer/DeepTweaksEngine.js:70)",
+    "-> tweak:hideSearchBox (electron/services/optimizer/DeepTweaksEngine.js:82)",
+    "-> tweak:hideTaskViewButton (electron/services/optimizer/DeepTweaksEngine.js:88)",
+    "-> tweak:taskbarEndTask (electron/services/optimizer/DeepTweaksEngine.js:76)"
    ]
   },
   {
@@ -16433,7 +16433,7 @@
    "file": "electron/services/optimizer/SystemOptimizerService.js",
    "line": 358,
    "calls": [
-    "-> tweak:taskbarEndTask (electron/services/optimizer/DeepTweaksEngine.js:75)"
+    "-> tweak:taskbarEndTask (electron/services/optimizer/DeepTweaksEngine.js:76)"
    ]
   },
   {
@@ -16444,7 +16444,7 @@
    "file": "electron/services/optimizer/SystemOptimizerService.js",
    "line": 367,
    "calls": [
-    "-> tweak:darkModeAndColors (electron/services/optimizer/DeepTweaksEngine.js:160)"
+    "-> tweak:darkModeAndColors (electron/services/optimizer/DeepTweaksEngine.js:161)"
    ]
   },
   {
@@ -16455,10 +16455,10 @@
    "file": "electron/services/optimizer/SystemOptimizerService.js",
    "line": 375,
    "calls": [
-    "-> tweak:explorerOpenThisPC (electron/services/optimizer/DeepTweaksEngine.js:114)",
-    "-> tweak:showFileExtensions (electron/services/optimizer/DeepTweaksEngine.js:120)",
-    "-> tweak:showHiddenFiles (electron/services/optimizer/DeepTweaksEngine.js:126)",
-    "-> tweak:explorerCompactMode (electron/services/optimizer/DeepTweaksEngine.js:132)"
+    "-> tweak:explorerOpenThisPC (electron/services/optimizer/DeepTweaksEngine.js:115)",
+    "-> tweak:showFileExtensions (electron/services/optimizer/DeepTweaksEngine.js:121)",
+    "-> tweak:showHiddenFiles (electron/services/optimizer/DeepTweaksEngine.js:127)",
+    "-> tweak:explorerCompactMode (electron/services/optimizer/DeepTweaksEngine.js:133)"
    ]
   },
   {
@@ -16469,7 +16469,7 @@
    "file": "electron/services/optimizer/SystemOptimizerService.js",
    "line": 384,
    "calls": [
-    "-> tweak:edgeOptimizations (electron/services/optimizer/DeepTweaksEngine.js:342)"
+    "-> tweak:edgeOptimizations (electron/services/optimizer/DeepTweaksEngine.js:343)"
    ]
   },
   {
@@ -16480,7 +16480,7 @@
    "file": "electron/services/optimizer/SystemOptimizerService.js",
    "line": 392,
    "calls": [
-    "-> tweak:disableMouseAcceleration (electron/services/optimizer/DeepTweaksEngine.js:275)"
+    "-> tweak:disableMouseAcceleration (electron/services/optimizer/DeepTweaksEngine.js:276)"
    ]
   },
   {
@@ -16491,7 +16491,7 @@
    "file": "electron/services/optimizer/SystemOptimizerService.js",
    "line": 400,
    "calls": [
-    "-> tweak:preventAutoBitLocker (electron/services/optimizer/DeepTweaksEngine.js:314)"
+    "-> tweak:preventAutoBitLocker (electron/services/optimizer/DeepTweaksEngine.js:315)"
    ]
   },
   {
@@ -16502,7 +16502,7 @@
    "file": "electron/services/optimizer/SystemOptimizerService.js",
    "line": 411,
    "calls": [
-    "-> tweak:disableHibernation (electron/services/optimizer/DeepTweaksEngine.js:302)"
+    "-> tweak:disableHibernation (electron/services/optimizer/DeepTweaksEngine.js:303)"
    ]
   },
   {
@@ -16538,8 +16538,8 @@
    "calls": [
     "SystemEngine.applyExtremeKernelMod",
     "SystemEngine.revertExtremeKernelMod",
-    "-> group:kernelCore (electron/services/optimizer/DeepTweaksEngine.js:664)",
-    "-> tweak:mmcssGames (electron/services/optimizer/DeepTweaksEngine.js:263)"
+    "-> group:kernelCore (electron/services/optimizer/DeepTweaksEngine.js:665)",
+    "-> tweak:mmcssGames (electron/services/optimizer/DeepTweaksEngine.js:264)"
    ]
   },
   {
@@ -27149,172 +27149,177 @@
    {
     "name": "defineTweak",
     "kind": "function",
-    "line": 48
+    "line": 49
    },
    {
     "name": "buildPublicTweaks",
     "kind": "function",
-    "line": 65
+    "line": 66
    },
    {
     "name": "isMachineDependent",
     "kind": "function",
-    "line": 659
+    "line": 660
    },
    {
     "name": "buildInternalGroups",
     "kind": "function",
-    "line": 662
+    "line": 663
    },
    {
     "name": "snapshotNumber",
     "kind": "function",
-    "line": 706
+    "line": 707
    },
    {
     "name": "DeepTweaksEngine",
     "kind": "class",
-    "line": 747
+    "line": 748
    },
    {
     "name": "_exclusive",
     "kind": "method",
-    "line": 767
+    "line": 768
    },
    {
     "name": "listTweaks",
     "kind": "method",
-    "line": 774
+    "line": 775
    },
    {
     "name": "ensureResolved",
     "kind": "method",
-    "line": 784
+    "line": 785
    },
    {
     "name": "_resolveMachine",
     "kind": "method",
-    "line": 796
+    "line": 797
    },
    {
     "name": "applyResolution",
     "kind": "method",
-    "line": 808
+    "line": 809
    },
    {
     "name": "getRecommendedIds",
     "kind": "method",
-    "line": 823
+    "line": 824
    },
    {
     "name": "getDefinition",
     "kind": "method",
-    "line": 827
+    "line": 828
    },
    {
     "name": "loadUndoStore",
     "kind": "method",
-    "line": 832
+    "line": 833
    },
    {
     "name": "saveUndoStore",
     "kind": "method",
-    "line": 843
+    "line": 844
    },
    {
     "name": "saveExtra",
     "kind": "method",
-    "line": 857
+    "line": 858
    },
    {
     "name": "getExtra",
     "kind": "method",
-    "line": 861
+    "line": 862
    },
    {
     "name": "clearExtra",
     "kind": "method",
-    "line": 864
+    "line": 865
    },
    {
     "name": "readEntries",
     "kind": "method",
-    "line": 871
+    "line": 872
    },
    {
     "name": "runRegistryOps",
     "kind": "method",
-    "line": 896
+    "line": 899
    },
    {
     "name": "exec",
     "kind": "function",
-    "line": 907
+    "line": 910
+   },
+   {
+    "name": "nativeWrite",
+    "kind": "function",
+    "line": 923
    },
    {
     "name": "_entriesFor",
     "kind": "method",
-    "line": 945
+    "line": 961
    },
    {
     "name": "_buildSnapshot",
     "kind": "method",
-    "line": 952
+    "line": 968
    },
    {
     "name": "captureSnapshot",
     "kind": "method",
-    "line": 965
+    "line": 981
    },
    {
     "name": "_writtenRows",
     "kind": "method",
-    "line": 975
+    "line": 991
    },
    {
     "name": "_evalDefStatus",
     "kind": "method",
-    "line": 982
+    "line": 998
    },
    {
     "name": "checkTweaksStatus",
     "kind": "method",
-    "line": 996
+    "line": 1012
    },
    {
     "name": "restartExplorer",
     "kind": "method",
-    "line": 1025
+    "line": 1041
    },
    {
     "name": "runLiveAction",
     "kind": "method",
-    "line": 1038
+    "line": 1054
    },
    {
     "name": "_applyDefsUnlocked",
     "kind": "method",
-    "line": 1058
+    "line": 1074
    },
    {
     "name": "writtenFor",
     "kind": "function",
-    "line": 1104
+    "line": 1120
    },
    {
     "name": "_finishRun",
     "kind": "method",
-    "line": 1153
+    "line": 1169
    },
    {
     "name": "_summarize",
     "kind": "method",
-    "line": 1164
+    "line": 1180
    },
    {
     "name": "_restoreDefsUnlocked",
     "kind": "method",
-    "line": 1224
+    "line": 1240
    }
   ],
   "electron/services/optimizer/DefenderControlEngine.js": [
@@ -28090,6 +28095,58 @@
     "name": "cleanTempFiles",
     "kind": "method",
     "line": 154
+   }
+  ],
+  "electron/services/optimizer/SysOps.js": [
+   {
+    "name": "defaultExe",
+    "kind": "function",
+    "line": 18
+   },
+   {
+    "name": "checkIntegrity",
+    "kind": "function",
+    "line": 26
+   },
+   {
+    "name": "setEngine",
+    "kind": "function",
+    "line": 30
+   },
+   {
+    "name": "getEngine",
+    "kind": "function",
+    "line": 33
+   },
+   {
+    "name": "_configure",
+    "kind": "function",
+    "line": 38
+   },
+   {
+    "name": "available",
+    "kind": "function",
+    "line": 44
+   },
+   {
+    "name": "request",
+    "kind": "function",
+    "line": 56
+   },
+   {
+    "name": "changeToOp",
+    "kind": "function",
+    "line": 82
+   },
+   {
+    "name": "readRegistry",
+    "kind": "function",
+    "line": 92
+   },
+   {
+    "name": "writeRegistry",
+    "kind": "function",
+    "line": 106
    }
   ],
   "electron/services/optimizer/SystemEngine.js": [
@@ -36055,6 +36112,212 @@
     "name": "Test-Luid",
     "kind": "function",
     "line": 148
+   }
+  ],
+  "native_sysops/src/main.rs": [
+   {
+    "name": "fail",
+    "kind": "function",
+    "line": 23
+   },
+   {
+    "name": "str_field",
+    "kind": "function",
+    "line": 27
+   },
+   {
+    "name": "result",
+    "kind": "function",
+    "line": 32
+   },
+   {
+    "name": "run_op",
+    "kind": "function",
+    "line": 39
+   },
+   {
+    "name": "handle",
+    "kind": "function",
+    "line": 87
+   },
+   {
+    "name": "main",
+    "kind": "function",
+    "line": 106
+   },
+   {
+    "name": "protocol_and_validation",
+    "kind": "function",
+    "line": 126
+   }
+  ],
+  "native_sysops/src/reg.rs": [
+   {
+    "name": "root",
+    "kind": "function",
+    "line": 17
+   },
+   {
+    "name": "wide",
+    "kind": "function",
+    "line": 26
+   },
+   {
+    "name": "err_text",
+    "kind": "function",
+    "line": 30
+   },
+   {
+    "name": "not_found",
+    "kind": "function",
+    "line": 40
+   },
+   {
+    "name": "drop",
+    "kind": "function",
+    "line": 46
+   },
+   {
+    "name": "open",
+    "kind": "function",
+    "line": 51
+   },
+   {
+    "name": "create",
+    "kind": "function",
+    "line": 58
+   },
+   {
+    "name": "query_raw",
+    "kind": "function",
+    "line": 68
+   },
+   {
+    "name": "utf16",
+    "kind": "function",
+    "line": 89
+   },
+   {
+    "name": "decode_sz",
+    "kind": "function",
+    "line": 94
+   },
+   {
+    "name": "decode_multi",
+    "kind": "function",
+    "line": 101
+   },
+   {
+    "name": "kind_and_value",
+    "kind": "function",
+    "line": 120
+   },
+   {
+    "name": "read",
+    "kind": "function",
+    "line": 137
+   },
+   {
+    "name": "encode",
+    "kind": "function",
+    "line": 151
+   },
+   {
+    "name": "set",
+    "kind": "function",
+    "line": 168
+   },
+   {
+    "name": "delete_value",
+    "kind": "function",
+    "line": 177
+   },
+   {
+    "name": "delete_key",
+    "kind": "function",
+    "line": 189
+   },
+   {
+    "name": "delete_key_if_empty",
+    "kind": "function",
+    "line": 209
+   },
+   {
+    "name": "p",
+    "kind": "function",
+    "line": 234
+   },
+   {
+    "name": "roundtrip_every_type_in_hkcu",
+    "kind": "function",
+    "line": 237
+   }
+  ],
+  "native_sysops/src/values.rs": [
+   {
+    "name": "split_key",
+    "kind": "function",
+    "line": 27
+   },
+   {
+    "name": "valid_name",
+    "kind": "function",
+    "line": 50
+   },
+   {
+    "name": "depth",
+    "kind": "function",
+    "line": 55
+   },
+   {
+    "name": "value_to_string",
+    "kind": "function",
+    "line": 69
+   },
+   {
+    "name": "parse_dword",
+    "kind": "function",
+    "line": 82
+   },
+   {
+    "name": "parse_qword",
+    "kind": "function",
+    "line": 107
+   },
+   {
+    "name": "parse_binary",
+    "kind": "function",
+    "line": 123
+   },
+   {
+    "name": "parse_multi",
+    "kind": "function",
+    "line": 137
+   },
+   {
+    "name": "parse_data",
+    "kind": "function",
+    "line": 145
+   },
+   {
+    "name": "hex",
+    "kind": "function",
+    "line": 158
+   },
+   {
+    "name": "keys_follow_split_reg_key",
+    "kind": "function",
+    "line": 168
+   },
+   {
+    "name": "dword_matches_parse_dword_like",
+    "kind": "function",
+    "line": 184
+   },
+   {
+    "name": "qword_binary_multi",
+    "kind": "function",
+    "line": 197
    }
   ],
   "scripts/dev.mjs": [
@@ -45790,6 +46053,33 @@
     "name": "tmpFile",
     "kind": "function",
     "line": 77
+   }
+  ],
+  "tests/sysops.test.ts": [
+   {
+    "name": "psWrite",
+    "kind": "function",
+    "line": 21
+   },
+   {
+    "name": "psRead",
+    "kind": "function",
+    "line": 26
+   },
+   {
+    "name": "opsFor",
+    "kind": "function",
+    "line": 29
+   },
+   {
+    "name": "readsFor",
+    "kind": "function",
+    "line": 51
+   },
+   {
+    "name": "strip",
+    "kind": "function",
+    "line": 54
    }
   ],
   "tests/tempCleanup.test.ts": [

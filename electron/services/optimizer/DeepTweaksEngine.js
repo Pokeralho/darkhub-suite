@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import ElevationHelper from './ElevationHelper.js';
+import SysOps from './SysOps.js';
 import Logger from '../../services/LoggerService.js';
 import { runPowerShell, runPowerShellJson } from '../PowerShellRunner.js';
 import { buildMoreTweaks, candidateChanges, factsFromProbe, resolveTweak, FACTS_SCRIPT } from './MoreTweaks.js';
@@ -876,6 +877,8 @@ class DeepTweaksEngine {
       if (!seen.has(id)) { seen.add(id); unique.push({ key: e.key, name: e.name || '' }); }
     }
     if (unique.length === 0) return new Map();
+    const native = await SysOps.readRegistry(unique, { timeoutMs: 15000 });
+    if (native) return native.size ? native : null;
     try {
       const res = await runPowerShell(buildRegistryReadScript(unique), { timeoutMs: 15000, trim: true });
       if (res.code !== 0 && !res.stdout) return null;
@@ -913,6 +916,19 @@ class DeepTweaksEngine {
         return { code: 1, stdout: '', stderr: e?.message ?? String(e) };
       }
     };
+
+    // Native helper first: HKCU always; machine keys only when this process is already elevated (the installed app
+    // runs as administrator). Otherwise (dev without admin) machine ops and commands keep the single elevated
+    // PowerShell batch, so there is still only one UAC prompt. A helper failure falls back to PowerShell.
+    const nativeWrite = async (idx) => {
+      if (!idx.length) return true;
+      const r = await SysOps.writeRegistry(idx.map((i) => ops[i]));
+      if (!r) return false;
+      idx.forEach((orig, j) => { results[orig] = r[j]; });
+      return true;
+    };
+    if (await nativeWrite(userIdx)) userIdx.length = 0;
+    if (machineIdx.length && SysOps.available() && await ElevationHelper.isElevated() && await nativeWrite(machineIdx)) machineIdx.length = 0;
 
     if (userIdx.length) {
       const res = await exec(buildRegistryScript(userIdx.map((i) => ops[i])), false);

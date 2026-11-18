@@ -1,0 +1,24 @@
+[package]
+name = "darkhub_sysops"
+version = "0.1.0"
+edition = "2021"
+
+# DarkHub.SysOps.exe: the Optimizer's system operations (registry first; services and power plans later) as one
+# JSON request on stdin -> one JSON response on stdout. Replaces the PowerShell scripts the engines used to build.
+
+[[bin]]
+name = "DarkHub_SysOps"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Registry", "Win32_System_Diagnostics_Debug"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "symbols"

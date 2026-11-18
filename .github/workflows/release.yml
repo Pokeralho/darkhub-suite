@@ -80,6 +80,7 @@ jobs:
           }
       - run: npm run build:disk
       - run: npm run build:cleaner
+      - run: npm run build:sysops
       - run: cargo build --release --manifest-path native_gpubench/Cargo.toml
         env:
           RUSTFLAGS: -C target-feature=+crt-static

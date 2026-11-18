@@ -44,6 +44,7 @@ jobs:
       # Rust engines: unit tests (the pacer's tests share global hooks, so one thread)
       - run: cargo test --manifest-path native_disk/Cargo.toml
       - run: cargo test --manifest-path native_cleaner/Cargo.toml
+      - run: cargo test --manifest-path native_sysops/Cargo.toml
       - run: cargo test --manifest-path native_pacer/Cargo.toml -- --test-threads=1
       - run: cargo build --release --target i686-pc-windows-msvc --manifest-path native_pacer/Cargo.toml --lib --bins
       - run: cargo build --release --manifest-path native_gpubench/Cargo.toml

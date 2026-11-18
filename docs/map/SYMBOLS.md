@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-18T14:27:27. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-18T17:23:01. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -618,7 +618,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/optimizer/DeepTweaksEngine.js`
 
-`defineTweak`:48, `buildPublicTweaks`:65, `isMachineDependent`:659, `buildInternalGroups`:662, `snapshotNumber`:706, `DeepTweaksEngine`:747 _class_, `_exclusive`:767, `listTweaks`:774, `ensureResolved`:784, `_resolveMachine`:796, `applyResolution`:808, `getRecommendedIds`:823, `getDefinition`:827, `loadUndoStore`:832, `saveUndoStore`:843, `saveExtra`:857, `getExtra`:861, `clearExtra`:864, `readEntries`:871, `runRegistryOps`:896, `exec`:907, `_entriesFor`:945, `_buildSnapshot`:952, `captureSnapshot`:965, `_writtenRows`:975, `_evalDefStatus`:982, `checkTweaksStatus`:996, `restartExplorer`:1025, `runLiveAction`:1038, `_applyDefsUnlocked`:1058, `writtenFor`:1104, `_finishRun`:1153, `_summarize`:1164, `_restoreDefsUnlocked`:1224
+`defineTweak`:49, `buildPublicTweaks`:66, `isMachineDependent`:660, `buildInternalGroups`:663, `snapshotNumber`:707, `DeepTweaksEngine`:748 _class_, `_exclusive`:768, `listTweaks`:775, `ensureResolved`:785, `_resolveMachine`:797, `applyResolution`:809, `getRecommendedIds`:824, `getDefinition`:828, `loadUndoStore`:833, `saveUndoStore`:844, `saveExtra`:858, `getExtra`:862, `clearExtra`:865, `readEntries`:872, `runRegistryOps`:899, `exec`:910, `nativeWrite`:923, `_entriesFor`:961, `_buildSnapshot`:968, `captureSnapshot`:981, `_writtenRows`:991, `_evalDefStatus`:998, `checkTweaksStatus`:1012, `restartExplorer`:1041, `runLiveAction`:1054, `_applyDefsUnlocked`:1074, `writtenFor`:1120, `_finishRun`:1169, `_summarize`:1180, `_restoreDefsUnlocked`:1240
 
 ## `electron/services/optimizer/DefenderControlEngine.js`
 
@@ -659,6 +659,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `electron/services/optimizer/StorageEngine.js`
 
 `StorageEngine`:6 _class_, `_getStandardizedTempDirs`:11, `unsafeTemp`:15, `add`:21, `_isProtectedPath`:42, `_walk`:67, `_newState`:108, `_deleteDirContents`:112, `_cleaner`:123, `analyzeTempFiles`:131, `cleanTempFiles`:154
+
+## `electron/services/optimizer/SysOps.js`
+
+`defaultExe`:18, `checkIntegrity`:26, `setEngine`:30, `getEngine`:33, `_configure`:38, `available`:44, `request`:56, `changeToOp`:82, `readRegistry`:92, `writeRegistry`:106
 
 ## `electron/services/optimizer/SystemEngine.js`
 
@@ -1059,6 +1063,18 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `native_pacer/tests/e2e.ps1`
 
 `Start-App`:19, `Get-Samples`:30, `Mean-Fps`:34, `Start-Limiter`:41, `Kill-Limiter`:60, `Last-Status`:66, `Wait-AppSecond`:72, `Test-Cap`:78, `Inject-Once`:105, `Test-Safety`:110, `Test-Luid`:148
+
+## `native_sysops/src/main.rs`
+
+`fail`:23, `str_field`:27, `result`:32, `run_op`:39, `handle`:87, `main`:106, `protocol_and_validation`:126
+
+## `native_sysops/src/reg.rs`
+
+`root`:17, `wide`:26, `err_text`:30, `not_found`:40, `drop`:46, `open`:51, `create`:58, `query_raw`:68, `utf16`:89, `decode_sz`:94, `decode_multi`:101, `kind_and_value`:120, `read`:137, `encode`:151, `set`:168, `delete_value`:177, `delete_key`:189, `delete_key_if_empty`:209, `p`:234, `roundtrip_every_type_in_hkcu`:237
+
+## `native_sysops/src/values.rs`
+
+`split_key`:27, `valid_name`:50, `depth`:55, `value_to_string`:69, `parse_dword`:82, `parse_qword`:107, `parse_binary`:123, `parse_multi`:137, `parse_data`:145, `hex`:158, `keys_follow_split_reg_key`:168, `dword_matches_parse_dword_like`:184, `qword_binary_multi`:197
 
 ## `scripts/dev.mjs`
 
@@ -2039,6 +2055,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/susuya.test.ts`
 
 `crop`:14, `fakeSusuya`:34, `send`:41, `tmpFile`:77
+
+## `tests/sysops.test.ts`
+
+`psWrite`:21, `psRead`:26, `opsFor`:29, `readsFor`:51, `strip`:54
 
 ## `tests/tempCleanup.test.ts`
 

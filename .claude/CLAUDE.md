@@ -22,7 +22,7 @@ Os números de linha podem estar desatualizados por alguns commits; confirme com
 - `npx vite build`
 - `npm run selftest` (com `npm run dev` rodando): chama todos os canais de **leitura** do backend nesta máquina, roda cenários funcionais com arquivos temporários (OCR, conversão, metadados, rede, YouTube, descoberta de jogos) e abre todas as telas com o backend real. Relatório e screenshots em `scratch/selftest/`. Nunca executa ações que alteram o sistema.
 - `npm run shot -- <rota>`: screenshot 1366x820 sem backend (layout).
-- Binários nativos: `npm run build:native` (C#) e `npm run build:pacer` (Rust; precisa do cargo)
+- Binários nativos: `npm run build:native` (C#), `npm run build:pacer` e `npm run build:sysops` (Rust; precisam do cargo)
 
 ## Regras do projeto
 
