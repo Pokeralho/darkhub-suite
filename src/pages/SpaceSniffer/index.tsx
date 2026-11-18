@@ -39,6 +39,8 @@ export default function DiskMap() {
   const [volume, setVolume] = useState<{ total: number; free: number } | null>(null);
   const [selected, setSelected] = useState<DiskMapNode | null>(null);
   const [info, setInfo] = useState<DiskMapInfo | null>(null);
+  // items inside $Recycle.Bin: where they were deleted from, or an orphan whose record is gone
+  const [binInfo, setBinInfo] = useState<{ original: string | null; orphan: boolean } | null>(null);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [confirmTrash, setConfirmTrash] = useState(false);
   // Drives without a usable Recycle Bin: an explicit "delete for good", step 1 = offer, step 2 = type the name.
@@ -100,6 +102,10 @@ export default function DiskMap() {
     api()?.info({ id: selected.id, filter })
       .then((r) => { if (!cancelled) setInfo(r?.ok ? r.info || null : null); })
       .catch(() => { if (!cancelled) setInfo(null); });
+    setBinInfo(null);
+    api()?.recycleInfo?.({ id: selected.id })
+      .then((r) => { if (!cancelled && r?.ok && r.inBin) setBinInfo({ original: r.original, orphan: r.orphan }); })
+      .catch(() => { /* older backend */ });
     return () => { cancelled = true; };
   }, [selected, filter, version]);
 
@@ -507,6 +513,15 @@ export default function DiskMap() {
               <div>
                 <div className="text-[13.5px] font-semibold text-zinc-100 break-words">{info.isRoot ? info.path : info.name}</div>
                 <div className="mt-1 font-mono text-[11px] text-zinc-500 break-all">{info.path}</div>
+                {binInfo && (
+                  <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-[11.5px] text-amber-200" role="note">
+                    {binInfo.original
+                      ? <>{t('diskmap.bin.from', 'In the Recycle Bin. Deleted from:')} <span className="font-mono break-all">{binInfo.original}</span></>
+                      : binInfo.orphan
+                        ? t('diskmap.bin.orphan', 'Orphaned Recycle Bin item: Windows lost its record, so it does not show in the Recycle Bin and its original path is unknown. Use "Delete for good" to free the space.')
+                        : t('diskmap.bin.inside', 'Inside the Recycle Bin.')}
+                  </div>
+                )}
               </div>
               <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 text-[12px]">
                 <dt className="text-zinc-500">{t('diskmap.size', 'Size')}</dt>

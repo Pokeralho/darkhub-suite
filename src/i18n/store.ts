@@ -76,7 +76,11 @@ function loadNamespaceFor(lang: string, ns: Namespace): Promise<void> {
   if (!loader) return Promise.resolve();
   return once(`${lang}:${ns}`, async () => {
     const mod = await loader();
-    addParts(lang, [[NAMESPACE_ORDER[ns], mod.default]]);
+    // +0.5: its own slot right after the eager part of the same dictionary (sshEager, psToolsEager, recoveryEager
+    // sit at NAMESPACE_ORDER in the core chunk). Sharing the slot made one replace the other: the eager keys
+    // (sidebar labels, rescue.err.*) vanished once the screen loaded, and on a live language switch a core chunk
+    // landing after the namespace dropped the whole screen dictionary.
+    addParts(lang, [[NAMESPACE_ORDER[ns] + 0.5, mod.default]]);
   });
 }
 

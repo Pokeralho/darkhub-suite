@@ -52,8 +52,9 @@ const Skel = ({ w = 'w-14', h = 'h-[18px]' }: { w?: string; h?: string }) => (
 
 // Renders a polled reading: '...' = not yet received (skeleton), 'Erro' = sensor failed, else value + dim unit.
 const Reading = ({ value, unit, tone = 'text-zinc-50' }: { value: string; unit?: string; tone?: string }) => {
+  const { t } = useI18n();
   if (value === '...') return <Skel />;
-  if (value === 'Erro') return <span className="text-[13px] text-red-400">Erro</span>;
+  if (value === 'Erro') return <span className="text-[13px] text-red-400">{t('common.error', 'Erro')}</span>;
   return <span className={tone}>{value}{unit ? <span className="ml-0.5 text-[12px] text-zinc-500">{unit}</span> : null}</span>;
 };
 
@@ -192,14 +193,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
     if (cpuVal != null && cpuVal >= 85) { healthy = false; factors.push(`CPU ${cpuVal.toFixed(0)}%`); }
     if (memPct != null && memPct >= 90) { healthy = false; factors.push(`RAM ${memPct.toFixed(0)}%`); }
-    if (diskActivityVal != null && diskActivityVal >= 95) { healthy = false; factors.push(`Disco ${diskActivityVal.toFixed(0)}%`); }
+    if (diskActivityVal != null && diskActivityVal >= 95) { healthy = false; factors.push(`${t('dashboard.health.disk', 'Disco')} ${diskActivityVal.toFixed(0)}%`); }
 
     const dUseNum = parseFloat(diskUse);
-    if (!isNaN(dUseNum) && dUseNum >= 90) { healthy = false; factors.push(`C: cheio ${dUseNum.toFixed(0)}%`); }
+    if (!isNaN(dUseNum) && dUseNum >= 90) { healthy = false; factors.push(t('dashboard.health.diskFull', 'C: cheio {n}%').replace('{n}', dUseNum.toFixed(0))); }
 
     const errorCount = [metrics?.cpu?.status, metrics?.ram?.status, metrics?.storage?.status, metrics?.network?.status]
       .filter(s => s === 'Error').length;
-    if (errorCount >= 3) { factors.push('Sensores offline'); }
+    if (errorCount >= 3) { factors.push(t('dashboard.statusOffline', 'Sensores offline')); }
     // The red security score must not sit next to a green "Optimal".
     if (securityScore != null && securityScore < 50) { healthy = false; factors.push(`${t('dashboard.securityShort', 'Segurança')} ${securityScore}/100`); }
 
@@ -409,7 +410,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       chart: <Sparkline data={gpuLoadHistory} min={0} max={100} color={glacier} height={32} strokeWidth={1.25} />
     },
     {
-      key: 'ram', icon: Server, label: t('dashboard.ramInUse', 'RAM em uso'), onClick: handleOptimizeRam, title: 'Clique para flush imediato de RAM',
+      key: 'ram', icon: Server, label: t('dashboard.ramInUse', 'RAM em uso'), onClick: handleOptimizeRam, title: t('dashboard.cell.ramFlushTitle', 'Clique para flush imediato de RAM'),
       value: memPct != null ? <span className={memTone}>{memPct.toFixed(1)}<span className="text-zinc-500">%</span></span> : null,
       chart: <Sparkline data={memPctHistory} min={0} max={100} color={glacier} height={32} strokeWidth={1.25} />
     },
@@ -445,7 +446,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           icon={Cpu}
           label={t('dashboard.cpu')}
           hint={t('dashboard.chart', 'Gráfico')}
-          title="Clique para abrir o Monitor de Sensores e Hardware"
+          title={t('dashboard.cell.cpuTitle', 'Clique para abrir o Monitor de Sensores e Hardware')}
           onClick={() => onNavigate && onNavigate('monitor')}
           sub={cpuTopology?.logical_cores ? `${cpuTopology.logical_cores} threads` : null}
         >
@@ -456,7 +457,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           icon={isOptimizingRam ? Loader2 : Layers}
           label={t('dashboard.ram')}
           hint={t('dashboard.free', 'Liberar')}
-          title="Clique para otimizar a memória RAM e liberar WorkingSets"
+          title={t('dashboard.cell.ramTitle', 'Clique para otimizar a memória RAM e liberar WorkingSets')}
           onClick={handleOptimizeRam}
         >
           {isOptimizingRam
@@ -467,15 +468,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <MetricCell
           icon={Trash2}
           label={t('dashboard.junk')}
-          title="Clique para limpar arquivos temporários e cache"
+          title={t('dashboard.cell.junkTitle', 'Clique para limpar arquivos temporários e cache')}
           onClick={handleCleanJunk}
           aside={
             <button
               type="button"
               onClick={() => { refreshJunk?.(true); }}
               disabled={junkLoading}
-              title="Recalcular lixo e caches residuais"
-              aria-label="Recalcular lixo e caches residuais"
+              title={t('dashboard.cell.junkRescan', 'Recalcular lixo e caches residuais')}
+              aria-label={t('dashboard.cell.junkRescan', 'Recalcular lixo e caches residuais')}
               className="-my-1 -mr-1 p-1 rounded text-zinc-600 hover:text-blue-300 hover:bg-zinc-800 disabled:opacity-60"
             >
               <RefreshCw size={12} className={junkLoading ? 'animate-spin text-blue-300' : ''} />
@@ -491,7 +492,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <MetricCell
           icon={HardDrive}
           label={t('dashboard.diskActivity', 'Atividade de disco')}
-          title="Clique para abrir as Otimizações de Disco e Sistema"
+          title={t('dashboard.cell.diskTitle', 'Clique para abrir as Otimizações de Disco e Sistema')}
           onClick={() => onNavigate && onNavigate('optimizer')}
           sub={diskStatus === 'OK' && diskReadKb !== '...'
             ? <>R {diskReadKb}<span className="text-zinc-600">K</span> · W {diskWriteKb}<span className="text-zinc-600">K</span></>
@@ -503,7 +504,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <MetricCell
           icon={ArrowDownUp}
           label={t('dashboard.network')}
-          title="Clique para abrir Ferramentas e Diagnóstico de Rede"
+          title={t('dashboard.cell.netTitle', 'Clique para abrir Ferramentas e Diagnóstico de Rede')}
           onClick={() => onNavigate && onNavigate('networktools')}
           sub={netStatus === 'OK' && rxKb !== '...' ? <>↑ {txKb}<span className="text-zinc-600"> KB/s</span></> : null}
         >

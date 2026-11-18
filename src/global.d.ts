@@ -1237,8 +1237,10 @@ export interface DarkHubAPI {
     tag: (payload: { id: string; color: DiskMapTag | null }) => Promise<{ ok: boolean; error?: string }>;
     open: (payload: { id: string }) => Promise<{ ok: boolean; error?: string }>;
     reveal: (payload: { id: string }) => Promise<{ ok: boolean; error?: string }>;
-    trash: (payload: { id: string }) => Promise<{ ok: boolean; error?: string; path?: string; partial?: boolean; noRecycle?: 'noBin' | 'disabled' | 'tooBig' | 'unknown' }>;
+    trash: (payload: { id: string }) => Promise<{ ok: boolean; error?: string; path?: string; partial?: boolean; noRecycle?: 'noBin' | 'disabled' | 'tooBig' | 'unknown' | 'inBin' }>;
     deletePermanent: (payload: { id: string; confirmName: string }) => Promise<{ ok: boolean; error?: string; path?: string; partial?: boolean }>;
+    /** For items inside a Recycle Bin: original path from the $I record, or orphan when that record is gone. */
+    recycleInfo: (payload: { id: string }) => Promise<{ ok: boolean; inBin: boolean; original: string | null; orphan: boolean }>;
     exportReport: (payload: { id?: string; format: 'txt' | 'csv'; filter?: string }) => Promise<{ ok: boolean; canceled?: boolean; error?: string; path?: string; rows?: number }>;
     onProgress: (callback: (status: DiskMapStatus) => void) => () => void;
   };

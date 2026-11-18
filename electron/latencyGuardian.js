@@ -13,7 +13,7 @@ import { encodePowerShellScript, powerShellArgsForEncodedScript } from './servic
 import { isSafeHost } from './services/network/hostValidation.js'
 import nativeLatencyClient from './services/NativeLatencyClient.js'
 import appEvents from './services/appEvents.js'
-import { persistableUndo, writeUndoRecord, readUndoRecord, clearUndoRecord } from './services/latencyUndoStore.js'
+import { persistableUndo, writeUndoRecord, readUndoRecord, clearUndoRecord, normalizeTcpPrev } from './services/latencyUndoStore.js'
 
 const PROCESS_OWNER = 'latencyGuardian'
 
@@ -443,7 +443,13 @@ public static class NtTimer {
       $ErrorActionPreference='Stop'
       $a=${psSingleQuote(adapter)}
       $s = Get-DnsClientServerAddress -InterfaceAlias $a -AddressFamily IPv4
-      [PSCustomObject]@{ adapter=$a; servers=@($s.ServerAddresses) } | ConvertTo-Json -Compress
+      # servers handed out by DHCP are not a static list: an empty "prev" makes the revert go back to DHCP
+      # (-ResetServerAddresses) instead of pinning today's DHCP servers as static ones
+      $ifGuid = ([string](Get-NetAdapter -Name $a).InterfaceGuid).Trim('{}')
+      $static = [string](Get-ItemProperty -LiteralPath "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{$ifGuid}" -Name NameServer -ErrorAction SilentlyContinue).NameServer
+      $list = @()
+      if ($static.Trim()) { $list = @($s.ServerAddresses) }
+      [PSCustomObject]@{ adapter=$a; servers=@($list) } | ConvertTo-Json -Compress
     `
     const { code: c1, stdout: o1, stderr: e1 } = await runPowerShell(psRead, { timeoutMs: 12000 })
     if (c1 !== 0) throw new Error(e1 || 'Failed to read DNS servers')
@@ -529,8 +535,10 @@ public static class NtTimer {
       $ErrorActionPreference='Stop'
       ${PS_SELECT_PRIMARY_ADAPTER}
       if ($null -eq $a) { throw 'Active network adapter not found' }
-      $guid = (Get-NetAdapter -Name $a.Name).InterfaceGuid.ToString()
+      # InterfaceGuid already comes as "{...}": wrapping it again wrote to a non-existent "{{...}}" key (no effect)
+      $guid = ([string](Get-NetAdapter -Name $a.Name).InterfaceGuid).Trim('{}')
       $k = "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{$guid}"
+      if (-not (Test-Path -LiteralPath $k)) { throw "Tcpip interface key not found: $k" }
       [PSCustomObject]@{
         key = $k
         TcpAckFrequency = (Get-ItemProperty -Path $k -Name TcpAckFrequency -ErrorAction SilentlyContinue).TcpAckFrequency
@@ -547,7 +555,7 @@ public static class NtTimer {
     const psWrite = `
       $ErrorActionPreference='Stop'
       $k = ${psSingleQuote(key)}
-      if (-not (Test-Path -LiteralPath $k)) { New-Item -Path $k -Force | Out-Null }
+      if (-not (Test-Path -LiteralPath $k)) { throw "Tcpip interface key not found: $k" }
       Set-ItemProperty -Path $k -Name TcpAckFrequency -Type DWord -Value 1 -Force
       Set-ItemProperty -Path $k -Name TCPNoDelay -Type DWord -Value 1 -Force
       Set-ItemProperty -Path $k -Name TcpDelAckTicks -Type DWord -Value 0 -Force
@@ -595,6 +603,14 @@ public static class NtTimer {
       const v = String(stripBom(r.stdout ?? '')).trim().toLowerCase()
       if (r.code === 0 && (v === 'enabled' || v === 'disabled')) rscPrev = v
     } catch {}
+    // the other switches too: "default" is not what many systems run (DarkOS ships timestamps off, SYN retries 4),
+    // and netsh refuses "maxsynretransmissions=default" outright. Read through the CIM class (not localized).
+    let prev = null
+    try {
+      const r = await runPowerShell(`$t = Get-NetTCPSetting -SettingName Internet -ErrorAction Stop; [pscustomobject]@{ Timestamps = [string]$t.Timestamps; EcnCapability = [string]$t.EcnCapability; MaxSynRetransmissions = [int]$t.MaxSynRetransmissions } | ConvertTo-Json -Compress`, { timeoutMs: 8000 })
+      const o = r.code === 0 ? safeJsonParse(stripBom(r.stdout), null) : null
+      if (o) prev = normalizeTcpPrev({ timestamps: o.Timestamps, ecn: o.EcnCapability, maxSyn: o.MaxSynRetransmissions })
+    } catch {}
     const ps = `
       $ErrorActionPreference='SilentlyContinue'
       netsh int tcp set global timestamps=disabled | Out-Null
@@ -605,17 +621,22 @@ public static class NtTimer {
       netsh int tcp set global fastopen=enabled | Out-Null
     `
     await runPowerShell(ps, { timeoutMs: 10000 })
-    return { optimized: true, rscPrev }
+    return prev ? { optimized: true, rscPrev, prev } : { optimized: true, rscPrev }
   }
 
-  async function restoreGlobalTcpStack(rscPrev) {
+  async function restoreGlobalTcpStack(rscPrev, prevIn) {
     const rsc = rscPrev === 'enabled' || rscPrev === 'disabled' ? rscPrev : 'default'
+    const prev = normalizeTcpPrev(prevIn) || {}
+    // records written before the previous values were kept: Windows' own defaults (SYN retries: 4)
+    const ts = prev.timestamps || 'default'
+    const ecn = prev.ecn || 'default'
+    const syn = prev.maxSyn || 4
     const ps = `
       $ErrorActionPreference='SilentlyContinue'
-      netsh int tcp set global timestamps=default | Out-Null
-      netsh int tcp set global ecncapability=default | Out-Null
+      netsh int tcp set global timestamps=${ts} | Out-Null
+      netsh int tcp set global ecncapability=${ecn} | Out-Null
       netsh int tcp set global rsc=${rsc} | Out-Null
-      netsh int tcp set global maxsynretransmissions=default | Out-Null
+      netsh int tcp set global maxsynretransmissions=${syn} | Out-Null
       netsh int tcp set global fastopen=default | Out-Null
     `
     await runPowerShell(ps, { timeoutMs: 10000 })
@@ -858,7 +879,7 @@ public static class NtTimer {
     } catch {}
 
     try {
-      if (u.tcpStack?.optimized) await restoreGlobalTcpStack(u.tcpStack.rscPrev)
+      if (u.tcpStack?.optimized) await restoreGlobalTcpStack(u.tcpStack.rscPrev, u.tcpStack.prev)
     } catch {}
   }
 

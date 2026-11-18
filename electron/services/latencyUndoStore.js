@@ -16,7 +16,26 @@ const QOS_NAME_RE = /^DarkHub-ULLM-[0-9a-f]{10}$/
 const IP_RE = /^(?:\d{1,3}(?:\.\d{1,3}){3}|[0-9A-Fa-f:]{2,39}(?:%\d{1,3})?)$/
 const RSC_VALUES = new Set(['enabled', 'disabled'])
 
+const TS_VALUES = new Set(['enabled', 'disabled', 'allowed'])
+const ECN_VALUES = new Set(['enabled', 'disabled'])
+
 const isObj = (v) => v != null && typeof v === 'object' && !Array.isArray(v)
+
+/**
+ * Global TCP values read before Ultra changed them (Get-NetTCPSetting Internet): only the words / range netsh accepts,
+ * since they end up on an elevated netsh command line. Null when nothing usable.
+ */
+export function normalizeTcpPrev(p) {
+  if (!isObj(p)) return null
+  const out = {}
+  const ts = String(p.timestamps ?? '').toLowerCase()
+  if (TS_VALUES.has(ts)) out.timestamps = ts
+  const ecn = String(p.ecn ?? '').toLowerCase()
+  if (ECN_VALUES.has(ecn)) out.ecn = ecn
+  const syn = Number(p.maxSyn)
+  if (Number.isInteger(syn) && syn >= 2 && syn <= 8) out.maxSyn = syn
+  return Object.keys(out).length ? out : null
+}
 const applied = (v) => isObj(v) && !v.error
 const shortStr = (v, max = 512) => (typeof v === 'string' && v.length <= max ? v : null)
 const regValue = (v) => (v === undefined || v === null || v === '' ? null : (typeof v === 'string' || typeof v === 'number') && String(v).length <= 64 ? v : undefined)
@@ -71,7 +90,8 @@ export function persistableUndo(undo, { exePath = '' } = {}) {
   }
   if (applied(u.tcpStack) && u.tcpStack.optimized === true) {
     const rscPrev = RSC_VALUES.has(String(u.tcpStack.rscPrev ?? '').toLowerCase()) ? String(u.tcpStack.rscPrev).toLowerCase() : null
-    out.tcpStack = { optimized: true, rscPrev }
+    const prev = normalizeTcpPrev(u.tcpStack.prev)
+    out.tcpStack = prev ? { optimized: true, rscPrev, prev } : { optimized: true, rscPrev }
   }
   if (!Object.keys(out).length) return null
   return { version: UNDO_VERSION, savedAt: Date.now(), exePath: shortStr(String(exePath ?? ''), 1024) ?? '', undo: out }

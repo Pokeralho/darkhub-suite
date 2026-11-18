@@ -279,6 +279,12 @@ if (-not $abort -and $wuIds.Count -gt 0) {
   }
 }
 
+# .NET Framework's recursive Directory.Delete removes a junction found inside without following it, but then throws
+# (DeleteVolumeMountPoint: 'parameter is incorrect') and leaves the now-empty folder behind: a second pass removes it.
+function Remove-DhTree([string]$p) {
+  try { [IO.Directory]::Delete($p, $true) } catch { try { [IO.Directory]::Delete($p, $true) } catch { } }
+}
+
 if (-not $abort) {
   # Admin copies left by earlier runs (an installer launched without waiting still ran from its folder): older than
   # a day. Reparse points are skipped and [IO.Directory]::Delete never follows a junction inside the folder, so a link
@@ -286,7 +292,7 @@ if (-not $abort) {
   try {
     Get-ChildItem -LiteralPath (Join-Path $env:SystemRoot 'Temp') -Directory -Filter 'DarkHubDrv_*' -Force -ErrorAction SilentlyContinue |
       Where-Object { -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -and $_.LastWriteTime -lt (Get-Date).AddDays(-1) } |
-      ForEach-Object { try { [IO.Directory]::Delete($_.FullName, $true) } catch { } }
+      ForEach-Object { Remove-DhTree $_.FullName }
   } catch { }
   foreach ($p in $packages) {
     $dir = $null
@@ -317,7 +323,7 @@ if (-not $abort) {
     } catch { DhP $p.id 'failed' $_.Exception.Message }
     finally {
       # the verified copy of a GPU driver is 0.7-1.5 GB: never leave it behind
-      if ($dir -and -not $keepDir) { try { [IO.Directory]::Delete($dir, $true) } catch { } }
+      if ($dir -and -not $keepDir) { Remove-DhTree $dir }
     }
   }
 }

@@ -3,6 +3,21 @@ import { useEffect, useRef, type RefObject } from 'react'
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
+// Open dialogs, in the order their effects ran. Only the one on top (e.g. an SSH confirm Modal over a Drawer)
+// reacts to Escape / Tab; otherwise every open dialog's capture listener would run and Escape would close them all.
+type OpenDialog = { ref: RefObject<HTMLElement | null> }
+const openStack: OpenDialog[] = []
+
+/** The dialog on top: no other open dialog sits inside it, and it opened last among those. */
+function topDialog(): OpenDialog | undefined {
+  // React runs a child's effects before its parent's, so a dialog nested in the DOM wins over open order.
+  const leaves = openStack.filter((d) => {
+    const root = d.ref.current
+    return !openStack.some((o) => o !== d && root && o.ref.current && o.ref.current !== root && root.contains(o.ref.current))
+  })
+  return leaves[leaves.length - 1]
+}
+
 /**
  * Keyboard basics for a modal dialog (pair it with role="dialog" aria-modal="true" on the container):
  *  - moves focus into the dialog when it opens (first focusable element, else the container),
@@ -33,7 +48,11 @@ export function useDialogA11y(
       }
     }
 
+    const token: OpenDialog = { ref }
+    openStack.push(token)
+
     const onKey = (e: KeyboardEvent) => {
+      if (topDialog() !== token) return
       if (e.key === 'Escape') {
         if (onCloseRef.current) {
           e.stopPropagation()
@@ -64,6 +83,8 @@ export function useDialogA11y(
     document.addEventListener('keydown', onKey, true)
     return () => {
       document.removeEventListener('keydown', onKey, true)
+      const at = openStack.indexOf(token)
+      if (at >= 0) openStack.splice(at, 1)
       if (previous && typeof previous.focus === 'function' && previous.isConnected) {
         try { previous.focus() } catch { /* element may be gone */ }
       }

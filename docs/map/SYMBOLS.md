@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-18T10:42:14. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-18T14:27:27. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -230,7 +230,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/latencyGuardian.js`
 
-`now`:20, `clampInt`:24, `stablePolicyName`:30, `safeJsonParse`:35, `psSingleQuote`:44, `encodedPowerShellArgs`:48, `isSafePingHost`:52, `registerLatencyGuardian`:57, `broadcastEvent`:70, `loadConfig`:140, `normalizeConfig`:152, `saveConfig`:196, `getProcessSnapshot`:203, `findGameProcess`:214, `setPowerPlanHighPerformance`:230, `restorePowerPlan`:242, `startTimerResolution05ms`:248, `clear`:274, `stopTimerResolution`:282, `setGamePriorityHigh`:293, `setDisableFullscreenOptimizations`:309, `restoreFullscreenOptimizations`:334, `setMouseAccelerationDisabled`:353, `restoreMouseAcceleration`:380, `setGpuHighPerformancePreference`:395, `restoreGpuPreference`:419, `applyDnsCloudflareWithUndo`:438, `restoreDns`:474, `setQosForExe`:494, `removeQosPolicy`:518, `setNagleDisabledOnActiveInterface`:526, `restoreNagle`:573, `optimizeGlobalTcpStack`:589, `restoreGlobalTcpStack`:611, `killBackgroundProcesses`:624, `serializeTransition`:645, `ultraEnable`:651, `ultraDisable`:655, `ultraEnableImpl`:659, `setApplied`:678, `restoreUndo`:827, `done`:829, `revertLeftoverUndo`:866, `ultraDisableImpl`:878, `unregisterHotkey`:903, `registerHotkey`:909, `updateMetricsFast`:926, `updateGpuUsage`:936, `updatePing`:957, `finish`:979, `smartCleanRam`:992, `loop`:1025, `loopTick`:1036, `syncLoops`:1070, `syncSmartClean`:1092, `start`:1107, `stop`:1114, `splitArgs`:1256
+`now`:20, `clampInt`:24, `stablePolicyName`:30, `safeJsonParse`:35, `psSingleQuote`:44, `encodedPowerShellArgs`:48, `isSafePingHost`:52, `registerLatencyGuardian`:57, `broadcastEvent`:70, `loadConfig`:140, `normalizeConfig`:152, `saveConfig`:196, `getProcessSnapshot`:203, `findGameProcess`:214, `setPowerPlanHighPerformance`:230, `restorePowerPlan`:242, `startTimerResolution05ms`:248, `clear`:274, `stopTimerResolution`:282, `setGamePriorityHigh`:293, `setDisableFullscreenOptimizations`:309, `restoreFullscreenOptimizations`:334, `setMouseAccelerationDisabled`:353, `restoreMouseAcceleration`:380, `setGpuHighPerformancePreference`:395, `restoreGpuPreference`:419, `applyDnsCloudflareWithUndo`:438, `restoreDns`:480, `setQosForExe`:500, `removeQosPolicy`:524, `setNagleDisabledOnActiveInterface`:532, `restoreNagle`:581, `optimizeGlobalTcpStack`:597, `restoreGlobalTcpStack`:627, `killBackgroundProcesses`:645, `serializeTransition`:666, `ultraEnable`:672, `ultraDisable`:676, `ultraEnableImpl`:680, `setApplied`:699, `restoreUndo`:848, `done`:850, `revertLeftoverUndo`:887, `ultraDisableImpl`:899, `unregisterHotkey`:924, `registerHotkey`:930, `updateMetricsFast`:947, `updateGpuUsage`:957, `updatePing`:978, `finish`:1000, `smartCleanRam`:1013, `loop`:1046, `loopTick`:1057, `syncLoops`:1091, `syncSmartClean`:1113, `start`:1128, `stop`:1135, `splitArgs`:1277
 
 ## `electron/libraryStore.js`
 
@@ -250,7 +250,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/preload.js`
 
-`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:185, `listener`:196, `handler`:235, `handler`:298, `handler`:317, `handler`:327, `handler`:345, `handler`:357, `listener`:400, `handler`:464, `handler`:490, `handler`:496, `handler`:502, `handler`:508, `listener`:517, `listener`:528, `handler`:553, `listener`:566, `listener`:585, `handler`:654, `handler`:678, `handler`:693, `listener`:717, `listener`:746, `listener`:781, `listener`:808, `handler`:849
+`pathsOf`:5, `handler`:10, `handler`:56, `listener`:90, `listener`:159, `listener`:164, `listener`:185, `listener`:196, `handler`:235, `handler`:298, `handler`:317, `handler`:327, `handler`:345, `handler`:357, `listener`:400, `handler`:464, `handler`:490, `handler`:496, `handler`:502, `handler`:508, `listener`:517, `listener`:528, `handler`:553, `listener`:566, `listener`:585, `handler`:654, `handler`:678, `handler`:693, `listener`:718, `listener`:747, `listener`:782, `listener`:809, `handler`:850
 
 ## `electron/services/CodeRunner.js`
 
@@ -266,7 +266,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/DarkHub.ClickEngine.cs`
 
-`ClickEngine`:11 _class_, `INPUT`:14 _class_, `INPUTUNION`:21 _class_, `MOUSEINPUT`:30 _class_, `KEYBDINPUT`:41 _class_, `POINT`:51 _class_, `MacroRecord`:57 _class_, `SendInput`:67, `mouse_event`:70, `keybd_event`:73, `MapVirtualKeyA`:76, `GetCursorPos`:79, `SetCursorPos`:82, `GetSystemMetrics`:85, `GetForegroundWindow`:88, `GetWindowThreadProcessId`:91, `SetProcessDPIAware`:94, `OpenInputDesktop`:97, `SetThreadDesktop`:100, `CloseDesktop`:103, `GetAsyncKeyState`:106, `timeBeginPeriod`:109, `timeEndPeriod`:112, `CreateWaitableTimerExW`:115, `SetWaitableTimer`:118, `WaitForSingleObject`:121, `CloseHandle`:124, `EmitJson`:193, `AttachInputDesktop`:201, `WaitPreciseMs`:217, `SendMouseButtonDown`:262, `SendMouseButtonUp`:281, `SendMouseMoveAbsolute`:300, `IsExtendedVk`:337, `SendKeyTransition`:345, `ReleaseAllButtons`:374, `ReleaseAllKeysAndButtons`:385, `PerformClick`:402, `WorkerLoop`:434, `RunClickLoop`:451, `GetMacroDurationMs`:507, `SaveRecFile`:515, `ReadRecFile`:538, `IsHotkeyKey`:573, `RecordWorkerLoop`:581, `MacroPlayWorkerLoop`:752, `ParseVkKey`:915, `ParseHotkey`:968, `Down`:986, `ModsDown`:988, `HotkeyListenerLoop`:998, `StopMacroInternalUnlocked`:1068, `StartMacroRecording`:1081, `StopMacroRecording`:1110, `StartMacroPlayback`:1125, `StopMacroPlayback`:1161, `StartClicking`:1177, `StopClicking`:1204, `AcquireTimerPeriod`:1224, `ReleaseTimerPeriod`:1236, `RunWithTimer`:1250, `Cleanup`:1260, `SetHotkey`:1277, `SetMacroHotkeys`:1286, `Arm`:1298, `DecodeB64Utf8`:1310, `Main`:1323
+`ClickEngine`:11 _class_, `INPUT`:14 _class_, `INPUTUNION`:21 _class_, `MOUSEINPUT`:30 _class_, `KEYBDINPUT`:41 _class_, `POINT`:51 _class_, `MacroRecord`:57 _class_, `SendInput`:67, `mouse_event`:70, `keybd_event`:73, `MapVirtualKeyA`:76, `GetCursorPos`:79, `SetCursorPos`:82, `GetSystemMetrics`:85, `GetForegroundWindow`:88, `GetWindowThreadProcessId`:91, `SetProcessDPIAware`:94, `OpenInputDesktop`:97, `SetThreadDesktop`:100, `CloseDesktop`:103, `GetAsyncKeyState`:106, `timeBeginPeriod`:109, `timeEndPeriod`:112, `CreateWaitableTimerExW`:115, `SetWaitableTimer`:118, `WaitForSingleObject`:121, `CloseHandle`:124, `EmitJson`:192, `AttachInputDesktop`:200, `WaitPreciseMs`:216, `SendMouseButtonDown`:261, `SendMouseButtonUp`:280, `SendMouseMoveAbsolute`:299, `IsExtendedVk`:336, `SendKeyTransition`:344, `ReleaseAllButtons`:373, `ReleaseAllKeysAndButtons`:384, `PerformClick`:401, `WorkerLoop`:433, `RunClickLoop`:450, `GetMacroDurationMs`:506, `SaveRecFile`:514, `ReadRecFile`:537, `IsHotkeyKey`:572, `RecordWorkerLoop`:580, `MacroPlayWorkerLoop`:751, `ParseVkKey`:914, `ParseHotkey`:967, `Down`:985, `ModsDown`:987, `HotkeyListenerLoop`:997, `StopMacroInternalUnlocked`:1067, `StartMacroRecording`:1080, `StopMacroRecording`:1109, `StartMacroPlayback`:1124, `StopMacroPlayback`:1160, `StartClicking`:1176, `StopClicking`:1203, `TimerPeriodRefCount`:1222 _class_, `Acquire`:1238, `Release`:1251, `ForceRelease`:1265, `Wrap`:1279, `RunWithTimer`:1294, `ForceReleaseTimerPeriod`:1299, `Cleanup`:1304, `SetHotkey`:1313, `SetMacroHotkeys`:1322, `Arm`:1334, `DecodeB64Utf8`:1346, `Main`:1359
 
 ## `electron/services/DarkHub.DiskScan.cs`
 
@@ -286,7 +286,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/DarkHub.LatencyEngine.cs`
 
-`PROCESS_POWER_THROTTLING_STATE`:17 _class_, `DarkHubLatencyEngine`:24 _class_, `NtSetTimerResolution`:29, `NtQueryTimerResolution`:32, `TimeBeginPeriod`:35, `TimeEndPeriod`:38, `AvSetMmThreadCharacteristicsW`:41, `AvRevertMmThreadCharacteristics`:44, `OpenProcess`:47, `SetPriorityClass`:50, `SetProcessPriorityBoost`:53, `SetProcessAffinityMask`:56, `GetProcessAffinityMask`:59, `CloseHandle`:62, `GetCurrentProcess`:65, `GetCurrentThread`:68, `SetThreadPriority`:71, `SetProcessInformation`:74, `IcmpCreateFile`:77, `IcmpCloseHandle`:80, `IcmpSendEcho`:83, `EmptyWorkingSet`:95, `GetForegroundWindow`:98, `GetWindowThreadProcessId`:101, `ForegroundPid`:104, `RECT`:114 _class_, `MONITORINFO`:117 _class_, `MonitorFromWindow`:120, `GetMonitorInfo`:123, `SetThreadDpiAwarenessContext`:126, `ForegroundMonitor`:129, `Main`:181, `NamedPipeServerWorker`:237, `HandleCommand`:267, `LockTimerResolution`:366, `UnlockTimerResolution`:390, `TimerWorkerLoop`:404, `QueryTimerResolutionInternal`:463, `HandleBoostProcess`:489, `HandleSetAffinity`:541, `HandleListProcesses`:573, `HandleCleanRam`:591, `GetLogicalProcessorInformationEx`:631, `Group0Mask`:640, `GetCpuTopologyInternal`:661, `HandlePingNative`:772, `IP_OPTION_INFORMATION`:859 _class_, `ICMP_ECHO_REPLY`:869 _class_, `SendJson`:880, `FormatResponse`:885, `DictionaryToJson`:896, `ObjectToJson`:912, `GetJsonStringValue`:937, `GetJsonIntValue`:949, `GetJsonBoolValue`:963
+`PROCESS_POWER_THROTTLING_STATE`:17 _class_, `DarkHubLatencyEngine`:24 _class_, `NtSetTimerResolution`:29, `NtQueryTimerResolution`:32, `TimeBeginPeriod`:35, `TimeEndPeriod`:38, `AvSetMmThreadCharacteristicsW`:41, `AvRevertMmThreadCharacteristics`:44, `OpenProcess`:47, `SetPriorityClass`:50, `SetProcessPriorityBoost`:53, `SetProcessAffinityMask`:56, `GetProcessAffinityMask`:59, `CloseHandle`:62, `GetCurrentProcess`:65, `GetCurrentThread`:68, `SetThreadPriority`:71, `SetProcessInformation`:74, `IcmpCreateFile`:77, `IcmpCloseHandle`:80, `IcmpSendEcho`:83, `EmptyWorkingSet`:95, `GetForegroundWindow`:98, `GetWindowThreadProcessId`:101, `ForegroundPid`:104, `RECT`:114 _class_, `MONITORINFO`:117 _class_, `MonitorFromWindow`:120, `GetMonitorInfo`:123, `SetThreadDpiAwarenessContext`:126, `ForegroundMonitor`:129, `Main`:181, `NamedPipeServerWorker`:237, `HandleCommand`:267, `LockTimerResolution`:366, `UnlockTimerResolution`:390, `TimerWorkerLoop`:404, `QueryTimerResolutionInternal`:463, `HandleBoostProcess`:489, `HandleSetAffinity`:541, `HandleListProcesses`:573, `HandleCleanRam`:591, `GetLogicalProcessorInformationEx`:631, `CpuCoreRecord`:638 _class_, `CpuL3Record`:646 _class_, `Group0Mask`:657, `ParseProcessorInfo`:675, `SelectCpuTopology`:716, `GetCpuTopologyInternal`:775, `HandlePingNative`:803, `IP_OPTION_INFORMATION`:890 _class_, `ICMP_ECHO_REPLY`:900 _class_, `SendJson`:911, `FormatResponse`:916, `DictionaryToJson`:927, `ObjectToJson`:943, `GetJsonStringValue`:968, `GetJsonIntValue`:980, `GetJsonBoolValue`:994
 
 ## `electron/services/DarkHub.Mcp.cs`
 
@@ -458,7 +458,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/diskscan/DiskScanService.js`
 
-`defaultExe`:16, `csvCell`:21, `normDir`:23, `isUnder`:24, `protectedPathReason`:29, `formatSize`:43, `RECYCLE_PROBE`:51, `recycleVerdict`:78, `clearReadOnly`:88, `DiskScanService`:96 _class_, `_filter`:108, `drives`:116, `status`:129, `emit`:163, `cancel`:194, `view`:205, `info`:226, `setTag`:231, `_pathOf`:236, `open`:242, `reveal`:249, `trash`:257, `deletePermanent`:277, `rm`:289, `recycleProbe`:306, `pathOf`:311, `exportTo`:314, `write`:319
+`defaultExe`:16, `csvCell`:21, `normDir`:23, `isUnder`:24, `protectedPathReason`:29, `recycleBinPlace`:48, `readRecycleInfo`:60, `formatSize`:77, `RECYCLE_PROBE`:85, `recycleVerdict`:112, `clearReadOnly`:122, `DiskScanService`:130 _class_, `_filter`:142, `drives`:150, `status`:163, `emit`:197, `cancel`:228, `view`:239, `info`:260, `setTag`:265, `_pathOf`:270, `open`:276, `reveal`:283, `trash`:291, `deletePermanent`:316, `rm`:332, `recycleInfo`:351, `recycleProbe`:362, `pathOf`:367, `exportTo`:370, `write`:375
 
 ## `electron/services/diskscan/ScanModel.js`
 
@@ -486,7 +486,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/drivers/DriverInstallService.js`
 
-`foreach`:83, `foreach`:93, `foreach`:126, `foreach`:127, `dhpFunc`:152, `wuSearchScript`:162, `wuSearchElevatedScript`:173, `buildInstallScript`:192, `foreach`:291, `readWuOutput`:330, `wuErrorKind`:340, `fetchText`:348, `driversDir`:365, `sha256File`:372, `DriverInstallService`:378 _class_, `scan`:389, `searchWindowsUpdate`:405, `lookupVendor`:427, `findDrivers`:463, `download`:489, `signature`:531, `note`:551, `pump`:596
+`foreach`:83, `foreach`:93, `foreach`:126, `foreach`:127, `dhpFunc`:152, `wuSearchScript`:162, `wuSearchElevatedScript`:173, `buildInstallScript`:192, `foreach`:297, `readWuOutput`:336, `wuErrorKind`:346, `fetchText`:354, `driversDir`:371, `sha256File`:378, `DriverInstallService`:384 _class_, `scan`:395, `searchWindowsUpdate`:411, `lookupVendor`:433, `findDrivers`:469, `download`:495, `signature`:537, `note`:557, `pump`:602
 
 ## `electron/services/drivers/driverPlan.js`
 
@@ -578,7 +578,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/latencyUndoStore.js`
 
-`isObj`:19, `applied`:20, `shortStr`:21, `regValue`:22, `dword`:23, `persistableUndo`:30, `parseUndoRecord`:81, `writeUndoRecord`:89, `readUndoRecord`:96, `clearUndoRecord`:100
+`isObj`:22, `normalizeTcpPrev`:28, `applied`:39, `shortStr`:40, `regValue`:41, `dword`:42, `persistableUndo`:49, `parseUndoRecord`:101, `writeUndoRecord`:109, `readUndoRecord`:116, `clearUndoRecord`:120
 
 ## `electron/services/maintenance/MaintenanceService.js`
 
@@ -734,7 +734,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/realtime/ClamAv.js`
 
-`parseClamscan`:21, `freshclamConf`:30, `run`:35, `ClamAv`:58 _class_, `find`:65, `clamscan`:74, `freshclam`:75, `hasDatabase`:77, `databaseAge`:84, `status`:88, `install`:92, `update`:109, `scan`:119
+`parseClamscan`:21, `freshclamConf`:30, `run`:35, `ClamAv`:58 _class_, `secure`:72, `find`:83, `clamscan`:92, `freshclam`:93, `hasDatabase`:95, `databaseAge`:102, `status`:106, `install`:110, `update`:133, `scan`:143
 
 ## `electron/services/realtime/HashDb.js`
 
@@ -742,7 +742,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/realtime/Quarantine.js`
 
-`xorStream`:18, `transcode`:32, `lockDownDir`:48, `run`:51, `Quarantine`:56 _class_, `ensureRoot`:67, `paths`:76, `add`:85, `public`:116, `list`:121, `restore`:133, `remove`:152
+`xorStream`:18, `transcode`:32, `lockDownDir`:48, `run`:51, `foreignOwnedFiles`:63, `secureDir`:85, `Quarantine`:92 _class_, `ensureRoot`:107, `paths`:119, `add`:128, `public`:159, `list`:164, `restore`:176, `remove`:200
 
 ## `electron/services/realtime/RealtimeOptimizer.js`
 
@@ -830,7 +830,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/ssh/SftpService.js`
 
-`SftpError`:17 _class_, `isDirMode`:28, `modeString`:30, `normalizeRemote`:38, `normalizeLocal`:44, `isSafeLocalName`:57, `sanitizeLocalName`:66, `isInsideLocal`:74, `editLocalName`:82, `protectedLocalRoots`:93, `parseMode`:99, `decodeText`:109, `encodeText`:124, `remoteEntry`:131, `p`:147, `shq`:151, `execCapture`:155, `sftpOverStream`:174, `fail`:215, `openSudoSftp`:229, `permErr`:249, `notFound`:250, `SftpService`:257 _class_, `open`:275, `assertLocalWritable`:306, `dropped`:318, `handle`:323, `close`:329, `listLocal`:342, `listDrives`:357, `listRemote`:363, `side`:378, `remoteExists`:409, `remoteRename`:414, `remoteReplace`:431, `walk`:461, `visit`:463, `transfer`:491, `emit`:524, `copyFile`:540, `cancelTransfer`:613, `readText`:621, `readAll`:637, `writeText`:654, `writeBuf`:676, `stat`:701, `du`:716, `editExternal`:725, `check`:742, `stopWatch`:777, `listWatches`:787, `removeRemote`:792, `fsOp`:806, `q`:848, `closeAll`:864
+`SftpError`:17 _class_, `isDirMode`:28, `modeString`:30, `normalizeRemote`:38, `normalizeLocal`:44, `isSafeLocalName`:57, `sanitizeLocalName`:66, `isInsideLocal`:74, `editLocalName`:82, `protectedLocalRoots`:93, `parseMode`:99, `decodeText`:109, `encodeText`:124, `remoteEntry`:131, `p`:147, `shq`:151, `execCapture`:155, `sftpOverStream`:174, `fail`:215, `openSudoSftp`:229, `permErr`:249, `notFound`:250, `SftpService`:257 _class_, `open`:275, `assertLocalWritable`:306, `dropped`:318, `handle`:323, `close`:329, `listLocal`:342, `listDrives`:357, `listRemote`:363, `side`:378, `remoteExists`:409, `remoteRename`:414, `remoteReplace`:431, `walk`:461, `visit`:463, `transfer`:491, `emit`:524, `copyFile`:540, `fail`:556, `cancelTransfer`:627, `readText`:635, `readAll`:651, `writeText`:668, `writeBuf`:690, `stat`:715, `du`:730, `editExternal`:739, `fail`:752, `check`:758, `fail`:774, `stopWatch`:796, `listWatches`:806, `removeRemote`:811, `fsOp`:825, `q`:867, `closeAll`:883
 
 ## `electron/services/ssh/SshSessionManager.js`
 
@@ -962,11 +962,11 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `native_cleaner/src/main.rs`
 
-`parse`:42, `get`:62, `flag`:65, `env_of`:70, `read_winapp2`:78, `read_ids`:87, `reg_exists`:93, `reg_sources`:104, `recycle_target`:114, `recycle_run`:123, `run`:146, `main`:219
+`parse`:42, `get`:62, `flag`:65, `env_of`:70, `read_winapp2`:78, `read_ids`:87, `reg_exists`:93, `reg_sources`:104, `recycle_target`:114, `recycle_run`:123, `run`:169, `main`:242
 
 ## `native_cleaner/src/recycle.rs`
 
-`query`:7, `empty`:17
+`query`:7, `empty`:17, `size_of`:42, `is_reparse`:55, `is_reparse`:60, `orphans_in`:65, `remove_orphan`:84, `user_bin_dirs`:97, `current_user_sid`:118
 
 ## `native_cleaner/src/registry.rs`
 
@@ -978,7 +978,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `native_cleaner/src/tests.rs`
 
-`tmp`:12, `put`:19, `no_reg`:24, `wildcard_matching`:29, `rules_outside_expected_folders_are_refused`:39, `winapp2_parsing_detection_and_validation`:60, `protected_files_survive_and_shred_unlinks`:121, `shred_overwrites_before_unlink`:142, `shred_never_overwrites_through_hard_links`:158, `builtin_targets_parse`:172, `make_db`:180, `browser_vacuum_shrinks_and_keeps_rows`:191, `values_of`:226, `command_lines`:233, `wow_redirect_is_case_insensitive`:242, `scan_backup_clean_and_restore`:251, `test_root_is_confined`:329, `rules_aimed_at_passwords_are_refused`:336, `recycle_bin_is_never_touched_in_test_mode`:352, `junction`:364, `literal_segments_through_junctions_are_refused`:372
+`tmp`:12, `put`:19, `no_reg`:24, `wildcard_matching`:29, `rules_outside_expected_folders_are_refused`:39, `winapp2_parsing_detection_and_validation`:60, `protected_files_survive_and_shred_unlinks`:121, `shred_overwrites_before_unlink`:142, `shred_never_overwrites_through_hard_links`:158, `builtin_targets_parse`:172, `make_db`:180, `browser_vacuum_shrinks_and_keeps_rows`:191, `values_of`:226, `command_lines`:233, `wow_redirect_is_case_insensitive`:242, `scan_backup_clean_and_restore`:251, `test_root_is_confined`:329, `rules_aimed_at_passwords_are_refused`:336, `recycle_bin_is_never_touched_in_test_mode`:352, `junction`:364, `literal_segments_through_junctions_are_refused`:372, `recycle_orphans_found_and_removed_without_following_junctions`:417
 
 ## `native_cleaner/src/util.rs`
 
@@ -1054,7 +1054,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `native_pacer/src/lib.rs`
 
-`CreateWindowExA`:152, `DestroyWindow`:166, `timeBeginPeriod`:171, `timeEndPeriod`:172, `QueryPerformanceCounter`:176, `QueryPerformanceFrequency`:177, `VirtualProtect`:178, `CreateFileMappingW`:179, `OpenFileMappingW`:180, `MapViewOfFile`:181, `CloseHandle`:182, `GetCurrentProcessId`:183, `GetCurrentThreadId`:184, `GetCurrentProcess`:185, `Sleep`:186, `LoadLibraryA`:187, `GetModuleHandleA`:188, `GetModuleHandleExW`:189, `FreeLibrary`:190, `FreeLibraryAndExitThread`:191, `K32EnumProcessModules`:192, `GetProcAddress`:193, `CreateThread`:194, `CreateWaitableTimerExW`:195, `SetWaitableTimer`:196, `WaitForSingleObject`:197, `get_qpc_ms`:330, `precision_wait`:340, `hist_recent`:366, `push_sample`:370, `compute_stats`:379, `publish`:429, `evaluate_config`:478, `current_directive`:501, `vfn`:525, `com_release`:530, `pack_luid`:539, `query_swapchain_luid`:548, `eligible`:595, `is_main_swapchain`:600, `main_is_eligible`:655, `perform_pacing`:665, `enter_present`:730, `leave_present`:739, `hooked_present`:746, `hooked_present1`:757, `gl_present`:799, `hooked_gdi_swap`:815, `hooked_gdifull_swap`:818, `hooked_wgl_swap`:821, `resolve_gl_targets`:825, `already_patched`:841, `patch_module_iat`:852, `patch_module_delay_iat`:903, `patch_thunks`:948, `install_gl_hooks`:980, `remove_gl_hooks`:1008, `map_named`:1023, `setup_shared_memory`:1042, `patch_slot`:1069, `install_vtable_hooks`:1084, `remove_vtable_hooks`:1181, `restore_vtable_slot`:1191, `init_thread`:1210, `init_thread_body`:1220, `DllMain`:1249, `reset`:1302, `stats_come_only_from_real_samples`:1308, `low01_unavailable_with_few_samples`:1327, `telemetry_layout_matches_reader`:1339, `config_layout_is_fixed`:1347, `cfg`:1368, `fresh_heartbeat_applies_the_cap`:1387, `stale_or_missing_heartbeat_passes_through`:1394, `disabled_uncapped_or_foreign_blocks_pass_through`:1402, `adapter_filter`:1419
+`CreateWindowExA`:152, `DestroyWindow`:166, `timeBeginPeriod`:171, `timeEndPeriod`:172, `QueryPerformanceCounter`:176, `QueryPerformanceFrequency`:177, `VirtualProtect`:178, `CreateFileMappingW`:179, `OpenFileMappingW`:180, `MapViewOfFile`:181, `CloseHandle`:182, `GetCurrentProcessId`:183, `GetCurrentThreadId`:184, `GetCurrentProcess`:185, `Sleep`:186, `LoadLibraryA`:187, `GetModuleHandleA`:188, `GetModuleHandleExW`:189, `FreeLibrary`:190, `FreeLibraryAndExitThread`:191, `K32EnumProcessModules`:192, `GetProcAddress`:193, `CreateThread`:194, `CreateWaitableTimerExW`:195, `SetWaitableTimer`:196, `WaitForSingleObject`:197, `get_qpc_ms`:330, `precision_wait`:340, `hist_recent`:367, `push_sample`:371, `compute_stats`:380, `publish`:430, `evaluate_config`:479, `current_directive`:502, `vfn`:526, `com_release`:531, `pack_luid`:540, `query_swapchain_luid`:549, `eligible`:596, `is_main_swapchain`:601, `main_is_eligible`:656, `perform_pacing`:666, `enter`:737, `drop`:744, `drain_hooked_calls`:751, `enter_present`:765, `leave_present`:774, `hooked_present`:781, `hooked_present1`:793, `gl_present`:836, `hooked_gdi_swap`:853, `hooked_gdifull_swap`:856, `hooked_wgl_swap`:859, `resolve_gl_targets`:863, `already_patched`:879, `patch_module_iat`:890, `patch_module_delay_iat`:941, `patch_thunks`:986, `install_gl_hooks`:1018, `remove_gl_hooks`:1046, `map_named`:1061, `setup_shared_memory`:1080, `patch_slot`:1107, `install_vtable_hooks`:1122, `remove_vtable_hooks`:1219, `restore_vtable_slot`:1229, `init_thread`:1248, `init_thread_body`:1258, `DllMain`:1287, `reset`:1341, `stats_come_only_from_real_samples`:1347, `low01_unavailable_with_few_samples`:1366, `telemetry_layout_matches_reader`:1378, `config_layout_is_fixed`:1386, `cfg`:1407, `fresh_heartbeat_applies_the_cap`:1426, `stale_or_missing_heartbeat_passes_through`:1433, `disabled_uncapped_or_foreign_blocks_pass_through`:1441, `adapter_filter`:1458
 
 ## `native_pacer/tests/e2e.ps1`
 
@@ -1434,7 +1434,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/hooks/useDialogA11y.ts`
 
-`useDialogA11y`:13, `onKey`:36
+`OpenDialog`:8 _type_, `topDialog`:12, `useDialogA11y`:28, `onKey`:54
 
 ## `src/hooks/useJunkScanner.ts`
 
@@ -1474,7 +1474,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/i18n/store.ts`
 
-`Namespace`:12 _type_, `Dict`:14 _type_, `Parts`:15 _type_, `rebuild`:46, `addParts`:56, `once`:63, `loadNamespaceFor`:74, `baseLanguage`:84, `loadLocale`:89, `loadNamespace`:100, `getDictionary`:112, `isLocaleLoaded`:116, `subscribe`:120, `getVersion`:127, `seedAllForTests`:132, `addStringsForTests`:141
+`Namespace`:12 _type_, `Dict`:14 _type_, `Parts`:15 _type_, `rebuild`:46, `addParts`:56, `once`:63, `loadNamespaceFor`:74, `baseLanguage`:88, `loadLocale`:93, `loadNamespace`:104, `getDictionary`:116, `isLocaleLoaded`:120, `subscribe`:124, `getVersion`:131, `seedAllForTests`:136, `addStringsForTests`:145
 
 ## `src/layouts/MainLayout.tsx`
 
@@ -1526,7 +1526,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/Dashboard.tsx`
 
-`formatBytes`:19, `timeAgo`:28, `Skel`:49 _component_, `Reading`:54 _component_, `MetricCell`:61 _component_, `DashboardProps`:95 _type_, `Dashboard`:99 _component_, `handleOptimizeRam`:249, `handleCleanJunk`:279, `handleCreateRestorePoint`:314, `handleRepairWindows`:336, `handleResolveSecurity`:357, `handleOpenWindowsSecurity`:368, `ExtensionWidgets`:720 _component_
+`formatBytes`:19, `timeAgo`:28, `Skel`:49 _component_, `Reading`:54 _component_, `MetricCell`:62 _component_, `DashboardProps`:96 _type_, `Dashboard`:100 _component_, `handleOptimizeRam`:250, `handleCleanJunk`:280, `handleCreateRestorePoint`:315, `handleRepairWindows`:337, `handleResolveSecurity`:358, `handleOpenWindowsSecurity`:369, `ExtensionWidgets`:721 _component_
 
 ## `src/pages/Decryption.tsx`
 
@@ -1666,7 +1666,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/pages/SpaceSniffer/index.tsx`
 
-`api`:14, `fmtDate`:19, `fmtInt`:20, `fmtTime`:21, `ColorMode`:23 _type_, `readMode`:24, `DiskMap`:27 _component_, `start`:111, `pickFolder`:118, `setColorMode`:130, `act`:166, `setTag`:176, `trash`:183, `deleteForGood`:195, `walk`:212, `walk`:228, `walk`:242, `onKey`:280
+`api`:14, `fmtDate`:19, `fmtInt`:20, `fmtTime`:21, `ColorMode`:23 _type_, `readMode`:24, `DiskMap`:27 _component_, `start`:117, `pickFolder`:124, `setColorMode`:136, `act`:172, `setTag`:182, `trash`:189, `deleteForGood`:201, `walk`:218, `walk`:234, `walk`:248, `onKey`:286
 
 ## `src/pages/SpaceSniffer/treemap.ts`
 
@@ -1788,13 +1788,21 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `read`:8, `sha`:9
 
+## `tests/cpuTopology.test.ts`
+
+`Topo`:29 _type_, `Out`:30 _type_, `run`:32, `one`:40, `Aff`:43 _type_, `groupAffinity`:47, `entry`:53, `core`:61, `cache`:70, `noise`:78, `bit`:80, `range`:81, `hex`:82, `cores`:85, `lowCaches`:89, `buf`:92, `padded`:187
+
 ## `tests/darkosService.test.ts`
 
 `fakeFs`:13, `out`:22, `makeService`:26, `make`:358
 
+## `tests/dialogA11y.test.tsx`
+
+`Dialog`:6 _component_, `press`:18
+
 ## `tests/diskMap.test.ts`
 
-`file`:15, `ok`:18, `build`:61, `w`:186
+`file`:15, `ok`:18, `build`:61, `w`:186, `w`:199
 
 ## `tests/diskRescue.test.ts`
 
@@ -1888,6 +1896,30 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `def`:15, `facts`:16, `readMapOf`:17, `hasFn`:53
 
+## `tests/native/ClickTimerHarness.cs`
+
+`ClickTimerHarness`:10 _class_, `Reset`:16, `Violation`:34, `Start`:36, `Check`:43, `Scenario`:45, `Main`:58, `SpinUntil`:143
+
+## `tests/native/CpuTopologyHarness.cs`
+
+`CpuTopologyHarness`:13 _class_, `Main`:15, `Hex`:29, `Run`:35
+
+## `tests/native/FakeX86Helper.cs`
+
+`FakeX86Helper`:13 _class_, `Main`:15
+
+## `tests/native/FrameLimiterHarness.cs`
+
+`FrameLimiterHarness`:8 _class_, `Main`:10, `Esc`:24
+
+## `tests/native/NvmlHarness.cs`
+
+`NvmlHarness`:8 _class_, `Main`:10
+
+## `tests/nativeHelpers.test.ts`
+
+`csc`:21, `alive`:22, `inject`:42, `check`:110
+
 ## `tests/navLayout.test.ts`
 
 `S`:4, `ids`:5
@@ -1944,6 +1976,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `rec`:12, `fixture`:18, `fakeDownload`:102
 
+## `tests/quarantinePlanted.test.ts`
+
+`tmp`:11, `plant`:12, `foreignOwned`:26, `foreignOwned`:38
+
 ## `tests/realtime.test.ts`
 
 `tmp`:19, `sha`:20, `waitFor`:21
@@ -1975,6 +2011,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/securityHardening.test.ts`
 
 `mkTmp`:41, `runIcacls`:52, `walk`:156, `open`:282, `next`:289
+
+## `tests/sshAuditPaths.test.ts`
+
+`attrsOf`:53, `sftpHandlers`:57, `toFs`:58, `h`:61, `hid`:62, `wrap`:63, `finish`:93, `done`:124, `setup`:168, `sha`:176, `instrument`:180, `junction`:450, `onUncaught`:504
 
 ## `tests/sshE2E.test.ts`
 
@@ -2039,6 +2079,26 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/wuDiagnose.test.ts`
 
 `ids`:17
+
+## `tools/gpu-harness/dxgi_harness/src/main.rs`
+
+`RegisterClassW`:76, `CreateWindowExW`:77, `DefWindowProcW`:78, `PeekMessageW`:79, `TranslateMessage`:80, `DispatchMessageW`:81, `D3D11CreateDevice`:85, `GetModuleHandleW`:89, `FreeLibrary`:90, `GetCurrentProcessId`:91, `wndproc`:94, `wide`:97, `vfn`:100, `hook_module`:103, `out`:114, `main`:121
+
+## `tools/gpu-harness/run_gpubench.mjs`
+
+`u32s`:16, `next`:34, `send`:43
+
+## `tools/gpu-harness/run_pacer.ps1`
+
+`Start-App`:19, `Get-Lines`:31, `Mean-Fps`:32, `Wait-AppSecond`:37, `Start-Limiter`:39, `Stop-LimiterGracefully`:58, `Kill-Limiter`:65, `Last-Status`:69, `App-Result`:74, `Test-Cap`:84, `Test-EarlyFree`:116
+
+## `tools/gpu-harness/run_vk.ps1`
+
+`Invoke-Harness`:22
+
+## `tools/gpu-harness/vk_harness/src/main.rs`
+
+`RegisterClassW`:65, `CreateWindowExW`:66, `DefWindowProcW`:67, `PeekMessageW`:68, `TranslateMessage`:69, `DispatchMessageW`:70, `DestroyWindow`:71, `GetModuleHandleW`:75, `GetModuleHandleExW`:76, `GetModuleFileNameW`:77, `GetCurrentProcess`:78, `GetProcessHandleCount`:79, `K32GetProcessMemoryInfo`:80, `wndproc`:82, `wide`:85, `pump`:88, `module_of`:97, `mem_snapshot`:113, `layer_dll_loaded`:122, `esc`:127, `emit`:141, `fail`:145, `chk`:153, `chk_raw`:159, `dbg_cb`:165, `parse`:272, `main`:290, `run_cycle`:354
 
 ## `vite.config.js`
 

@@ -187,7 +187,6 @@ namespace DarkHub.Native
         private static volatile bool exitRequested = false;
         private static readonly object stateLock = new object();
         private static readonly object outLock = new object();
-        private static int timerPeriodActive = 0;
         private static IntPtr inputDesktop = IntPtr.Zero;
 
         private static void EmitJson(string json)
@@ -1218,43 +1217,88 @@ namespace DarkHub.Native
         // 1 ms timer resolution only while a clicking / recording / playback worker is alive: the daemon itself runs
         // 24/7 for the global hotkeys and must not keep the whole system at 1 ms while idle. Reference-counted, one
         // acquire + one release per worker thread (RunWithTimer), and force-released on exit.
-        private static readonly object timerLock = new object();
-        private static int timerRefs = 0;
-
-        private static void AcquireTimerPeriod()
+        // The counting is a plain class with injected begin/end so tests/native/ClickTimerHarness.cs can check the
+        // balance with counters instead of winmm (and without sending any input).
+        internal sealed class TimerPeriodRefCount
         {
-            lock (timerLock)
+            private readonly object gate = new object();
+            private readonly Func<bool> begin; // true when the period was actually raised
+            private readonly Action end;
+            private int refs;
+            private int generation;
+            private bool active;
+
+            public TimerPeriodRefCount(Func<bool> begin, Action end) { this.begin = begin; this.end = end; }
+
+            public int Refs { get { lock (gate) return refs; } }
+            public bool Active { get { lock (gate) return active; } }
+
+            // Returns the token Release expects. ForceRelease bumps the generation, so a worker that outlives a forced
+            // release can't drop a reference (and end a period) that a newer worker owns.
+            public int Acquire()
             {
-                timerRefs++;
-                if (timerRefs == 1 && timerPeriodActive == 0)
+                lock (gate)
                 {
-                    try { if (timeBeginPeriod(1) == 0) timerPeriodActive = 1; } catch {}
+                    refs++;
+                    if (refs == 1 && !active)
+                    {
+                        try { active = begin(); } catch { active = false; }
+                    }
+                    return generation;
                 }
+            }
+
+            public void Release(int token)
+            {
+                lock (gate)
+                {
+                    if (token != generation || refs <= 0) return; // already force-released
+                    refs--;
+                    if (refs == 0 && active)
+                    {
+                        try { end(); } catch {}
+                        active = false;
+                    }
+                }
+            }
+
+            public void ForceRelease()
+            {
+                lock (gate)
+                {
+                    generation++;
+                    refs = 0;
+                    if (active)
+                    {
+                        try { end(); } catch {}
+                        active = false;
+                    }
+                }
+            }
+
+            public ThreadStart Wrap(ThreadStart body)
+            {
+                return delegate
+                {
+                    int token = Acquire();
+                    try { body(); }
+                    finally { Release(token); }
+                };
             }
         }
 
-        private static void ReleaseTimerPeriod()
+        internal static TimerPeriodRefCount timerPeriod = new TimerPeriodRefCount(
+            delegate { return timeBeginPeriod(1) == 0; },
+            delegate { timeEndPeriod(1); });
+
+        internal static ThreadStart RunWithTimer(ThreadStart body)
         {
-            lock (timerLock)
-            {
-                if (timerRefs <= 0) return; // already force-released by Cleanup
-                timerRefs--;
-                if (timerRefs == 0 && timerPeriodActive == 1)
-                {
-                    try { timeEndPeriod(1); } catch {}
-                    timerPeriodActive = 0;
-                }
-            }
+            return timerPeriod.Wrap(body);
         }
 
-        private static ThreadStart RunWithTimer(ThreadStart body)
+        internal static void ForceReleaseTimerPeriod()
         {
-            return delegate
-            {
-                AcquireTimerPeriod();
-                try { body(); }
-                finally { ReleaseTimerPeriod(); }
-            };
+            timerPeriod.ForceRelease();
         }
 
         private static void Cleanup()
@@ -1263,15 +1307,7 @@ namespace DarkHub.Native
             isRunning = false;
             macroMode = 0;
             ReleaseAllKeysAndButtons();
-            lock (timerLock)
-            {
-                timerRefs = 0;
-                if (timerPeriodActive == 1)
-                {
-                    try { timeEndPeriod(1); } catch {}
-                    timerPeriodActive = 0;
-                }
-            }
+            ForceReleaseTimerPeriod();
         }
 
         public static void SetHotkey(string key)

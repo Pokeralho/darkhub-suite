@@ -712,6 +712,7 @@ const darkhubApi = {
     reveal: (payload) => ipcRenderer.invoke('diskscan:reveal', payload),
     trash: (payload) => ipcRenderer.invoke('diskscan:trash', payload),
     deletePermanent: (payload) => ipcRenderer.invoke('diskscan:deletePermanent', payload),
+    recycleInfo: (payload) => ipcRenderer.invoke('diskscan:recycleInfo', payload),
     exportReport: (payload) => ipcRenderer.invoke('diskscan:export', payload),
     onProgress: (callback) => {
       const listener = (_e, st) => callback(st)

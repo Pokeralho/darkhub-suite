@@ -1,6 +1,6 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-18T10:42:14. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-18T14:27:27. NAO edite a mao: rode `npm run map`. -->
 
-# Canais IPC (602)
+# Canais IPC (603)
 
 | API (`window.darkhub.`) | canal | handler | chama | usado em |
 |---|---|---|---|---|
@@ -92,13 +92,14 @@
 | `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1881` |  | `src/pages/DllInjector.tsx`<br>`src/pages/FileConverter.tsx`<br>`src/pages/ImageTextExtractor.tsx`<br>`src/pages/Library.tsx`<br>`src/pages/MetaDataEditor.tsx`<br>`src/pages/OptiScalerManager.tsx`<br>`src/pages/Optimizer.tsx`<br>`src/pages/PasswordManager.tsx`<br>`src/pages/TextEditor.tsx`<br>`src/pages/TextSummarizer.tsx`<br>`src/pages/UltraLowLatency.tsx`<br>`src/pages/YoutubeDownloader.tsx` |
 | `dialog.selectFolder` | `dialog:selectFolder` | `electron/main.js:1892` |  | `src/components/setup/RestoreComponentsPanel.tsx`<br>`src/pages/FileConverter.tsx`<br>`src/pages/Library.tsx`<br>`src/pages/PasswordManager.tsx`<br>`src/pages/YoutubeDownloader.tsx` |
 | `diskscan.cancel` | `diskscan:cancel` | `electron/ipc/diskScanIpc.js:22` | `svc.cancel` | `src/pages/SpaceSniffer/index.tsx` |
-| `diskscan.deletePermanent` | `diskscan:deletePermanent` | `electron/ipc/diskScanIpc.js:30` | `svc.deletePermanent` | _nao usado_ |
+| `diskscan.deletePermanent` | `diskscan:deletePermanent` | `electron/ipc/diskScanIpc.js:31` | `svc.deletePermanent` | _nao usado_ |
 | `diskscan.drives` | `diskscan:drives` | `electron/ipc/diskScanIpc.js:14` | `svc.drives` | `src/pages/SpaceSniffer/index.tsx` |
-| `diskscan.exportReport` | `diskscan:export` | `electron/ipc/diskScanIpc.js:32` | `svc.pathOf`<br>`svc.exportTo` | _nao usado_ |
+| `diskscan.exportReport` | `diskscan:export` | `electron/ipc/diskScanIpc.js:33` | `svc.pathOf`<br>`svc.exportTo` | _nao usado_ |
 | `diskscan.info` | `diskscan:info` | `electron/ipc/diskScanIpc.js:25` | `svc.info` | `src/pages/SpaceSniffer/index.tsx` |
 | `diskscan.onProgress` | `diskscan:progress` | _evento main->tela_ |  | `src/pages/SpaceSniffer/index.tsx` |
 | `diskscan.open` | `diskscan:open` | `electron/ipc/diskScanIpc.js:27` | `svc.open` | _nao usado_ |
 | `diskscan.pickFolder` | `diskscan:pickFolder` | `electron/ipc/diskScanIpc.js:15` |  | `src/pages/Dlss5Manager.tsx`<br>`src/pages/Realtime.tsx`<br>`src/pages/SpaceSniffer/index.tsx` |
+| `diskscan.recycleInfo` | `diskscan:recycleInfo` | `electron/ipc/diskScanIpc.js:30` | `svc.recycleInfo` | `src/pages/SpaceSniffer/index.tsx` |
 | `diskscan.reveal` | `diskscan:reveal` | `electron/ipc/diskScanIpc.js:28` | `svc.reveal` | _nao usado_ |
 | `diskscan.start` | `diskscan:start` | `electron/ipc/diskScanIpc.js:19` | `svc.start`<br>`sender.isDestroyed`<br>`sender.send` | `src/pages/SpaceSniffer/index.tsx` |
 | `diskscan.status` | `diskscan:status` | `electron/ipc/diskScanIpc.js:23` | `svc.status` | `src/pages/SpaceSniffer/index.tsx` |
@@ -223,16 +224,16 @@
 | `kakugan.steamLoginPoll` | `kakugan:steamLoginPoll` | `electron/ipc/kakuganIpc.js:124` | `client.steamLoginPoll` | `src/pages/Kakugan.tsx` |
 | `kakugan.steamLoginStart` | `kakugan:steamLoginStart` | `electron/ipc/kakuganIpc.js:123` | `client.steamLoginStart` | `src/pages/Kakugan.tsx` |
 | `kakugan.updateAccount` | `kakugan:updateAccount` | `electron/ipc/kakuganIpc.js:127` | `games.map`<br>`client.updateAccount` | _nao usado_ |
-| `latency.boostNow` | `latency:boostNow` | `electron/latencyGuardian.js:1242` |  | `src/pages/UltraLowLatency.tsx` |
-| `latency.disableUltra` | `latency:disableUltra` | `electron/latencyGuardian.js:1223` |  | `src/pages/UltraLowLatency.tsx` |
-| `latency.enableUltra` | `latency:enableUltra` | `electron/latencyGuardian.js:1178` |  | `src/pages/UltraLowLatency.tsx` |
-| `latency.enableUltraStable` | `latency:enableUltraStable` | `electron/latencyGuardian.js:1188` |  | `src/pages/UltraLowLatency.tsx` |
-| `latency.getConfig` | `latency:getConfig` | `electron/latencyGuardian.js:1129` | `nativeLatencyClient.queryTimer (electron/services/NativeLatencyClient.js)` | `src/components/GuardianWidget.tsx`<br>`src/pages/UltraLowLatency.tsx` |
-| `latency.getCpuTopology` | `latency:getCpuTopology` | `electron/latencyGuardian.js:1154` | `nativeLatencyClient.getCpuTopology (electron/services/NativeLatencyClient.js)` | _nao usado_ |
-| `latency.launchGameWithProfile` | `latency:launchGameWithProfile` | `electron/latencyGuardian.js:1287` | `argsArray.map`<br>`pingHost.trim`<br>`proc.once` | `src/pages/Library.tsx` |
-| `latency.queryTimer` | `latency:queryTimer` | `electron/latencyGuardian.js:1145` | `nativeLatencyClient.queryTimer (electron/services/NativeLatencyClient.js)` | _nao usado_ |
-| `latency.setConfig` | `latency:setConfig` | `electron/latencyGuardian.js:1163` |  | `src/components/GuardianWidget.tsx`<br>`src/pages/UltraLowLatency.tsx` |
-| `latency.toggleUltra` | `latency:toggleUltra` | `electron/latencyGuardian.js:1232` |  | _nao usado_ |
+| `latency.boostNow` | `latency:boostNow` | `electron/latencyGuardian.js:1263` |  | `src/pages/UltraLowLatency.tsx` |
+| `latency.disableUltra` | `latency:disableUltra` | `electron/latencyGuardian.js:1244` |  | `src/pages/UltraLowLatency.tsx` |
+| `latency.enableUltra` | `latency:enableUltra` | `electron/latencyGuardian.js:1199` |  | `src/pages/UltraLowLatency.tsx` |
+| `latency.enableUltraStable` | `latency:enableUltraStable` | `electron/latencyGuardian.js:1209` |  | `src/pages/UltraLowLatency.tsx` |
+| `latency.getConfig` | `latency:getConfig` | `electron/latencyGuardian.js:1150` | `nativeLatencyClient.queryTimer (electron/services/NativeLatencyClient.js)` | `src/components/GuardianWidget.tsx`<br>`src/pages/UltraLowLatency.tsx` |
+| `latency.getCpuTopology` | `latency:getCpuTopology` | `electron/latencyGuardian.js:1175` | `nativeLatencyClient.getCpuTopology (electron/services/NativeLatencyClient.js)` | _nao usado_ |
+| `latency.launchGameWithProfile` | `latency:launchGameWithProfile` | `electron/latencyGuardian.js:1308` | `argsArray.map`<br>`pingHost.trim`<br>`proc.once` | `src/pages/Library.tsx` |
+| `latency.queryTimer` | `latency:queryTimer` | `electron/latencyGuardian.js:1166` | `nativeLatencyClient.queryTimer (electron/services/NativeLatencyClient.js)` | _nao usado_ |
+| `latency.setConfig` | `latency:setConfig` | `electron/latencyGuardian.js:1184` |  | `src/components/GuardianWidget.tsx`<br>`src/pages/UltraLowLatency.tsx` |
+| `latency.toggleUltra` | `latency:toggleUltra` | `electron/latencyGuardian.js:1253` |  | _nao usado_ |
 | `library.discover` | `library:discover` | `electron/main.js:1309` | `steamSvc.getSteamPath`<br>`steamSvc.getLibraryPaths`<br>`steamPaths.push` | `src/pages/Library.tsx` |
 | `library.fetchCover` | `library:fetchCover` | `electron/main.js:1238` | `service.fetchCover`<br>`i.test`<br>`folder.startsWith` | `src/components/library/GameCard.tsx` |
 | `library.list` | `library:list` | `electron/main.js:1175` | `webContents.send` | `src/pages/Library.tsx`<br>`src/pages/OptiScalerManager.tsx` |

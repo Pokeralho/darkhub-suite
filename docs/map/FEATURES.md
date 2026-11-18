@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-18T10:42:14. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-18T14:27:27. NAO edite a mao: rode `npm run map`. -->
 
 # Mapa de funcionalidades (tela -> IPC -> backend)
 Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/preload.js` -> canal IPC -> handler -> servico.
@@ -373,12 +373,12 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | API | canal | handler | chama |
 |---|---|---|---|
 | `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1881` |  |
-| `latency.boostNow` | `latency:boostNow` | `electron/latencyGuardian.js:1242` |  |
-| `latency.disableUltra` | `latency:disableUltra` | `electron/latencyGuardian.js:1223` |  |
-| `latency.enableUltra` | `latency:enableUltra` | `electron/latencyGuardian.js:1178` |  |
-| `latency.enableUltraStable` | `latency:enableUltraStable` | `electron/latencyGuardian.js:1188` |  |
-| `latency.getConfig` | `latency:getConfig` | `electron/latencyGuardian.js:1129` | `nativeLatencyClient.queryTimer (electron/services/NativeLatencyClient.js)` |
-| `latency.setConfig` | `latency:setConfig` | `electron/latencyGuardian.js:1163` |  |
+| `latency.boostNow` | `latency:boostNow` | `electron/latencyGuardian.js:1263` |  |
+| `latency.disableUltra` | `latency:disableUltra` | `electron/latencyGuardian.js:1244` |  |
+| `latency.enableUltra` | `latency:enableUltra` | `electron/latencyGuardian.js:1199` |  |
+| `latency.enableUltraStable` | `latency:enableUltraStable` | `electron/latencyGuardian.js:1209` |  |
+| `latency.getConfig` | `latency:getConfig` | `electron/latencyGuardian.js:1150` | `nativeLatencyClient.queryTimer (electron/services/NativeLatencyClient.js)` |
+| `latency.setConfig` | `latency:setConfig` | `electron/latencyGuardian.js:1184` |  |
 
 ## Overview
 
@@ -589,7 +589,7 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 |---|---|---|---|
 | `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1881` |  |
 | `dialog.selectFolder` | `dialog:selectFolder` | `electron/main.js:1892` |  |
-| `latency.launchGameWithProfile` | `latency:launchGameWithProfile` | `electron/latencyGuardian.js:1287` | `argsArray.map`<br>`pingHost.trim`<br>`proc.once`<br>`proc.on` |
+| `latency.launchGameWithProfile` | `latency:launchGameWithProfile` | `electron/latencyGuardian.js:1308` | `argsArray.map`<br>`pingHost.trim`<br>`proc.once`<br>`proc.on` |
 | `library.discover` | `library:discover` | `electron/main.js:1309` | `steamSvc.getSteamPath`<br>`steamSvc.getLibraryPaths`<br>`steamPaths.push`<br>`content.matchAll` |
 | `library.fetchCover` | `library:fetchCover` | `electron/main.js:1238` | `service.fetchCover`<br>`i.test`<br>`folder.startsWith`<br>`exeKey.startsWith` |
 | `library.list` | `library:list` | `electron/main.js:1175` | `webContents.send` |
@@ -730,6 +730,7 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | `diskscan.info` | `diskscan:info` | `electron/ipc/diskScanIpc.js:25` | `svc.info` |
 | `diskscan.onProgress` | `diskscan:progress` | `nao encontrado` |  |
 | `diskscan.pickFolder` | `diskscan:pickFolder` | `electron/ipc/diskScanIpc.js:15` |  |
+| `diskscan.recycleInfo` | `diskscan:recycleInfo` | `electron/ipc/diskScanIpc.js:30` | `svc.recycleInfo` |
 | `diskscan.start` | `diskscan:start` | `electron/ipc/diskScanIpc.js:19` | `svc.start`<br>`sender.isDestroyed`<br>`sender.send` |
 | `diskscan.status` | `diskscan:status` | `electron/ipc/diskScanIpc.js:23` | `svc.status` |
 

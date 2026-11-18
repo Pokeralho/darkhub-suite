@@ -411,3 +411,34 @@ fn literal_segments_through_junctions_are_refused() {
     assert!(!ram.join("junk.tmp").exists());
     let _ = fs::remove_dir_all(&base);
 }
+
+#[cfg(windows)]
+#[test]
+fn recycle_orphans_found_and_removed_without_following_junctions() {
+    use crate::recycle;
+    let bin = tmp("bin");
+    let outside = tmp("outside");
+    put(&outside.join("keep.bin"), 64);
+    // a normal item ($R + $I) and an orphan ($R alone) holding a junction to a folder outside the bin
+    put(&bin.join("$RKEEP01.txt"), 10);
+    put(&bin.join("$IKEEP01.txt"), 40);
+    put(&bin.join("$RORPH01").join("romfs").join("a.bin"), 3000);
+    put(&bin.join("$RORPH02.dat"), 500);
+    let j = bin.join("$RORPH01").join("link");
+    let st = std::process::Command::new("cmd").args(["/c", "mklink", "/J"]).arg(&j).arg(&outside).output().unwrap();
+    assert!(st.status.success(), "mklink /J failed");
+    let mut found = recycle::orphans_in(&bin);
+    found.sort_by(|a, b| a.path.cmp(&b.path));
+    let names: Vec<String> = found.iter().map(|o| o.path.file_name().unwrap().to_string_lossy().into_owned()).collect();
+    assert_eq!(names, vec!["$RORPH01", "$RORPH02.dat"]);
+    assert_eq!(found[0].bytes, 3000, "the junction target is not counted");
+    assert_eq!(found[1].bytes, 500);
+    for o in &found {
+        assert!(recycle::remove_orphan(o));
+    }
+    assert!(recycle::orphans_in(&bin).is_empty());
+    assert!(bin.join("$RKEEP01.txt").exists() && bin.join("$IKEEP01.txt").exists(), "items with a record stay");
+    assert!(outside.join("keep.bin").exists(), "the junction target is untouched");
+    let _ = fs::remove_dir_all(&bin);
+    let _ = fs::remove_dir_all(&outside);
+}

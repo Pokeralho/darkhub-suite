@@ -7,7 +7,7 @@ param(
   [int]$DiskNumber = -1,
   [UInt64]$ExpectedSize = 0,
   [string]$IsoPath = '',
-  [ValidatePattern('^[A-Za-z0-9_-]{1,11}$')][string]$Label = 'DARKOS',
+  [ValidatePattern('^[A-Za-z0-9_-]{1,11}\z')][string]$Label = 'DARKOS',
   [switch]$AllowVirtual
 )
 $ErrorActionPreference = 'Stop'

@@ -1,0 +1,11 @@
+[package]
+name = "dxgi_harness"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Standalone test program (see ../README.md). No dependencies: builds for x86_64 and i686 msvc.
+[workspace]
+
+[profile.release]
+opt-level = 2

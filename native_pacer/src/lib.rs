@@ -341,7 +341,8 @@ unsafe fn precision_wait(target_ms: f64, start_ms: f64) {
     loop {
         let elapsed = get_qpc_ms() - start_ms;
         let remaining = target_ms - elapsed;
-        if remaining <= 0.0 {
+        // DLL_PROCESS_DETACH is waiting for this call to leave the module (see drain_hooked_calls).
+        if remaining <= 0.0 || UNLOADING.load(Ordering::Acquire) {
             break;
         }
         // Block on a high-resolution waitable timer while far from the deadline (no core burned),
@@ -725,6 +726,40 @@ unsafe fn perform_pacing(sc: usize, kind: u8) {
     BUSY.store(false, Ordering::Release);
 }
 
+/// Calls currently executing inside one of our hooks. DLL_PROCESS_DETACH removes the hooks and then waits
+/// for this to drop to zero before the module is unmapped: a game thread sleeping in perform_pacing (which
+/// is most of the frame while a cap is active) would otherwise wake up in unmapped code and crash the game.
+static ACTIVE_CALLS: AtomicU32 = AtomicU32::new(0);
+
+struct CallGuard;
+impl CallGuard {
+    #[inline(always)]
+    fn enter() -> CallGuard {
+        ACTIVE_CALLS.fetch_add(1, Ordering::SeqCst);
+        CallGuard
+    }
+}
+impl Drop for CallGuard {
+    #[inline(always)]
+    fn drop(&mut self) {
+        ACTIVE_CALLS.fetch_sub(1, Ordering::Release);
+    }
+}
+
+/// Runs in DLL_PROCESS_DETACH after the hooks are removed (no new call can enter). Bounded: a thread stuck
+/// in the original Present for longer than this is not waited for.
+unsafe fn drain_hooked_calls() {
+    // A caller may have read the hooked slot just before it was restored and not yet reached enter().
+    Sleep(5);
+    let mut waited = 0u32;
+    while ACTIVE_CALLS.load(Ordering::Acquire) != 0 && waited < 1000 {
+        Sleep(1);
+        waited += 1;
+    }
+    // The last caller decremented the counter but may still be executing its epilogue.
+    Sleep(5);
+}
+
 /// Enters a hooked present. Returns (owns_guard, nested).
 #[inline]
 unsafe fn enter_present() -> (bool, bool) {
@@ -744,6 +779,7 @@ fn leave_present(owned: bool) {
 
 // Hooked IDXGISwapChain::Present (vtable index 8)
 unsafe extern "system" fn hooked_present(p_swap_chain: *mut c_void, sync_interval: u32, flags: u32) -> HRESULT {
+    let _call = CallGuard::enter();
     let (owned, nested) = enter_present();
     if !nested {
         perform_pacing(p_swap_chain as usize, KIND_DXGI);
@@ -760,6 +796,7 @@ unsafe extern "system" fn hooked_present1(
     present_flags: u32,
     p_present_parameters: *const c_void,
 ) -> HRESULT {
+    let _call = CallGuard::enter();
     let (owned, nested) = enter_present();
     if !nested {
         perform_pacing(p_swap_chain as usize, KIND_DXGI);
@@ -797,6 +834,7 @@ static mut SELF_BASE: usize = 0;
 
 #[inline]
 unsafe fn gl_present(which: usize, hdc: *mut c_void) -> BOOL {
+    let _call = CallGuard::enter();
     let (owned, nested) = enter_present();
     if !nested && !hdc.is_null() {
         perform_pacing(hdc as usize, KIND_GL);
@@ -1276,6 +1314,7 @@ pub extern "system" fn DllMain(
                 if reserved.is_null() {
                     remove_vtable_hooks();
                     remove_gl_hooks();
+                    drain_hooked_calls();
                     // Hooks are gone, but a present may still be inside perform_pacing on another
                     // thread; only free the timer when nobody holds BUSY.
                     if !WAIT_TIMER.is_null() && BUSY.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_ok() {

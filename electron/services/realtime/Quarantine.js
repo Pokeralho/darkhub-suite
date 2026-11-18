@@ -53,14 +53,54 @@ export function lockDownDir(dir) {
     .then(() => run([dir, '/inheritance:r', '/grant:r', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-18:(OI)(CI)F']))
 }
 
+const TRUSTED_OWNERS = new Set(['S-1-5-32-544', 'S-1-5-18'])
+
+/**
+ * Files under `dir` (recursive) owned by anyone but Administrators / SYSTEM. Before the first lockdown ProgramData lets
+ * a standard user create the folder and files in it; the lockdown cuts its access, but what it planted (a .json naming
+ * any restore target, with its own key and payload) would still be listed and restored as admin. Windows only.
+ */
+export function foreignOwnedFiles(dir) {
+  if (process.platform !== 'win32') return Promise.resolve([])
+  const lit = `'${String(dir).replace(/'/g, "''")}'`
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    '[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)',
+    `Get-ChildItem -LiteralPath ${lit} -Recurse -Force -File | ForEach-Object {`,
+    '  $o = (Get-Acl -LiteralPath $_.FullName).GetOwner([Security.Principal.SecurityIdentifier]).Value',
+    `  if (${[...TRUSTED_OWNERS].map((s) => `$o -ne '${s}'`).join(' -and ')}) { $_.FullName }`,
+    '}'
+  ].join('\n')
+  const ps = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+  const args = ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')]
+  return new Promise((resolve, reject) => {
+    execFile(ps, args, { windowsHide: true, timeout: 60000, maxBuffer: 16 << 20, encoding: 'utf8' }, (err, out) => {
+      if (err) return reject(new Error(`could not check who owns the files in ${dir}: ${err.message}`))
+      resolve(String(out).split(/\r?\n/).map((l) => l.trim()).filter(Boolean))
+    })
+  })
+}
+
+/** lockDownDir + removes what a non-admin planted there before. Resolves the removed paths; throws when unsure. */
+export async function secureDir(dir, { foreignOwned = foreignOwnedFiles } = {}) {
+  if (!(await lockDownDir(dir))) throw new Error(`could not secure ${dir}`)
+  const bad = await foreignOwned(dir)
+  for (const f of bad) fs.rmSync(f, { force: true })
+  return bad
+}
+
 export class Quarantine {
   /**
    * opts.lockDown: ACL the folder to Administrators + SYSTEM before first use. A boolean or an async predicate: the app
    * passes "are we elevated?" (a non-elevated dev run would lock itself out, and is no privilege-escalation path anyway).
    */
-  constructor(root, { lockDown = false } = {}) {
+  constructor(root, { lockDown = false, foreignOwned = foreignOwnedFiles, secure = secureDir } = {}) {
     this.root = root
     this.lockDown = lockDown
+    this.foreignOwned = foreignOwned
+    this.secure = secure
+    this.locked = false
+    this.purged = []
     this.ready = null
   }
 
@@ -68,7 +108,10 @@ export class Quarantine {
     this.ready ||= (async () => {
       fs.mkdirSync(this.root, { recursive: true })
       const lock = typeof this.lockDown === 'function' ? await this.lockDown().catch(() => false) : this.lockDown
-      if (lock && !(await lockDownDir(this.root))) throw new Error('could not secure the quarantine folder')
+      if (lock) {
+        try { this.purged = await this.secure(this.root, { foreignOwned: this.foreignOwned }) } catch { throw new Error('could not secure the quarantine folder') }
+        this.locked = true
+      }
     })().catch((e) => { this.ready = null; throw e })
     return this.ready
   }
@@ -139,6 +182,11 @@ export class Quarantine {
     }
     // never write into Windows / Program Files / ProgramData as admin on behalf of a metadata file
     if (protectedPathReason(meta.originalPath)) throw new Error('refusing to restore into a system folder: restore it manually')
+    if (this.locked) {
+      // only entries this (elevated) app wrote: anything else in the folder was planted, whatever the lockdown left
+      const foreign = new Set((await this.foreignOwned(this.root)).map((f) => path.resolve(f).toLowerCase()))
+      if ([p.meta, p.data].some((f) => foreign.has(path.resolve(f).toLowerCase()))) throw new Error('quarantine entry not created by DarkHub: refusing to restore')
+    }
     const { dir, name, ext } = path.parse(meta.originalPath)
     let dest = meta.originalPath
     for (let i = 1; fs.existsSync(dest); i++) dest = path.join(dir, `${name} (restored ${i})${ext}`)
