@@ -448,6 +448,18 @@ const darkhubApi = {
     getHotkey: () => ipcRenderer.invoke('autoclicker:getHotkey'),
     setHotkey: (payload) => ipcRenderer.invoke('autoclicker:setHotkey', payload),
     setTabActive: (active) => ipcRenderer.invoke('autoclicker:setTabActive', active),
+    macroSetConfig: (payload) => ipcRenderer.invoke('autoclicker:macroSetConfig', payload),
+    macroRecordStart: () => ipcRenderer.invoke('autoclicker:macroRecordStart'),
+    macroRecordStop: () => ipcRenderer.invoke('autoclicker:macroRecordStop'),
+    macroPlayStart: (payload) => ipcRenderer.invoke('autoclicker:macroPlayStart', payload),
+    macroPlayStop: () => ipcRenderer.invoke('autoclicker:macroPlayStop'),
+    macroClear: () => ipcRenderer.invoke('autoclicker:macroClear'),
+    macroOpenFile: () => ipcRenderer.invoke('autoclicker:macroOpenFile'),
+    macroSaveFile: () => ipcRenderer.invoke('autoclicker:macroSaveFile'),
+    macroCompileExe: () => ipcRenderer.invoke('autoclicker:macroCompileExe'),
+    waypointsSave: (payload) => ipcRenderer.invoke('autoclicker:waypointsSave', payload),
+    waypointsPlay: (payload) => ipcRenderer.invoke('autoclicker:waypointsPlay', payload),
+    waypointsPickScreen: (payload) => ipcRenderer.invoke('autoclicker:waypointsPickScreen', payload),
     onChanged: (cb) => {
       const handler = (_event, data) => cb(data)
       ipcRenderer.on('autoclicker:changed', handler)

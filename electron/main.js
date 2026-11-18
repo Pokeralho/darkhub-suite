@@ -40,6 +40,7 @@ import { upgradeWrapperIfWeak, backupVaultFile } from './services/vaultBridge/va
 import Logger from './services/LoggerService.js'
 import { runCommand, runPowerShell, runPowerShellJson, stripBom } from './services/PowerShellRunner.js'
 import { AutoClickerService } from './services/autoclicker/AutoClickerService.js'
+import { makePointPicker } from './services/autoclicker/PointPicker.js'
 import { HotkeyService } from './services/hotkeys/HotkeyService.js'
 import { wingetOutcome, parseWingetShow, silentInstall, signerMatches, isFetchableUrl } from './services/setup/wingetFallback.js'
 import { CpuLoadTracker } from './services/CpuLoadTracker.js'
@@ -3318,6 +3319,58 @@ ipcMain.handle('autoclicker:toggle', autoClickerCall((p) => autoClicker.toggle(p
 ipcMain.handle('autoclicker:getHotkey', async () => ({ ok: true, hotkey: autoClicker.hotkey }))
 ipcMain.handle('autoclicker:setHotkey', autoClickerCall((p) => autoClicker.setHotkey(p?.hotkey)))
 ipcMain.handle('autoclicker:setTabActive', () => ({ ok: true }))
+ipcMain.handle('autoclicker:macroSetConfig', autoClickerCall((p) => autoClicker.macroSetConfig(p)))
+ipcMain.handle('autoclicker:macroRecordStart', autoClickerCall(() => autoClicker.macroRecordStart()))
+ipcMain.handle('autoclicker:macroRecordStop', autoClickerCall(() => autoClicker.macroRecordStop()))
+ipcMain.handle('autoclicker:macroPlayStart', autoClickerCall((p) => autoClicker.macroPlayStart(p)))
+ipcMain.handle('autoclicker:macroPlayStop', autoClickerCall(() => autoClicker.macroPlayStop()))
+ipcMain.handle('autoclicker:macroClear', autoClickerCall(() => autoClicker.macroClear()))
+ipcMain.handle('autoclicker:macroOpenFile', autoClickerCall(async () => {
+  const res = await dialog.showOpenDialog(mainWindow, {
+    title: 'Abrir Macro (.rec ou .exe TinyTask)',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Arquivos de Macro (*.rec, *.exe)', extensions: ['rec', 'exe'] },
+      { name: 'Gravações TinyTask (*.rec)', extensions: ['rec'] },
+      { name: 'Macro Compilada (*.exe)', extensions: ['exe'] }
+    ]
+  })
+  if (res.canceled || !res.filePaths?.[0]) return { ok: true, canceled: true, ...autoClicker.state() }
+  return autoClicker.macroLoadFromPath(res.filePaths[0])
+}))
+ipcMain.handle('autoclicker:macroSaveFile', autoClickerCall(async () => {
+  const defaultName = autoClicker.macroRuntime?.fileName?.endsWith('.rec') ? autoClicker.macroRuntime.fileName : 'macro.rec'
+  const res = await dialog.showSaveDialog(mainWindow, {
+    title: 'Salvar Gravação de Macro (.rec)',
+    defaultPath: defaultName,
+    filters: [{ name: 'Gravação de Macro (*.rec)', extensions: ['rec'] }]
+  })
+  if (res.canceled || !res.filePath) return { ok: true, canceled: true }
+  return autoClicker.macroSaveToPath(res.filePath)
+}))
+ipcMain.handle('autoclicker:macroCompileExe', autoClickerCall(async () => {
+  const pickStub = await dialog.showOpenDialog(mainWindow, {
+    title: 'Selecione o executável base (TinyTask 1.77 / meumacro.exe)',
+    properties: ['openFile'],
+    filters: [{ name: 'Executável TinyTask (*.exe)', extensions: ['exe'] }]
+  })
+  if (pickStub.canceled || !pickStub.filePaths?.[0]) return { ok: true, canceled: true }
+  const pickOut = await dialog.showSaveDialog(mainWindow, {
+    title: 'Salvar Macro Compilada (.exe standalone)',
+    defaultPath: 'minha_macro.exe',
+    filters: [{ name: 'Executável Windows (*.exe)', extensions: ['exe'] }]
+  })
+  if (pickOut.canceled || !pickOut.filePath) return { ok: true, canceled: true }
+  return autoClicker.macroCompileExe({ templateExePath: pickStub.filePaths[0], targetPath: pickOut.filePath })
+}))
+const pickScreenPoints = makePointPicker({ BrowserWindow, screen })
+ipcMain.handle('autoclicker:waypointsSave', autoClickerCall((p) => autoClicker.waypointsSave(p)))
+ipcMain.handle('autoclicker:waypointsPlay', autoClickerCall((p) => autoClicker.waypointsPlay(p)))
+ipcMain.handle('autoclicker:waypointsPickScreen', autoClickerCall(async (p) => {
+  const picked = await pickScreenPoints(mainWindow)
+  if (picked.canceled || !picked.points?.length) return { ok: true, canceled: true, ...autoClicker.state() }
+  return autoClicker.waypointsAddPicked(picked.points, { replace: Boolean(p?.replace) })
+}))
 
 ipcMain.handle('metadata:read', async (_event, imagePath) => {
   try {

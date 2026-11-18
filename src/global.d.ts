@@ -936,7 +936,19 @@ export interface DarkHubAPI {
     getHotkey: () => Promise<any>;
     setHotkey: (payload: any) => Promise<any>;
     setTabActive: (active: boolean) => Promise<any>;
-    onChanged: (callback: (payload: { running: boolean; state: any }) => void) => () => void;
+    macroSetConfig: (payload: { speed?: number; loops?: number; continuous?: boolean; recordHotkey?: string; playHotkey?: string }) => Promise<any>;
+    macroRecordStart: () => Promise<any>;
+    macroRecordStop: () => Promise<any>;
+    macroPlayStart: (payload?: { speed?: number; loops?: number; continuous?: boolean }) => Promise<any>;
+    macroPlayStop: () => Promise<any>;
+    macroClear: () => Promise<any>;
+    macroOpenFile: () => Promise<any>;
+    macroSaveFile: () => Promise<any>;
+    macroCompileExe: () => Promise<any>;
+    waypointsSave: (payload: { waypoints?: any[]; options?: { humanArc?: boolean }; compileToMacro?: boolean }) => Promise<any>;
+    waypointsPlay: (payload?: { waypoints?: any[]; options?: { humanArc?: boolean }; speed?: number; loops?: number; continuous?: boolean }) => Promise<any>;
+    waypointsPickScreen: (payload?: { replace?: boolean }) => Promise<any>;
+    onChanged: (callback: (payload: { running: boolean; state: any; macro?: any }) => void) => () => void;
   };
   latency: {
     queryTimer: () => Promise<any>;
