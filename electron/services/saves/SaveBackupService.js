@@ -237,7 +237,13 @@ export class SaveBackupService {
       fs.writeFileSync(path.join(vdir, 'backup.json'), JSON.stringify(info, null, 1))
       this._rotate(name)
       this.onEvent?.({ type: 'backup', game: name, id })
-      return { ok: true, id, files: list.length, bytes, registry: registry.length }
+      const skippedRegistry = process.platform !== 'win32' && regKeys.length > 0
+      return {
+        ok: true, id, files: list.length, bytes, registry: registry.length,
+        ...(skippedRegistry ? {
+          partial: true, platform: process.platform, reason: 'windows-only-features-skipped', skippedRegistry: regKeys.length
+        } : {})
+      }
     } finally {
       this.busy = false
     }

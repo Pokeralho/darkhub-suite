@@ -59,11 +59,18 @@ export function registerMetadataIPC({ ipcMain, assertFileAccessGranted, hasFileA
     }
     return service.write(req)
   })
-  handle('metax:setFileProps', async (p) => service.setFileProps(granted(p.path, 'arquivo'), {
+  // Alternate Data Streams and Win32 file attributes have no cross-platform equivalent; degrade explicitly
+  // instead of surfacing a raw "PowerShell is not available on this platform" error. metax:read/write use
+  // ExifTool and remain cross-platform.
+  const windowsOnly = (what) => process.platform === 'win32' ? null : {
+    ok: false, unsupported: true, platform: process.platform, reason: 'windows-only',
+    error: `${what} está disponível apenas no Windows.`
+  }
+  handle('metax:setFileProps', async (p) => windowsOnly('Propriedades de arquivo') || service.setFileProps(granted(p.path, 'arquivo'), {
     created: p.created, modified: p.modified, accessed: p.accessed,
     readOnly: typeof p.readOnly === 'boolean' ? p.readOnly : undefined,
     hidden: typeof p.hidden === 'boolean' ? p.hidden : undefined
   }))
-  handle('metax:removeStream', async (p) => service.removeStream(granted(p.path, 'arquivo'), p.name))
+  handle('metax:removeStream', async (p) => windowsOnly('Fluxos alternativos (ADS)') || service.removeStream(granted(p.path, 'arquivo'), p.name))
   return service
 }

@@ -323,6 +323,13 @@ class UpdateService {
 
       const file = this._downloadedFilePath;
       if (file && fs.existsSync(file)) {
+        // The manual installer is a Windows .exe invoked with /S; electron-updater handles the Linux
+        // artifacts through quitAndInstall above. _platform is injectable for tests.
+        const platform = this._platform || process.platform;
+        if (platform !== 'win32') return {
+          ok: false, unsupported: true, platform, reason: 'windows-only',
+          error: 'O instalador .exe é suportado apenas no Windows.'
+        };
         // The installer sat in the user's %TEMP% since the download, and this process is elevated: anything running
         // unelevated as the same user could have replaced it. Hash it again right before running it.
         let actual = null;
