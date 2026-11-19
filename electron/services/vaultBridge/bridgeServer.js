@@ -29,6 +29,9 @@ function isLoopbackAddress(addr) {
   return a === '127.0.0.1' || a === '::ffff:127.0.0.1' || a === '::1'
 }
 
+
+/** Message types that wait for the user's answer in the app; handled off the per-connection queue. */
+const PROMPTING_TYPES = new Set(['pair.request', 'logins.save'])
 export class VaultBridgeServer {
   /**
    * @param {object} deps
@@ -124,7 +127,10 @@ export class VaultBridgeServer {
       caller: null,
       client: null,
       authFailures: 0,
-      prompt: null
+      prompt: null,
+      // frames of one connection are handled one after the other, in arrival order: a "logins.query" sent right
+      // behind "auth" in the same TCP chunk must see the session already authenticated (or not), never race it
+      queue: Promise.resolve()
     }
     this.sessions.add(session)
     const timer = setTimeout(() => {
@@ -136,8 +142,10 @@ export class VaultBridgeServer {
       let frames
       try { frames = session.decoder.push(chunk) } catch { this.#fail(session); return }
       for (const f of frames) {
-        if (socket.destroyed) return
-        this.#onFrame(session, f).catch(() => this.#send(session, { type: 'error', error: 'internal' }))
+        session.queue = session.queue.then(async () => {
+          if (socket.destroyed) return
+          try { await this.#onFrame(session, f) } catch { this.#send(session, { type: 'error', error: 'internal' }) }
+        })
       }
     })
     const cleanup = () => {
@@ -187,8 +195,14 @@ export class VaultBridgeServer {
     }
     const v = validateMessage(frame)
     if (!v.ok) return this.#send(session, { id: v.id, ok: false, error: v.error })
-    const reply = await this.#handle(session, v.type, v.payload, v.id)
-    if (reply) this.#send(session, { id: v.id, ...reply })
+    const work = this.#handle(session, v.type, v.payload, v.id).then((reply) => { if (reply) this.#send(session, { id: v.id, ...reply }) })
+    // Requests that wait for the user (pairing, save prompt) must not hold the queue: "pair.cancel" and the other
+    // frames behind them still need an answer. Their own checks ran before the first await inside them.
+    if (PROMPTING_TYPES.has(v.type)) {
+      work.catch(() => this.#send(session, { type: 'error', error: 'internal' }))
+      return
+    }
+    await work
   }
 
   async #handle(session, type, p, id) {

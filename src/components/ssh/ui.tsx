@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useId, useRef } from 'react';
+import { useDialogA11y } from '../../hooks/useDialogA11y';
 import { X } from '../icons';
 import type { SshResult, SshVaultState } from '../../global';
 
@@ -6,16 +7,14 @@ export interface VaultProps { vault: SshVaultState; reload: () => Promise<void> 
 
 /** Right-side drawer used for the host, key, snippet and tunnel forms. */
 export function Drawer({ title, onClose, children, footer }: { title: React.ReactNode; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const ref = useRef<HTMLElement>(null);
+  const titleId = useId();
+  useDialogA11y(ref, true, onClose);
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <aside className="w-[min(440px,100vw)] h-full flex flex-col bg-zinc-950 border-l border-zinc-800 shadow-2xl">
+      <aside ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId} className="w-[min(440px,100vw)] h-full flex flex-col bg-zinc-950 border-l border-zinc-800 shadow-2xl">
         <header className="flex items-center justify-between h-12 px-4 border-b border-zinc-800/80">
-          <h2 className="dh-section-title">{title}</h2>
+          <h2 id={titleId} className="dh-section-title">{title}</h2>
           <button type="button" className="dh-btn dh-btn-sm dh-btn-ghost" aria-label="Close" onClick={onClose}><X size={16} /></button>
         </header>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">{children}</div>
@@ -26,10 +25,14 @@ export function Drawer({ title, onClose, children, footer }: { title: React.Reac
 }
 
 export function Modal({ title, children, footer, onClose, tone }: { title: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode; onClose?: () => void; tone?: 'warn' }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  // Escape closes only when the caller allows closing (onClose given).
+  useDialogA11y(ref, true, onClose);
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onMouseDown={(e) => { if (onClose && e.target === e.currentTarget) onClose(); }}>
-      <div className={`w-[min(520px,100%)] dh-card p-5 space-y-4 ${tone === 'warn' ? 'border-amber-500/50' : ''}`}>
-        <h2 className="dh-section-title">{title}</h2>
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId} className={`w-[min(520px,100%)] dh-card p-5 space-y-4 ${tone === 'warn' ? 'border-amber-500/50' : ''}`}>
+        <h2 id={titleId} className="dh-section-title">{title}</h2>
         <div className="space-y-3 text-[13px] text-zinc-300">{children}</div>
         {footer ? <div className="flex items-center justify-end gap-2">{footer}</div> : null}
       </div>

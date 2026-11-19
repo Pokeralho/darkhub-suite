@@ -1,14 +1,14 @@
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import Logger from '../LoggerService.js';
-import { runCommand, runPowerShell } from '../PowerShellRunner.js';
+import { runCommand, runPowerShell, encodePowerShellScript } from '../PowerShellRunner.js';
 import { wrapMarkedScript, parseMarkedOutput, psQuote } from './OptimizerUtils.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /** How long we wait for the elevated process to START (i.e. for the user to answer the UAC prompt). */
 const UAC_START_TIMEOUT_MS = 180000;
@@ -44,6 +44,59 @@ export function decodeShellOutput(buf) {
   }
   if (buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) return buf.slice(3).toString('utf8');
   return buf.toString('utf8').replace(/\0/g, '');
+}
+
+/**
+ * cscript reads a .vbs without BOM in the ANSI code page, so a path like C:\Users\João came out garbled and the UAC
+ * launch never happened (we then waited the whole 180 s). UTF-16 LE with BOM is read as Unicode.
+ */
+export function encodeVbs(text) {
+  return Buffer.from(`\ufeff${text}`, 'utf16le');
+}
+
+/**
+ * PowerShell run elevated in place of `-File psFile`: reads the file once, refuses it unless its SHA-256 is
+ * `sha256Hex` (writing the refusal to the result files so the caller does not wait for a timeout), then runs the
+ * bytes it checked from memory.
+ */
+export function buildVerifiedBootstrap(psFile, sha256Hex, { startedFile, errFile, exitFile, flagFile }) {
+  return [
+    `$__dhF = ${psQuote(psFile)}`,
+    'try { $__dhB = [IO.File]::ReadAllBytes($__dhF) } catch { $__dhB = $null }',
+    "$__dhH = ''",
+    "if ($__dhB) { $__dhH = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($__dhB)).Replace('-', '').ToLowerInvariant() }",
+    `if ($__dhH -ne ${psQuote(String(sha256Hex).toLowerCase())}) {`,
+    `  '1' | Out-File -LiteralPath ${psQuote(startedFile)} -Encoding ascii`,
+    `  'O script elevado foi alterado antes de rodar; execucao recusada.' | Out-File -LiteralPath ${psQuote(errFile)} -Encoding utf8`,
+    `  '1' | Out-File -LiteralPath ${psQuote(exitFile)} -Encoding utf8`,
+    `  'DONE' | Out-File -LiteralPath ${psQuote(flagFile)} -Encoding utf8`,
+    '  exit 1',
+    '}',
+    '$__dhT = [Text.Encoding]::UTF8.GetString($__dhB)',
+    'if ($__dhT.Length -gt 0 -and $__dhT[0] -eq [char]0xFEFF) { $__dhT = $__dhT.Substring(1) }',
+    '& ([ScriptBlock]::Create($__dhT))'
+  ].join('\n');
+}
+
+/** PowerShell that runs `cmd` with cmd.exe (arguments passed verbatim) and reports its output and exit code. */
+export function buildCmdRunnerScript(cmd) {
+  return [
+    '$__dhPsi = New-Object System.Diagnostics.ProcessStartInfo',
+    "$__dhPsi.FileName = Join-Path $env:SystemRoot 'System32\\cmd.exe'",
+    `$__dhPsi.Arguments = '/d /s /c "' + ${psQuote(cmd)} + '"'`,
+    '$__dhPsi.UseShellExecute = $false',
+    '$__dhPsi.RedirectStandardOutput = $true',
+    '$__dhPsi.RedirectStandardError = $true',
+    '$__dhPsi.CreateNoWindow = $true',
+    '$__dhP = [System.Diagnostics.Process]::Start($__dhPsi)',
+    '$__dhErr = $__dhP.StandardError.ReadToEndAsync()',
+    '$__dhOut = $__dhP.StandardOutput.ReadToEnd()',
+    '$__dhP.WaitForExit()',
+    'if ($__dhOut) { Write-Output $__dhOut.TrimEnd() }',
+    '$__dhE = $__dhErr.Result',
+    'if ($__dhE) { Write-Output $__dhE.TrimEnd() }',
+    '$global:LASTEXITCODE = $__dhP.ExitCode'
+  ].join('\n');
 }
 
 class ElevationHelper {
@@ -127,16 +180,22 @@ ${script}
         "$__dhExitCode" | Out-File -LiteralPath ${psQuote(exitFile)} -Encoding utf8
         "DONE" | Out-File -LiteralPath ${psQuote(flagFile)} -Encoding utf8
       `;
-      // BOM so Windows PowerShell 5.1 reads the file as UTF-8 (accents in messages/paths survive)
-      fs.writeFileSync(psFile, `\ufeff${fullScript}`, 'utf8');
+      // %LOCALAPPDATA% is writable by every unelevated program of this user, and the UAC prompt can stay open for minutes:
+      // the elevated side gets only a bootstrap on its command line, which reads the script once, checks its SHA-256
+      // and runs it from memory, so a swapped file is refused instead of run as administrator.
+      const scriptBytes = Buffer.from(`\ufeff${fullScript}`, 'utf8');
+      fs.writeFileSync(psFile, scriptBytes, { flag: 'wx' });
+      const scriptSha = crypto.createHash('sha256').update(scriptBytes).digest('hex');
+      const bootstrap = buildVerifiedBootstrap(psFile, scriptSha, { startedFile, errFile, exitFile, flagFile });
 
-      const vbsContent = `
-        Set UAC = CreateObject("Shell.Application")
-        UAC.ShellExecute "powershell.exe", "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""${psFile}""", "", "runas", 0
-      `;
-      fs.writeFileSync(vbsFile, vbsContent, 'utf8');
+      const vbsContent = [
+        'Set UAC = CreateObject("Shell.Application")',
+        `UAC.ShellExecute "powershell.exe", "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand ${encodePowerShellScript(bootstrap)}", "", "runas", 0`,
+        ''
+      ].join('\r\n');
+      fs.writeFileSync(vbsFile, encodeVbs(vbsContent));
 
-      await execAsync(`cscript //nologo "${vbsFile}"`);
+      await execFileAsync(path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'cscript.exe'), ['//nologo', vbsFile], { windowsHide: true });
 
       const state = await waitForElevated(flagFile, startedFile, timeoutMs);
 
@@ -187,67 +246,11 @@ ${script}
       return result;
     }
 
-    const tmpId = `${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
-    const tmpDir = this._privateDir();
-    const batFile = path.join(tmpDir, `dh_elevate_${tmpId}.bat`);
-    const vbsFile = path.join(tmpDir, `dh_elevate_${tmpId}.vbs`);
-    const flagFile = path.join(tmpDir, `dh_elevate_${tmpId}.done`);
-    const outFile = path.join(tmpDir, `dh_elevate_${tmpId}.out`);
-    const exitFile = path.join(tmpDir, `dh_elevate_${tmpId}.exit`);
-    const startedFile = path.join(tmpDir, `dh_elevate_${tmpId}.started`);
-
-    try {
-      const batContent = [
-        '@echo off',
-        `echo started> "${startedFile}"`,
-        `(${cmd}) 1>> "${outFile}" 2>>&1`,
-        `echo %ERRORLEVEL% > "${exitFile}"`,
-        `echo DONE > "${flagFile}"`
-      ].join('\r\n');
-      fs.writeFileSync(batFile, batContent, 'utf8');
-
-      const vbsContent = `
-        Set UAC = CreateObject("Shell.Application")
-        UAC.ShellExecute "cmd.exe", "/c ""${batFile}""", "", "runas", 0
-      `;
-      fs.writeFileSync(vbsFile, vbsContent, 'utf8');
-      await execAsync(`cscript //nologo "${vbsFile}"`);
-
-      const state = await waitForElevated(flagFile, startedFile, timeoutMs);
-
-      const readSafe = (file) => {
-        try { return fs.readFileSync(file, 'utf8'); } catch { return ''; }
-      };
-
-      if (state !== 'done') {
-        const result = {
-          code: 1,
-          stdout: readSafe(outFile).trim(),
-          stderr: state === 'not-started'
-            ? 'Elevação cancelada: o pedido de administrador (UAC) foi recusado ou não foi respondido.'
-            : 'Timeout aguardando elevação (UAC pode ter sido cancelado ou o comando não terminou a tempo).'
-        };
-        Logger.auditOptimizer({ type: 'elevated-cmd', ...this._auditScript(cmd), ...result, ok: false });
-        return result;
-      }
-
-      const code = Number.parseInt(readSafe(exitFile).trim(), 10);
-      const result = {
-        code: Number.isFinite(code) ? code : 1,
-        stdout: readSafe(outFile).trim(),
-        stderr: ''
-      };
-      Logger.auditOptimizer({ type: 'elevated-cmd', ...this._auditScript(cmd), ...result, ok: result.code === 0 });
-      return result;
-    } catch (e) {
-      const result = { code: 1, stdout: '', stderr: e.message };
-      Logger.auditOptimizer({ type: 'elevated-cmd', ...this._auditScript(cmd), ...result, ok: false });
-      return result;
-    } finally {
-      for (const f of [batFile, vbsFile, flagFile, outFile, exitFile, startedFile]) {
-        if (fs.existsSync(f)) { try { fs.unlinkSync(f); } catch (err) {} }
-      }
-    }
+    // No .bat file: cmd.exe re-reads a batch file while it runs, so a copy in a user-writable folder could be changed
+    // under the elevated process. The command travels inside the (hash-checked) elevated PowerShell script instead.
+    const result = await this.runElevatedPowerShell(buildCmdRunnerScript(cmd), { timeoutMs });
+    Logger.auditOptimizer({ type: 'elevated-cmd', ...this._auditScript(cmd), ...result, ok: result.code === 0 });
+    return result;
   }
 }
 

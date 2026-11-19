@@ -1,0 +1,41 @@
+// pt-BR strings for maintenance (generated from maintenanceMessages.ts; edit here).
+// Keep the same keys in the other language's file.
+const dict: Record<string, string> = {
+  "maint.task.saves": "Backup dos saves dos jogos",
+  "maint.desc.saves": "Guarda uma nova versão dos saves de cada jogo que mudou desde o último backup.",
+  "maint.sum.saves": "{s} jogos com backup novo, {u} sem mudanças",
+  "nav.maintenance": "Manutenção agendada",
+  "maint.task.cleanTemp": "Limpar arquivos temporários",
+  "maint.task.securityLists": "Atualizar listas de segurança",
+  "maint.task.clamav": "Atualizar assinaturas do ClamAV",
+  "maint.task.winget": "Atualizações de programas (winget)",
+  "maint.desc.cleanTemp": "Apaga o conteúdo das pastas temporárias. Arquivos em uso são pulados.",
+  "maint.desc.securityLists": "Baixa de novo as listas da comunidade ativadas na Segurança Avançada. Não altera o que já está aplicado.",
+  "maint.desc.clamav": "Roda o freshclam se o ClamAV estiver instalado.",
+  "maint.desc.winget": "Verifica quais programas têm atualização. Só instala se você ligar a opção abaixo.",
+  "maint.sum.clean": "{mb} liberados, {n} arquivos",
+  "maint.sum.noLists": "nenhuma lista ativada",
+  "maint.sum.lists": "{n} listas atualizadas",
+  "maint.sum.noClam": "ClamAV não instalado",
+  "maint.sum.clam": "assinaturas atualizadas",
+  "maint.sum.wingetInstalled": "{i} de {n} atualizados",
+  "maint.sum.winget": "{n} atualizações disponíveis",
+  "maint.sum.failed": "{f} com falha",
+  "maint.subtitle": "Tarefas que rodam sozinhas no horário escolhido enquanto o DarkHub estiver aberto (inclusive na bandeja). Se o PC estiver desligado na hora, a tarefa roda uma vez quando o DarkHub abrir de novo.",
+  "maint.daily": "Todo dia",
+  "maint.weekly": "Toda semana",
+  "maint.monthly": "Todo mês",
+  "maint.day": "dia",
+  "maint.at": "às",
+  "maint.installHelp": "Instala todas as atualizações em modo silencioso, aceitando os termos de cada programa.",
+  "maint.install": "Instalar automaticamente",
+  "maint.last": "Última vez: {d}",
+  "maint.never": "Nunca rodou",
+  "maint.next": "Próxima: {d}",
+  "maint.runNow": "Rodar agora",
+  "maint.tray": "Para as tarefas rodarem sem você abrir o app, deixe o DarkHub iniciar com o Windows (ele fica na bandeja).",
+  "maint.history": "Histórico",
+  "maint.manual": "manual"
+};
+
+export default dict;

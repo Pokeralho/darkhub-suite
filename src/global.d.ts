@@ -946,7 +946,19 @@ export interface DarkHubAPI {
     getHotkey: () => Promise<any>;
     setHotkey: (payload: any) => Promise<any>;
     setTabActive: (active: boolean) => Promise<any>;
-    onChanged: (callback: (payload: { running: boolean; state: any }) => void) => () => void;
+    macroSetConfig: (payload: { speed?: number; loops?: number; continuous?: boolean; recordHotkey?: string; playHotkey?: string }) => Promise<any>;
+    macroRecordStart: () => Promise<any>;
+    macroRecordStop: () => Promise<any>;
+    macroPlayStart: (payload?: { speed?: number; loops?: number; continuous?: boolean }) => Promise<any>;
+    macroPlayStop: () => Promise<any>;
+    macroClear: () => Promise<any>;
+    macroOpenFile: () => Promise<any>;
+    macroSaveFile: () => Promise<any>;
+    macroCompileExe: () => Promise<any>;
+    waypointsSave: (payload: { waypoints?: any[]; options?: { humanArc?: boolean }; compileToMacro?: boolean }) => Promise<any>;
+    waypointsPlay: (payload?: { waypoints?: any[]; options?: { humanArc?: boolean }; speed?: number; loops?: number; continuous?: boolean }) => Promise<any>;
+    waypointsPickScreen: (payload?: { replace?: boolean }) => Promise<any>;
+    onChanged: (callback: (payload: { running: boolean; state: any; macro?: any }) => void) => () => void;
   };
   latency: {
     queryTimer: () => Promise<{ ok: boolean; data?: any; error?: string; unsupported?: boolean; platform?: string; reason?: string }>;
@@ -1235,8 +1247,10 @@ export interface DarkHubAPI {
     tag: (payload: { id: string; color: DiskMapTag | null }) => Promise<{ ok: boolean; error?: string }>;
     open: (payload: { id: string }) => Promise<{ ok: boolean; error?: string }>;
     reveal: (payload: { id: string }) => Promise<{ ok: boolean; error?: string }>;
-    trash: (payload: { id: string }) => Promise<{ ok: boolean; error?: string; path?: string; partial?: boolean; noRecycle?: 'noBin' | 'disabled' | 'tooBig' | 'unknown' }>;
+    trash: (payload: { id: string }) => Promise<{ ok: boolean; error?: string; path?: string; partial?: boolean; noRecycle?: 'noBin' | 'disabled' | 'tooBig' | 'unknown' | 'inBin' }>;
     deletePermanent: (payload: { id: string; confirmName: string }) => Promise<{ ok: boolean; error?: string; path?: string; partial?: boolean }>;
+    /** For items inside a Recycle Bin: original path from the $I record, or orphan when that record is gone. */
+    recycleInfo: (payload: { id: string }) => Promise<{ ok: boolean; inBin: boolean; original: string | null; orphan: boolean }>;
     exportReport: (payload: { id?: string; format: 'txt' | 'csv'; filter?: string }) => Promise<{ ok: boolean; canceled?: boolean; error?: string; path?: string; rows?: number }>;
     onProgress: (callback: (status: DiskMapStatus) => void) => () => void;
   };

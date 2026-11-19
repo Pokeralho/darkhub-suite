@@ -205,6 +205,25 @@ function isWebUrl(u) {
   return typeof u === 'string' && /^https?:\/\//i.test(u)
 }
 
+// Approximate registrable domain ("site") without the Public Suffix List: the last two labels, or three when the
+// second-to-last is a common second-level suffix under a country code (example.co.uk, example.com.br). Errs on the
+// side of "different site", which only means no save is offered. The app re-checks with the real list.
+const SECOND_LEVEL = new Set(['co', 'com', 'net', 'org', 'gov', 'edu', 'ac', 'gob', 'mil', 'ne', 'or', 'go', 'nic'])
+function siteOf(u) {
+  let host
+  try { host = new URL(u).hostname.toLowerCase().replace(/\.$/, '') } catch { return null }
+  if (!host) return null
+  if (/^[\d.]+$/.test(host) || host.includes(':') || !host.includes('.')) return host // IPs, IPv6, single labels
+  const labels = host.split('.')
+  const n = labels.length >= 3 && labels[labels.length - 1].length === 2 && SECOND_LEVEL.has(labels[labels.length - 2]) ? 3 : 2
+  return labels.slice(-n).join('.')
+}
+
+function sameSite(a, b) {
+  const sa = siteOf(a)
+  return Boolean(sa) && sa === siteOf(b)
+}
+
 async function queryLogins(url, topUrl) {
   const res = await request('logins.query', { url, topUrl: topUrl || url })
   return res
@@ -299,6 +318,9 @@ async function popupSave(tabId) {
   const p = await getPendingSave(tabId)
   if (!p) return { ok: false, error: 'nothing_to_save' }
   await clearPendingSave(tabId)
+  // the tab moved to another site since the submit: that site's popup must not save the old one's password
+  const tab = await api.tabs.get(tabId).catch(() => null)
+  if (!tab || !sameSite(p.url, tab.url)) return { ok: false, error: 'nothing_to_save' }
   return request('logins.save', { url: p.url, username: p.username, password: p.password }, SAVE_TIMEOUT_MS)
 }
 
@@ -361,6 +383,9 @@ async function handleMessage(msg, sender) {
     }
     case 'cs.submitted':
       if (typeof msg.password !== 'string') return { ok: false }
+      // content.js runs in every frame: a third-party iframe (ad, widget) must not queue a "save password" offer
+      // under the tab's site. Only the top frame or a frame of the same site as the tab.
+      if (sender.frameId !== 0 && !sameSite(frameUrl, tab.url)) return { ok: false, error: 'cross_site_frame' }
       offerSave(tab.id, frameUrl, typeof msg.username === 'string' ? msg.username : '', msg.password).catch(() => {})
       return { ok: true }
     default:
@@ -374,3 +399,11 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 })
 
 api.tabs.onRemoved.addListener((tabId) => { sessionRemove(`pending:${tabId}`).catch(() => {}) })
+
+// A captured login belongs to the site it was typed on: drop it when the tab navigates to a different site.
+api.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (!changeInfo?.url) return
+  sessionGet(`pending:${tabId}`).then((p) => {
+    if (p && !sameSite(p.url, changeInfo.url)) return clearPendingSave(tabId)
+  }).catch(() => {})
+})

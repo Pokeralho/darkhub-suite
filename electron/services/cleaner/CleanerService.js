@@ -8,6 +8,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { integrityError, TAMPERED_MESSAGE } from '../binaryIntegrity.js';
 
 export const WINAPP2_URL = 'https://content.thewebatom.net/files/winapp2.ini';
 const WINAPP2_MAX = 16 << 20;
@@ -65,8 +66,9 @@ function platformReason(platform) {
 }
 
 export class CleanerService {
-  constructor({ exePath = defaultExe(), dataDir, backupDir = null, execFileImpl = execFile, fetchImpl = globalThis.fetch, extraArgs = [] } = {}) {
+  constructor({ exePath = defaultExe(), dataDir, backupDir = null, execFileImpl = execFile, fetchImpl = globalThis.fetch, extraArgs = [], checkIntegrity = () => integrityError(['DarkHub.Cleaner.exe']) } = {}) {
     this.exePath = exePath;
+    this.checkIntegrity = checkIntegrity;
     this.dataDir = dataDir || path.join(os.tmpdir(), 'DarkHub-Cleaner');
     this.backupDirPref = backupDir;
     this.execFile = execFileImpl;
@@ -113,10 +115,11 @@ export class CleanerService {
     if (!platformOk && !this._injectedExec) {
       return Promise.resolve({ ok: false, unsupported: true, platform: process.platform, reason: 'unsupported-platform', error: 'DarkHub Cleaner não é suportado nesta plataforma.' });
     }
-    if (!this._injectedExec && !fs.existsSync(this.exePath)) {
+    if (!this.available()) {
       const hint = process.platform === 'win32' ? 'rode npm run build:cleaner' : 'compile o motor nativo (native_cleaner) para esta plataforma';
       return Promise.resolve({ ok: false, code: 'missing_engine', error: `Motor do Cleaner não foi encontrado (${hint}).` });
     }
+    if (this.checkIntegrity?.()) return Promise.resolve({ ok: false, code: 'integrity_failed', error: TAMPERED_MESSAGE });
     return new Promise((resolve) => {
       this.execFile(this.exePath, [...args, ...this.extraArgs], { windowsHide: true, timeout: timeoutMs, maxBuffer: 256 << 20 }, (err, stdout, stderr) => {
         const line = String(stdout || '').trim().split(/\r?\n/).filter((l) => l.startsWith('{')).pop();

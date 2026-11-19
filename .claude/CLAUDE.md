@@ -22,11 +22,13 @@ Os números de linha podem estar desatualizados por alguns commits; confirme com
 - `npx vite build`
 - `npm run selftest` (com `npm run dev` rodando): chama todos os canais de **leitura** do backend nesta máquina, roda cenários funcionais com arquivos temporários (OCR, conversão, metadados, rede, YouTube, descoberta de jogos) e abre todas as telas com o backend real. Relatório e screenshots em `scratch/selftest/`. Nunca executa ações que alteram o sistema.
 - `npm run shot -- <rota>`: screenshot 1366x820 sem backend (layout).
-- Binários nativos: `npm run build:native` (C#) e `npm run build:pacer` (Rust; precisa do cargo)
+- Binários nativos: `npm run build:native` (C#), `npm run build:pacer` e `npm run build:sysops` (Rust; precisam do cargo)
 
 ## Regras do projeto
 
 - Toda função nova passa por: serviço → handler IPC → `electron/preload.js` + `src/global.d.ts` → tela → i18n (pt-BR **e** en-US) → teste.
+- Textos novos vão em `src/i18n/locales/pt-BR/<x>.ts` **e** `src/i18n/locales/en-US/<x>.ts` (só o idioma ativo carrega no início; os `*Messages.ts` são apenas wrappers). `tests/i18nLocales.test.ts` cobra a paridade.
+- Binários nativos alterados: rode `npm run integrity` (o app empacotado recusa helper com hash diferente).
 - PowerShell embutido: escape com os helpers de `electron/services/optimizer/OptimizerUtils.js`. Prefira `execFile`/`spawn` com array de argumentos a strings de shell.
 - `DarkOS.Recovery.psm1`: compatível com PowerShell 5.1 e só ASCII. **Suba o `# ModuleVersion: N` (linha 2) a cada mudança de comportamento**: o app usa o mais novo entre o módulo instalado em `C:\ProgramData\DarkOS\bin` e o embutido.
 - Recursos exclusivos do DarkOS devem degradar com elegância no Windows comum (`darkos:isDarkOS`).

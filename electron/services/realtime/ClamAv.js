@@ -21,7 +21,7 @@ export const CLAMAV = Object.freeze({
 export function parseClamscan(stdout) {
   const out = []
   for (const line of String(stdout || '').split(/\r?\n/)) {
-    const m = FOUND_RE.exec(line.trim())
+    const m = FOUND_RE.exec(line.trimEnd()) // trimEnd: a file name may start with spaces
     if (m) out.push({ file: m[1], signature: m[2] })
   }
   return out
@@ -45,6 +45,9 @@ function run(file, args, { timeoutMs, lowPriority = true } = {}) {
     }
     if (lowPriority) { try { os.setPriority(child.pid, os.constants.priority.PRIORITY_LOW) } catch { /* best effort */ } }
     const timer = setTimeout(() => { try { child.kill() } catch { /* gone */ } }, timeoutMs)
+    // decode as streams: a file name with accents split across two chunks must not turn into U+FFFD
+    child.stdout.setEncoding?.('utf8')
+    child.stderr.setEncoding?.('utf8')
     child.stdout.on('data', (d) => { if (stdout.length < 4e6) stdout += d })
     child.stderr.on('data', (d) => { if (stderr.length < 1e5) stderr += d })
     child.on('error', (e) => { clearTimeout(timer); resolve({ code: -1, stdout, stderr: String(e.message) }) })
@@ -53,10 +56,28 @@ function run(file, args, { timeoutMs, lowPriority = true } = {}) {
 }
 
 export class ClamAv {
-  constructor(root) {
+  /** opts.lockDown: lock the folder to Administrators/SYSTEM (default: when this process is elevated). */
+  constructor(root, { lockDown = null } = {}) {
     this.dir = path.join(root, 'ClamAV')
     this.db = path.join(this.dir, 'db')
     this.conf = path.join(this.dir, 'freshclam.conf')
+    this.lockDown = lockDown
+    this.secured = null
+  }
+
+  // The signatures and freshclam.conf live under ProgramData, where any user may add files to a folder an admin
+  // created (VM round43: a standard user could drop files into ClamAVdb). The elevated clamscan loads every
+  // database file there, so a planted .ign2/.fp would silence detections: lock the folder before using it and remove
+  // whatever a non-admin left there.
+  #secure() {
+    this.secured ||= (async () => {
+      fs.mkdirSync(this.db, { recursive: true })
+      const want = typeof this.lockDown === 'function' ? await this.lockDown() : this.lockDown ?? (await import('../secureStaging.js')).isProcessElevated()
+      if (!want) return
+      const { secureDir } = await import('./Quarantine.js')
+      await secureDir(this.dir)
+    })().catch((e) => { this.secured = null; throw e })
+    return this.secured
   }
 
   #find(exe) {
@@ -89,16 +110,22 @@ export class ClamAv {
   async install() {
     if (this.clamscan) return { ok: true }
     // the pinned official MSI (works without winget, e.g. on DarkOS); DarkHub runs as administrator, so msiexec /qn is enough
+    // msiexec runs elevated: the MSI is staged where only Administrators/SYSTEM can write (never the user's %TEMP%,
+    // where any unelevated program could swap it between the hash check and msiexec) and re-hashed right before use
     const { downloadToFile } = await import('../SecureDownload.js')
-    const msi = path.join(os.tmpdir(), `darkhub-clamav-${CLAMAV.version}.msi`)
+    const { createSecureStagingDir, assertUnchanged } = await import('../secureStaging.js')
+    let staging = null
     try {
+      staging = await createSecureStagingDir({ prefix: 'clamav-', fallbackBase: path.join(os.tmpdir(), 'DarkHub-ClamAV') })
+      const msi = staging.file(`clamav-${CLAMAV.version}.win.x64.msi`)
       await downloadToFile(CLAMAV.url, msi, { expectedSha256: CLAMAV.sha256, maxBytes: 400 * 1024 * 1024, timeoutMs: 30 * 60000 })
+      assertUnchanged(msi, CLAMAV.sha256)
       const r = await run('msiexec.exe', ['/i', msi, '/qn', '/norestart'], { timeoutMs: 15 * 60000, lowPriority: false })
       return this.clamscan ? { ok: true } : { ok: false, error: `msiexec exit ${r.code}` }
     } catch (e) {
       return { ok: false, error: String(e?.message ?? e) }
     } finally {
-      try { fs.rmSync(msi, { force: true }) } catch { /* in use */ }
+      await staging?.cleanup()
     }
   }
 
@@ -106,7 +133,7 @@ export class ClamAv {
   async update() {
     const freshclam = this.freshclam
     if (!freshclam) return { ok: false, error: 'ClamAV not installed' }
-    fs.mkdirSync(this.db, { recursive: true })
+    try { await this.#secure() } catch (e) { return { ok: false, error: String(e?.message ?? e) } }
     fs.writeFileSync(this.conf, freshclamConf(this.db))
     const r = await run(freshclam, [`--config-file=${this.conf}`, `--datadir=${this.db}`], { timeoutMs: 30 * 60000 })
     return r.code === 0 || this.hasDatabase() ? { ok: true } : { ok: false, error: (r.stderr || r.stdout).trim().slice(-300) }
@@ -116,9 +143,12 @@ export class ClamAv {
   async scan(files) {
     const clamscan = this.clamscan
     if (!clamscan || !this.hasDatabase()) return { error: 'ClamAV not ready', detections: [] }
+    try { await this.#secure() } catch (e) { return { error: String(e?.message ?? e), detections: [] } }
     const r = await run(clamscan, [`--database=${this.db}`, '--infected', '--no-summary', '--stdout', '--max-filesize=512M', '--max-scansize=1024M', ...files], { timeoutMs: 10 * 60000 })
     const detections = parseClamscan(r.stdout)
-    // exit 1 = something found, 0 = clean, 2 = error (detections listed before an error still count)
-    return r.code === 2 && !detections.length ? { error: (r.stderr || 'clamscan error').trim().slice(-300), detections } : { detections }
+    // exit 1 = something found, 0 = clean; anything else (2 = error, null = timeout/killed) means some files may never have
+    // been scanned: detections listed before the error still count, but nothing else in the batch can be called clean
+    if (r.code === 0 || r.code === 1) return { detections }
+    return { error: (r.stderr || 'clamscan error (code ' + r.code + ')').trim().slice(-300), detections }
   }
 }

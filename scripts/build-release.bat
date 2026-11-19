@@ -2,26 +2,10 @@
 chcp 65001 > nul
 cd /d "%~dp0.."
 
+rem "npm run build" already builds the C# helpers, the Rust engines, the vendored tools, the renderer, regenerates
+rem integrity.json and runs electron-builder (NSIS setup + portable, in dist_release\).
 echo.
-echo ===== ETAPA 2.1: Build C# (build:native) =====
-call npm run build:native
-if errorlevel 1 (
-    echo ERRO em build:native
-    pause
-    exit /b 1
-)
-
-echo.
-echo ===== ETAPA 2.2: Build Rust (build:pacer) =====
-call npm run build:pacer
-if errorlevel 1 (
-    echo ERRO em build:pacer
-    pause
-    exit /b 1
-)
-
-echo.
-echo ===== ETAPA 2.3: Build Completo (Vite + Electron) =====
+echo ===== Build completo (nativos + Vite + Electron) =====
 call npm run build
 if errorlevel 1 (
     echo ERRO em build
@@ -30,16 +14,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo ===== ETAPA 3: Build Setup Inno =====
-call npm run build:setup-inno
-if errorlevel 1 (
-    echo ERRO em build:setup-inno
-    pause
-    exit /b 1
-)
-
-echo.
-echo ===== ✅ BUILD COMPLETO SUCESSO =====
+echo ===== BUILD COMPLETO =====
 echo Arquivos gerados em: dist_release\
 dir dist_release\*.exe
 echo.

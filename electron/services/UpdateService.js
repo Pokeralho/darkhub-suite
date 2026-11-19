@@ -17,9 +17,15 @@ export function pickInstallerAsset(assets) {
   return exes.find((a) => /setup/i.test(a.name) && !/portable/i.test(a.name)) || exes.find((a) => !/portable/i.test(a.name)) || null;
 }
 
-/** SHA-256 of a file on disk, hex. */
+/** SHA-256 of a file on disk, hex. Streamed: the installer is ~300 MB and must not be read whole on the main thread. */
 export function sha256File(file) {
-  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    const rs = fs.createReadStream(file);
+    rs.on('error', reject);
+    rs.on('data', (chunk) => hash.update(chunk));
+    rs.on('end', () => resolve(hash.digest('hex')));
+  });
 }
 
 // An update offer older than this is checked again before downloading (a newer release may be out).
@@ -320,7 +326,7 @@ class UpdateService {
         // The installer sat in the user's %TEMP% since the download, and this process is elevated: anything running
         // unelevated as the same user could have replaced it. Hash it again right before running it.
         let actual = null;
-        try { actual = sha256File(file); } catch { /* unreadable */ }
+        try { actual = await sha256File(file); } catch { /* unreadable */ }
         if (!this._downloadedSha256 || actual !== this._downloadedSha256) {
           this._downloadedFilePath = null;
           this._setState('error');

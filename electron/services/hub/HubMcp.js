@@ -36,6 +36,17 @@ const TOOLS = [
   { name: 'hub_update', title: 'Update a package', description: 'Updates an installed Hub package to its latest version (removes the old one, installs the new). Asks the user for approval.', inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] }, annotations: { openWorldHint: true } }
 ]
 
+/**
+ * A folder on a local drive ("C:\dev\ext"). Refuses UNC shares (\\server\share: touching one sends this user's
+ * NTLM credentials to that server), device and long-path namespaces (\\?\, \\.\) and relative paths.
+ */
+export function isLocalFolderPath(p) {
+  const s = String(p ?? '')
+  if (!s || s.length > 1024 || /[\0-\x1f]/.test(s)) return false
+  if (/^[\\/]{2}/.test(s)) return false
+  return /^[A-Za-z]:[\\/]/.test(s)
+}
+
 const toText = (p) => (typeof p === 'string' ? p : JSON.stringify(p ?? null, null, 2))
 const rpcError = (id, code, message) => ({ jsonrpc: '2.0', id: id ?? null, error: { code, message } })
 
@@ -234,13 +245,20 @@ export class HubMcp {
       case 'darkhub_extension_dev_load': {
         if (!this.extensions) return { ok: false, error: 'extensões indisponíveis' }
         const folder = String(a.path || '')
+        if (!isLocalFolderPath(folder)) return { ok: false, error: 'Use o caminho absoluto de uma pasta num disco local (C:\\...); compartilhamentos de rede (\\\\servidor\\...) não são aceitos.' }
+        // nothing is read from disk before the user agrees to it: first the folder, then (after reading) its contents
+        const allowRead = await this._approved(client, `Ler a extensão em desenvolvimento da pasta ${folder}`, null)
+        if (allowRead) return allowRead
+        let real
+        try { real = fs.realpathSync.native(folder) } catch { return { ok: false, error: 'Pasta não encontrada.' } }
+        if (!isLocalFolderPath(real)) return { ok: false, error: 'A pasta aponta para um compartilhamento de rede; não é aceita.' }
         const { packExtensionFolder } = await import('./extensionPack.js')
         let pkg
-        try { pkg = packExtensionFolder(folder) } catch (e) { return { ok: false, error: e.message } }
+        try { pkg = packExtensionFolder(real) } catch (e) { return { ok: false, error: e.message } }
         const preview = await this.hub.inspect(JSON.stringify(pkg), 'pt-BR')
         if (!preview.ok) return { ok: false, errors: preview.errors }
         const denied = await this._approved(client, `Carregar a extensão ${preview.pkg.name} (desenvolvimento)`, preview)
-        return denied || this.extensions.loadDev(folder)
+        return denied || this.extensions.loadDev(real)
       }
       case 'darkhub_extension_reload': return this.extensions ? this.extensions.reload(a.id) : { ok: false, error: 'extensões indisponíveis' }
       case 'darkhub_extension_logs': return { ok: true, items: this.extensions ? this.extensions.logs(a.id) : [] }

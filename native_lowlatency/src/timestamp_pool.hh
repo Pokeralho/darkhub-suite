@@ -118,6 +118,10 @@ class TimestampPool final {
         // then the reaper must skip await_end as the queries were reset but
         // never written (avoiding a hang).
         std::atomic<bool> was_submitted{};
+        // Timeline value our pool's semaphore reaches once the submission
+        // carrying this handle's command buffers has fully completed. Written
+        // before the submit; only read by the reaper when was_submitted.
+        std::uint64_t completion_value{};
 
       public:
         explicit Handle(TimestampPool& timestamp_pool, QueryChunk& query_chunk,
@@ -153,6 +157,34 @@ class TimestampPool final {
 
   private:
     void do_reaper(const std::stop_token stoken);
+    // Blocks until the submission that signals `value` has completed (or the
+    // device is lost / we are shutting down). Never throws.
+    void await_completion(const Handle& handle,
+                          const std::stop_token& stoken) const noexcept;
+
+  private:
+    // Timeline semaphore signalled by an extra empty batch we append to every
+    // submission that carries our timestamp command buffers. Semaphore signal
+    // operations cover all earlier work in submission order, so reaching the
+    // value proves the command buffers left the pending state and can be
+    // reset safely.
+    struct TimelineSemaphoreOwner final {
+      private:
+        const QueueContext& queue_context;
+        VkSemaphore semaphore{};
+
+      public:
+        explicit TimelineSemaphoreOwner(const QueueContext& queue_context);
+        TimelineSemaphoreOwner(const TimelineSemaphoreOwner&) = delete;
+        TimelineSemaphoreOwner(TimelineSemaphoreOwner&&) = delete;
+        TimelineSemaphoreOwner&
+        operator=(const TimelineSemaphoreOwner&) = delete;
+        TimelineSemaphoreOwner& operator=(TimelineSemaphoreOwner&&) = delete;
+        ~TimelineSemaphoreOwner();
+
+      public:
+        operator const VkSemaphore&() const { return this->semaphore; }
+    };
 
   private:
     std::mutex mutex{};
@@ -160,6 +192,11 @@ class TimestampPool final {
 
     std::deque<Handle*> expiring_handles{};
     std::unordered_set<std::unique_ptr<QueryChunk>> query_chunks{};
+
+    // Declared before reaper_worker: created before the thread starts and
+    // destroyed only after it has been joined.
+    std::unique_ptr<TimelineSemaphoreOwner> timeline{};
+    std::atomic<std::uint64_t> timeline_counter{};
 
     std::jthread reaper_worker{};
 
@@ -173,6 +210,12 @@ class TimestampPool final {
 
   public:
     std::shared_ptr<Handle> acquire();
+
+    // The semaphore to signal from the trailing batch of a submission, and
+    // the next value to signal it with. Submissions to a queue are externally
+    // synchronized, so values are strictly increasing in submission order.
+    const VkSemaphore& get_timeline_semaphore() const;
+    std::uint64_t next_timeline_value();
 };
 
 } // namespace low_latency

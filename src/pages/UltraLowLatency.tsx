@@ -4,6 +4,7 @@ import { useI18n } from '../i18n/I18nProvider'
 import { Zap, Loader2 } from '../components/icons'
 import { HelpTip } from '../components/HelpTip'
 import PageHeader from '../components/ui/PageHeader'
+import HotkeyCapture from '../components/HotkeyCapture'
 
 type LatencyPayload = {
   ok: boolean
@@ -19,6 +20,24 @@ type LatencyPayload = {
 const Skel = ({ w = 'w-12' }: { w?: string }) => (
   <span aria-hidden="true" className={`inline-block h-4 ${w} rounded bg-zinc-800/80 animate-pulse align-middle`} />
 )
+
+/**
+ * HotkeyCapture speaks the auto clicker spelling ("Win+X", "NumAdd"); the Guardian registers the hotkey with
+ * Electron's globalShortcut, which wants "Super" and at least one modifier unless it is an F key.
+ * Returns the accelerator, or null when it cannot be used as a global toggle.
+ */
+export function toLatencyAccelerator(hotkey: string): string | null {
+  const parts = String(hotkey || '').split('+').filter(Boolean)
+  if (parts.length === 0) return null
+  const key = parts[parts.length - 1]
+  if (/^Mouse/.test(key)) return null
+  const mods = parts.slice(0, -1).map((m) => (m === 'Win' ? 'Super' : m))
+  if (mods.length === 0 && !/^F\d{1,2}$/.test(key)) return null
+  return [...mods, key].join('+')
+}
+
+/** Electron accelerators spell the Windows key "Super"; show it the way HotkeyCapture does. */
+const toCaptureSpelling = (accel: string) => accel.split('+').map((p) => (p === 'Super' ? 'Win' : p)).join('+')
 
 const Check = ({ checked, onChange, children, disabled, title }: { checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode; disabled?: boolean; title?: string }) => (
   <label className={`flex items-center gap-2 text-[12.5px] ${disabled ? 'text-zinc-600' : 'text-zinc-300'} ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`} title={title}>
@@ -74,7 +93,6 @@ export default function UltraLowLatency() {
   const [auto, setAuto] = useState(false)
   const [hotkey, setHotkey] = useState('Ctrl+F1')
   const [pingHost, setPingHost] = useState('1.1.1.1')
-  const [hotkeyEditing, setHotkeyEditing] = useState(false)
   const [overlayEnabled, setOverlayEnabled] = useState(false)
   const [shieldEnabled, setShieldEnabled] = useState(false)
   const [shieldDeltaMs, setShieldDeltaMs] = useState(30)
@@ -100,10 +118,6 @@ export default function UltraLowLatency() {
     dirtyRef.current = dirty
   }, [dirty])
 
-  useEffect(() => {
-    hotkeyEditingRef.current = hotkeyEditing
-  }, [hotkeyEditing])
-
   const markDirty = () => {
     dirtyRef.current = true
     setDirty(true)
@@ -125,8 +139,9 @@ export default function UltraLowLatency() {
         shieldMinMs,
         shieldBeep
       })
-      if (!res?.ok) setError(res?.error ?? 'Falha ao ativar.')
+      if (!res?.ok) setError(res?.error ?? t('ull.errorActivate', 'Falha ao ativar.'))
       if (res?.applied) setLastApplied(res.applied)
+      try { window.dispatchEvent(new Event('darkhub:latency-config')) } catch {}
       await refresh()
     } catch (e: any) {
       setError(e?.message ?? String(e))
@@ -160,7 +175,7 @@ export default function UltraLowLatency() {
         if (cap?.level === 'partial') setPartialMode(true)
         if (res?.applied) setLastApplied(res.applied)
         else if (res?.status?.lastApplied) setLastApplied(res.status.lastApplied)
-        if (!dirtyRef.current && !hotkeyEditingRef.current) {
+        if (!dirtyRef.current) {
           setGameExePath(String(res.config?.gameExePath ?? ''))
           setAuto(Boolean(res.config?.auto))
           setHotkey(String(res.config?.hotkey ?? 'Ctrl+F1'))
@@ -201,8 +216,8 @@ export default function UltraLowLatency() {
     if (!window.darkhub?.dialog) return
     const isWin = (data?.status?.capabilities?.platform || capabilities?.platform || '') === 'win32' || !partialMode
     const res = await window.darkhub.dialog.selectFiles({
-      title: 'Selecione o executável do jogo',
-      filters: isWin ? [{ name: 'Executável', extensions: ['exe'] }] : undefined
+      title: t('ull.selectGame', 'Selecione o executável do jogo'),
+      filters: isWin ? [{ name: t('ull.page.exe.dialogFilter', 'Executável'), extensions: ['exe'] }] : undefined
     })
     if (!res?.canceled && Array.isArray(res?.filePaths) && res.filePaths[0]) {
       markDirty()
@@ -211,7 +226,7 @@ export default function UltraLowLatency() {
   }
 
   const persistConfig = async () => {
-    if (!window.darkhub?.latency) return { ok: false, error: 'Latency API unavailable' }
+    if (!window.darkhub?.latency) return { ok: false, error: t('ull.page.err.latencyApi', 'API de latência indisponível') }
     const res = await window.darkhub.latency.setConfig({
       gameExePath,
       auto,
@@ -231,6 +246,8 @@ export default function UltraLowLatency() {
       dirtyRef.current = false
       setDirty(false)
     }
+    // GuardianWidget polls slowly while hidden: tell it the config changed (e.g. widget turned on).
+    try { window.dispatchEvent(new Event('darkhub:latency-config')) } catch {}
     return res
   }
 
@@ -240,7 +257,7 @@ export default function UltraLowLatency() {
     setSaving(true)
     try {
       const res = await persistConfig()
-      if (!res?.ok) setError(res?.error ?? 'Falha ao salvar.')
+      if (!res?.ok) setError(res?.error ?? t('ull.page.err.save', 'Falha ao salvar.'))
       await refresh()
     } catch (e: any) {
       setError(e?.message ?? String(e))
@@ -256,11 +273,11 @@ export default function UltraLowLatency() {
     try {
       const saved = await persistConfig()
       if (!saved?.ok) {
-        setError(saved?.error ?? 'Falha ao salvar configurações.')
+        setError(saved?.error ?? t('ull.page.err.saveConfig', 'Falha ao salvar configurações.'))
         return
       }
       const res = await window.darkhub.latency.enableUltra()
-      if (!res?.ok) setError(res?.error ?? 'Falha ao ativar.')
+      if (!res?.ok) setError(res?.error ?? t('ull.errorActivate', 'Falha ao ativar.'))
       await refresh()
     } catch (e: any) {
       setError(e?.message ?? String(e))
@@ -275,7 +292,7 @@ export default function UltraLowLatency() {
     setLoading(true)
     try {
       const res = await window.darkhub.latency.disableUltra()
-      if (!res?.ok) setError(res?.error ?? 'Falha ao desativar.')
+      if (!res?.ok) setError(res?.error ?? t('ull.errorDisable', 'Falha ao desativar.'))
       await refresh()
     } catch (e: any) {
       setError(e?.message ?? String(e))
@@ -291,46 +308,13 @@ export default function UltraLowLatency() {
     try {
       await persistConfig()
       const res = await window.darkhub.latency.boostNow()
-      if (!res?.ok) setError(res?.error ?? 'Falha no BOOST NOW.')
+      if (!res?.ok) setError(res?.error ?? t('ull.page.err.boost', 'Falha no BOOST NOW.'))
       await refresh()
     } catch (e: any) {
       setError(e?.message ?? String(e))
     } finally {
       setLoading(false)
     }
-  }
-
-  const buildAcceleratorFromEvent = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const key = e.key
-    if (key === 'Control' || key === 'Shift' || key === 'Alt' || key === 'Meta') return null
-    const mods: string[] = []
-    if (e.ctrlKey) mods.push('Ctrl')
-    if (e.altKey) mods.push('Alt')
-    if (e.shiftKey) mods.push('Shift')
-    if (e.metaKey) mods.push('Super')
-
-    let k = key
-    if (k.length === 1) k = k.toUpperCase()
-    if (k === ' ') k = 'Space'
-    if (k === 'Escape') k = 'Esc'
-    if (k === 'ArrowUp') k = 'Up'
-    if (k === 'ArrowDown') k = 'Down'
-    if (k === 'ArrowLeft') k = 'Left'
-    if (k === 'ArrowRight') k = 'Right'
-    if (k === 'Enter') k = 'Enter'
-    if (k === 'Backspace') k = 'Backspace'
-    if (k === 'Delete') k = 'Delete'
-    if (k === 'Tab') k = 'Tab'
-    if (k === 'PageUp') k = 'PageUp'
-    if (k === 'PageDown') k = 'PageDown'
-    if (k === 'Home') k = 'Home'
-    if (k === 'End') k = 'End'
-
-    if (mods.length === 0) {
-      if (/^F\d{1,2}$/.test(k)) return k
-      return null
-    }
-    return [...mods, k].join('+')
   }
 
   const status = data?.status
@@ -379,16 +363,16 @@ export default function UltraLowLatency() {
   }
 
   const tweakList: Array<[string, string]> = [
-    ['powerPlanHigh', 'Power Plan High Performance'],
-    ['timerResolution05', 'Timer Resolution 0.5ms'],
-    ['processPriorityHigh', 'Prioridade High (jogo)'],
-    ['disableMouseAcceleration', 'Desativar Mouse Acceleration'],
-    ['disableFullscreenOptimizations', 'Disable Fullscreen Optimizations'],
-    ['gpuHighPerformance', 'GPU High Performance (por exe)'],
-    ['dnsCloudflare', 'DNS Cloudflare + Flush'],
-    ['disableNagle', 'Desativar Nagle (interface ativa)'],
-    ['qosForExe', 'QoS (DSCP) por exe'],
-    ['killBackground', 'Encerrar processos de fundo']
+    ['powerPlanHigh', t('ull.page.tweak.powerPlanHigh', 'Power Plan High Performance')],
+    ['timerResolution05', t('ull.page.tweak.timerResolution05', 'Timer Resolution 0.5ms')],
+    ['processPriorityHigh', t('ull.page.tweak.processPriorityHigh', 'Prioridade High (jogo)')],
+    ['disableMouseAcceleration', t('ull.page.tweak.disableMouseAcceleration', 'Desativar Mouse Acceleration')],
+    ['disableFullscreenOptimizations', t('ull.page.tweak.disableFullscreenOptimizations', 'Disable Fullscreen Optimizations')],
+    ['gpuHighPerformance', t('ull.page.tweak.gpuHighPerformance', 'GPU High Performance (por exe)')],
+    ['dnsCloudflare', t('ull.page.tweak.dnsCloudflare', 'DNS Cloudflare + Flush')],
+    ['disableNagle', t('ull.page.tweak.disableNagle', 'Desativar Nagle (interface ativa)')],
+    ['qosForExe', t('ull.page.tweak.qosForExe', 'QoS (DSCP) por exe')],
+    ['killBackground', t('ull.page.tweak.killBackground', 'Encerrar processos de fundo')]
   ]
 
   const platformLabel = capabilities?.platform || (partialMode ? 'linux' : 'win32')
@@ -405,22 +389,22 @@ export default function UltraLowLatency() {
             Ultra Low Latency Mode
             <HelpTip
               title="Ultra Low Latency Mode"
-              description="Perfil para reduzir latência e melhorar responsividade em jogos. O modo Básico aplica um preset estável; o modo Avançado permite controle fino dos tweaks."
+              description={t('ull.page.help.desc', 'Perfil para reduzir latência e melhorar responsividade em jogos. O modo Básico aplica um preset estável; o modo Avançado permite controle fino dos tweaks.')}
               sections={[
-                { title: 'Básico', content: 'Um botão único para ativar o perfil com aplicação best-effort e foco em estabilidade.' },
-                { title: 'Avançado', content: 'Ajustes individuais (power plan, prioridade, QoS, Nagle, etc.), com mais risco e mais controle.' },
+                { title: t('ull.basic', 'Básico'), content: t('ull.page.help.basicBody', 'Um botão único para ativar o perfil com aplicação best-effort e foco em estabilidade.') },
+                { title: t('ull.advanced', 'Avançado'), content: t('ull.page.help.advBody', 'Ajustes individuais (power plan, prioridade, QoS, Nagle, etc.), com mais risco e mais controle.') },
                 { title: 'Plataformas', content: 'Windows: conjunto completo. Linux: modo parcial com diagnósticos (CPU/RAM/ping) e ajustes seguros best-effort (perfil de energia, renice, flush DNS via Boost). Tweaks exclusivos do Windows ficam indisponíveis.' },
-                { title: 'Dica', content: 'Se o jogo não estiver rodando, a prioridade High pode ser adiada (comportamento mais estável). Abra o jogo e clique Ativar novamente.' }
+                { title: t('ull.page.help.tipTitle', 'Dica'), content: t('ull.page.help.tipBody', 'Se o jogo não estiver rodando, a prioridade High pode ser adiada (comportamento mais estável). Abra o jogo e clique Ativar novamente.') }
               ]}
-              example="Exemplo: selecione o executável do jogo, use “Básico” para aplicar o preset e, se necessário, ajuste no “Avançado”."
-              buttonLabel="Ajuda"
+              example={t('ull.page.help.example', 'Exemplo: selecione o executável do jogo, use “Básico” para aplicar o preset e, se necessário, ajuste no “Avançado”.')}
+              buttonLabel={t('ull.page.help.button', 'Ajuda')}
             />
           </span>
         }
-        subtitle={<>Perfil de baixa latência para jogos (manual ou automático). Atalho padrão: <span className="font-mono text-zinc-300">Ctrl+F1</span>.{isLinuxPartial ? <span className="ml-2 text-amber-300/90">Modo parcial no Linux (diagnósticos + ajustes seguros).</span> : null}</>}
+        subtitle={<>{t('ull.page.subtitlePre', 'Perfil de baixa latência para jogos (manual ou automático). Atalho padrão: ')}<span className="font-mono text-zinc-300">Ctrl+F1</span>{t('ull.page.subtitlePost', '.')}{isLinuxPartial ? <span className="ml-2 text-amber-300/90">Modo parcial no Linux (diagnósticos + ajustes seguros).</span> : null}</>}
         actions={
-          <div role="tablist" aria-label="Modo" className="flex items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900/60 p-0.5">
-            {([['simple', 'Básico'], ['advanced', 'Avançado']] as const).map(([m, label]) => (
+          <div role="tablist" aria-label={t('ull.page.modeLabel', 'Modo')} className="flex items-center gap-0.5 rounded-md border border-zinc-800 bg-zinc-900/60 p-0.5">
+            {([['simple', t('ull.basic', 'Básico')], ['advanced', t('ull.advanced', 'Avançado')]] as const).map(([m, label]) => (
               <button
                 key={m}
                 role="tab"
@@ -456,7 +440,7 @@ export default function UltraLowLatency() {
       ) : null}
 
       {/* Live status strip */}
-      <section aria-label="Status">
+      <section aria-label={t('ull.page.statusLabel', 'Status')}>
         <dl className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-px rounded-xl border border-zinc-800/80 bg-zinc-800/70 overflow-hidden">
           <div className="bg-zinc-950 px-4 py-3 min-w-0">
             <dt className="text-[11.5px] text-zinc-500">Ultra Mode</dt>
@@ -464,20 +448,20 @@ export default function UltraLowLatency() {
               {waiting ? <Skel w="w-16" /> : !data ? <span className="font-mono text-zinc-600">--</span> : (
                 <>
                   <span className={`w-1.5 h-1.5 rounded-full ${ultraOn ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
-                  <span className={ultraOn ? 'text-zinc-50 font-medium' : 'text-zinc-400'}>{ultraOn ? 'Ativo' : 'Desligado'}</span>
+                  <span className={ultraOn ? 'text-zinc-50 font-medium' : 'text-zinc-400'}>{ultraOn ? t('ull.page.stateOn', 'Ativo') : t('ull.page.stateOff', 'Desligado')}</span>
                 </>
               )}
             </dd>
           </div>
           <div className="bg-zinc-950 px-4 py-3 min-w-0">
-            <dt className="text-[11.5px] text-zinc-500">Timer Kernel</dt>
+            <dt className="text-[11.5px] text-zinc-500">{t('ull.page.timerKernel', 'Timer Kernel')}</dt>
             <dd className="mt-1.5 font-mono text-[14px] text-zinc-50 tabular-nums">
               {timerMs ? <>{timerMs}<span className="text-[11px] text-zinc-500"> ms</span></> : (capabilities?.features?.queryTimer === false ? <span className="text-zinc-500 text-[12px]">N/D</span> : waiting ? <Skel w="w-16" /> : <span className="text-zinc-600">--</span>)}
             </dd>
-            <dd className="mt-0.5 text-[11px] text-zinc-500 truncate">{capabilities?.features?.queryTimer === false ? 'Indisponível no Linux' : (status?.timerResolutionInfo?.locked ? 'MMCSS Games Locked' : 'Default')}</dd>
+            <dd className="mt-0.5 text-[11px] text-zinc-500 truncate">{capabilities?.features?.queryTimer === false ? 'Indisponível no Linux' : (status?.timerResolutionInfo?.locked ? t('ull.page.timerLocked', 'MMCSS Games Locked') : t('ull.page.timerDefault', 'Padrão'))}</dd>
           </div>
           <div className="bg-zinc-950 px-4 py-3 min-w-0 md:col-span-2 xl:col-span-1">
-            <dt className="text-[11.5px] text-zinc-500">Jogo</dt>
+            <dt className="text-[11.5px] text-zinc-500">{t('ull.page.game', 'Jogo')}</dt>
             <dd className="mt-1.5 font-mono text-[13px] text-zinc-50 truncate" title={status?.game?.name ?? ''}>
               {status?.game?.name ?? (waiting ? <Skel w="w-20" /> : <span className="text-zinc-600">--</span>)}
             </dd>
@@ -495,32 +479,32 @@ export default function UltraLowLatency() {
           <div className="bg-zinc-950 px-4 py-3"><dt className="text-[11.5px] text-zinc-500">GPU</dt><dd className="mt-1.5 font-mono text-[14px] text-zinc-50 tabular-nums">{pct(metrics?.gpuPct)}</dd></div>
         </dl>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-500">
-          <span>Guardian Telemetry (ICMP Realtime). Coleta em tempo real via socket ICMP e HAL de hardware nativo.</span>
-          <span className="dh-tag">native engine</span>
+          <span>{t('ull.page.telemetry', 'Guardian Telemetry (ICMP Realtime). Coleta em tempo real via socket ICMP e HAL de hardware nativo.')}</span>
+          <span className="dh-tag">{t('ull.page.nativeEngine', 'motor nativo')}</span>
         </div>
-        {status?.lastError ? <p className="mt-2 text-[12px] text-red-300 break-all">Erro: {status.lastError}</p> : null}
+        {status?.lastError ? <p className="mt-2 text-[12px] text-red-300 break-all">{t('ull.page.errorPrefix', 'Erro')}: {status.lastError}</p> : null}
       </section>
 
       {/* Configuration */}
-      <section className="dh-card divide-y divide-zinc-800/80" aria-label="Configuração">
+      <section className="dh-card divide-y divide-zinc-800/80" aria-label={t('ull.page.configLabel', 'Configuração')}>
         <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
           <div>
             <div className="dh-label mb-1.5 flex items-center gap-2">
-              <span>Executável do jogo</span>
+              <span>{t('ull.page.exe.label', 'Executável do jogo')}</span>
               <HelpTip
-                title="Executável do jogo"
-                description="Caminho completo do .exe do jogo que o DarkHub usará para detectar quando o jogo está rodando e para aplicar ajustes por executável."
+                title={t('ull.page.exe.label', 'Executável do jogo')}
+                description={t('ull.page.exe.desc', 'Caminho completo do .exe do jogo que o DarkHub usará para detectar quando o jogo está rodando e para aplicar ajustes por executável.')}
                 sections={[
-                  { title: 'Entrada', content: 'Um caminho válido para um arquivo .exe (ex.: C:\\\\Games\\\\MeuJogo\\\\game.exe).' },
+                  { title: t('ull.page.sec.input', 'Entrada'), content: t('ull.page.exe.inputBody', 'Um caminho válido para um arquivo .exe (ex.: C:\\\\Games\\\\MeuJogo\\\\game.exe).') },
                   {
-                    title: 'Uso',
+                    title: t('ull.page.sec.usage', 'Uso'),
                     content:
-                      'No modo Básico, o preset estável usa este caminho para aplicar ajustes por jogo.\nNo modo Avançado, ele também é usado para QoS por exe, preferência de GPU e compat layer (Fullscreen Optimizations).'
+                      t('ull.page.exe.usageBody', 'No modo Básico, o preset estável usa este caminho para aplicar ajustes por jogo.\nNo modo Avançado, ele também é usado para QoS por exe, preferência de GPU e compat layer (Fullscreen Optimizations).')
                   },
                   {
-                    title: 'Observações',
+                    title: t('ull.page.sec.notes', 'Observações'),
                     content:
-                      'Se o jogo não estiver aberto, a prioridade High do processo será pulada (comportamento estável). Abra o jogo e aplique novamente se quiser esse ajuste.'
+                      t('ull.page.exe.notesBody', 'Se o jogo não estiver aberto, a prioridade High do processo será pulada (comportamento estável). Abra o jogo e aplique novamente se quiser esse ajuste.')
                   }
                 ]}
                 example="C:\\Games\\MeuJogo\\game.exe"
@@ -537,83 +521,75 @@ export default function UltraLowLatency() {
                 className="dh-input flex-1 min-w-0 font-mono"
               />
               <button onClick={pickExe} className="dh-btn shrink-0">
-                Selecionar
+                {t('ull.page.exe.pick', 'Selecionar')}
               </button>
             </div>
           </div>
 
           <div className="flex items-end gap-3 lg:pb-1.5">
-            <Check checked={auto} onChange={dirtyThen(setAuto)}>Ativar automaticamente ao detectar o jogo</Check>
+            <Check checked={auto} onChange={dirtyThen(setAuto)}>{t('ull.page.auto.label', 'Ativar automaticamente ao detectar o jogo')}</Check>
             <HelpTip
-              title="Ativação automática"
-              description="Quando ativado, o Guardian tenta detectar o jogo pelo executável configurado e liga/desliga o Ultra Mode automaticamente."
+              title={t('ull.page.auto.title', 'Ativação automática')}
+              description={t('ull.page.auto.desc', 'Quando ativado, o Guardian tenta detectar o jogo pelo executável configurado e liga/desliga o Ultra Mode automaticamente.')}
               sections={[
-                { title: 'Entrada', content: 'Requer que o Executável do jogo esteja configurado.' },
-                { title: 'Saída', content: 'Ultra Mode liga quando encontra o processo e desliga quando o processo some.' },
-                { title: 'Estabilidade', content: 'Evita aplicar prioridade/QoS/otros em processos inexistentes; o modo Básico é recomendado.' }
+                { title: t('ull.page.sec.input', 'Entrada'), content: t('ull.page.auto.inputBody', 'Requer que o Executável do jogo esteja configurado.') },
+                { title: t('ull.page.sec.output', 'Saída'), content: t('ull.page.auto.outputBody', 'Ultra Mode liga quando encontra o processo e desliga quando o processo some.') },
+                { title: t('ull.page.sec.stability', 'Estabilidade'), content: t('ull.page.auto.stabilityBody', 'Evita aplicar prioridade/QoS/otros em processos inexistentes; o modo Básico é recomendado.') }
               ]}
             />
           </div>
 
           <div>
             <div className="dh-label mb-1.5 flex items-center gap-2">
-              <span>Hotkey global (toggle)</span>
+              <span>{t('ull.page.hotkey.label', 'Hotkey global (toggle)')}</span>
               <HelpTip
-                title="Hotkey global"
-                description="Atalho global para alternar o Ultra Mode sem abrir a janela do DarkHub."
+                title={t('ull.page.hotkey.title', 'Hotkey global')}
+                description={t('ull.page.hotkey.desc', 'Atalho global para alternar o Ultra Mode sem abrir a janela do DarkHub.')}
                 sections={[
-                  { title: 'Entrada', content: 'Pressione uma combinação (ex.: Ctrl+F1). Precisa conter ao menos um modificador, exceto teclas F.' },
-                  { title: 'Retorno', content: 'O atalho é registrado no Windows; se estiver em uso, o backend retorna erro.' },
+                  { title: t('ull.page.sec.input', 'Entrada'), content: t('ull.page.hotkey.inputBody', 'Pressione uma combinação (ex.: Ctrl+F1). Precisa conter ao menos um modificador, exceto teclas F.') },
+                  { title: t('ull.page.sec.return', 'Retorno'), content: t('ull.page.hotkey.returnBody', 'O atalho é registrado no Windows; se estiver em uso, o backend retorna erro.') },
                   {
-                    title: 'Exemplo de uso',
-                    content: 'Defina Ctrl+F1 e use no jogo: Ctrl+F1 liga/desliga o Ultra Mode.'
+                    title: t('ull.page.sec.usageExample', 'Exemplo de uso'),
+                    content: t('ull.page.hotkey.usageBody', 'Defina Ctrl+F1 e use no jogo: Ctrl+F1 liga/desliga o Ultra Mode.')
                   }
                 ]}
               />
             </div>
-            <input
-              value={hotkeyEditing ? '' : hotkey}
-              placeholder="Clique e pressione (ex: Ctrl+F1)"
-              readOnly
-              onFocus={() => {
-                hotkeyEditingRef.current = true
-                setHotkeyEditing(true)
-              }}
-              onBlur={() => {
-                hotkeyEditingRef.current = false
-                setHotkeyEditing(false)
-              }}
-              onKeyDown={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                if (e.key === 'Escape') {
-                  hotkeyEditingRef.current = false
-                  setHotkeyEditing(false)
+            <HotkeyCapture
+              keyboardOnly
+              ariaLabel={t('ull.page.hotkey.label', 'Hotkey global (toggle)')}
+              value={hotkey ? toCaptureSpelling(hotkey) : null}
+              onChange={(k) => {
+                if (!k) {
+                  // X button: no global hotkey
+                  markDirty()
+                  setHotkey('')
                   return
                 }
-                const accel = buildAcceleratorFromEvent(e)
-                if (!accel) return
+                const accel = toLatencyAccelerator(k)
+                if (!accel) {
+                  setError(t('ull.page.hotkey.needModifier', 'Use ao menos um modificador (Ctrl, Alt, Shift ou Win), exceto para teclas F.'))
+                  return
+                }
+                setError(null)
                 markDirty()
                 setHotkey(accel)
-                hotkeyEditingRef.current = false
-                setHotkeyEditing(false)
               }}
-              className="dh-input w-full font-mono cursor-pointer"
             />
             <p className="dh-help mt-1.5">
-              Para aplicar QoS/Nagle/hosts e mexer em processos elevados, rode o DarkHub como Administrador.
+              {t('ull.page.hotkey.adminNote', 'Para aplicar QoS/Nagle/hosts e mexer em processos elevados, rode o DarkHub como Administrador.')}
             </p>
           </div>
 
           <div>
             <div className="dh-label mb-1.5 flex items-center gap-2">
-              <span>Host de ping</span>
+              <span>{t('ull.page.ping.label', 'Host de ping')}</span>
               <HelpTip
-                title="Host de ping"
-                description="Servidor usado para medir latência (ping) no Guardian."
+                title={t('ull.page.ping.label', 'Host de ping')}
+                description={t('ull.page.ping.desc', 'Servidor usado para medir latência (ping) no Guardian.')}
                 sections={[
-                  { title: 'Entrada', content: 'IP ou domínio (ex.: 1.1.1.1, 8.8.8.8, google.com).' },
-                  { title: 'Saída', content: 'O Guardian exibe o ping atual em ms (medição leve). ' }
+                  { title: t('ull.page.sec.input', 'Entrada'), content: t('ull.page.ping.inputBody', 'IP ou domínio (ex.: 1.1.1.1, 8.8.8.8, google.com).') },
+                  { title: t('ull.page.sec.output', 'Saída'), content: t('ull.page.ping.outputBody', 'O Guardian exibe o ping atual em ms (medição leve). ') }
                 ]}
                 example="1.1.1.1"
               />
@@ -633,33 +609,33 @@ export default function UltraLowLatency() {
         <div className="p-5 space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-3">
             <div className="flex items-center gap-3">
-              <Check checked={overlayEnabled} onChange={dirtyThen(setOverlayEnabled)}>Widget discreto (canto da tela)</Check>
+              <Check checked={overlayEnabled} onChange={dirtyThen(setOverlayEnabled)}>{t('ull.page.widget.label', 'Widget discreto (canto da tela)')}</Check>
               <HelpTip
-                title="Widget discreto"
-                description="Exibe um mini-widget com ping/cpu/ram/gpu e status do boost."
+                title={t('ull.page.widget.title', 'Widget discreto')}
+                description={t('ull.page.widget.desc', 'Exibe um mini-widget com ping/cpu/ram/gpu e status do boost.')}
                 sections={[
-                  { title: 'Estabilidade', content: 'O widget é leve; a medição de GPU (3D) é opcional e fica no modo Avançado.' }
+                  { title: t('ull.page.sec.stability', 'Estabilidade'), content: t('ull.page.widget.stabilityBody', 'O widget é leve; a medição de GPU (3D) é opcional e fica no modo Avançado.') }
                 ]}
               />
             </div>
             <div className="flex items-center gap-3">
-              <Check checked={shieldEnabled} onChange={dirtyThen(setShieldEnabled)}>Latency Shield (alerta de pico)</Check>
+              <Check checked={shieldEnabled} onChange={dirtyThen(setShieldEnabled)}>{t('ull.page.shield.label', 'Latency Shield (alerta de pico)')}</Check>
               <HelpTip
                 title="Latency Shield"
-                description="Monitora o ping e alerta quando houver um pico repentino (Δms acima do normal)."
+                description={t('ull.page.shield.desc', 'Monitora o ping e alerta quando houver um pico repentino (Δms acima do normal).')}
                 sections={[
-                  { title: 'Parâmetros', content: 'Disparo (Δms) e Ping mínimo (ms) controlam quando o alerta dispara.' },
-                  { title: 'Saída', content: 'Alerta visual no widget e opcionalmente beep.' }
+                  { title: t('ull.page.sec.params', 'Parâmetros'), content: t('ull.page.shield.paramsBody', 'Disparo (Δms) e Ping mínimo (ms) controlam quando o alerta dispara.') },
+                  { title: t('ull.page.sec.output', 'Saída'), content: t('ull.page.shield.outputBody', 'Alerta visual no widget e opcionalmente beep.') }
                 ]}
               />
-              <Check checked={shieldBeep} onChange={dirtyThen(setShieldBeep)} disabled={!shieldEnabled}>Beep</Check>
+              <Check checked={shieldBeep} onChange={dirtyThen(setShieldBeep)} disabled={!shieldEnabled}>{t('ull.page.shield.beep', 'Beep')}</Check>
             </div>
           </div>
 
           {shieldEnabled ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 max-w-xl">
               <div>
-                <label className="dh-label block mb-1.5">Disparo (Δms)</label>
+                <label className="dh-label block mb-1.5">{t('ull.page.shield.delta', 'Disparo (Δms)')}</label>
                 <input
                   type="number"
                   min={5}
@@ -673,7 +649,7 @@ export default function UltraLowLatency() {
                 />
               </div>
               <div>
-                <label className="dh-label block mb-1.5">Ping mínimo (ms)</label>
+                <label className="dh-label block mb-1.5">{t('ull.page.shield.min', 'Ping mínimo (ms)')}</label>
                 <input
                   type="number"
                   min={10}
@@ -694,7 +670,7 @@ export default function UltraLowLatency() {
           <div className="p-5 space-y-5">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-3">
               <div className="max-w-[16rem]">
-                <label className="dh-label block mb-1.5">Smart Clean (min)</label>
+                <label className="dh-label block mb-1.5">{t('ull.page.smartClean.label', 'Smart Clean (min)')}</label>
                 <input
                   type="number"
                   min={0}
@@ -708,17 +684,17 @@ export default function UltraLowLatency() {
                   className="dh-input w-full font-mono"
                   title={capabilities?.features?.smartCleanRam === false ? 'Indisponível nesta plataforma' : undefined}
                 />
-                <p className="dh-help mt-1.5">{capabilities?.features?.smartCleanRam === false ? 'Indisponível no Linux (limpeza de working set é específica do Windows).' : '0 desativa. Recomendado: 10 a 30.'}</p>
+                <p className="dh-help mt-1.5">{capabilities?.features?.smartCleanRam === false ? 'Indisponível no Linux (limpeza de working set é específica do Windows).' : t('ull.page.smartClean.help', '0 desativa. Recomendado: 10 a 30.')}</p>
               </div>
               <div className="flex items-center gap-5 lg:pt-6 flex-wrap">
-                <Check checked={smartCleanDuringGaming} onChange={dirtyThen(setSmartCleanDuringGaming)} disabled={capabilities?.features?.smartCleanRam === false}>Permitir durante o jogo</Check>
-                <Check checked={gpuPollingEnabled} onChange={dirtyThen(setGpuPollingEnabled)} disabled={!metricsGpuSupported}>Medir GPU (3D)</Check>
+                <Check checked={smartCleanDuringGaming} onChange={dirtyThen(setSmartCleanDuringGaming)} disabled={capabilities?.features?.smartCleanRam === false}>{t('ull.page.smartClean.duringGame', 'Permitir durante o jogo')}</Check>
+                <Check checked={gpuPollingEnabled} onChange={dirtyThen(setGpuPollingEnabled)} disabled={!metricsGpuSupported}>{t('ull.page.measureGpu', 'Medir GPU (3D)')}</Check>
                 {!metricsGpuSupported ? <span className="text-[11.5px] text-zinc-500">GPU (3D) indisponível nesta plataforma</span> : null}
               </div>
             </div>
 
             <div>
-              <h2 className="dh-section-title mb-2.5">Tweaks</h2>
+              <h2 className="dh-section-title mb-2.5">{t('ull.page.tweaks', 'Tweaks')}</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2.5">
                 {tweakList.map(([key, label]) => {
                   const supported = isTweakSupported(capabilities, key)
@@ -747,36 +723,36 @@ export default function UltraLowLatency() {
                 className={`dh-btn ${ultraOn ? '' : 'dh-btn-primary'} min-w-[200px]`}
               >
                 {loading ? <Loader2 size={15} className="animate-spin" /> : <Zap size={15} />}
-                <span>{ultraOn ? 'Desativar (Estável)' : 'Ativar (Estável)'}</span>
+                <span>{ultraOn ? t('ull.page.btn.disableStable', 'Desativar (Estável)') : t('ull.applyPreset', 'Ativar (Estável)')}</span>
               </button>
               <p className="dh-help max-w-[75ch]">
                 {isLinuxPartial
                   ? 'Preset estável (Linux, best-effort): perfil de energia e prioridade do processo (renice) quando o jogo for detectado. Ajustes do Windows são reportados como indisponíveis.'
-                  : 'Preset estável: Power Plan + Prioridade do jogo (quando detectado) + Mouse Acceleration OFF. Tweaks agressivos ficam no modo Avançado.'}
+                  : t('ull.page.stablePresetNote', 'Preset estável: Power Plan + Prioridade do jogo (quando detectado) + Mouse Acceleration OFF. Tweaks agressivos ficam no modo Avançado.')}
               </p>
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-2">
               <button onClick={enable} disabled={loading} className="dh-btn dh-btn-primary">
                 {loading ? <Loader2 size={15} className="animate-spin" /> : <Zap size={15} />}
-                <span>Ativar</span>
+                <span>{t('ull.page.btn.enable', 'Ativar')}</span>
               </button>
               <button onClick={save} disabled={saving} className="dh-btn">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-                {saving ? 'Salvando…' : 'Salvar'}
+                {saving ? t('ull.page.btn.saving', 'Salvando…') : t('ull.page.btn.save', 'Salvar')}
               </button>
               <button onClick={disable} disabled={loading} className="dh-btn">
-                Desativar
+                {t('ull.page.btn.disable', 'Desativar')}
               </button>
               <button onClick={boostNow} disabled={loading || !boostSupported} className="dh-btn dh-btn-ghost" title={!boostSupported ? 'Indisponível nesta plataforma' : undefined}>
-                Boost now
+                {t('ull.page.btn.boostNow', 'Boost now')}
               </button>
-              {dirty ? <span className="ml-auto text-[11.5px] text-amber-300">Alterações não salvas</span> : null}
+              {dirty ? <span className="ml-auto text-[11.5px] text-amber-300">{t('ull.page.unsaved', 'Alterações não salvas')}</span> : null}
             </div>
           )}
           {prioSkipped ? (
             <p role="status" className="mt-3 text-[12px] text-amber-300">
-              Abra o jogo e clique Ativar novamente para aplicar prioridade High.
+              {t('ull.page.prioSkipped', 'Abra o jogo e clique Ativar novamente para aplicar prioridade High.')}
             </p>
           ) : null}
           {!launchSupported ? (
@@ -789,7 +765,7 @@ export default function UltraLowLatency() {
 
       {lastApplied && typeof lastApplied === 'object' ? (
         <section className="dh-card p-4" aria-labelledby="ull-applied">
-          <h2 id="ull-applied" className="dh-section-title mb-2">Resultado da aplicação</h2>
+          <h2 id="ull-applied" className="dh-section-title mb-2">{t('ull.page.appliedResult', 'Resultado da aplicação')}</h2>
           <ul className="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
             {Object.keys(lastApplied).map((k) => {
               const v = lastApplied?.[k]

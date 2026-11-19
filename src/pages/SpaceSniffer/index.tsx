@@ -6,6 +6,7 @@ import {
 } from '../../components/icons';
 import PageHeader from '../../components/ui/PageHeader';
 import { useI18n } from '../../i18n/I18nProvider';
+import { visibleInterval } from '../../utils/visibleInterval';
 import TreemapCanvas, { CLASS_COLOR, TAG_COLOR } from './TreemapCanvas';
 import { formatBytes } from './treemap';
 import { CATEGORIES, CATEGORY_COLOR, DiskCategory, categoryFill, classifyPath, joinPath } from './diskCategories';
@@ -38,6 +39,8 @@ export default function DiskMap() {
   const [volume, setVolume] = useState<{ total: number; free: number } | null>(null);
   const [selected, setSelected] = useState<DiskMapNode | null>(null);
   const [info, setInfo] = useState<DiskMapInfo | null>(null);
+  // items inside $Recycle.Bin: where they were deleted from, or an orphan whose record is gone
+  const [binInfo, setBinInfo] = useState<{ original: string | null; orphan: boolean } | null>(null);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [confirmTrash, setConfirmTrash] = useState(false);
   // Drives without a usable Recycle Bin: an explicit "delete for good", step 1 = offer, step 2 = type the name.
@@ -93,8 +96,7 @@ export default function DiskMap() {
   useEffect(() => { if (active) loadView(); }, [active, loadView, version, areaTick]);
   useEffect(() => {
     if (!running) return;
-    const h = setInterval(loadView, 1000);
-    return () => clearInterval(h);
+    return visibleInterval(loadView, 1000);
   }, [running, loadView]);
   const wasRunning = useRef(false);
   useEffect(() => { if (wasRunning.current && !running) loadView(); wasRunning.current = running; }, [running, loadView]);
@@ -104,7 +106,16 @@ export default function DiskMap() {
     setPermanent((p) => (p && p.id === selected?.id ? p : null));
     setTypedName('');
     if (!selected || !['dir', 'file'].includes(selected.kind)) { setInfo(null); return; }
-    api()?.info({ id: selected.id, filter }).then((r) => setInfo(r?.ok ? r.info || null : null)).catch(() => setInfo(null));
+    // Holding an arrow key fires many selections: only the latest answer may land.
+    let cancelled = false;
+    api()?.info({ id: selected.id, filter })
+      .then((r) => { if (!cancelled) setInfo(r?.ok ? r.info || null : null); })
+      .catch(() => { if (!cancelled) setInfo(null); });
+    setBinInfo(null);
+    api()?.recycleInfo?.({ id: selected.id })
+      .then((r) => { if (!cancelled && r?.ok && r.inBin) setBinInfo({ original: r.original, orphan: r.orphan }); })
+      .catch(() => { /* older backend */ });
+    return () => { cancelled = true; };
   }, [selected, filter, version]);
 
   const onSize = useCallback((w: number, h: number) => {
@@ -278,8 +289,15 @@ export default function DiskMap() {
 
   // Keyboard: Backspace / Alt+Up up, Alt+Left back, Alt+Right forward, Up/Down walk the list,
   // Enter opens, Delete asks to trash, Escape clears, Ctrl+1..4 tags.
+  // The listener is added once; it reads the latest render's handler through a ref.
+  const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const onKey = (e: KeyboardEvent) => keyHandlerRef.current(e);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  {
+    keyHandlerRef.current = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !active) return;
       if (e.key === 'Backspace' || (e.altKey && e.key === 'ArrowUp')) { e.preventDefault(); goUp(); }
@@ -303,9 +321,7 @@ export default function DiskMap() {
       else if (e.key === 'Escape') { setSelected(null); setConfirmTrash(false); setHighlight(null); }
       else if (e.ctrlKey && /^[1-4]$/.test(e.key) && selected) { e.preventDefault(); setTag(TAGS[Number(e.key) - 1]); }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
+  }
 
   const scanned = status?.done;
 
@@ -511,6 +527,15 @@ export default function DiskMap() {
               <div>
                 <div className="text-[13.5px] font-semibold text-zinc-100 break-words">{info.isRoot ? info.path : info.name}</div>
                 <div className="mt-1 font-mono text-[11px] text-zinc-500 break-all">{info.path}</div>
+                {binInfo && (
+                  <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-[11.5px] text-amber-200" role="note">
+                    {binInfo.original
+                      ? <>{t('diskmap.bin.from', 'In the Recycle Bin. Deleted from:')} <span className="font-mono break-all">{binInfo.original}</span></>
+                      : binInfo.orphan
+                        ? t('diskmap.bin.orphan', 'Orphaned Recycle Bin item: Windows lost its record, so it does not show in the Recycle Bin and its original path is unknown. Use "Delete for good" to free the space.')
+                        : t('diskmap.bin.inside', 'Inside the Recycle Bin.')}
+                  </div>
+                )}
               </div>
               <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 text-[12px]">
                 <dt className="text-zinc-500">{t('diskmap.size', 'Size')}</dt>

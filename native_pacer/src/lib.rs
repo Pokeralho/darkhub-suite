@@ -97,6 +97,7 @@ struct GUID {
 const IID_IDXGIDevice: GUID = GUID { d1: 0x54ec77fa, d2: 0x1377, d3: 0x44e6, d4: [0x8c, 0x32, 0x88, 0xfd, 0x5f, 0x44, 0xc8, 0x4c] };
 const IID_ID3D12CommandQueue: GUID = GUID { d1: 0x0ec870a6, d2: 0x5d7e, d3: 0x4c22, d4: [0x8c, 0xfc, 0x5b, 0xaa, 0xe0, 0x76, 0x16, 0xed] };
 const IID_ID3D12Device: GUID = GUID { d1: 0x189819f1, d2: 0x1db6, d3: 0x4b57, d4: [0xbe, 0x54, 0x18, 0x21, 0x33, 0x9b, 0x85, 0xf7] };
+const IID_IDXGISwapChain1: GUID = GUID { d1: 0x790a45f7, d2: 0x0d42, d3: 0x4876, d4: [0x98, 0x3a, 0x0a, 0x55, 0xcf, 0xe6, 0xf4, 0xaa] };
 
 // ---------------------------------------------------------------------------------------------
 // Controller -> hook config v2 (shared memory "DarkHub_Pacer_Config2").
@@ -187,6 +188,7 @@ extern "system" {
     fn GetModuleHandleA(lpModuleName: *const i8) -> HMODULE;
     fn GetModuleHandleExW(dwFlags: DWORD, lpModuleName: *const u16, phModule: *mut HMODULE) -> BOOL;
     fn FreeLibrary(hLibModule: HMODULE) -> BOOL;
+    fn FreeLibraryAndExitThread(hLibModule: HMODULE, dwExitCode: DWORD) -> !;
     fn K32EnumProcessModules(hProcess: HANDLE, lphModule: *mut HMODULE, cb: DWORD, lpcbNeeded: *mut DWORD) -> BOOL;
     fn GetProcAddress(hModule: *mut c_void, lpProcName: *const i8) -> *mut c_void;
     fn CreateThread(lpThreadAttributes: *mut c_void, dwStackSize: SIZE_T, lpStartAddress: extern "system" fn(*mut c_void) -> u32, lpParameter: *mut c_void, dwCreationFlags: DWORD, lpThreadId: *mut DWORD) -> HANDLE;
@@ -339,7 +341,8 @@ unsafe fn precision_wait(target_ms: f64, start_ms: f64) {
     loop {
         let elapsed = get_qpc_ms() - start_ms;
         let remaining = target_ms - elapsed;
-        if remaining <= 0.0 {
+        // DLL_PROCESS_DETACH is waiting for this call to leave the module (see drain_hooked_calls).
+        if remaining <= 0.0 || UNLOADING.load(Ordering::Acquire) {
             break;
         }
         // Block on a high-resolution waitable timer while far from the deadline (no core burned),
@@ -723,6 +726,40 @@ unsafe fn perform_pacing(sc: usize, kind: u8) {
     BUSY.store(false, Ordering::Release);
 }
 
+/// Calls currently executing inside one of our hooks. DLL_PROCESS_DETACH removes the hooks and then waits
+/// for this to drop to zero before the module is unmapped: a game thread sleeping in perform_pacing (which
+/// is most of the frame while a cap is active) would otherwise wake up in unmapped code and crash the game.
+static ACTIVE_CALLS: AtomicU32 = AtomicU32::new(0);
+
+struct CallGuard;
+impl CallGuard {
+    #[inline(always)]
+    fn enter() -> CallGuard {
+        ACTIVE_CALLS.fetch_add(1, Ordering::SeqCst);
+        CallGuard
+    }
+}
+impl Drop for CallGuard {
+    #[inline(always)]
+    fn drop(&mut self) {
+        ACTIVE_CALLS.fetch_sub(1, Ordering::Release);
+    }
+}
+
+/// Runs in DLL_PROCESS_DETACH after the hooks are removed (no new call can enter). Bounded: a thread stuck
+/// in the original Present for longer than this is not waited for.
+unsafe fn drain_hooked_calls() {
+    // A caller may have read the hooked slot just before it was restored and not yet reached enter().
+    Sleep(5);
+    let mut waited = 0u32;
+    while ACTIVE_CALLS.load(Ordering::Acquire) != 0 && waited < 1000 {
+        Sleep(1);
+        waited += 1;
+    }
+    // The last caller decremented the counter but may still be executing its epilogue.
+    Sleep(5);
+}
+
 /// Enters a hooked present. Returns (owns_guard, nested).
 #[inline]
 unsafe fn enter_present() -> (bool, bool) {
@@ -742,6 +779,7 @@ fn leave_present(owned: bool) {
 
 // Hooked IDXGISwapChain::Present (vtable index 8)
 unsafe extern "system" fn hooked_present(p_swap_chain: *mut c_void, sync_interval: u32, flags: u32) -> HRESULT {
+    let _call = CallGuard::enter();
     let (owned, nested) = enter_present();
     if !nested {
         perform_pacing(p_swap_chain as usize, KIND_DXGI);
@@ -758,6 +796,7 @@ unsafe extern "system" fn hooked_present1(
     present_flags: u32,
     p_present_parameters: *const c_void,
 ) -> HRESULT {
+    let _call = CallGuard::enter();
     let (owned, nested) = enter_present();
     if !nested {
         perform_pacing(p_swap_chain as usize, KIND_DXGI);
@@ -795,6 +834,7 @@ static mut SELF_BASE: usize = 0;
 
 #[inline]
 unsafe fn gl_present(which: usize, hdc: *mut c_void) -> BOOL {
+    let _call = CallGuard::enter();
     let (owned, nested) = enter_present();
     if !nested && !hdc.is_null() {
         perform_pacing(hdc as usize, KIND_GL);
@@ -1139,15 +1179,24 @@ unsafe fn install_vtable_hooks() -> bool {
         PRESENT_ORIG_ADDR = *(present_slot as *const usize);
         ORIGINAL_PRESENT = Some(std::mem::transmute(PRESENT_ORIG_ADDR));
         if patch_slot(present_slot, hooked_present as *const () as usize) {
-            // Present1 (index 22), only when the implementation exposes it
-            let present1_slot = vtable.add(22) as usize;
-            let orig1 = *(present1_slot as *const usize);
-            if orig1 != 0 {
-                PRESENT1_ORIG_ADDR = orig1;
-                ORIGINAL_PRESENT1 = Some(std::mem::transmute(orig1));
-                if patch_slot(present1_slot, hooked_present1 as *const () as usize) {
-                    PRESENT1_SLOT = present1_slot;
+            // Present1 (index 22) only exists on IDXGISwapChain1. Ask for that interface instead of
+            // reading slot 22 of a vtable that may be shorter (DXGI 1.0 runtimes): past its end is
+            // unrelated memory, and patching it would corrupt whatever lives there.
+            let mut sc1: *mut c_void = ptr::null_mut();
+            let qi: unsafe extern "system" fn(*mut c_void, *const GUID, *mut *mut c_void) -> HRESULT =
+                std::mem::transmute(vfn(p_swap_chain as *mut c_void, 0)); // IUnknown::QueryInterface
+            if qi(p_swap_chain as *mut c_void, &IID_IDXGISwapChain1, &mut sc1) >= 0 && !sc1.is_null() {
+                let vtable1 = *(sc1 as *const *mut usize);
+                let present1_slot = vtable1.add(22) as usize;
+                let orig1 = *(present1_slot as *const usize);
+                if orig1 != 0 {
+                    PRESENT1_ORIG_ADDR = orig1;
+                    ORIGINAL_PRESENT1 = Some(std::mem::transmute(orig1));
+                    if patch_slot(present1_slot, hooked_present1 as *const () as usize) {
+                        PRESENT1_SLOT = present1_slot;
+                    }
                 }
+                com_release(sc1);
             }
 
             HOOK_INSTALLED.store(true, Ordering::Relaxed);
@@ -1171,18 +1220,43 @@ unsafe fn remove_vtable_hooks() {
     if !HOOK_INSTALLED.swap(false, Ordering::Relaxed) {
         return;
     }
-    if PRESENT_SLOT != 0 && PRESENT_ORIG_ADDR != 0 {
-        patch_slot(PRESENT_SLOT, PRESENT_ORIG_ADDR);
+    // Restore only slots that still hold OUR hook: if another tool (overlay, recorder) hooked the
+    // same entry after us, writing our saved original back would silently remove its hook.
+    restore_vtable_slot(PRESENT_SLOT, hooked_present as *const () as usize, PRESENT_ORIG_ADDR);
+    restore_vtable_slot(PRESENT1_SLOT, hooked_present1 as *const () as usize, PRESENT1_ORIG_ADDR);
+}
+
+unsafe fn restore_vtable_slot(slot: usize, ours: usize, orig: usize) {
+    if slot == 0 || orig == 0 {
+        return;
     }
-    if PRESENT1_SLOT != 0 && PRESENT1_ORIG_ADDR != 0 {
-        patch_slot(PRESENT1_SLOT, PRESENT1_ORIG_ADDR);
+    // dxgi.dll (which owns the vtable) must still be mapped.
+    let mut owner: HMODULE = ptr::null_mut();
+    if GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, slot as *const u16, &mut owner) == 0 {
+        return;
+    }
+    if (*(slot as *const std::sync::atomic::AtomicUsize)).load(Ordering::SeqCst) == ours {
+        patch_slot(slot, orig);
     }
 }
 
 static UNLOADING: AtomicBool = AtomicBool::new(false);
 
-extern "system" fn init_thread(_param: *mut c_void) -> u32 {
+/// `param` is a module reference taken in DllMain for this thread: the DLL cannot be unmapped while
+/// the thread sleeps in it (FreeLibrary from the controller only drops the other reference), and the
+/// thread gives it back with FreeLibraryAndExitThread, which never returns into unmapped code.
+extern "system" fn init_thread(param: *mut c_void) -> u32 {
     unsafe {
+        init_thread_body();
+        if !param.is_null() {
+            FreeLibraryAndExitThread(param as HMODULE, 0);
+        }
+    }
+    0
+}
+
+unsafe fn init_thread_body() {
+    {
         // 1 ms kernel timer resolution for the limiter's coarse sleep (fallback path).
         if timeBeginPeriod(1) == 0 {
             TIMER_PERIOD_SET.store(true, Ordering::Release);
@@ -1207,7 +1281,6 @@ extern "system" fn init_thread(_param: *mut c_void) -> u32 {
             install_gl_hooks();
         }
     }
-    0
 }
 
 #[no_mangle]
@@ -1219,9 +1292,18 @@ pub extern "system" fn DllMain(
     match reason {
         1 => { // DLL_PROCESS_ATTACH
             unsafe {
-                let h = CreateThread(ptr::null_mut(), 0, init_thread, ptr::null_mut(), 0, ptr::null_mut());
-                if !h.is_null() {
-                    CloseHandle(h); // the thread keeps running; we never wait on it
+                // Extra module reference owned by the init thread (released by FreeLibraryAndExitThread):
+                // taken here, not in the thread, so an unload between CreateThread and the thread's first
+                // instruction cannot unmap its code either. No refcount = no thread (a thread running
+                // in an unpinned module would crash the game if the controller unloads us mid-Sleep).
+                let mut pin: HMODULE = ptr::null_mut();
+                if GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, init_thread as *const () as *const u16, &mut pin) != 0 {
+                    let h = CreateThread(ptr::null_mut(), 0, init_thread, pin as *mut c_void, 0, ptr::null_mut());
+                    if !h.is_null() {
+                        CloseHandle(h); // the thread keeps running; we never wait on it
+                    }
+                    // If CreateThread failed the reference is simply kept (FreeLibrary is not allowed
+                    // inside DllMain); the DLL then just stays loaded.
                 }
             }
         }
@@ -1232,6 +1314,7 @@ pub extern "system" fn DllMain(
                 if reserved.is_null() {
                     remove_vtable_hooks();
                     remove_gl_hooks();
+                    drain_hooked_calls();
                     // Hooks are gone, but a present may still be inside perform_pacing on another
                     // thread; only free the timer when nobody holds BUSY.
                     if !WAIT_TIMER.is_null() && BUSY.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_ok() {
@@ -1406,6 +1489,7 @@ mod win_stubs {
     #[no_mangle] pub extern "system" fn GetModuleHandleA(_: *const i8) -> HMODULE { ptr::null_mut() }
     #[no_mangle] pub extern "system" fn GetModuleHandleExW(_: DWORD, _: *const u16, _: *mut HMODULE) -> BOOL { 0 }
     #[no_mangle] pub extern "system" fn FreeLibrary(_: HMODULE) -> BOOL { 0 }
+    #[no_mangle] pub extern "system" fn FreeLibraryAndExitThread(_: HMODULE, _: DWORD) -> ! { loop {} }
     #[no_mangle] pub extern "system" fn K32EnumProcessModules(_: HANDLE, _: *mut HMODULE, _: DWORD, _: *mut DWORD) -> BOOL { 0 }
     #[no_mangle] pub extern "system" fn GetProcAddress(_: *mut c_void, _: *const i8) -> *mut c_void { ptr::null_mut() }
     #[no_mangle] pub extern "system" fn CreateThread(_: *mut c_void, _: SIZE_T, _: extern "system" fn(*mut c_void) -> u32, _: *mut c_void, _: DWORD, _: *mut DWORD) -> HANDLE { ptr::null_mut() }

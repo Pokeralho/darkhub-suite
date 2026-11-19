@@ -62,10 +62,13 @@ pub struct Opts {
 /// Overwrites the file `passes` times (random data, last pass zeros when there are two or more), flushes it to
 /// disk, renames it to a random name and only then unlinks it. On SSDs the controller may keep old copies in
 /// remapped blocks; this is the best a file-level tool can do.
+///
+/// Links are never overwritten: a symlink / junction / other reparse point, or a file with more than one hard
+/// link, would carry the overwrite to data outside the cleaned folder. Those only lose this directory entry.
 pub fn shred_file(path: &Path, passes: u32) -> io::Result<()> {
-    let len = fs::metadata(path)?.len();
     {
-        let mut f = OpenOptions::new().write(true).open(path)?;
+        let Some(mut f) = open_for_shred(path)? else { return fs::remove_file(path) };
+        let len = f.metadata()?.len();
         let mut rng = XorShift::seeded();
         let mut buf = vec![0u8; 1 << 20];
         for pass in 0..passes.max(1) {
@@ -92,6 +95,33 @@ pub fn shred_file(path: &Path, passes: u32) -> io::Result<()> {
     let tmp = path.with_file_name(format!("{}.dhs", name.iter().map(|b| format!("{b:02x}")).collect::<String>()));
     fs::rename(path, &tmp)?;
     fs::remove_file(&tmp)
+}
+
+/// Opens `path` itself (not what it points to) for writing; `None` when it is a link that must not be overwritten.
+#[cfg(windows)]
+fn open_for_shred(path: &Path) -> io::Result<Option<fs::File>> {
+    use std::os::windows::fs::OpenOptionsExt;
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_OPEN_REPARSE_POINT};
+    let f = OpenOptions::new().write(true).custom_flags(FILE_FLAG_OPEN_REPARSE_POINT).open(path)?;
+    let mut info: BY_HANDLE_FILE_INFORMATION = unsafe { std::mem::zeroed() };
+    if unsafe { GetFileInformationByHandle(f.as_raw_handle() as _, &mut info) } == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    if info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0 || info.nNumberOfLinks != 1 {
+        return Ok(None);
+    }
+    Ok(Some(f))
+}
+
+#[cfg(not(windows))]
+fn open_for_shred(path: &Path) -> io::Result<Option<fs::File>> {
+    use std::os::unix::fs::MetadataExt;
+    let md = fs::symlink_metadata(path)?;
+    if md.file_type().is_symlink() || md.nlink() != 1 {
+        return Ok(None);
+    }
+    Ok(Some(OpenOptions::new().write(true).open(path)?))
 }
 
 pub fn delete_file(path: &Path, shred: u32) -> io::Result<()> {

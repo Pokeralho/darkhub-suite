@@ -62,3 +62,43 @@ jobs:
           cargo check --manifest-path native_gpubench/Cargo.toml
       - name: Linux package smoke (dir)
         run: npm run build:linux
+  native:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc,i686-pc-windows-msvc
+      # Rust engines: unit tests (the pacer's tests share global hooks, so one thread)
+      - run: cargo test --manifest-path native_disk/Cargo.toml
+      - run: cargo test --manifest-path native_cleaner/Cargo.toml
+      - run: cargo test --manifest-path native_sysops/Cargo.toml
+      - run: cargo test --manifest-path native_pacer/Cargo.toml -- --test-threads=1
+      - run: cargo build --release --target i686-pc-windows-msvc --manifest-path native_pacer/Cargo.toml --lib --bins
+      - run: cargo build --release --manifest-path native_gpubench/Cargo.toml
+      # C# helpers (.NET Framework 4 csc that ships with Windows): compile only, into a scratch folder
+      - name: C# helpers compile
+        shell: pwsh
+        run: |
+          $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          New-Item -ItemType Directory -Force out | Out-Null
+          $jobs = @(
+            @('electron/services/DarkHub.LatencyEngine.cs', 'x64', @()),
+            @('electron/services/DarkHub.FrameLimiter.cs', 'x64', @()),
+            @('electron/services/DarkHub.ClickEngine.cs', 'x64', @()),
+            @('electron/services/DarkHub.SensorDaemon.cs', 'x64', @()),
+            @('electron/services/DarkHub.DiskScan.cs', 'x64', @()),
+            @('electron/services/hwsensors/DarkHub.HwSensors.cs', 'x64', @('/r:electron/services/hwsensors/LibreHardwareMonitorLib.dll', '/r:System.Management.dll')),
+            @('electron/services/DarkHub.VaultBridgeHost.cs', 'anycpu', @()),
+            @('electron/services/DarkHub.Mcp.cs', 'anycpu', @('/r:System.Web.Extensions.dll')),
+            @('electron/services/DarkHub.HotkeyWatch.cs', 'anycpu', @())
+          )
+          foreach ($j in $jobs) {
+            $out = Join-Path out ([IO.Path]::GetFileNameWithoutExtension($j[0]) + '.exe')
+            & $csc /nologo /target:exe "/platform:$($j[1])" /optimize+ "/out:$out" @($j[2]) $j[0]
+            if ($LASTEXITCODE -ne 0) { throw "csc failed: $($j[0])" }
+          }
+      # Vulkan low-latency layer (C++23, MSVC + CMake + Ninja from the runner's Visual Studio)
+      - run: call native_lowlatency\build-windows.cmd
+        shell: cmd

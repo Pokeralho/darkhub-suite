@@ -29,6 +29,7 @@ export function registerDiskScanIPC({ ipcMain, dialog, shell, BrowserWindow, log
   handle('diskscan:open', (p) => svc.open(String(p.id || '')))
   handle('diskscan:reveal', (p) => svc.reveal(String(p.id || '')))
   handle('diskscan:trash', (p) => svc.trash(String(p.id || '')))
+  handle('diskscan:recycleInfo', (p) => svc.recycleInfo(String(p.id || '')))
   handle('diskscan:deletePermanent', (p) => svc.deletePermanent(String(p.id || ''), typeof p.confirmName === 'string' ? p.confirmName : ''))
   // The destination always comes from the native save dialog.
   handle('diskscan:export', async (p, event) => {

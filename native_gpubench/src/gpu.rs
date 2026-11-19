@@ -91,6 +91,8 @@ pub struct Gpu {
     device: ID3D12Device5,
     queue: ID3D12CommandQueue,
     swap: IDXGISwapChain3,
+    /// DXGI_FEATURE_PRESENT_ALLOW_TEARING is supported: the swap chain was created with the tearing flag.
+    tearing: bool,
     backbuffers: Vec<ID3D12Resource>,
     fence: ID3D12Fence,
     fence_event: HANDLE,
@@ -317,10 +319,17 @@ impl Gpu {
                 None => CreateWindowExW(WINDOW_EX_STYLE(0), class, title, WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 1296, 759, None, None, hinst, None)?,
             };
 
+            // Tearing (uncapped present) needs OS + driver support; asking for it without checking makes
+            // CreateSwapChainForHwnd / Present fail with DXGI_ERROR_INVALID_CALL on systems without it.
+            let mut allow_tearing = BOOL(0);
+            let tearing = factory
+                .CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &mut allow_tearing as *mut BOOL as *mut c_void, size_of::<BOOL>() as u32)
+                .is_ok()
+                && allow_tearing.as_bool();
             let sd = DXGI_SWAP_CHAIN_DESC1 {
                 Width: WIDTH, Height: HEIGHT, Format: DXGI_FORMAT_R8G8B8A8_UNORM, SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
                 BufferUsage: DXGI_USAGE_RENDER_TARGET_OUTPUT, BufferCount: 3, Scaling: DXGI_SCALING_STRETCH, SwapEffect: DXGI_SWAP_EFFECT_FLIP_DISCARD,
-                Flags: DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING.0 as u32, ..Default::default()
+                Flags: if tearing { DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING.0 as u32 } else { 0 }, ..Default::default()
             };
             let swap: IDXGISwapChain3 = factory.CreateSwapChainForHwnd(&queue, hwnd, &sd, None, None)?.cast()?;
             let backbuffers = (0..3).map(|i| swap.GetBuffer::<ID3D12Resource>(i)).collect::<Result<Vec<_>>>()?;
@@ -379,7 +388,7 @@ impl Gpu {
 
             let mut g = Gpu {
                 info: Info { name, vendor: ad.VendorId, device: ad.DeviceId, vram_mb: (ad.DedicatedVideoMemory / 1048576) as u64, driver, dxr },
-                hwnd, closed: false, device, queue, swap, backbuffers, fence, fence_event, fence_next: 1, slots, root,
+                hwnd, closed: false, device, queue, swap, tearing, backbuffers, fence, fence_event, fence_next: 1, slots, root,
                 pso_shadow, pso_vis, pso_ground, pso_shade, pso_tiles, pso_tone, heap, inc, rtv_heap, dsv_heap,
                 ids, ids_state: D3D12_RESOURCE_STATE_RENDER_TARGET, hdr, ldr, shadow, _depth: depth, tile_buf,
                 cb, cb_ptr: cb_ptr as *mut u8, query, query_rb, ts_freq, rt: None,
@@ -596,6 +605,9 @@ impl Gpu {
                 DestAccelerationStructureData: rt.tlas.GetGPUVirtualAddress(), Inputs: inputs,
                 ScratchAccelerationStructureData: rt.scratch.GetGPUVirtualAddress(), ..Default::default()
             };
+            // One TLAS + scratch serve all SLOTS in-flight frames: order this rebuild after every earlier
+            // access to them (the previous frame's build and ray queries) before overwriting them.
+            list.ResourceBarrier(&[uav_barrier(&rt.tlas), uav_barrier(&rt.scratch)]);
             list.BuildRaytracingAccelerationStructure(&build, None);
             list.ResourceBarrier(&[uav_barrier(&rt.tlas)]);
             list.SetPipelineState(&rt.pso);
@@ -671,7 +683,8 @@ impl Gpu {
 
     unsafe fn submit(&mut self, slot: usize) -> Result<()> {
         self.queue.ExecuteCommandLists(&[Some(self.slots[slot].list.cast()?)]);
-        self.swap.Present(0, DXGI_PRESENT_ALLOW_TEARING).ok()?;
+        // ALLOW_TEARING is only legal on a swap chain created with the tearing flag.
+        self.swap.Present(0, if self.tearing { DXGI_PRESENT_ALLOW_TEARING } else { DXGI_PRESENT(0) }).ok()?;
         let v = self.fence_next;
         self.fence_next += 1;
         self.queue.Signal(&self.fence, v)?;

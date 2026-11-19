@@ -62,6 +62,13 @@ export function entryData(e) {
   throw new Error(`unsupported compression method ${e.method} in ${e.name}`)
 }
 
+/** entryData off the main thread (zlib thread pool): for whole-archive passes, where entries can be big media. */
+export function entryDataAsync(e) {
+  if (e.method === 0) return Promise.resolve(Buffer.from(e.raw))
+  if (e.method === 8) return new Promise((resolve, reject) => zlib.inflateRaw(e.raw, (err, out) => (err ? reject(err) : resolve(out))))
+  return Promise.reject(new Error(`unsupported compression method ${e.method} in ${e.name}`))
+}
+
 /** replacements: Map<name, Buffer|null> (null removes the entry). New names are appended. */
 export function rewriteZip(buf, replacements) {
   const entries = readZipEntries(buf)

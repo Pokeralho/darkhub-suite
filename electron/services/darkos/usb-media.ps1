@@ -7,7 +7,7 @@ param(
   [int]$DiskNumber = -1,
   [UInt64]$ExpectedSize = 0,
   [string]$IsoPath = '',
-  [string]$Label = 'DARKOS',
+  [ValidatePattern('^[A-Za-z0-9_-]{1,11}\z')][string]$Label = 'DARKOS',
   [switch]$AllowVirtual
 )
 $ErrorActionPreference = 'Stop'
@@ -53,11 +53,20 @@ try {
   # FAT32 partition boots on UEFI PCs and on older BIOS/CSM ones (same layout Rufus uses for "BIOS or UEFI").
   # Windows only formats FAT32 up to 32 GB, more than any ISO needs.
   $sizeMb = [Math]::Min([Math]::Floor([double]$disk.Size / 1MB) - 2, 32000)
-  $dp = Join-Path $env:TEMP 'darkhub-usb-diskpart.txt'
+  # unguessable name, created new and held open without write sharing until diskpart is done: no other process can
+  # swap the script between writing it and diskpart reading it (we run elevated and TEMP is the user's)
+  $dp = Join-Path $env:TEMP ('darkhub-usb-' + [guid]::NewGuid().ToString('N') + '.txt')
   $lines = @("select disk $DiskNumber", 'clean', 'convert mbr', "create partition primary size=$sizeMb", "format fs=fat32 quick label=$Label", 'active', 'assign')
-  [IO.File]::WriteAllLines($dp, $lines)
-  $dpOut = & diskpart.exe /s $dp 2>&1 | Out-String
-  Remove-Item -LiteralPath $dp -Force -ErrorAction SilentlyContinue
+  $dpLock = New-Object IO.FileStream($dp, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+  try {
+    $bytes = [Text.Encoding]::ASCII.GetBytes(($lines -join "`r`n") + "`r`n")
+    $dpLock.Write($bytes, 0, $bytes.Length)
+    $dpLock.Flush()
+    $dpOut = & diskpart.exe /s $dp 2>&1 | Out-String
+  } finally {
+    $dpLock.Dispose()
+    Remove-Item -LiteralPath $dp -Force -ErrorAction SilentlyContinue
+  }
   if ($LASTEXITCODE -ne 0) { throw ('diskpart: ' + (($dpOut -split "`r?`n" | Where-Object { $_.Trim() }) | Select-Object -Last 2) -join ' ') }
   Start-Sleep -Milliseconds 800
   $part = Get-Partition -DiskNumber $DiskNumber | Select-Object -First 1

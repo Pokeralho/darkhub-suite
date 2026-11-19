@@ -123,17 +123,40 @@ fn recycle_target() -> Value {
 fn recycle_run(apply: bool) -> R<Value> {
     #[cfg(windows)]
     {
-        let (bytes, items) = recycle::query()?;
+        let (shell_bytes, shell_items) = recycle::query()?;
+        // $R entries that lost their $I record: invisible to the Shell, so measured and removed here
+        let bins = recycle::user_bin_dirs();
+        let orphans: Vec<recycle::Orphan> = bins.iter().flat_map(|d| recycle::orphans_in(d)).collect();
+        let orphan_bytes: u64 = orphans.iter().map(|o| o.bytes).sum();
+        let bytes = shell_bytes + orphan_bytes;
+        let items = shell_items + orphans.len() as u64;
         let (mut freed_bytes, mut freed_items, mut left) = (bytes, items, (0u64, 0u64));
+        // shown by the page as "examples of what will be deleted" (plain paths, like the file targets)
+        let mut sample: Vec<String> = orphans.iter().take(20).map(|o| format!("{} (item órfão da Lixeira, sem registro)", o.path.to_string_lossy())).collect();
         if apply && items > 0 {
-            recycle::empty()?;
-            left = recycle::query()?;
+            if shell_items > 0 {
+                recycle::empty()?;
+            }
+            // emptying can itself leave new orphans (a file in use): look again after it
+            let after: Vec<recycle::Orphan> = bins.iter().flat_map(|d| recycle::orphans_in(d)).collect();
+            let mut stuck = (0u64, 0u64);
+            sample.clear();
+            for o in &after {
+                if !recycle::remove_orphan(o) {
+                    let rest = recycle::orphans_in(o.path.parent().unwrap_or(&o.path)).into_iter().find(|x| x.path == o.path).map(|x| x.bytes).unwrap_or(0);
+                    stuck = (stuck.0 + rest, stuck.1 + 1);
+                    sample.push(format!("{} (em uso, não apagado)", o.path.to_string_lossy()));
+                }
+            }
+            let shell_left = recycle::query()?;
+            left = (shell_left.0 + stuck.0, shell_left.1 + stuck.1);
             freed_bytes = bytes.saturating_sub(left.0);
             freed_items = items.saturating_sub(left.1);
         }
         Ok(json!({
             "id": RECYCLE_ID, "name": "Lixeira", "files": freed_items, "bytes": freed_bytes, "locked": left.1, "denied": 0,
-            "protected": 0, "links": 0, "sample": [], "refused": [], "before": { "bytes": bytes, "items": items },
+            "protected": 0, "links": 0, "sample": sample, "refused": [], "before": { "bytes": bytes, "items": items },
+            "orphans": { "items": orphans.len(), "bytes": orphan_bytes },
         }))
     }
     #[cfg(not(windows))]

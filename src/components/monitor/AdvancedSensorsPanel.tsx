@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Cpu, Fan, Loader2, Zap } from '../icons';
 import { useI18n } from '../../i18n/I18nProvider';
 import type { HwSensorsStatus, OverlayHw } from '../../global';
+import { visibleInterval } from '../../utils/visibleInterval';
 
 interface Props {
   /** metrics.temps.values from the HAL */
@@ -24,8 +25,7 @@ function GpuRails() {
     if (!ov?.power) return undefined;
     const tick = () => { void ov.power().then((r) => { if (r?.ok) setHw(r.hw); }).catch(() => {}); };
     tick();
-    const id = setInterval(tick, 1500);
-    return () => clearInterval(id);
+    return visibleInterval(tick, 1500);
   }, []);
   const g = hw?.gpu;
   if (!g) return null;

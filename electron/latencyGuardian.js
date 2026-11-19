@@ -10,6 +10,7 @@ import { PS_SELECT_PRIMARY_ADAPTER } from './services/optimizer/activeAdapterPs.
 import { CpuLoadTracker } from './services/CpuLoadTracker.js'
 import ManagedProcessRegistry from './services/ManagedProcessRegistry.js'
 import { encodePowerShellScript, powerShellArgsForEncodedScript } from './services/PowerShellRunner.js'
+import { isSafeHost } from './services/network/hostValidation.js'
 import nativeLatencyClient from './services/NativeLatencyClient.js'
 import appEvents from './services/appEvents.js'
 import {
@@ -21,6 +22,7 @@ import {
   matchGameProcess,
   buildLatencyCapabilities
 } from './services/latency/linuxOps.js'
+import { persistableUndo, writeUndoRecord, readUndoRecord, clearUndoRecord, normalizeTcpPrev } from './services/latencyUndoStore.js'
 
 const PROCESS_OWNER = 'latencyGuardian'
 
@@ -57,7 +59,8 @@ function encodedPowerShellArgs(script) {
 }
 
 function isSafePingHost(host) {
-  return /^[A-Za-z0-9_.:-]{1,253}$/.test(String(host ?? '').trim())
+  // shared validator (services/network/hostValidation.js): also refuses a leading "-", read by ping.exe as an option
+  return isSafeHost(String(host ?? ''))
 }
 
 export function registerLatencyGuardian(deps) {
@@ -81,6 +84,8 @@ export function registerLatencyGuardian(deps) {
   }
 
   const configPath = path.join(app.getPath('userData'), 'latency.json')
+  // what Ultra mode changed, so a run that ends with Ultra still on is reverted by the next one
+  const undoPath = path.join(app.getPath('userData'), 'latency-undo.json')
 
   let config = {
     enabled: false,
@@ -452,7 +457,13 @@ public static class NtTimer {
       $ErrorActionPreference='Stop'
       $a=${psSingleQuote(adapter)}
       $s = Get-DnsClientServerAddress -InterfaceAlias $a -AddressFamily IPv4
-      [PSCustomObject]@{ adapter=$a; servers=@($s.ServerAddresses) } | ConvertTo-Json -Compress
+      # servers handed out by DHCP are not a static list: an empty "prev" makes the revert go back to DHCP
+      # (-ResetServerAddresses) instead of pinning today's DHCP servers as static ones
+      $ifGuid = ([string](Get-NetAdapter -Name $a).InterfaceGuid).Trim('{}')
+      $static = [string](Get-ItemProperty -LiteralPath "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{$ifGuid}" -Name NameServer -ErrorAction SilentlyContinue).NameServer
+      $list = @()
+      if ($static.Trim()) { $list = @($s.ServerAddresses) }
+      [PSCustomObject]@{ adapter=$a; servers=@($list) } | ConvertTo-Json -Compress
     `
     const { code: c1, stdout: o1, stderr: e1 } = await runPowerShell(psRead, { timeoutMs: 12000 })
     if (c1 !== 0) throw new Error(e1 || 'Failed to read DNS servers')
@@ -538,8 +549,10 @@ public static class NtTimer {
       $ErrorActionPreference='Stop'
       ${PS_SELECT_PRIMARY_ADAPTER}
       if ($null -eq $a) { throw 'Active network adapter not found' }
-      $guid = (Get-NetAdapter -Name $a.Name).InterfaceGuid.ToString()
+      # InterfaceGuid already comes as "{...}": wrapping it again wrote to a non-existent "{{...}}" key (no effect)
+      $guid = ([string](Get-NetAdapter -Name $a.Name).InterfaceGuid).Trim('{}')
       $k = "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{$guid}"
+      if (-not (Test-Path -LiteralPath $k)) { throw "Tcpip interface key not found: $k" }
       [PSCustomObject]@{
         key = $k
         TcpAckFrequency = (Get-ItemProperty -Path $k -Name TcpAckFrequency -ErrorAction SilentlyContinue).TcpAckFrequency
@@ -556,7 +569,7 @@ public static class NtTimer {
     const psWrite = `
       $ErrorActionPreference='Stop'
       $k = ${psSingleQuote(key)}
-      if (-not (Test-Path -LiteralPath $k)) { New-Item -Path $k -Force | Out-Null }
+      if (-not (Test-Path -LiteralPath $k)) { throw "Tcpip interface key not found: $k" }
       Set-ItemProperty -Path $k -Name TcpAckFrequency -Type DWord -Value 1 -Force
       Set-ItemProperty -Path $k -Name TCPNoDelay -Type DWord -Value 1 -Force
       Set-ItemProperty -Path $k -Name TcpDelAckTicks -Type DWord -Value 0 -Force
@@ -596,6 +609,22 @@ public static class NtTimer {
   }
 
   async function optimizeGlobalTcpStack() {
+    // RSC is the only switch here whose Windows default is "enabled" while some setups (NIC/driver advice) turn it
+    // off on purpose: remember it so the revert puts back what was there instead of guessing
+    let rscPrev = null
+    try {
+      const r = await runPowerShell(`(Get-NetOffloadGlobalSetting -ErrorAction Stop).ReceiveSegmentCoalescing`, { timeoutMs: 8000 })
+      const v = String(stripBom(r.stdout ?? '')).trim().toLowerCase()
+      if (r.code === 0 && (v === 'enabled' || v === 'disabled')) rscPrev = v
+    } catch {}
+    // the other switches too: "default" is not what many systems run (DarkOS ships timestamps off, SYN retries 4),
+    // and netsh refuses "maxsynretransmissions=default" outright. Read through the CIM class (not localized).
+    let prev = null
+    try {
+      const r = await runPowerShell(`$t = Get-NetTCPSetting -SettingName Internet -ErrorAction Stop; [pscustomobject]@{ Timestamps = [string]$t.Timestamps; EcnCapability = [string]$t.EcnCapability; MaxSynRetransmissions = [int]$t.MaxSynRetransmissions } | ConvertTo-Json -Compress`, { timeoutMs: 8000 })
+      const o = r.code === 0 ? safeJsonParse(stripBom(r.stdout), null) : null
+      if (o) prev = normalizeTcpPrev({ timestamps: o.Timestamps, ecn: o.EcnCapability, maxSyn: o.MaxSynRetransmissions })
+    } catch {}
     const ps = `
       $ErrorActionPreference='SilentlyContinue'
       netsh int tcp set global timestamps=disabled | Out-Null
@@ -606,15 +635,22 @@ public static class NtTimer {
       netsh int tcp set global fastopen=enabled | Out-Null
     `
     await runPowerShell(ps, { timeoutMs: 10000 })
-    return { optimized: true }
+    return prev ? { optimized: true, rscPrev, prev } : { optimized: true, rscPrev }
   }
 
-  async function restoreGlobalTcpStack() {
+  async function restoreGlobalTcpStack(rscPrev, prevIn) {
+    const rsc = rscPrev === 'enabled' || rscPrev === 'disabled' ? rscPrev : 'default'
+    const prev = normalizeTcpPrev(prevIn) || {}
+    // records written before the previous values were kept: Windows' own defaults (SYN retries: 4)
+    const ts = prev.timestamps || 'default'
+    const ecn = prev.ecn || 'default'
+    const syn = prev.maxSyn || 4
     const ps = `
       $ErrorActionPreference='SilentlyContinue'
-      netsh int tcp set global timestamps=default | Out-Null
-      netsh int tcp set global ecncapability=default | Out-Null
-      netsh int tcp set global maxsynretransmissions=default | Out-Null
+      netsh int tcp set global timestamps=${ts} | Out-Null
+      netsh int tcp set global ecncapability=${ecn} | Out-Null
+      netsh int tcp set global rsc=${rsc} | Out-Null
+      netsh int tcp set global maxsynretransmissions=${syn} | Out-Null
       netsh int tcp set global fastopen=default | Out-Null
     `
     await runPowerShell(ps, { timeoutMs: 10000 })
@@ -903,56 +939,84 @@ public static class NtTimer {
 
     state.ultraEnabled = true
     state.appliedAt = now()
+    state.undoExePath = exePath
     config.enabled = true
     if (manual) config.auto = false
     state.lastApplied = applied
+    // on disk too: if DarkHub quits/crashes/updates while Ultra is on, the next start reverts these
+    await writeUndoRecord(undoPath, persistableUndo(state.undo, { exePath })).catch(() => {})
     await saveConfig().catch(() => {})
+    syncLoops()
     return { ok: true, status: state, applied }
+  }
+
+  /** Reverts the system-wide tweaks of an undo record (in RAM, or the one left on disk by a previous run). */
+  async function restoreUndo(undo, exePath) {
+    const u = undo && typeof undo === 'object' ? undo : {}
+    const done = (v) => v && typeof v === 'object' && !v.error
+
+    try {
+      if (done(u.powerPlan)) await restorePowerPlan(u.powerPlan.prev)
+    } catch {}
+
+    try {
+      // only when FSO was actually applied: restoring "nothing" would delete a flag the user set himself
+      if (exePath && done(u.fullscreen)) await restoreFullscreenOptimizations(exePath, u.fullscreen.prev)
+    } catch {}
+
+    try {
+      if (done(u.mouseAccel) && u.mouseAccel.prev) await restoreMouseAcceleration(u.mouseAccel.prev)
+    } catch {}
+
+    try {
+      if (exePath && done(u.gpuPref)) await restoreGpuPreference(exePath, u.gpuPref.prev)
+    } catch {}
+
+    try {
+      if (u.qos?.policyName) await removeQosPolicy(u.qos.policyName)
+    } catch {}
+
+    try {
+      if (u.nagle?.key) await restoreNagle(u.nagle)
+    } catch {}
+
+    try {
+      if (u.dns?.adapter) await restoreDns(u.dns.adapter, u.dns.prev)
+    } catch {}
+
+    try {
+      if (u.tcpStack?.optimized) await restoreGlobalTcpStack(u.tcpStack.rscPrev, u.tcpStack.prev)
+    } catch {}
+  }
+
+  /** A previous run quit with Ultra on (crash, update, kill): put the system back before anything else starts. */
+  async function revertLeftoverUndo() {
+    if (process.platform !== 'win32') return
+    const record = await readUndoRecord(undoPath)
+    if (!record) { await clearUndoRecord(undoPath); return }
+    await restoreUndo(record.undo, record.exePath)
+    await clearUndoRecord(undoPath)
+    if (config.enabled) {
+      config.enabled = false
+      await saveConfig().catch(() => {})
+    }
   }
 
   async function ultraDisableImpl() {
     if (!state.ultraEnabled) return { ok: true, status: state }
     const isWin = process.platform === 'win32'
     const isLin = process.platform === 'linux'
-    const exePath = String(config.gameExePath || '').trim()
+    // the tweaks were applied to the exe found running (or the configured one) at enable time
+    const exePath = String(state.undoExePath || config.gameExePath || '').trim()
     let restoreError = null
-
-    if (isWin) {
-      try {
-        await restorePowerPlan(state.undo?.powerPlan?.prev)
-      } catch {}
 
       try {
         await stopTimerResolution()
       } catch {}
 
-      try {
-        if (exePath) await restoreFullscreenOptimizations(exePath, state.undo?.fullscreen?.prev)
-      } catch {}
-
-      try {
-        if (state.undo?.mouseAccel?.prev) await restoreMouseAcceleration(state.undo.mouseAccel.prev)
-      } catch {}
-
-      try {
-        if (exePath) await restoreGpuPreference(exePath, state.undo?.gpuPref?.prev)
-      } catch {}
-
-      try {
-        if (state.undo?.qos?.policyName) await removeQosPolicy(state.undo.qos.policyName)
-      } catch {}
-
-      try {
-        if (state.undo?.nagle?.key) await restoreNagle(state.undo.nagle)
-      } catch {}
-
-      try {
-        if (state.undo?.dns?.adapter) await restoreDns(state.undo.dns.adapter, state.undo.dns.prev)
-      } catch {}
-
-      try {
-        if (state.undo?.tcpStack?.optimized) await restoreGlobalTcpStack()
-      } catch {}
+    if (isWin) {
+      // Shared with crash/restart recovery: restore only what was actually applied.
+      await restoreUndo(state.undo, exePath)
     } else if (isLin) {
       // Linux restores: never swallow a failure. A restore that exits non-zero
       // or fails its read-back must be reported, never treated as success.
@@ -976,11 +1040,14 @@ public static class NtTimer {
 
     ManagedProcessRegistry.releaseAllBy(PROCESS_OWNER)
 
+    await clearUndoRecord(undoPath)
     state.ultraEnabled = false
     state.appliedAt = null
     state.game = null
+    state.undoExePath = null
     config.enabled = false
     await saveConfig().catch(() => {})
+    syncLoops()
     return { ok: !restoreError, status: state, ...(restoreError ? { error: restoreError } : {}) }
   }
 
@@ -1143,30 +1210,69 @@ public static class Psapi {
         if (!game) await ultraDisable()
       } catch {}
     }
+
+    // nobody is reading the metrics any more and no feature needs the loop: go idle
+    syncLoops()
+  }
+
+  // The loops only run while something needs them, not 24/7:
+  //  - the 1.5 s loop (CPU/RAM metrics + auto mode's game detection): auto mode on, Ultra on, or metrics wanted;
+  //  - the 5 s ping and the 15 s GPU counter (a PowerShell Get-Counter each time): only while metrics are wanted.
+  // "Metrics wanted" = the page or the widget polled latency:getConfig in the last METRICS_IDLE_MS (the renderer
+  // stops polling when the window is hidden, so a DarkHub sitting in the tray goes fully idle).
+  const METRICS_IDLE_MS = 10000
+  let loopsActive = false
+  let lastMetricsDemand = 0
+
+  function syncLoops() {
+    const demand = loopsActive && now() - lastMetricsDemand < METRICS_IDLE_MS
+    const wantLoop = loopsActive && (demand || config.auto || state.ultraEnabled)
+    if (wantLoop && !timers.loop) timers.loop = setInterval(loop, 1500)
+    if (!wantLoop && timers.loop) { clearInterval(timers.loop); timers.loop = null }
+
+    if (demand && !timers.ping) {
+      updatePing().catch(() => {})
+      timers.ping = setInterval(() => updatePing().catch(() => {}), 5000)
+    }
+    if (!demand && timers.ping) { clearInterval(timers.ping); timers.ping = null }
+
+    const wantGpu = demand && config.gpuPollingEnabled && process.platform === 'win32'
+    if (wantGpu && !timers.gpu) {
+      updateGpuUsage().catch(() => {})
+      timers.gpu = setInterval(() => updateGpuUsage().catch(() => {}), 15000)
+    }
+    if (!wantGpu && timers.gpu) { clearInterval(timers.gpu); timers.gpu = null }
+    if (!wantGpu) metrics.gpuPct = null
+  }
+
+  /** Smart Clean is its own opt-in feature (every N minutes): it runs on its own timer whenever configured. */
+  function syncSmartClean(force = false) {
+    const minutes = loopsActive ? clampInt(config.smartCleanMinutes, 0, 240, 0) : 0
+    if (minutes <= 0) {
+      if (timers.smartClean) clearInterval(timers.smartClean)
+      timers.smartClean = null
+      return
+    }
+    if (timers.smartClean && !force) return
+    if (timers.smartClean) clearInterval(timers.smartClean)
+    timers.smartClean = setInterval(() => {
+      if (state.ultraEnabled && !config.smartCleanDuringGaming) return
+      smartCleanRam(state.game?.pid).catch(() => {})
+    }, clampInt(config.smartCleanMinutes, 1, 240, 10) * 60_000)
   }
 
   function start() {
-    if (timers.loop) return
-    timers.loop = setInterval(loop, 1500)
-    timers.ping = setInterval(updatePing, 5000)
-    if (clampInt(config.smartCleanMinutes, 0, 240, 0) > 0) {
-      timers.smartClean = setInterval(() => {
-        if (state.ultraEnabled && !config.smartCleanDuringGaming) return
-        smartCleanRam(state.game?.pid).catch(() => {})
-      }, clampInt(config.smartCleanMinutes, 1, 240, 10) * 60_000)
-    }
-    if (process.platform === 'win32' && config.gpuPollingEnabled) {
-      updateGpuUsage().catch(() => {})
-      timers.gpu = setInterval(() => updateGpuUsage().catch(() => {}), 15000)
-    } else {
-      metrics.gpuPct = null
-    }
+    if (loopsActive) return
+    loopsActive = true
+    syncSmartClean()
+    syncLoops()
   }
 
   async function stop() {
     try {
       if (state.ultraEnabled) await ultraDisable()
     } catch {}
+    loopsActive = false
     for (const k of Object.keys(timers)) {
       const t = timers[k]
       if (t) clearInterval(t)
@@ -1178,6 +1284,10 @@ public static class Psapi {
   }
 
   ipcMain.handle('latency:getConfig', async () => {
+    // someone is looking at the metrics: keep (or start) the loops that refresh them
+    lastMetricsDemand = now()
+    if (loopsActive && !timers.loop) updateMetricsFast().catch(() => {})
+    syncLoops()
     // Polled every 1.5 s by the page and the global GuardianWidget: don't spawn
     // the native daemon just to read the timer; only ask it when it is alive.
     let timerRes = null
@@ -1223,7 +1333,6 @@ public static class Psapi {
   })
 
   ipcMain.handle('latency:setConfig', async (_event, payload) => {
-    const prevGpu = Boolean(config.gpuPollingEnabled)
     const prevSmart = clampInt(config.smartCleanMinutes, 0, 240, 0)
     config = {
       ...config,
@@ -1232,30 +1341,8 @@ public static class Psapi {
     normalizeConfig()
     const res = registerHotkey()
 
-    if (timers.loop) {
-      const nextSmart = clampInt(config.smartCleanMinutes, 0, 240, 0)
-      if (nextSmart <= 0) {
-        if (timers.smartClean) clearInterval(timers.smartClean)
-        timers.smartClean = null
-      } else if (!timers.smartClean || nextSmart !== prevSmart) {
-        if (timers.smartClean) clearInterval(timers.smartClean)
-        timers.smartClean = setInterval(() => {
-          if (state.ultraEnabled && !config.smartCleanDuringGaming) return
-          smartCleanRam(state.game?.pid).catch(() => {})
-        }, clampInt(config.smartCleanMinutes, 1, 240, 10) * 60_000)
-      }
-
-      const nextGpu = Boolean(config.gpuPollingEnabled)
-      if (!nextGpu) {
-        if (timers.gpu) clearInterval(timers.gpu)
-        timers.gpu = null
-        metrics.gpuPct = null
-      } else if (!timers.gpu || nextGpu !== prevGpu) {
-        if (timers.gpu) clearInterval(timers.gpu)
-        updateGpuUsage().catch(() => {})
-        timers.gpu = setInterval(() => updateGpuUsage().catch(() => {}), 15000)
-      }
-    }
+    syncSmartClean(clampInt(config.smartCleanMinutes, 0, 240, 0) !== prevSmart)
+    syncLoops()
     await saveConfig().catch(() => {})
     return { ok: true, config, hotkey: res }
   })
@@ -1511,6 +1598,7 @@ public static class Psapi {
           config = g?.prevConfig ?? config
           await saveConfig().catch(() => {})
           registerHotkey()
+          syncLoops() // the restored config may have auto mode on again
           if (g?.prevUltra && !state.ultraEnabled) {
             try {
               await ultraEnable(false)
@@ -1543,13 +1631,15 @@ public static class Psapi {
       config = prevConfig
       await saveConfig().catch(() => {})
       registerHotkey()
+      syncLoops()
       return { ok: false, error: String(e?.message ?? e) }
     }
   })
 
   loadConfig()
-    .then(() => {
+    .then(async () => {
       normalizeConfig()
+      await revertLeftoverUndo().catch(() => {})
       registerHotkey()
       start()
     })

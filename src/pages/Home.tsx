@@ -92,8 +92,8 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
     let alive = true;
     const read = () => window.darkhub?.system?.getMemory?.().then((m) => { if (alive && m?.ok) setMem(m); }).catch(() => {});
     read();
-    const h = setInterval(read, 3000);
-    return () => { alive = false; clearInterval(h); };
+    const stop = visibleInterval(read, 3000);
+    return () => { alive = false; stop(); };
   }, []);
   const usedPct = mem && mem.total > 0 ? Math.min(100, Math.max(0, Math.round((mem.used / mem.total) * 100))) : null;
   const gb = (b: number) => (b / 1024 ** 3).toFixed(1);

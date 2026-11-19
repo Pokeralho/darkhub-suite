@@ -4,6 +4,7 @@ import PageHeader from '../components/ui/PageHeader';
 import OverlayStage, { BACKGROUNDS } from '../components/overlay/OverlayStage';
 import { useI18n } from '../i18n/I18nProvider';
 import type { OvlItem, OvlLayout, OvlLayoutsState, OvlPreview, OvlStyle, OvlTheme, OvlWidget } from '../global';
+import { visibleInterval } from '../utils/visibleInterval';
 
 const api = () => window.darkhub?.overlay;
 const FONTS = ['"Cascadia Mono", Consolas, monospace', 'Consolas, monospace', '"Segoe UI", system-ui, sans-serif', '"Segoe UI Variable Display", "Segoe UI", sans-serif', 'Bahnschrift, "Segoe UI", sans-serif', 'Arial, sans-serif', 'Verdana, sans-serif', 'Tahoma, sans-serif', '"Trebuchet MS", sans-serif', 'Impact, sans-serif', '"Courier New", monospace', '"Lucida Console", monospace'];
@@ -305,8 +306,12 @@ export default function OverlayEditor({ onNavigate }: { onNavigate?: (page: stri
   }, [draft]);
   useEffect(() => {
     if (!preview?.live) return;
-    const id = window.setInterval(() => { if (latest.current) void api()?.preview({ layout: latest.current }).then((p) => p?.ok && setPreview(p)); }, 300);
-    return () => window.clearInterval(id);
+    // Paused while the window is hidden/minimised: nobody sees the preview and each tick rebuilds the Shadow DOM.
+    return visibleInterval(async () => {
+      if (!latest.current) return;
+      const p = await api()?.preview({ layout: latest.current });
+      if (p?.ok) setPreview(p);
+    }, 300);
   }, [preview?.live]);
 
   const change = (patch: Partial<OvlLayout>) => { setDraft((d) => (d ? { ...d, ...patch } : d)); setDirty(true); };

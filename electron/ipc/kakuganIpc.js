@@ -14,11 +14,19 @@ const SITE_PAGES = new Set(['/', '/entrar', '/criar-conta', '/painel', '/termos'
  */
 export function makeTokenStore(file, safeStorage) {
   let token = null
-  const can = () => Boolean(safeStorage?.isEncryptionAvailable?.())
-  try { if (can() && fs.existsSync(file)) token = safeStorage.decryptString(fs.readFileSync(file)) || null } catch { token = null }
+  // Read lazily: the IPC is registered before app 'ready', when safeStorage still says encryption is unavailable;
+  // reading here at creation time left the saved session unread forever. Retried until safeStorage works.
+  let loaded = false
+  const can = () => { try { return Boolean(safeStorage?.isEncryptionAvailable?.()) } catch { return false } }
+  const load = () => {
+    if (loaded || !can()) return
+    loaded = true
+    try { if (fs.existsSync(file)) token = safeStorage.decryptString(fs.readFileSync(file)) || null } catch { token = null }
+  }
   return {
-    get: () => token,
+    get: () => { load(); return token },
     set(v) {
+      loaded = true // what the user just did wins over the file
       token = v || null
       try {
         if (!token) fs.rmSync(file, { force: true })

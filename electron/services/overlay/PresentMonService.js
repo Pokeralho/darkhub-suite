@@ -70,6 +70,7 @@ export class PresentMonService extends EventEmitter {
     const parse = createCsvParser()
     let buf = ''
     let err = ''
+    child.stdout.setEncoding?.('utf8') // stream decoding: no U+FFFD when a multibyte char is split across chunks
     child.stdout.on('data', (d) => {
       buf += d
       let i

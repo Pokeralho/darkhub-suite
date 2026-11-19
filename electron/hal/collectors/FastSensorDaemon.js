@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EventEmitter } from 'node:events';
 import Logger from '../../services/LoggerService.js';
+import { integrityError } from '../../services/binaryIntegrity.js';
 
 // Packaged builds: Electron makes fs see inside app.asar, but a process cannot be started from there. The exe is
 // unpacked (asarUnpack electron/services/*.exe), so it must be spawned from app.asar.unpacked.
@@ -33,8 +34,13 @@ class FastSensorDaemon extends EventEmitter {
       Logger.error('FastSensorDaemon', `DarkHub.SensorDaemon.exe não encontrado em ${SENSOR_DAEMON_EXE}`);
       return;
     }
+    const tampered = integrityError(['DarkHub.SensorDaemon.exe'], { log: (m) => Logger.warn('FastSensorDaemon', m) });
+    if (tampered) { Logger.error('FastSensorDaemon', tampered); return; }
     const child = cp.spawn(SENSOR_DAEMON_EXE, [], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     this.process = child;
+    // decode as a stream: a multibyte UTF-8 char split across chunks must not become U+FFFD
+    child.stdout.setEncoding?.('utf8');
+    child.stderr.setEncoding?.('utf8');
 
     child.stdout.on('data', (data) => {
       this._failures = 0;

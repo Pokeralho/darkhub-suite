@@ -10,15 +10,8 @@ import { runCommand, runPowerShell } from './PowerShellRunner.js';
 import { psQuote, parseDhSnapLines } from './optimizer/OptimizerUtils.js';
 import { planNetworkReset, readNetworkFacts, networkResetLines } from './network/networkResetSafety.js';
 
-export const SAFE_HOST_RE = /^[A-Za-z0-9_.:-]{1,253}$/;
-
-export function assertSafeHost(host) {
-  const h = String(host ?? '').trim();
-  if (!SAFE_HOST_RE.test(h) || h.startsWith('-')) {
-    throw new Error('Host inválido: apenas letras, números, pontos, dois-pontos, hífen e underscore são permitidos.');
-  }
-  return h;
-}
+import { SAFE_HOST_RE, assertSafeHost } from './network/hostValidation.js';
+export { SAFE_HOST_RE, assertSafeHost };
 
 /**
  * Regional endpoints that answer ICMP or TCP/443. Game publishers rarely expose a pingable game server, so the

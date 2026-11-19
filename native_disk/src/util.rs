@@ -27,6 +27,7 @@ impl From<io::Error> for Fail {
             _ => match e.kind() {
                 io::ErrorKind::NotFound => "not_found",
                 io::ErrorKind::PermissionDenied => "access_denied",
+                io::ErrorKind::ResourceBusy => "in_use",
                 _ => "io_error",
             },
         };

@@ -6,6 +6,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-11-18
+
+### Changed
+- **Native Optimizer registry engine**: Optimizer tweaks are now read and written by a new native helper
+  (`DarkHub.SysOps.exe`, Rust) that talks to the Windows registry directly instead of generating PowerShell scripts.
+  Checking the status of every tweak went from 0.4-1.2 s to about 25 ms, and the registry part of applying or undoing
+  a batch now takes milliseconds (tweaks that also run system commands still take a few seconds). The helper only accepts a closed list of registry operations (no command execution), always uses the
+  64-bit view, refuses hive roots and top-level keys, and is checked against `integrity.json` before it runs. If it is
+  missing, fails the check or misbehaves, the Optimizer falls back to the previous PowerShell path automatically.
+  Undo points saved by earlier versions keep working.
+
+### Fixed
+- Undoing "No Microsoft Store suggestions in Start search" no longer leaves an empty `HKCU\Software\DarkHub\Tweaks`
+  key behind.
+
+## [0.9.4] - 2026-11-18
+
+### Security
+- **Hardened Electron build**: ASAR integrity validation and `onlyLoadAppFromAsar` on, `NODE_OPTIONS` and `--inspect`
+  off. A tampered `app.asar` or native helper is refused (every helper is checked against `integrity.json` before it
+  starts or is injected).
+- **Elevated file handling**: installers and elevated scripts go through an Administrators-only staging folder and are
+  re-hashed right before running; quarantine folder locked to Administrators/SYSTEM, only quarantines the exact file
+  that was scanned and never restores into system folders; ClamAV no longer marks unscanned files clean after an error.
+- **Destructive actions guarded**: the disk map refuses system folders, drive roots and user profiles; save-backup
+  restore only imports `.reg` files that touch `HKEY_CURRENT_USER`; DiskRescue refuses raw volume/device paths; the
+  cleaner never shreds through hard links or junctions; the DLL injector refuses system and anti-cheat processes.
+- **Other**: Hub extensions must be re-approved when an update asks for more permissions; full-strength vault recovery
+  phrases (old vaults still open and are upgraded); browser extension ignores cross-site frames; `install.ps1` stops
+  when it cannot verify the download.
+
+### Fixed
+- **Recycle Bin orphans**: the disk map can delete items that are already inside `$Recycle.Bin` and shows where they
+  came from; the cleaner finds and removes orphaned items Windows lost track of (invisible in Explorer).
+- **Native stability**: frame limiter hook no longer crashes a game when unloaded; Vulkan low-latency layer handles
+  hybrid-GPU enumeration and never throws across the driver boundary; GPU benchmark checks tearing support; disk
+  recovery carving can no longer hang, writes unaligned tails correctly and never force-dismounts a busy volume.
+- **CPU affinity**: the latency engine reads the real CPU topology (P-cores on hybrid Intel, the V-Cache or first CCD on
+  Ryzen) instead of guessing.
+- **Ultra Low Latency**: settings are reverted on the next start if the app closed while Ultra was on; Nagle, DNS (DHCP
+  aware), TCP and RSC are restored exactly.
+- **SSH/SFTP**: no crash when a tunnel client resets, files renamed only after they are closed, symlink loops skipped,
+  no leaked handles on failed transfers.
+- **Accented user names**: elevation no longer hangs for 3 minutes on profiles like `C:\Users\João`.
+- **Interface**: listener leaks, the Ultra Low Latency hotkey field no longer traps Tab, accessible dialogs, live
+  language switch on every screen, 478 missing translations and several screens translated.
+
+### Changed
+- **Smaller and lighter**: about 40% less JavaScript before the first screen, SSH screen 5x smaller, `app.asar` 17 MB
+  smaller; the FSR4 RDNA2 DLL is downloaded only when used; the setup no longer downloads ClamAV (installed when
+  real-time protection is turned on).
+- **Idle use**: background timers, sensors, pings and the 1 ms timer only run while something needs them.
+- **Installer**: closes every DarkHub helper before updating and removes the Vulkan layer on uninstall.
+
+## [0.9.3] - 2026-11-18
+
+### Added
+- **AutoClicker, Priority Point Sequencer `(X, Y)`**: mark multiple targets directly on any monitor (`#1`, `#2`, `#3`...
+  with live path preview and undo), reorder priority, customize click button (`left`, `right`, `middle`, `double`),
+  travel time and post-click delay, and run them in a continuous or counted loop with smooth quadratic-Bezier +
+  cubic-ease-in-out cursor movement and automatic loop closure back to `#1`.
+- **AutoClicker, TinyTask-compatible Macro Recorder & Player (`.rec`)**: native 250 Hz keyboard and mouse recording
+  and sub-millisecond `WaitableTimer` playback in `DarkHub.ClickEngine.exe`, speed multipliers from `0.5x` to `100x`
+  Turbo (with mouse-move coalescing), independent non-consuming global hotkeys, hardware emergency stop (`Pause` /
+  `ScrollLock`) with automatic panic key/button release, binary `.rec` import/export, extraction from compiled TinyTask
+  `.exe` files, and standalone `.exe` compilation.
+
 ## [0.9.2] - 2026-11-16
 
 ### Added

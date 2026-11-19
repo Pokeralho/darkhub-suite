@@ -7,7 +7,7 @@ import { parseFilter, matchFile, classOf } from '../electron/services/diskscan/f
 // @ts-ignore plain JS module
 import { ScanModel } from '../electron/services/diskscan/ScanModel.js';
 // @ts-ignore plain JS module
-import { DiskScanService, recycleVerdict } from '../electron/services/diskscan/DiskScanService.js';
+import { DiskScanService, recycleVerdict, protectedPathReason, recycleBinPlace, readRecycleInfo } from '../electron/services/diskscan/DiskScanService.js';
 import { squarify, layoutTree, hitTest } from '../src/pages/SpaceSniffer/treemap';
 
 const win32 = process.platform === 'win32' ? it : it.skip;
@@ -180,4 +180,57 @@ describe('disk scan service (real helper)', () => {
     expect(svc.view({ id: 'd0' }).tree.size).toBe(1000);
     fs.rmSync(root, { recursive: true, force: true });
   }, 30000);
+});
+
+describe('disk map protected paths', () => {
+  const w = (s: string) => s.replace(/\//g, '\\');
+  const env = { SystemDrive: 'C:', SystemRoot: w('C:/Windows'), ProgramFiles: w('C:/Program Files'), 'ProgramFiles(x86)': w('C:/Program Files (x86)'), ProgramData: w('C:/ProgramData'), USERPROFILE: w('C:/Users/Ana') };
+  it('refuses system trees, roots, profiles and their ancestors', () => {
+    for (const p of ['C:/', 'D:/', 'C:/Windows', 'c:/windows/System32/drivers', 'C:/Program Files/App', 'C:/ProgramData', 'C:/Users', 'C:/Users/Ana', 'C:/Users/Outro', '//srv/share'])
+      expect(protectedPathReason(w(p), env), p).not.toBeNull();
+  });
+  it('allows ordinary folders', () => {
+    for (const p of ['C:/Users/Ana/Downloads/iso', 'D:/Jogos/velho', 'E:/pasta', 'C:/Windows.old2'])
+      expect(protectedPathReason(w(p), env), p).toBeNull();
+  });
+});
+
+describe('disk map: items already in the Recycle Bin', () => {
+  const w = (s: string) => s.replace(/\//g, '\\');
+  const sid = 'S-1-5-21-2147948401-4266930342-983689016-1000';
+  it('places paths in the bin', () => {
+    expect(recycleBinPlace(w('C:/$Recycle.Bin'))).toEqual({ level: 'root' });
+    expect(recycleBinPlace(w(`D:/$RECYCLE.BIN/${sid}`))?.level).toBe('user');
+    const e = recycleBinPlace(w(`C:/$Recycle.Bin/${sid}/$RQ7KZ19`));
+    expect(e).toMatchObject({ level: 'entry', entry: '$RQ7KZ19', isWhole: true });
+    expect(e?.iFile).toBe(w(`C:/$Recycle.Bin/${sid}/$IQ7KZ19`));
+    expect(recycleBinPlace(w(`C:/$Recycle.Bin/${sid}/$RQ7KZ19/romfs/a.bin`))).toMatchObject({ level: 'entry', isWhole: false });
+    expect(recycleBinPlace(w('C:/Users/x/$Recycle.Bin/y'))).toBeNull();
+    expect(recycleBinPlace(w('C:/Jogos/RecycleBin'))).toBeNull();
+  });
+  it('reads the original path from a $I record (format 2 and 1)', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-ibin-'));
+    const name = w('D:/Jogos/Zelda/hookshot_programs.bin');
+    const v2 = Buffer.alloc(28 + (name.length + 1) * 2);
+    v2.writeBigInt64LE(2n, 0); v2.writeBigInt64LE(3891000000n, 8); v2.writeInt32LE(name.length + 1, 24); v2.write(name, 28, 'utf16le');
+    fs.writeFileSync(path.join(dir, 'i2'), v2);
+    expect(readRecycleInfo(path.join(dir, 'i2'))).toEqual({ original: name, size: 3891000000 });
+    const v1 = Buffer.alloc(24 + 520);
+    v1.writeBigInt64LE(1n, 0); v1.writeBigInt64LE(5n, 8); v1.write(name, 24, 'utf16le');
+    fs.writeFileSync(path.join(dir, 'i1'), v1);
+    expect(readRecycleInfo(path.join(dir, 'i1'))?.original).toBe(name);
+    expect(readRecycleInfo(path.join(dir, 'missing'))).toBeNull();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+  win32('never tries to recycle a bin item again, and lets it be deleted for good without the bin check', async () => {
+    const svc = new DiskScanService({ exePath: 'x', shell: { trashItem: async () => { throw new Error('must not be called'); } } });
+    const entry = w(`C:/$Recycle.Bin/${sid}/$RZZTEST9`);
+    (svc as any)._pathOf = () => entry;
+    (svc as any).model = { info: () => ({ size: 1 }), markRemoved: () => {} };
+    svc.recycleProbe = async () => { throw new Error('bin probe must not run'); };
+    expect(await svc.trash('d5')).toMatchObject({ ok: false, noRecycle: 'inBin' });
+    (svc as any)._pathOf = () => w(`C:/$Recycle.Bin/${sid}`);
+    expect((await svc.trash('d5')).noRecycle).toBeUndefined();
+    expect((await svc.deletePermanent('d5', sid)).ok).toBe(false);
+  });
 });

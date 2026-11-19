@@ -1,0 +1,41 @@
+// en-US strings for maintenance (generated from maintenanceMessages.ts; edit here).
+// Keep the same keys in the other language's file.
+const dict: Record<string, string> = {
+  "maint.task.saves": "Back up game saves",
+  "maint.desc.saves": "Keeps a new version of the saves of every game that changed since the last backup.",
+  "maint.sum.saves": "{s} games backed up, {u} unchanged",
+  "nav.maintenance": "Scheduled maintenance",
+  "maint.task.cleanTemp": "Clean temporary files",
+  "maint.task.securityLists": "Update security lists",
+  "maint.task.clamav": "Update ClamAV signatures",
+  "maint.task.winget": "Program updates (winget)",
+  "maint.desc.cleanTemp": "Empties the temporary folders. Files in use are skipped.",
+  "maint.desc.securityLists": "Downloads again the community lists enabled in Advanced Security. Does not change what is already applied.",
+  "maint.desc.clamav": "Runs freshclam when ClamAV is installed.",
+  "maint.desc.winget": "Checks which programs have updates. Installs only if you turn on the option below.",
+  "maint.sum.clean": "{mb} freed, {n} files",
+  "maint.sum.noLists": "no lists enabled",
+  "maint.sum.lists": "{n} lists updated",
+  "maint.sum.noClam": "ClamAV not installed",
+  "maint.sum.clam": "signatures updated",
+  "maint.sum.wingetInstalled": "{i} of {n} updated",
+  "maint.sum.winget": "{n} updates available",
+  "maint.sum.failed": "{f} failed",
+  "maint.subtitle": "Tasks that run by themselves at the chosen time while DarkHub is open (tray included). If the PC is off at that time, the task runs once when DarkHub opens again.",
+  "maint.daily": "Every day",
+  "maint.weekly": "Every week",
+  "maint.monthly": "Every month",
+  "maint.day": "day",
+  "maint.at": "at",
+  "maint.installHelp": "Installs every update silently, accepting each program's terms.",
+  "maint.install": "Install automatically",
+  "maint.last": "Last run: {d}",
+  "maint.never": "Never ran",
+  "maint.next": "Next: {d}",
+  "maint.runNow": "Run now",
+  "maint.tray": "For tasks to run without opening the app, let DarkHub start with Windows (it stays in the tray).",
+  "maint.history": "History",
+  "maint.manual": "manual"
+};
+
+export default dict;

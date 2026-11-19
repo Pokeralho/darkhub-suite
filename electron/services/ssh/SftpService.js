@@ -173,19 +173,38 @@ export function execCapture(client, cmd, stdin, timeoutMs = SUDO_TIMEOUT_MS) {
  */
 export function sftpOverStream(client, stream, { preamble } = {}) {
   const { SFTP } = require('ssh2/lib/protocol/SFTP.js')
+  // Backpressure: when the exec channel's buffer is full (write() returns false) the SFTP layer is told its window
+  // is exhausted, so it queues packets in its own buffer instead of piling them on the channel; 'drain' reopens it.
+  const OPEN_WINDOW = Number.MAX_SAFE_INTEGER
+  let paused = false
   const fake = {
     _protocol: {
       _remoteIdentRaw: client?._protocol?._remoteIdentRaw,
-      channelData: (_id, data) => { try { stream.write(data) } catch { /* closed */ } },
+      channelData: (_id, data) => {
+        let flowing = true
+        try { flowing = stream.write(data) !== false } catch { /* closed */ }
+        if (!flowing) { paused = true; info.outgoing.window = 0; sftp._waitWindow = true }
+      },
       channelClose: () => { try { stream.end() } catch { /* closed */ } }
     }
   }
   const info = {
     type: 'session',
     incoming: { id: 0, window: 2 ** 32 - 1, packetSize: 256 * 1024, state: 'open' },
-    outgoing: { id: 0, window: Number.MAX_SAFE_INTEGER, packetSize: 256 * 1024, state: 'open' }
+    outgoing: { id: 0, window: OPEN_WINDOW, packetSize: 256 * 1024, state: 'open' }
   }
   const sftp = new SFTP(fake, info, {})
+  stream.on?.('drain', () => {
+    if (!paused) return
+    paused = false
+    info.outgoing.window = OPEN_WINDOW
+    sftp._waitWindow = false
+    const resume = sftp._chunkcb
+    sftp._chunkcb = undefined
+    if (typeof resume === 'function') { resume.call(sftp); return }
+    // a packet split when the pause hit was queued without a resume callback: flush the queue in order
+    while (!paused && Array.isArray(sftp._buffer) && sftp._buffer.length) fake._protocol.channelData(0, sftp._buffer.shift())
+  })
   let stderr = ''
   stream.stderr?.on('data', (d) => { stderr = (stderr + d).slice(-4000) })
   stream.on('data', (d) => sftp.push(d))
@@ -362,6 +381,7 @@ export class SftpService {
         kind,
         join: (...a) => path.join(...a),
         stat: async (f) => { const s = await fs.promises.stat(f); return { isDir: s.isDirectory(), size: s.size, mode: s.mode & 0o7777, mtimeMs: s.mtimeMs } },
+        lstat: async (f) => { const s = await fs.promises.lstat(f); return { isDir: s.isDirectory(), isLink: s.isSymbolicLink(), size: s.size } },
         readdir: async (d) => (await fs.promises.readdir(d)),
         mkdir: (d) => fs.promises.mkdir(d, { recursive: true }),
         readStream: (f) => fs.createReadStream(f),
@@ -375,6 +395,7 @@ export class SftpService {
       kind,
       join: (...a) => path.posix.join(...a),
       stat: async (f) => { const s = await p((cb) => sftp.stat(f, cb)); return { isDir: isDirMode(s.mode), size: Number(s.size ?? 0), mode: s.mode & 0o7777, mtimeMs: Number(s.mtime ?? 0) * 1000 } },
+      lstat: async (f) => { const s = await p((cb) => sftp.lstat(f, cb)); return { isDir: isDirMode(s.mode), isLink: (s.mode & S_IFMT) === S_IFLNK, size: Number(s.size ?? 0) } },
       readdir: async (d) => (await p((cb) => sftp.readdir(d, cb))).map((i) => i.filename).filter((n) => n !== '.' && n !== '..'),
       mkdir: async (d) => { try { await p((cb) => sftp.mkdir(d, cb)) } catch (err) { if (!(await this.remoteExists(sftp, d))) throw err } },
       readStream: (f) => sftp.createReadStream(f),
@@ -446,7 +467,16 @@ export class SftpService {
         if (--budget.left < 0) throw new SftpError('TOO_MANY', `more than ${MAX_TREE} entries`)
         const r = rel ? (src.kind === 'local' ? path.join(rel, n) : path.posix.join(rel, n)) : n
         let st
-        try { st = await src.stat(src.join(root, r)) } catch { continue }
+        try {
+          // lstat: a symlink/junction to a folder is not descended (it can point back up the tree and loop forever);
+          // a symlink to a file is copied as the file it points to
+          st = await src.lstat(src.join(root, r))
+          if (st.isLink) {
+            const t = await src.stat(src.join(root, r))
+            if (t.isDir) continue
+            st = t
+          }
+        } catch { continue }
         if (st.isDir) { out.push({ rel: r, isDir: true, size: 0 }); await visit(r) } else out.push({ rel: r, isDir: false, size: st.size })
       }
     }
@@ -519,10 +549,25 @@ export class SftpService {
             const t = Date.now()
             if (t - lastEmit >= PROGRESS_MS) { lastEmit = t; emit('running') }
           })
-          rs.on('error', reject)
-          ws.on('error', reject)
-          ws.on('close', resolve)
-          ws.on('finish', resolve)
+          // pipe() leaves the destination open when the source fails (and the source open when the destination
+          // fails): close both ends so neither the local fd nor the remote handle leaks, and wait (bounded: a dead
+          // connection never answers FXP_CLOSE) until the .part is closed before it is unlinked
+          let failed = false
+          const fail = (err) => {
+            if (failed) return
+            failed = true
+            try { rs.unpipe(ws) } catch { /* gone */ }
+            try { rs.destroy() } catch { /* gone */ }
+            if (ws.closed) return reject(err)
+            const timer = setTimeout(() => reject(err), 2000)
+            ws.once('close', () => { clearTimeout(timer); reject(err) })
+            try { ws.destroy() } catch { clearTimeout(timer); reject(err) }
+          }
+          rs.on('error', fail)
+          ws.on('error', fail)
+          // 'close' (not 'finish'): on SFTP it fires only after the remote handle is closed (FXP_CLOSE answered),
+          // so the .part file is complete on the server before it is renamed
+          ws.on('close', () => { if (!failed) resolve() })
           rs.pipe(ws)
         })
         if (state.cancelled) throw new SftpError('CANCELLED', 'transfer cancelled')
@@ -645,8 +690,7 @@ export class SftpService {
     const writeBuf = (dest) => new Promise((resolve, reject) => {
       const ws = io.writeStream(dest)
       ws.on('error', reject)
-      ws.on('close', resolve)
-      ws.on('finish', resolve)
+      ws.on('close', resolve) // after the handle is closed (see copyFile)
       ws.end(buf)
     })
     if (!isLocal) {
@@ -704,7 +748,9 @@ export class SftpService {
     await new Promise((resolve, reject) => {
       const rs = sftp.createReadStream(file)
       const ws = fs.createWriteStream(local)
-      rs.on('error', reject); ws.on('error', reject); ws.on('close', resolve)
+      // a failed download must not leave the local temp file open (locked) or the remote handle open
+      const fail = (err) => { try { rs.destroy() } catch { /* gone */ } try { ws.destroy() } catch { /* gone */ } reject(err) }
+      rs.on('error', fail); ws.on('error', fail); ws.on('close', resolve)
       rs.pipe(ws)
     })
     let last = (await fs.promises.stat(local)).mtimeMs
@@ -723,7 +769,10 @@ export class SftpService {
         await this.remoteReplace(h.sftp, file, (dest) => new Promise((resolve, reject) => {
           const rs = fs.createReadStream(local)
           const ws = h.sftp.createWriteStream(dest)
-          rs.on('error', reject); ws.on('error', reject); ws.on('close', resolve); ws.on('finish', resolve)
+          // 'close' only (as in copyFile): the temp file must be closed on the server before remoteReplace renames it;
+          // on an error both ends are closed so the remote handle doesn't leak
+          const fail = (err) => { try { rs.destroy() } catch { /* gone */ } try { ws.destroy() } catch { /* gone */ } reject(err) }
+          rs.on('error', fail); ws.on('error', fail); ws.on('close', resolve)
           rs.pipe(ws)
         }))
         this.onWatch({ watchId, sftpId, remotePath: file, localPath: local, status: 'uploaded', at: Date.now() })

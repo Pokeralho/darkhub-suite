@@ -14,6 +14,7 @@ import crypto from 'node:crypto'
 import { spawn as spawnDefault } from 'node:child_process'
 import { runPowerShell, runCommand, parseJsonOutput, stripBom } from '../PowerShellRunner.js'
 import { psQuote } from '../optimizer/OptimizerUtils.js'
+import { createSecureStagingDir } from '../secureStaging.js'
 import {
   buildPlan, normalizeRows, parseWingetTable, parseWlanProfileXml, isValidWifiProfileName,
   parseHosts, validateHostsContent, buildHostsWriteScript, diffLines, validateSnippet,
@@ -37,7 +38,7 @@ export function hostsFilePath(env = process.env) {
 }
 
 export class PsToolkitService {
-  constructor({ runner, cmdRunner, elevatedRunner, fsImpl, spawnImpl, dataDir, tmpDir, platform } = {}) {
+  constructor({ runner, cmdRunner, elevatedRunner, fsImpl, spawnImpl, dataDir, tmpDir, platform, staging } = {}) {
     this._fs = fsImpl || fsDefault
     this._ps = runner || ((script, opts) => runPowerShell(script, opts))
     this._cmd = cmdRunner || ((cmd, args, opts) => runCommand(cmd, args, opts))
@@ -45,6 +46,11 @@ export class PsToolkitService {
     this._spawn = spawnImpl || spawnDefault
     this._dataDir = dataDir || null // function or string
     this._tmpBase = tmpDir || path.join(process.env.LOCALAPPDATA || os.tmpdir(), 'DarkHub', 'pstools')
+    // DarkHub runs as administrator, so the scripts it starts (and the Wi-Fi exports, keys included) are elevated:
+    // they go to a folder only Administrators/SYSTEM can write, not to %LOCALAPPDATA% (see secureStaging.js).
+    this._staging = staging !== undefined ? staging
+      : (tmpDir || fsImpl) ? null
+        : async () => (await createSecureStagingDir({ prefix: 'pstools-', fallbackBase: this._tmpBase })).dir
     this._platform = platform || process.platform
     this._custom = null // { runId, child, elevated }
   }
@@ -54,7 +60,8 @@ export class PsToolkitService {
     return d || path.join(os.tmpdir(), 'DarkHub')
   }
 
-  _privateTmp() {
+  async _privateTmp() {
+    if (this._staging) return this._staging()
     const dir = path.join(this._tmpBase, crypto.randomBytes(6).toString('hex'))
     this._fs.mkdirSync(dir, { recursive: true })
     return dir
@@ -137,7 +144,7 @@ export class PsToolkitService {
   // ---------- Wi-Fi ----------
 
   async _exportWlan(extra = []) {
-    const dir = this._privateTmp()
+    const dir = await this._privateTmp()
     try {
       // netsh parses its own command line; names are validated (no quotes) before reaching here.
       const res = await this._cmd('netsh.exe', ['wlan', 'export', 'profile', ...extra, `folder="${dir}"`], {
@@ -245,9 +252,18 @@ export class PsToolkitService {
       return { ok: true, runId, elevated: true }
     }
 
-    const dir = this._privateTmp()
-    const file = path.join(dir, 'custom.ps1')
-    this._fs.writeFileSync(file, `\ufeff${text}`, 'utf8')
+    this._custom = { runId, child: null, elevated: false, stopped: false } // taken before the await below
+    let dir
+    let file
+    try {
+      dir = await this._privateTmp()
+      file = path.join(dir, 'custom.ps1')
+      this._fs.writeFileSync(file, `\ufeff${text}`, { encoding: 'utf8', flag: 'wx' })
+    } catch (e) {
+      this._custom = null
+      if (dir) { try { this._fs.rmSync(dir, { recursive: true, force: true }) } catch { /* ignore */ } }
+      return { ok: false, error: e?.message ?? String(e) }
+    }
     let child
     try {
       // UTF-8 pipe so accents survive; `& file` keeps the user's line numbers in error messages.
@@ -256,6 +272,7 @@ export class PsToolkitService {
         windowsHide: true, cwd: process.env.USERPROFILE || undefined
       })
     } catch (e) {
+      this._custom = null
       try { this._fs.rmSync(dir, { recursive: true, force: true }) } catch { /* ignore */ }
       return { ok: false, error: e?.message ?? String(e) }
     }

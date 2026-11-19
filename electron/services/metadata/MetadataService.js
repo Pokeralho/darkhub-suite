@@ -13,7 +13,7 @@ import crypto from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { probeFile, hexDump, readFsInfo, setFsProps, removeStream, detectType, validStreamName } from './fileProbe.js'
 import { readTags, readBinaryTag, writeTagsTo, assignArg } from './exiftoolRunner.js'
-import { readOoxmlProps, writeOoxmlProps, readZipEntries, entryData, crc32 } from './ooxmlZip.js'
+import { readOoxmlProps, writeOoxmlProps, readZipEntries, entryDataAsync, crc32 } from './ooxmlZip.js'
 
 // ---------------------------------------------------------------- field catalogs
 
@@ -397,7 +397,7 @@ export function createMetadataService({ getExiftoolPath, getFfmpegPath, logger }
     if (family === 'office') {
       const buf = await fs.readFile(tmp)
       for (const e of readZipEntries(buf)) {
-        if (!e.name.endsWith('/') && crc32(entryData(e)) !== e.crc) throw new Error(`zip verification failed: bad CRC in ${e.name}`)
+        if (!e.name.endsWith('/') && crc32(await entryDataAsync(e)) !== e.crc) throw new Error(`zip verification failed: bad CRC in ${e.name}`)
       }
       office = readOoxmlProps(buf)
     }

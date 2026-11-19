@@ -16,6 +16,7 @@ import PowerPanel from '../components/monitor/PowerPanel';
 import { Sparkline } from '../components/library/Sparkline';
 import { useSensorHistory } from '../hooks/useSensorHistory';
 import { pickPrimaryGpu } from '../../electron/hal/models/gpuMatch.js';
+import { visibleInterval } from '../utils/visibleInterval';
 
 const formatBytes = (bytes: number | null | undefined) => {
   if (bytes == null || isNaN(bytes)) return '--';
@@ -26,16 +27,19 @@ const formatBytes = (bytes: number | null | undefined) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-const PropertyRow = ({ label, value, status }: { label: string; value: React.ReactNode; status?: string }) => (
+const PropertyRow = ({ label, value, status }: { label: string; value: React.ReactNode; status?: string }) => {
+  const { t } = useI18n();
+  return (
   <div className="flex justify-between items-center gap-6 min-h-9 py-2 px-4 border-b border-zinc-800/80 last:border-0 hover:bg-zinc-900/60 transition-colors">
     <span className="text-[12.5px] text-zinc-500 shrink-0">{label}</span>
     <div className="flex items-center gap-2 min-w-0">
-      {status === 'Error' && <span title="Falha ao ler sensor"><AlertTriangle size={13} className="text-amber-400" /></span>}
+      {status === 'Error' && <span title={t('monitor.hw.sensorReadFail', 'Falha ao ler sensor')}><AlertTriangle size={13} className="text-amber-400" /></span>}
       {status === 'OK' && <CheckCircle2 size={13} className="text-emerald-400" />}
       <span className="text-[12.5px] font-mono text-zinc-100 text-right break-all">{value ?? '--'}</span>
     </div>
   </div>
-);
+  );
+};
 
 const Skel = ({ className = '' }: { className?: string }) => (
   <span aria-hidden="true" className={`inline-block rounded bg-zinc-800/80 animate-pulse align-middle ${className}`} />
@@ -217,10 +221,10 @@ const SystemMonitor = () => {
     };
 
     fetchUsage();
-    const interval = setInterval(fetchUsage, 3000);
+    const stopPolling = visibleInterval(fetchUsage, 3000);
     return () => {
       mounted = false;
-      clearInterval(interval);
+      stopPolling();
     };
   }, [isOverviewTab]);
 
@@ -247,7 +251,7 @@ const SystemMonitor = () => {
         }
       } catch (e) {
         console.error('Benchmark error', e);
-        showToast('Erro inesperado ao executar o benchmark.', 'error');
+        showToast(t('monitor.hw.benchmarkUnexpected', 'Erro inesperado ao executar o benchmark.'), 'error');
       } finally {
         setIsBenchmarking(false);
       }
@@ -334,7 +338,7 @@ const SystemMonitor = () => {
 
           {benchmarkResult && (
             <dl className="animate-in rounded-lg border border-zinc-800/80 px-3 py-2.5 flex items-baseline justify-between">
-              <dt className="text-[11.5px] text-zinc-500">Benchmark</dt>
+              <dt className="text-[11.5px] text-zinc-500">{t('monitor.hw.benchmark', 'Benchmark')}</dt>
               <dd className="font-mono text-right">
                 <span className="text-[16px] text-zinc-50">{benchmarkResult.mops}</span><span className="text-[11px] text-zinc-500"> MOPS</span>
                 <span className="block text-[11px] text-zinc-500">{benchmarkResult.time} ms</span>
@@ -367,7 +371,7 @@ const SystemMonitor = () => {
       <AlertTriangle size={16} className="text-red-400 shrink-0 mt-0.5" />
       <div className="min-w-0">
         <h3 className="dh-section-title">{t('monitor.tabError', 'Falha ao obter dados desta seção')}</h3>
-        <p className="mt-1 text-[12.5px] text-red-300 break-words">{errorMap[tabKey] || 'O Windows não retornou os dados para esta categoria.'}</p>
+        <p className="mt-1 text-[12.5px] text-red-300 break-words">{errorMap[tabKey] || t('monitor.hw.tabErrorFallback', 'O Windows não retornou os dados para esta categoria.')}</p>
         <button onClick={() => refreshCategory(tabKey)} className="dh-btn dh-btn-sm mt-3">
           <RefreshCw size={13} />
           {t('monitor.tabRetry', 'Tentar Novamente')}
@@ -398,7 +402,7 @@ const SystemMonitor = () => {
 
             {/* Compact Per-Core CPU Preview */}
             {cores.length > 0 && (
-              <SectionBlock title="Distribuição de Carga por Núcleo" icon={Zap}>
+              <SectionBlock title={t('monitor.hw.overview.perCoreLoad', 'Distribuição de Carga por Núcleo')} icon={Zap}>
                 <div className="px-4 py-3 grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-x-4 gap-y-3">
                   {cores.map((core: any, idx: number) => {
                     const val: number | null = core?.value ?? null;
@@ -454,7 +458,7 @@ const SystemMonitor = () => {
                     {darkhubUsage.processes.map((p, idx) => (
                       <li key={idx} className="flex items-center justify-between gap-2 py-1.5 border-b border-zinc-800/60 text-[11.5px] font-mono">
                         <span className="text-zinc-300 capitalize truncate" title={`${p.type} (${p.pid})`}>
-                          {p.type || p.name || 'Process'} <span className="text-zinc-600">{p.pid}</span>
+                          {p.type || p.name || t('monitor.hw.overview.process', 'Process')} <span className="text-zinc-600">{p.pid}</span>
                         </span>
                         <span className="text-zinc-400 shrink-0 tabular-nums">
                           {p.workingSetMb}<span className="text-zinc-600"> MB</span> · {p.cpuPercent}<span className="text-zinc-600">%</span>
@@ -478,7 +482,7 @@ const SystemMonitor = () => {
 
         return (
           <div className="space-y-4 animate-in">
-            <SectionBlock title="Desempenho por Núcleo" icon={Zap}>
+            <SectionBlock title={t('monitor.hw.cpu.perCorePerf', 'Desempenho por Núcleo')} icon={Zap}>
               <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-x-5 gap-y-3.5">
                 {r.coresLoad?.map((core: any, idx: number) => {
                   const val: number | null = core?.value ?? null;
@@ -500,17 +504,17 @@ const SystemMonitor = () => {
               </div>
             </SectionBlock>
 
-            <SectionBlock title="Topologia e Clocks" icon={CpuIcon}>
-              <PropertyRow label="Modelo" value={`${d.manufacturer ?? ''} ${d.brand ?? ''}`} />
-              <PropertyRow label="Família / Model / Stepping" value={`${d.family ?? '--'} / ${d.model ?? '--'} / ${d.stepping ?? '--'}`} />
-              <PropertyRow label="Soquete" value={d.socket} />
-              <PropertyRow label="Núcleos (Threads)" value={`${d.physicalCores ?? '--'} Físicos / ${d.cores ?? '--'} Lógicos`} />
-              <PropertyRow label="Frequência Base" value={d.speedBase ? `${d.speedBase} GHz` : '--'} />
-              <PropertyRow label="Frequência Turbo Max" value={d.speedMax ? `${d.speedMax} GHz` : '--'} />
+            <SectionBlock title={t('monitor.hw.cpu.topology', 'Topologia e Clocks')} icon={CpuIcon}>
+              <PropertyRow label={t('monitor.model', 'Modelo')} value={`${d.manufacturer ?? ''} ${d.brand ?? ''}`} />
+              <PropertyRow label={t('monitor.hw.cpu.familyModelStepping', 'Família / Model / Stepping')} value={`${d.family ?? '--'} / ${d.model ?? '--'} / ${d.stepping ?? '--'}`} />
+              <PropertyRow label={t('monitor.hw.cpu.socket', 'Soquete')} value={d.socket} />
+              <PropertyRow label={t('monitor.hw.cpu.coresThreads', 'Núcleos (Threads)')} value={t('monitor.hw.cpu.physLogical', '{p} Físicos / {l} Lógicos').replace('{p}', String(d.physicalCores ?? '--')).replace('{l}', String(d.cores ?? '--'))} />
+              <PropertyRow label={t('monitor.hw.cpu.baseFreq', 'Frequência Base')} value={d.speedBase ? `${d.speedBase} GHz` : '--'} />
+              <PropertyRow label={t('monitor.hw.cpu.turboFreq', 'Frequência Turbo Max')} value={d.speedMax ? `${d.speedMax} GHz` : '--'} />
             </SectionBlock>
 
-            <SectionBlock title="Hierarquia de Cache" icon={Server}>
-              <PropertyRow label="Cache L1 (Dados + Instrução)" value={d.cache?.l1d ? formatBytes(d.cache.l1d + (d.cache.l1i || 0)) : '--'} />
+            <SectionBlock title={t('monitor.hw.cpu.cacheHierarchy', 'Hierarquia de Cache')} icon={Server}>
+              <PropertyRow label={t('monitor.hw.cpu.cacheL1', 'Cache L1 (Dados + Instrução)')} value={d.cache?.l1d ? formatBytes(d.cache.l1d + (d.cache.l1i || 0)) : '--'} />
               <PropertyRow label="Cache L2" value={d.cache?.l2 ? formatBytes(d.cache.l2) : '--'} />
               <PropertyRow label="Cache L3" value={d.cache?.l3 ? formatBytes(d.cache.l3) : '--'} />
             </SectionBlock>
@@ -526,8 +530,8 @@ const SystemMonitor = () => {
         const r = metrics?.ram?.values || {};
         return (
           <div className="space-y-4 animate-in">
-             <SectionBlock title="Visão Geral de Memória" icon={Activity}>
-              <PropertyRow label="Uso em Tempo Real" value={r.percent?.value != null ? `${toFixedSafe(r.percent.value, 1)}% (${formatBytes(r.used?.value)} / ${formatBytes(r.total?.value)})` : '--'} />
+             <SectionBlock title={t('monitor.hw.ram.overview', 'Visão Geral de Memória')} icon={Activity}>
+              <PropertyRow label={t('monitor.hw.ram.liveUsage', 'Uso em Tempo Real')} value={r.percent?.value != null ? `${toFixedSafe(r.percent.value, 1)}% (${formatBytes(r.used?.value)} / ${formatBytes(r.total?.value)})` : '--'} />
               <div className="px-4 pb-3">
                 <div className="w-full bg-zinc-800 rounded-full h-[3px] overflow-hidden">
                   <div className={`${Number(r.percent?.value) >= 90 ? 'bg-red-400' : Number(r.percent?.value) >= 80 ? 'bg-amber-400' : 'bg-blue-400'} h-full transition-all duration-500`} style={{ width: r.percent?.value ? `${r.percent.value}%` : '0%' }}></div>
@@ -536,12 +540,12 @@ const SystemMonitor = () => {
             </SectionBlock>
 
             {list.map((m: any, idx: number) => (
-              <SectionBlock key={idx} title={`Slot Físico: ${m.bank || `DIMM ${idx+1}`}`} icon={Server}>
-                <PropertyRow label="Fabricante" value={m.manufacturer || 'Desconhecido'} />
-                <PropertyRow label="Tipo de Memória" value={m.type || 'Desconhecido'} />
-                <PropertyRow label="Tamanho" value={formatBytes(m.size)} />
-                <PropertyRow label="Frequência Efetiva" value={m.clockSpeed ? `${m.clockSpeed} MHz` : '--'} />
-                <PropertyRow label="Formato (Form Factor)" value={m.formFactor || '--'} />
+              <SectionBlock key={idx} title={t('monitor.hw.ram.slotTitle', 'Slot Físico: {name}').replace('{name}', m.bank || `DIMM ${idx+1}`)} icon={Server}>
+                <PropertyRow label={t('monitor.hw.manufacturer', 'Fabricante')} value={m.manufacturer || t('monitor.hw.unknown', 'Desconhecido')} />
+                <PropertyRow label={t('monitor.hw.ram.type', 'Tipo de Memória')} value={m.type || t('monitor.hw.unknown', 'Desconhecido')} />
+                <PropertyRow label={t('monitor.hw.ram.size', 'Tamanho')} value={formatBytes(m.size)} />
+                <PropertyRow label={t('monitor.hw.ram.effectiveFreq', 'Frequência Efetiva')} value={m.clockSpeed ? `${m.clockSpeed} MHz` : '--'} />
+                <PropertyRow label={t('monitor.hw.ram.formFactor', 'Formato (Form Factor)')} value={m.formFactor || '--'} />
                 <PropertyRow label="Part Number" value={m.partNum || '--'} />
               </SectionBlock>
             ))}
@@ -568,31 +572,31 @@ const SystemMonitor = () => {
 
               return (
                 <div key={idx} className="space-y-4">
-                  <SectionBlock title={`Adaptador Gráfico ${idx+1}: ${g.vendor || ''} ${g.model || ''}`} icon={Monitor}>
-                    <PropertyRow label="Uso de GPU" value={utilVal != null ? `${utilVal}%` : '--'} />
+                  <SectionBlock title={t('monitor.hw.gpu.adapterTitle', 'Adaptador Gráfico {n}: {name}').replace('{n}', String(idx+1)).replace('{name}', `${g.vendor || ''} ${g.model || ''}`)} icon={Monitor}>
+                    <PropertyRow label={t('monitor.hw.gpu.usage', 'Uso de GPU')} value={utilVal != null ? `${utilVal}%` : '--'} />
                     <div className="px-4 pb-3 border-b border-zinc-800/80">
                       <div className="w-full bg-zinc-800 rounded-full h-[3px] overflow-hidden">
                         <div className="bg-blue-400 h-full transition-all" style={{ width: `${utilVal || 0}%` }}></div>
                       </div>
                     </div>
-                    <PropertyRow label="Temperatura da GPU" value={tempVal != null ? `${tempVal}°C` : '--'} status={rt.temperature?.status} />
-                    <PropertyRow label="VRAM Usada" value={vramUsedVal != null ? `${vramUsedVal} MB` : '--'} status={rt.vramUsed?.status} />
-                    <PropertyRow label="VRAM Total (Dedicada)" value={rt.vramTotal?.value != null ? `${rt.vramTotal.value} MB` : g.vram ? `${g.vram} MB` : '--'} />
+                    <PropertyRow label={t('monitor.hw.gpu.temp', 'Temperatura da GPU')} value={tempVal != null ? `${tempVal}°C` : '--'} status={rt.temperature?.status} />
+                    <PropertyRow label={t('monitor.hw.gpu.vramUsed', 'VRAM Usada')} value={vramUsedVal != null ? `${vramUsedVal} MB` : '--'} status={rt.vramUsed?.status} />
+                    <PropertyRow label={t('monitor.hw.gpu.vramTotal', 'VRAM Total (Dedicada)')} value={rt.vramTotal?.value != null ? `${rt.vramTotal.value} MB` : g.vram ? `${g.vram} MB` : '--'} />
                   </SectionBlock>
 
-                  <SectionBlock title="Arquitetura & Detalhes do Driver" icon={ShieldCheck}>
-                    <PropertyRow label="Versão do Driver" value={g.driverVersion || '--'} />
-                    <PropertyRow label="Data do Driver" value={g.driverDate || '--'} />
-                    <PropertyRow label="Processador de Vídeo" value={g.videoProcessor || '--'} />
-                    <PropertyRow label="ID de Arquitetura (WMI)" value={g.architecture || '--'} />
-                    <PropertyRow label="Interface de Barramento" value={g.bus || '--'} />
+                  <SectionBlock title={t('monitor.hw.gpu.archDriver', 'Arquitetura & Detalhes do Driver')} icon={ShieldCheck}>
+                    <PropertyRow label={t('monitor.hw.gpu.driverVersion', 'Versão do Driver')} value={g.driverVersion || '--'} />
+                    <PropertyRow label={t('monitor.hw.gpu.driverDate', 'Data do Driver')} value={g.driverDate || '--'} />
+                    <PropertyRow label={t('monitor.hw.gpu.videoProcessor', 'Processador de Vídeo')} value={g.videoProcessor || '--'} />
+                    <PropertyRow label={t('monitor.hw.gpu.archId', 'ID de Arquitetura (WMI)')} value={g.architecture || '--'} />
+                    <PropertyRow label={t('monitor.hw.gpu.bus', 'Interface de Barramento')} value={g.bus || '--'} />
                     <PropertyRow label="Sub-Device ID" value={g.subDeviceId || '--'} />
-                    <PropertyRow label="Taxa de Atualização Atual" value={g.refreshRate ? `${g.refreshRate} Hz` : '--'} />
+                    <PropertyRow label={t('monitor.hw.gpu.currentRefresh', 'Taxa de Atualização Atual')} value={g.refreshRate ? `${g.refreshRate} Hz` : '--'} />
                   </SectionBlock>
                 </div>
               );
             })}
-            {staticList.length === 0 && <p className="text-[12.5px] text-zinc-500 py-6">Nenhum adaptador gráfico detectado.</p>}
+            {staticList.length === 0 && <p className="text-[12.5px] text-zinc-500 py-6">{t('monitor.hw.gpu.none', 'Nenhum adaptador gráfico detectado.')}</p>}
           </div>
         );
       }
@@ -603,10 +607,10 @@ const SystemMonitor = () => {
         const cpuTempUnavailable = !mainTemp || mainTemp.availability !== 'available' || mainTemp.value == null;
 
         const categoriesGroup: Record<string, { title: string; icon: any; items: any[] }> = {
-          cpu: { title: 'Processador', icon: Cpu, items: [] },
-          gpu: { title: 'Placa de Vídeo', icon: Monitor, items: [] },
-          storage: { title: 'Armazenamento', icon: HardDrive, items: [] },
-          system: { title: 'Placa-Mãe & Sistema', icon: Server, items: [] }
+          cpu: { title: t('monitor.hw.temps.cpu', 'Processador'), icon: Cpu, items: [] },
+          gpu: { title: t('monitor.hw.temps.gpu', 'Placa de Vídeo'), icon: Monitor, items: [] },
+          storage: { title: t('monitor.tab.storage', 'Armazenamento'), icon: HardDrive, items: [] },
+          system: { title: t('monitor.hw.temps.system', 'Placa-Mãe & Sistema'), icon: Server, items: [] }
         };
 
         probes.forEach((p: any) => {
@@ -670,7 +674,7 @@ const SystemMonitor = () => {
               <div className="bg-zinc-950 px-4 py-4 flex items-end justify-between gap-4">
                 <div className="min-w-0">
                   <dt className="flex items-center gap-1.5 text-[12px] text-zinc-500"><Monitor size={14} /> {t('monitor.temps.primaryGpu', 'GPU Primária')}</dt>
-                  <dd className="text-[11.5px] text-zinc-600 mt-1 truncate">{primaryGpu?.name || 'Placa de Vídeo'}</dd>
+                  <dd className="text-[11.5px] text-zinc-600 mt-1 truncate">{primaryGpu?.name || t('monitor.hw.temps.gpu', 'Placa de Vídeo')}</dd>
                 </div>
                 <dd className="text-right shrink-0">
                   {gpuTempObj?.availability === 'available' ? (
@@ -685,7 +689,7 @@ const SystemMonitor = () => {
                   ) : (
                     <>
                       <span className="block text-[13px] text-zinc-500">
-                        {gpuTempObj?.availability === 'unsupported' ? 'Sem sensor' : 'Indisponível'}
+                        {gpuTempObj?.availability === 'unsupported' ? t('monitor.hw.temps.noSensor', 'Sem sensor') : t('monitor.hw.temps.unavailable', 'Indisponível')}
                       </span>
                       <div className="text-[11px] text-zinc-500 mt-1">{t('monitor.temps.gpuNoSensor', 'Ative os sensores avançados')}</div>
                     </>
@@ -698,7 +702,7 @@ const SystemMonitor = () => {
 
             {/* Probe list categorized */}
             {probes.length === 0 ? (
-              <p className="text-[12.5px] text-zinc-500">Nenhuma sonda de temperatura reportada ainda.</p>
+              <p className="text-[12.5px] text-zinc-500">{t('monitor.hw.temps.noProbes', 'Nenhuma sonda de temperatura reportada ainda.')}</p>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {Object.entries(categoriesGroup).map(([key, cat]) => {
@@ -736,9 +740,9 @@ const SystemMonitor = () => {
                                   ) : tempObj?.availability === 'loading' ? (
                                     <Skel className="h-3 w-12" />
                                   ) : tempObj?.availability === 'error' ? (
-                                    <span className="text-[11.5px] text-red-400">Erro</span>
+                                    <span className="text-[11.5px] text-red-400">{t('monitor.hw.error', 'Erro')}</span>
                                   ) : (
-                                    <span className="text-[11.5px] text-zinc-600">Não disponível</span>
+                                    <span className="text-[11.5px] text-zinc-600">{t('monitor.hw.temps.notAvailable', 'Não disponível')}</span>
                                   )}
                                 </div>
                               </div>
@@ -808,7 +812,7 @@ const SystemMonitor = () => {
                     {filteredCpu.length === 0 && (procSearch ? (
                       <tr>
                         <td colSpan={4} className="px-4 py-6 text-center text-zinc-500">
-                          Nenhum processo correspondente encontrado.
+                          {t('monitor.hw.procs.none', 'Nenhum processo correspondente encontrado.')}
                         </td>
                       </tr>
                     ) : Array.from({ length: 6 }).map((_, i) => (
@@ -835,19 +839,19 @@ const SystemMonitor = () => {
         const io = metrics?.diskIo?.values || {};
         return (
           <div className="space-y-4 animate-in">
-             <SectionBlock title="Atividade Global de Discos" icon={Activity}>
-              <PropertyRow label="Leitura Direta" value={io.readBps?.value != null ? `${formatBytes(io.readBps.value)}/s` : '--'} />
-              <PropertyRow label="Escrita Direta" value={io.writeBps?.value != null ? `${formatBytes(io.writeBps.value)}/s` : '--'} />
-              <PropertyRow label="Tempo ativo (como no Gerenciador de Tarefas)" value={io.activity?.value != null ? `${io.activity.value}%` : '--'} />
+             <SectionBlock title={t('monitor.hw.storage.globalActivity', 'Atividade Global de Discos')} icon={Activity}>
+              <PropertyRow label={t('monitor.hw.storage.directRead', 'Leitura Direta')} value={io.readBps?.value != null ? `${formatBytes(io.readBps.value)}/s` : '--'} />
+              <PropertyRow label={t('monitor.hw.storage.directWrite', 'Escrita Direta')} value={io.writeBps?.value != null ? `${formatBytes(io.writeBps.value)}/s` : '--'} />
+              <PropertyRow label={t('monitor.hw.storage.activeTime', 'Tempo ativo (como no Gerenciador de Tarefas)')} value={io.activity?.value != null ? `${io.activity.value}%` : '--'} />
             </SectionBlock>
 
             {list.map((d: any, idx: number) => (
-              <SectionBlock key={idx} title={`Disco: ${d.name || d.device}`} icon={HardDrive}>
-                <PropertyRow label="Tipo / Interface" value={`${d.type || 'N/A'} - ${d.interfaceType || 'N/A'}`} />
-                <PropertyRow label="Capacidade Bruta" value={formatBytes(d.size)} />
-                <PropertyRow label="Status SMART Global" value={d.smartStatus || '--'} status={String(d.smartStatus || '').toLowerCase() === 'ok' ? 'OK' : undefined} />
-                <PropertyRow label="Desgaste Físico (Wear Level)" value={d.wearLevel != null ? `${d.wearLevel}%` : 'N/A'} />
-                <PropertyRow label="Temperatura do Disco" value={d.temperature != null ? `${d.temperature}°C` : '--'} />
+              <SectionBlock key={idx} title={t('monitor.hw.storage.diskTitle', 'Disco: {name}').replace('{name}', String(d.name || d.device))} icon={HardDrive}>
+                <PropertyRow label={t('monitor.hw.storage.typeInterface', 'Tipo / Interface')} value={`${d.type || 'N/A'} - ${d.interfaceType || 'N/A'}`} />
+                <PropertyRow label={t('monitor.hw.storage.rawCapacity', 'Capacidade Bruta')} value={formatBytes(d.size)} />
+                <PropertyRow label={t('monitor.hw.storage.smartStatus', 'Status SMART Global')} value={d.smartStatus || '--'} status={String(d.smartStatus || '').toLowerCase() === 'ok' ? 'OK' : undefined} />
+                <PropertyRow label={t('monitor.hw.storage.wear', 'Desgaste Físico (Wear Level)')} value={d.wearLevel != null ? `${d.wearLevel}%` : 'N/A'} />
+                <PropertyRow label={t('monitor.hw.storage.temp', 'Temperatura do Disco')} value={d.temperature != null ? `${d.temperature}°C` : '--'} />
               </SectionBlock>
             ))}
           </div>
@@ -862,15 +866,15 @@ const SystemMonitor = () => {
          return (
            <div className="space-y-4 animate-in">
              {list.map((m: any, idx: number) => (
-               <SectionBlock key={idx} title={`Monitor ${idx+1}: ${m.model || m.vendor || 'Desconhecido'}`} icon={Monitor}>
-                 <PropertyRow label="Principal" value={m.main ? 'Sim' : 'Não'} />
-                 <PropertyRow label="Resolução Nativa" value={`${m.resolutionx}x${m.resolutiony}`} />
-                 <PropertyRow label="Resolução Atual" value={`${m.currentResX}x${m.currentResY}`} />
-                 <PropertyRow label="Taxa de Atualização" value={m.currentRefreshRate ? `${m.currentRefreshRate} Hz` : '--'} />
-                 <PropertyRow label="Conexão" value={m.connection || '--'} />
+               <SectionBlock key={idx} title={t('monitor.hw.displays.title', 'Monitor {n}: {name}').replace('{n}', String(idx+1)).replace('{name}', m.model || m.vendor || t('monitor.hw.unknown', 'Desconhecido'))} icon={Monitor}>
+                 <PropertyRow label={t('monitor.hw.displays.primary', 'Principal')} value={m.main ? t('monitor.hw.yes', 'Sim') : t('monitor.hw.no', 'Não')} />
+                 <PropertyRow label={t('monitor.hw.displays.nativeRes', 'Resolução Nativa')} value={`${m.resolutionx}x${m.resolutiony}`} />
+                 <PropertyRow label={t('monitor.hw.displays.currentRes', 'Resolução Atual')} value={`${m.currentResX}x${m.currentResY}`} />
+                 <PropertyRow label={t('monitor.hw.displays.refreshRate', 'Taxa de Atualização')} value={m.currentRefreshRate ? `${m.currentRefreshRate} Hz` : '--'} />
+                 <PropertyRow label={t('monitor.hw.displays.connection', 'Conexão')} value={m.connection || '--'} />
                </SectionBlock>
              ))}
-             {list.length === 0 && <p className="text-[12.5px] text-zinc-500 py-6">Nenhum monitor detectado via systeminformation.</p>}
+             {list.length === 0 && <p className="text-[12.5px] text-zinc-500 py-6">{t('monitor.hw.displays.none', 'Nenhum monitor detectado via systeminformation.')}</p>}
            </div>
          );
       }
@@ -882,16 +886,16 @@ const SystemMonitor = () => {
         const d = (categories.mobo || categories.mainboard)?.data || {};
         return (
           <div className="space-y-4 animate-in">
-            <SectionBlock title="Placa Principal (Baseboard)" icon={LayoutTemplate}>
-              <PropertyRow label="Fabricante" value={d.manufacturer || '--'} />
-              <PropertyRow label="Modelo" value={d.model || '--'} />
-              <PropertyRow label="Revisão (Versão)" value={d.version || '--'} />
-              <PropertyRow label="Número de Série" value={d.serial || '--'} />
+            <SectionBlock title={t('monitor.hw.mobo.baseboard', 'Placa Principal (Baseboard)')} icon={LayoutTemplate}>
+              <PropertyRow label={t('monitor.hw.manufacturer', 'Fabricante')} value={d.manufacturer || '--'} />
+              <PropertyRow label={t('monitor.model', 'Modelo')} value={d.model || '--'} />
+              <PropertyRow label={t('monitor.hw.mobo.revision', 'Revisão (Versão)')} value={d.version || '--'} />
+              <PropertyRow label={t('monitor.hw.mobo.serial', 'Número de Série')} value={d.serial || '--'} />
             </SectionBlock>
-            <SectionBlock title="Firmware (BIOS/UEFI)" icon={CpuIcon}>
-              <PropertyRow label="Fornecedor da BIOS" value={d.biosVendor || '--'} />
-              <PropertyRow label="Versão da BIOS" value={d.biosVersion || '--'} />
-              <PropertyRow label="Data de Lançamento" value={d.biosReleaseDate || '--'} />
+            <SectionBlock title={t('monitor.hw.mobo.firmware', 'Firmware (BIOS/UEFI)')} icon={CpuIcon}>
+              <PropertyRow label={t('monitor.hw.mobo.biosVendor', 'Fornecedor da BIOS')} value={d.biosVendor || '--'} />
+              <PropertyRow label={t('monitor.hw.mobo.biosVersion', 'Versão da BIOS')} value={d.biosVersion || '--'} />
+              <PropertyRow label={t('monitor.hw.mobo.releaseDate', 'Data de Lançamento')} value={d.biosReleaseDate || '--'} />
             </SectionBlock>
           </div>
         );
@@ -909,9 +913,9 @@ const SystemMonitor = () => {
 
         return (
           <div className="space-y-4 animate-in">
-            <SectionBlock title="Tráfego Consolidado" icon={Activity}>
-              <PropertyRow label="Banda de Download" value={r.rxBps?.value != null ? `${formatBytes(r.rxBps.value)}/s` : '--'} />
-              <PropertyRow label="Banda de Upload" value={r.txBps?.value != null ? `${formatBytes(r.txBps.value)}/s` : '--'} />
+            <SectionBlock title={t('monitor.hw.net.traffic', 'Tráfego Consolidado')} icon={Activity}>
+              <PropertyRow label={t('monitor.hw.net.download', 'Banda de Download')} value={r.rxBps?.value != null ? `${formatBytes(r.rxBps.value)}/s` : '--'} />
+              <PropertyRow label={t('monitor.hw.net.upload', 'Banda de Upload')} value={r.txBps?.value != null ? `${formatBytes(r.txBps.value)}/s` : '--'} />
             </SectionBlock>
 
             {/* Filter Bar */}
@@ -933,25 +937,25 @@ const SystemMonitor = () => {
                   checked={filterVirtualNet}
                   onChange={e => setFilterVirtualNet(e.target.checked)}
                 />
-                <span>{t('monitor.network.filterVirtual', 'Apenas Físicos')}</span>
+                <span>{t('monitor.network.filterVirtual', 'Apenas Adaptadores Físicos')}</span>
               </label>
             </div>
 
             {displayList.map((n: any, idx: number) => {
               const isVirt = isVirtualNet(n);
               return (
-                <SectionBlock key={idx} title={`Adaptador: ${n.ifaceName || n.iface}`} icon={Wifi}>
-                  <PropertyRow label="Classificação" value={isVirt ? t('monitor.network.virtualTag', 'Virtual / VPN') : t('monitor.network.physicalTag', 'Físico')} />
-                  <PropertyRow label="Status da Camada (Link)" value={n.operstate === 'down' ? 'Desconectado' : n.speed ? `${n.speed} Mbps` : '--'} status={n.operstate !== 'down' && n.speed ? 'OK' : undefined} />
-                  <PropertyRow label="Tipo de Adaptador" value={n.type || '--'} />
-                  <PropertyRow label="Endereço IPv4" value={n.ip4 || '--'} />
-                  <PropertyRow label="Endereço MAC" value={n.mac || '--'} />
+                <SectionBlock key={idx} title={t('monitor.hw.net.adapterTitle', 'Adaptador: {name}').replace('{name}', String(n.ifaceName || n.iface))} icon={Wifi}>
+                  <PropertyRow label={t('monitor.hw.net.classification', 'Classificação')} value={isVirt ? t('monitor.network.virtualTag', 'Virtual / VPN') : t('monitor.network.physicalTag', 'Físico')} />
+                  <PropertyRow label={t('monitor.hw.net.linkStatus', 'Status da Camada (Link)')} value={n.operstate === 'down' ? t('monitor.hw.net.disconnected', 'Desconectado') : n.speed ? `${n.speed} Mbps` : '--'} status={n.operstate !== 'down' && n.speed ? 'OK' : undefined} />
+                  <PropertyRow label={t('monitor.hw.net.adapterType', 'Tipo de Adaptador')} value={n.type || '--'} />
+                  <PropertyRow label={t('monitor.hw.net.ipv4', 'Endereço IPv4')} value={n.ip4 || '--'} />
+                  <PropertyRow label={t('monitor.hw.net.mac', 'Endereço MAC')} value={n.mac || '--'} />
                 </SectionBlock>
               );
             })}
             {displayList.length === 0 && (
               <p className="text-[12.5px] text-zinc-500 py-6 text-center">
-                Nenhum adaptador encontrado com os filtros atuais.
+                {t('monitor.hw.net.none', 'Nenhum adaptador encontrado com os filtros atuais.')}
               </p>
             )}
           </div>
@@ -966,16 +970,16 @@ const SystemMonitor = () => {
         const win = d.windowsDetails || {};
         return (
           <div className="space-y-4 animate-in">
-            <SectionBlock title="Núcleo do Sistema" icon={FileDigit}>
-              <PropertyRow label="Plataforma Base" value={`${d.platform || ''} (${d.arch || ''})`} />
-              <PropertyRow label="Distribuição" value={d.distro || '--'} />
-              <PropertyRow label="Lançamento (Kernel/Core)" value={d.release || '--'} />
+            <SectionBlock title={t('monitor.hw.os.systemCore', 'Núcleo do Sistema')} icon={FileDigit}>
+              <PropertyRow label={t('monitor.hw.os.basePlatform', 'Plataforma Base')} value={`${d.platform || ''} (${d.arch || ''})`} />
+              <PropertyRow label={t('monitor.distribution', 'Distribuição')} value={d.distro || '--'} />
+              <PropertyRow label={t('monitor.hw.os.kernelRelease', 'Lançamento (Kernel/Core)')} value={d.release || '--'} />
             </SectionBlock>
             {Object.keys(win).length > 0 && (
-              <SectionBlock title="Detalhes do Registro do Windows" icon={LayoutTemplate}>
-                <PropertyRow label="Versão de Exibição" value={win.DisplayVersion || '--'} />
-                <PropertyRow label="Build Principal" value={win.CurrentBuildNumber || d.build || '--'} />
-                <PropertyRow label="Revisão (UBR)" value={win.UBR || '--'} />
+              <SectionBlock title={t('monitor.hw.os.registryDetails', 'Detalhes do Registro do Windows')} icon={LayoutTemplate}>
+                <PropertyRow label={t('monitor.hw.os.displayVersion', 'Versão de Exibição')} value={win.DisplayVersion || '--'} />
+                <PropertyRow label={t('monitor.hw.os.mainBuild', 'Build Principal')} value={win.CurrentBuildNumber || d.build || '--'} />
+                <PropertyRow label={t('monitor.hw.os.ubr', 'Revisão (UBR)')} value={win.UBR || '--'} />
               </SectionBlock>
             )}
           </div>
@@ -1008,27 +1012,27 @@ const SystemMonitor = () => {
         const dpcVal = r.dpcsQueued?.value;
         const intVal = r.interrupts?.value;
 
-        let statusText = 'Lendo sensores...';
+        let statusText = t('monitor.hw.lat.reading', 'Lendo sensores...');
         let statusColor = 'text-zinc-400 border-zinc-800/80';
         let statusBg = 'bg-zinc-900/40';
-        let statusDesc = 'O WMI Daemon está iniciando a telemetria do kernel.';
+        let statusDesc = t('monitor.hw.lat.readingDesc', 'O WMI Daemon está iniciando a telemetria do kernel.');
 
         if (dpcVal != null) {
           if (dpcVal < 5000) {
-            statusText = 'Excelente (Latência Ultra-baixa)';
+            statusText = t('monitor.hw.lat.excellent', 'Excelente (Latência Ultra-baixa)');
             statusColor = 'text-emerald-300 border-emerald-500/25';
             statusBg = 'bg-emerald-500/[0.04]';
-            statusDesc = 'O sistema operacional está processando as chamadas DPC do kernel de forma extremamente rápida. Configuração ideal para jogos competitivos sem micro-engasgos (stuttering) e produção de áudio em tempo real.';
+            statusDesc = t('monitor.hw.lat.excellentDesc', 'O sistema operacional está processando as chamadas DPC do kernel de forma extremamente rápida. Configuração ideal para jogos competitivos sem micro-engasgos (stuttering) e produção de áudio em tempo real.');
           } else if (dpcVal < 15000) {
-            statusText = 'Moderado (Atividade Normal)';
+            statusText = t('monitor.hw.lat.moderate', 'Moderado (Atividade Normal)');
             statusColor = 'text-amber-300 border-amber-500/25';
             statusBg = 'bg-amber-500/[0.04]';
-            statusDesc = 'Há uma carga de trabalho típica do Windows no kernel. Isso é perfeitamente seguro e esperado para tarefas diárias. Para jogadores de eSports de altíssimo nível, pode introduzir pequenas latências de frametime.';
+            statusDesc = t('monitor.hw.lat.moderateDesc', 'Há uma carga de trabalho típica do Windows no kernel. Isso é perfeitamente seguro e esperado para tarefas diárias. Para jogadores de eSports de altíssimo nível, pode introduzir pequenas latências de frametime.');
           } else {
-            statusText = 'Alto Jitter (Sobrecarga de Interrupção)';
+            statusText = t('monitor.hw.lat.high', 'Alto Jitter (Sobrecarga de Interrupção)');
             statusColor = 'text-red-300 border-red-500/25';
             statusBg = 'bg-red-500/[0.04]';
-            statusDesc = 'Indicador de gargalo de latência! Uma taxa elevada de DPCs/s pode induzir micro-travamentos repentinos nos jogos ou estalos no som (audio crackling). Considere verificar e atualizar os drivers de placa gráfica, adaptadores de rede ou desativar periféricos USB não utilizados.';
+            statusDesc = t('monitor.hw.lat.highDesc', 'Indicador de gargalo de latência! Uma taxa elevada de DPCs/s pode induzir micro-travamentos repentinos nos jogos ou estalos no som (audio crackling). Considere verificar e atualizar os drivers de placa gráfica, adaptadores de rede ou desativar periféricos USB não utilizados.');
           }
         }
 
@@ -1038,7 +1042,7 @@ const SystemMonitor = () => {
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2 min-w-0">
                   <Clock size={15} className="shrink-0" />
-                  <h2 className="dh-section-title">Status de Resposta do Kernel</h2>
+                  <h2 className="dh-section-title">{t('monitor.hw.lat.kernelStatus', 'Status de Resposta do Kernel')}</h2>
                 </div>
                 <span className="font-mono text-[18px] leading-none text-zinc-50 tabular-nums shrink-0">
                   {dpcVal != null ? <>{dpcVal.toLocaleString()}<span className="text-[12px] text-zinc-500"> DPC/s</span></> : <Skel className="h-4 w-20" />}
@@ -1049,12 +1053,12 @@ const SystemMonitor = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <SectionBlock title="Telemetria de DPC" icon={Activity}>
-                <PropertyRow label="DPCs Enfileirados" value={dpcVal != null ? `${dpcVal.toLocaleString()} /s` : '--'} />
-                <PropertyRow label="Tempo Gasto com DPC" value={r.percentDpc?.value != null ? `${r.percentDpc.value}%` : '--'} />
+              <SectionBlock title={t('monitor.hw.lat.dpcTelemetry', 'Telemetria de DPC')} icon={Activity}>
+                <PropertyRow label={t('monitor.hw.lat.dpcQueued', 'DPCs Enfileirados')} value={dpcVal != null ? `${dpcVal.toLocaleString()} /s` : '--'} />
+                <PropertyRow label={t('monitor.hw.lat.dpcTime', 'Tempo Gasto com DPC')} value={r.percentDpc?.value != null ? `${r.percentDpc.value}%` : '--'} />
                 {dpcHistory.length > 1 && (
                   <div className="px-4 pt-3 pb-3 border-t border-zinc-800/80">
-                    <p className="text-[11px] text-zinc-500 mb-2">Histórico de DPCs/s (Últimos 60s)</p>
+                    <p className="text-[11px] text-zinc-500 mb-2">{t('monitor.hw.lat.history', 'Histórico de DPCs/s (Últimos 60s)')}</p>
                     <div className="h-14 flex items-end">
                       <Sparkline data={dpcHistory} min={0} max={25000} color="var(--color-blue-400)" strokeWidth={1.25} />
                     </div>
@@ -1062,17 +1066,17 @@ const SystemMonitor = () => {
                 )}
               </SectionBlock>
 
-              <SectionBlock title="Telemetria de Interrupções (ISR)" icon={Cpu}>
-                <PropertyRow label="Interrupções de Hardware" value={intVal != null ? `${intVal.toLocaleString()} /s` : '--'} />
-                <PropertyRow label="Tempo Gasto com ISR" value={r.percentInt?.value != null ? `${r.percentInt.value}%` : '--'} />
+              <SectionBlock title={t('monitor.hw.lat.isrTelemetry', 'Telemetria de Interrupções (ISR)')} icon={Cpu}>
+                <PropertyRow label={t('monitor.hw.lat.hwInterrupts', 'Interrupções de Hardware')} value={intVal != null ? `${intVal.toLocaleString()} /s` : '--'} />
+                <PropertyRow label={t('monitor.hw.lat.isrTime', 'Tempo Gasto com ISR')} value={r.percentInt?.value != null ? `${r.percentInt.value}%` : '--'} />
               </SectionBlock>
             </div>
 
-            <SectionBlock title={`Drivers de Kernel Ativos (${filteredDrivers.length} / ${drivers.length})`} icon={List}>
+            <SectionBlock title={t('monitor.hw.lat.drivers', 'Drivers de Kernel Ativos ({shown} / {total})').replace('{shown}', String(filteredDrivers.length)).replace('{total}', String(drivers.length))} icon={List}>
               <div className="px-4 py-3">
                 <input
                   type="search"
-                  placeholder="Pesquisar por driver (ex: amdkmdag, nvlddmkm)..."
+                  placeholder={t('monitor.hw.lat.driverSearch', 'Pesquisar por driver (ex: amdkmdag, nvlddmkm)...')}
                   value={driverSearch}
                   onChange={(e) => setDriverSearch(e.target.value)}
                   className="dh-input w-full"
@@ -1082,9 +1086,9 @@ const SystemMonitor = () => {
                 <table className="w-full text-left border-collapse text-[12px]">
                   <thead>
                     <tr className="border-b border-zinc-800/80 bg-zinc-900 text-[11px] text-zinc-500 sticky top-0">
-                      <th className="px-4 h-8 font-normal">Nome</th>
-                      <th className="px-4 h-8 font-normal">Descrição (Display Name)</th>
-                      <th className="px-4 h-8 font-normal">Caminho (.sys)</th>
+                      <th className="px-4 h-8 font-normal">{t('monitor.procs.name', 'Nome')}</th>
+                      <th className="px-4 h-8 font-normal">{t('monitor.hw.lat.colDisplayName', 'Descrição (Display Name)')}</th>
+                      <th className="px-4 h-8 font-normal">{t('monitor.hw.lat.colPath', 'Caminho (.sys)')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800/60">
@@ -1098,7 +1102,7 @@ const SystemMonitor = () => {
                     {filteredDrivers.length === 0 && (
                       <tr>
                         <td colSpan={3} className="px-4 py-6 text-center text-zinc-500">
-                          {drivers.length === 0 && !driverSearch ? 'Lendo drivers de kernel...' : 'Nenhum driver ativo correspondente.'}
+                          {drivers.length === 0 && !driverSearch ? t('monitor.hw.lat.readingDrivers', 'Lendo drivers de kernel...') : t('monitor.hw.lat.noDrivers', 'Nenhum driver ativo correspondente.')}
                         </td>
                       </tr>
                     )}
@@ -1108,15 +1112,15 @@ const SystemMonitor = () => {
             </SectionBlock>
 
             <div className="px-1 text-[12.5px] leading-relaxed space-y-2 text-zinc-400 max-w-[75ch]">
-              <h3 className="dh-section-title">O que é DPC e ISR?</h3>
+              <h3 className="dh-section-title">{t('monitor.hw.lat.whatTitle', 'O que é DPC e ISR?')}</h3>
               <p>
-                Quando um dispositivo físico (como placa de som, placa de rede ou placa de vídeo) precisa de atenção, ele envia uma <strong>Interrupção de Hardware (ISR)</strong> para o processador, que pausa instantaneamente o que está fazendo para atendê-lo.
+                {t('monitor.hw.lat.p1a', 'Quando um dispositivo físico (como placa de som, placa de rede ou placa de vídeo) precisa de atenção, ele envia uma ')}<strong>{t('monitor.hw.lat.p1b', 'Interrupção de Hardware (ISR)')}</strong>{t('monitor.hw.lat.p1c', ' para o processador, que pausa instantaneamente o que está fazendo para atendê-lo.')}
               </p>
               <p>
-                Como as ISRs devem ser curtíssimas, tarefas mais pesadas de processamento secundário são enfileiradas como <strong>DPC (Deferred Procedure Call)</strong>. Se um driver mal programado demorar muito tempo para liberar o controle, a fila de DPCs se acumula, fazendo com que o processador demore para responder a outras tarefas. Isso gera latência perceptível nos jogos e estalos de som.
+                {t('monitor.hw.lat.p2a', 'Como as ISRs devem ser curtíssimas, tarefas mais pesadas de processamento secundário são enfileiradas como ')}<strong>DPC (Deferred Procedure Call)</strong>{t('monitor.hw.lat.p2b', '. Se um driver mal programado demorar muito tempo para liberar o controle, a fila de DPCs se acumula, fazendo com que o processador demore para responder a outras tarefas. Isso gera latência perceptível nos jogos e estalos de som.')}
               </p>
               <p className="text-zinc-300">
-                <strong className="font-medium text-zinc-100">Dica:</strong> Em sistemas Windows normais, picos esporádicos são comuns. Mas se a taxa se mantiver muito alta constantemente, recomenda-se desinstalar drivers de rede antigos, atualizar o driver da GPU utilizando ferramentas de instalação limpa (DDU) ou atualizar a BIOS da placa-mãe.
+                <strong className="font-medium text-zinc-100">{t('monitor.hw.lat.tipLabel', 'Dica:')}</strong> {t('monitor.hw.lat.tipBody', 'Em sistemas Windows normais, picos esporádicos são comuns. Mas se a taxa se mantiver muito alta constantemente, recomenda-se desinstalar drivers de rede antigos, atualizar o driver da GPU utilizando ferramentas de instalação limpa (DDU) ou atualizar a BIOS da placa-mãe.')}
               </p>
             </div>
           </div>
@@ -1145,7 +1149,7 @@ const SystemMonitor = () => {
               title={t('monitor.helpTitle', 'Sobre o Hardware Inspector')}
               description={t('monitor.helpDesc', 'Plataforma avançada de diagnóstico de hardware modular com coletas de WMI, nvidia-smi e polling de kernel nativo.')}
               sections={[]}
-              buttonLabel="Entendi"
+              buttonLabel={t('monitor.hw.gotIt', 'Entendi')}
             />
           </span>
         }

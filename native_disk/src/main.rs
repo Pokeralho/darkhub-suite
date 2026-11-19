@@ -81,6 +81,11 @@ fn system_disks() -> Vec<u32> {
 /// Rules for any command that writes to `t`: never the Windows disk, and a physical disk only with
 /// `--confirm-disk N` naming the same disk.
 pub fn guard_write(t: &Target, confirm: Option<i64>, sys: &[u32]) -> R<()> {
+    if let Target::Image(p) = t {
+        if device::is_raw_device_path(p) {
+            return Err(Fail::new("bad_target", format!("{p} é um dispositivo/volume, não um arquivo de imagem. Use disk:N para discos físicos.")));
+        }
+    }
     if let Target::Disk(n) = t {
         if sys.contains(n) {
             return Err(Fail::new("system_disk", format!("O disco {n} contém o Windows em uso. Gravação recusada.")));
@@ -410,6 +415,8 @@ const STREAMING: &[&str] = &["clone", "verify", "hash", "surface-test", "carve",
 fn main() {
     let argv: Vec<String> = std::env::args().skip(1).collect();
     let a = Args::parse(&argv);
+    #[cfg(windows)]
+    win::set_force_dismount(a.flag("force-dismount"));
     let streaming = STREAMING.contains(&a.cmd.as_str());
     let mut prog = if streaming && !a.flag("quiet") { Progress::new() } else { Progress::silent() };
     if streaming {

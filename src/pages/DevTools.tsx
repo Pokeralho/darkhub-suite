@@ -1,7 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { ArrowRight, Hash, Brackets, Scale, FileDiff, Calculator, Code, Key, Clock, Search, Type, Fingerprint, Sparkles, Link2, Eraser } from '../components/icons';
 import PageHeader from '../components/ui/PageHeader';
-import CryptoJS from 'crypto-js';
 import * as Diff from 'diff';
 import UnitConverter from '../devtools/UnitConverter';
 import ColorPicker from '../devtools/ColorPicker';
@@ -43,17 +42,23 @@ const DevTools = () => {
     }
   };
 
+  // crypto-js is only needed by the hash tool: load it on first use. `hashSeq` drops results of older inputs.
+  const hashSeq = useRef(0);
   const generateHashes = (val: string) => {
     setHashInput(val);
+    const seq = ++hashSeq.current;
     if (!val) {
       setHashes({ md5: '', sha1: '', sha256: '', sha512: '' });
       return;
     }
-    setHashes({
-      md5: CryptoJS.MD5(val).toString(),
-      sha1: CryptoJS.SHA1(val).toString(),
-      sha256: CryptoJS.SHA256(val).toString(),
-      sha512: CryptoJS.SHA512(val).toString()
+    void import('crypto-js').then(({ default: CryptoJS }) => {
+      if (seq !== hashSeq.current) return;
+      setHashes({
+        md5: CryptoJS.MD5(val).toString(),
+        sha1: CryptoJS.SHA1(val).toString(),
+        sha256: CryptoJS.SHA256(val).toString(),
+        sha512: CryptoJS.SHA512(val).toString()
+      });
     });
   };
 

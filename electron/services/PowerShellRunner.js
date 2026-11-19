@@ -2,6 +2,7 @@
 
 import log from 'electron-log'
 import { spawn } from 'node:child_process'
+import { StringDecoder } from 'node:string_decoder'
 
 /** Longest -EncodedCommand value that keeps the whole command line under Windows' 32767-char limit. */
 export const MAX_ENCODED_ARG = 30000
@@ -52,8 +53,12 @@ export function runCommand(command, args = [], {
       fn(value)
     }
 
+    // a multibyte UTF-8 character split across two 'data' chunks must not turn into two U+FFFD: decode statefully
+    const enc = Buffer.isEncoding(encoding) ? encoding : 'utf8'
+    const decoders = { stdout: new StringDecoder(enc), stderr: new StringDecoder(enc) }
     const appendChunk = (streamName, current, chunk, callback) => {
-      const text = chunk.toString(encoding)
+      const text = typeof chunk === 'string' ? chunk : decoders[streamName].write(chunk)
+      if (!text) return current
       if (typeof callback === 'function') {
         try {
           callback(text, child)
@@ -100,6 +105,10 @@ export function runCommand(command, args = [], {
       finish(reject, err)
     })
     child.on('close', (code) => {
+      const outTail = decoders.stdout.end()
+      const errTail = decoders.stderr.end()
+      if (outTail) stdout += outTail
+      if (errTail) stderr += errTail
       finish(resolve, {
         code,
         stdout: trim ? stdout.trim() : stdout,
@@ -139,17 +148,25 @@ export function parseJsonOutput(stdout, fallback = null) {
   try {
     return JSON.parse(text)
   } catch {
-    const objectStart = text.indexOf('{')
-    const objectEnd = text.lastIndexOf('}')
-    const arrayStart = text.indexOf('[')
-    const arrayEnd = text.lastIndexOf(']')
-    const candidates = []
-    if (objectStart >= 0 && objectEnd > objectStart) candidates.push(text.slice(objectStart, objectEnd + 1))
-    if (arrayStart >= 0 && arrayEnd > arrayStart) candidates.push(text.slice(arrayStart, arrayEnd + 1))
+    // Non-JSON noise (WARNING:/VERBOSE: lines, progress text) may precede the payload. The payload starts at the
+    // first line that begins with "[" or "{" and its opener decides the closer: trying "{" before "[" would return
+    // only the inner object of a one-element array.
+    const starts = []
+    const lineRe = /^[ \t]*([[{])/gm
+    let m
+    while ((m = lineRe.exec(text)) && starts.length < 32) starts.push(m.index + m[0].length - 1)
+    // last resort: the first "[" or "{" anywhere (JSON glued to the end of a noise line)
+    const anyStart = [text.indexOf('['), text.indexOf('{')].filter((i) => i >= 0).sort((a, b) => a - b)
+    if (anyStart.length) starts.push(anyStart[0])
 
-    for (const candidate of candidates) {
+    const tried = new Set()
+    for (const start of starts) {
+      if (tried.has(start)) continue
+      tried.add(start)
+      const end = text.lastIndexOf(text[start] === '[' ? ']' : '}')
+      if (end <= start) continue
       try {
-        return JSON.parse(candidate)
+        return JSON.parse(text.slice(start, end + 1))
       } catch {}
     }
 
@@ -181,6 +198,11 @@ ${script}`
     ...(workingDirectory ? { cwd: workingDirectory } : {})
   }
 
+  // asAdmin starts a second, elevated powershell through ShellExecute (Start-Process -Verb RunAs). ShellExecute
+  // cannot redirect the child's standard streams, so the result only carries the exit code: stdout/stderr are
+  // always ''. This is inherent, not a bug. Capturing the output through a temp file is deliberately not done: the
+  // file would sit in a folder an unelevated process can write to (see the stdin note below). DarkHub already runs
+  // elevated, so callers that need output should run without asAdmin.
   if (asAdmin) {
     const workingDirectoryLine = workingDirectory
       ? `$startInfo.WorkingDirectory = ${psSingleQuote(workingDirectory)}`

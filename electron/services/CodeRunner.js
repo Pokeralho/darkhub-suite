@@ -81,6 +81,8 @@ function exec(cmd, args, { cwd, env, input, timeoutMs }) {
     const child = spawn(cmd, args, { cwd, env: { ...process.env, ...env }, windowsHide: true, detached: !isWin })
     current = { child, cancelled: false }
     const run = current
+    child.stdout.setEncoding?.('utf8') // stream decoding: no U+FFFD when a multibyte char is split across chunks
+    child.stderr.setEncoding?.('utf8')
     const take = (buf, chunk) => (buf.length < OUTPUT_CAP ? buf + chunk.toString('utf8') : buf)
     child.stdout.on('data', (c) => { stdout = take(stdout, c) })
     child.stderr.on('data', (c) => { stderr = take(stderr, c) })

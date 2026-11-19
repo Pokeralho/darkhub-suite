@@ -84,18 +84,30 @@ class LayerContext final : public Context {
         return reinterpret_cast<void*>(dt);
     }
 
+    // Returns nullptr when the handle is unknown to us (e.g. a physical device
+    // the app got without going through our enumerate hooks). Callers must
+    // fail safe instead of dereferencing: in Release the old assert was gone
+    // and std::end() was dereferenced.
     template <DispatchableType DT>
-    std::shared_ptr<dispatch_context_t<DT>> get_context(const DT& dt) {
+    std::shared_ptr<dispatch_context_t<DT>>
+    get_context(const DT& dt) noexcept {
+        if (!dt) {
+            return nullptr;
+        }
         const auto key = get_key(dt);
 
-        const auto lock = std::shared_lock{this->mutex};
-        const auto it = this->contexts.find(key);
-        assert(it != std::end(this->contexts));
+        try {
+            const auto lock = std::shared_lock{this->mutex};
+            const auto it = this->contexts.find(key);
+            if (it == std::end(this->contexts) || !it->second) {
+                return nullptr;
+            }
 
-        using context_t = dispatch_context_t<DT>;
-        const auto ptr = std::dynamic_pointer_cast<context_t>(it->second);
-        assert(ptr);
-        return ptr;
+            using context_t = dispatch_context_t<DT>;
+            return std::dynamic_pointer_cast<context_t>(it->second);
+        } catch (...) {
+            return nullptr;
+        }
     }
 };
 

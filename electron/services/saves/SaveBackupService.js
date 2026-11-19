@@ -28,6 +28,21 @@ const safeName = (s) => String(s).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace
 // pattern; otherwise the stored prefix keeps the placeholder and a restore resolves it to a path containing "*".
 export const templatePrefix = (tpl) => staticPrefix(String(tpl).replace(/<storeUserId>/g, '*').replace(/\//g, '\\'))
 
+/** True when every key section in a .reg export is under HKEY_CURRENT_USER (reg export writes UTF-16 LE with BOM). */
+export function regFileOnlyHkcu(file) {
+  let buf
+  try { buf = fs.readFileSync(file) } catch { return false }
+  const text = buf[0] === 0xff && buf[1] === 0xfe ? buf.toString('utf16le') : buf.toString('utf8')
+  let sections = 0
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/^\uFEFF/, '').trim()
+    if (!line.startsWith('[')) continue
+    sections++
+    if (!/^\[-?HKEY_CURRENT_USER\\/i.test(line)) return false
+  }
+  return sections > 0
+}
+
 export class SaveBackupService {
   constructor({ app, getInstalledGames, onEvent, now = Date.now }) {
     this.app = app
@@ -271,7 +286,10 @@ export class SaveBackupService {
       const skipped = []
       for (const t of p.targets) {
         if (!t.dest) { skipped.push(t.rel); continue }
-        const src = path.join(p.vdir, 'files', String(t.group), t.rel)
+        const base = path.join(p.vdir, 'files', path.basename(String(t.group)))
+        const src = path.resolve(base, String(t.rel))
+        // backup.json is plain data on disk: never let a crafted entry read from outside this version's files folder
+        if (!src.startsWith(base + path.sep)) { skipped.push(t.rel); continue }
         fs.mkdirSync(path.dirname(t.dest), { recursive: true })
         fs.copyFileSync(src, t.dest)
         restored++
@@ -279,7 +297,10 @@ export class SaveBackupService {
       let registry = 0
       if (process.platform === 'win32') for (const r of p.info.registry || []) {
         if (!/^HKEY_CURRENT_USER\\/i.test(r.key)) continue
-        const res = await run('reg.exe', ['import', path.join(p.vdir, r.file)])
+        // we run as Administrator: the .reg file itself must only touch HKCU, whatever backup.json claims
+        const regFile = path.join(p.vdir, path.basename(String(r.file)))
+        if (!regFileOnlyHkcu(regFile)) continue
+        const res = await run('reg.exe', ['import', regFile])
         if (res.code === 0) registry++
       }
       this.onEvent?.({ type: 'restore', game: name, id })

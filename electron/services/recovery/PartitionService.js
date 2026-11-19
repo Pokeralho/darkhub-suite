@@ -237,6 +237,8 @@ export class PartitionService {
       const p = this.spawn(exe, args, { windowsHide: true })
       let out = ''
       let err = ''
+      p.stdout.setEncoding?.('utf8') // stream decoding: no U+FFFD when a multibyte char is split across chunks
+      p.stderr.setEncoding?.('utf8')
       p.stdout.on('data', (d) => { out += d.toString('utf8') })
       p.stderr.on('data', (d) => { err += d.toString('utf8') })
       p.on('error', (e) => resolve({ ok: false, code: 'failed', written: false, detail: e.message }))

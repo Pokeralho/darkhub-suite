@@ -10,6 +10,7 @@ import { parseFilter } from './filter.js';
 import { runPowerShell } from '../PowerShellRunner.js';
 import { psQuote } from '../optimizer/OptimizerUtils.js';
 import { oneDriveRootOf } from '../cloudSync.js';
+import { integrityError, TAMPERED_MESSAGE } from '../binaryIntegrity.js';
 
 const TAG_COLORS = new Set(['red', 'yellow', 'green', 'blue']);
 
@@ -33,6 +34,60 @@ function isSupported() {
 }
 
 const csvCell = (v) => `"${String(v).replace(/"/g, '""')}"`;
+
+const normDir = (p) => path.win32.resolve(String(p)).replace(/[\\/]+$/, '').toLowerCase();
+const isUnder = (t, r) => t === r || t.startsWith(`${r}\\`);
+/**
+ * Why `p` must never be deleted from the disk map (we run as Administrator), or null. Blocks volume roots, the Windows,
+ * Program Files and ProgramData trees, the Users folder and each profile in it, the app's own folder, and any ancestor of those.
+ */
+export function protectedPathReason(p, env = process.env) {
+  const t = normDir(p);
+  if (/^[a-z]:$/.test(t) || /^\\\\[^\\]+\\[^\\]+$/.test(t)) return 'root';
+  const sysDrive = (env.SystemDrive || 'C:').toLowerCase();
+  const users = normDir(`${sysDrive}\\Users`);
+  const trees = [env.SystemRoot || env.windir || `${sysDrive}\\Windows`, env.ProgramFiles, env['ProgramFiles(x86)'], env.ProgramW6432, env.ProgramData]
+    .filter(Boolean).map(normDir);
+  for (const r of trees) if (isUnder(t, r) || isUnder(r, t)) return 'system';
+  for (const r of [users, env.USERPROFILE, path.dirname(process.execPath)].filter(Boolean).map(normDir)) if (isUnder(r, t)) return 'system';
+  if (path.win32.dirname(t) === users) return 'system'; // a whole profile folder (C:\Users\<name>)
+  return null;
+}
+const PROTECTED_MSG = 'Pasta do sistema, raiz de disco ou pasta de usuário: o DarkHub não apaga isso daqui.';
+
+const BIN_RE = /^([a-z]:)\\\$recycle\.bin(?:\\(s-1-[0-9-]+)(?:\\([^\\]+))?)?(?:\\|$)/i;
+/**
+ * Where `p` sits in a drive's Recycle Bin, or null when it is outside it. `level`: 'root' ($Recycle.Bin), 'user' (the
+ * per-account SID folder), 'entry' (a $R/$I item or anything inside one). Items in there cannot be recycled again.
+ */
+export function recycleBinPlace(p) {
+  const m = BIN_RE.exec(path.win32.resolve(String(p)));
+  if (!m) return null;
+  if (!m[2]) return { level: 'root' };
+  const sidDir = `${m[1]}\\$Recycle.Bin\\${m[2]}`;
+  if (!m[3]) return { level: 'user', sidDir };
+  const entry = m[3];
+  const id = /^\$[RI]/i.test(entry) ? entry.slice(2) : null;
+  return { level: 'entry', sidDir, entry, isWhole: path.win32.resolve(String(p)).length === `${sidDir}\\${entry}`.length, rFile: id && `${sidDir}\\$R${id}`, iFile: id && `${sidDir}\\$I${id}` };
+}
+
+/** The original path recorded in a $I file (Windows Vista+ format 1 or 2), or null when missing or unreadable. */
+export function readRecycleInfo(iFile) {
+  let b;
+  try { b = fs.readFileSync(iFile); } catch { return null; }
+  if (b.length < 28) return null;
+  const ver = Number(b.readBigInt64LE(0));
+  let name = '';
+  if (ver === 2) { const n = b.readInt32LE(24); name = b.subarray(28, Math.min(b.length, 28 + n * 2)).toString('utf16le'); }
+  else if (ver === 1) name = b.subarray(24, Math.min(b.length, 24 + 520)).toString('utf16le');
+  else return null;
+  name = name.replace(/\0[\s\S]*$/, '');
+  return name ? { original: name, size: Number(b.readBigInt64LE(8)) } : null;
+}
+const BIN_MSG = {
+  root: 'Esta é a pasta da Lixeira do Windows: esvazie a Lixeira pelo Explorador de Arquivos ou pelo Limpador do DarkHub.',
+  inBin: 'Este item já está dentro da Lixeira, então não pode ir para ela de novo. Use "Apagar de vez" para liberar o espaço.'
+};
 
 export function formatSize(bytes) {
   if (!(bytes > 0)) return '0 B';
@@ -142,6 +197,7 @@ export class DiskScanService {
     try { st = fs.statSync(target); } catch { return { ok: false, error: 'A pasta não existe ou não pode ser lida.' }; }
     if (!st.isDirectory()) return { ok: false, error: 'Escolha uma pasta ou unidade.' };
     if (!fs.existsSync(this.exePath)) return { ok: false, error: 'DarkHub.DiskScan.exe não foi encontrado.' };
+    if (integrityError(['DarkHub.DiskScan.exe'])) return { ok: false, error: TAMPERED_MESSAGE };
     this.cancel();
 
     const rootPath = /^[A-Za-z]:\\?$/.test(target) ? `${target.slice(0, 2)}\\` : target;
@@ -261,6 +317,12 @@ export class DiskScanService {
     if (id === 'd0') return { ok: false, error: 'A pasta analisada não pode ser enviada para a Lixeira daqui.' };
     const p = this._pathOf(id);
     if (!p) return { ok: false, error: 'Item não encontrado.' };
+    if (protectedPathReason(p)) return { ok: false, error: PROTECTED_MSG };
+    const bin = recycleBinPlace(p);
+    if (bin && bin.level !== 'entry') return { ok: false, error: BIN_MSG.root };
+    // already in the Recycle Bin (often an orphan $R folder whose $I record is gone, invisible in Explorer): the only way
+    // to free it is a permanent delete, so answer like a drive without a bin and let the page offer it
+    if (bin) return { ok: false, noRecycle: 'inBin', error: BIN_MSG.inBin };
     // Electron's trashItem runs without Windows' dialog: where the Recycle Bin cannot take the item (no bin on the drive,
     // bin turned off, item bigger than the bin) Windows deletes it for good instead of asking. Refuse those cases.
     const size = Number(this.model.info(id, this._filter(''))?.size) || 0;
@@ -281,27 +343,45 @@ export class DiskScanService {
     if (id === 'd0') return { ok: false, error: 'A pasta analisada não pode ser apagada daqui.' };
     const p = this._pathOf(id);
     if (!p) return { ok: false, error: 'Item não encontrado.' };
+    if (protectedPathReason(p)) return { ok: false, error: PROTECTED_MSG };
     if (String(confirmName ?? '') !== path.basename(p)) return { ok: false, error: 'Digite o nome exato do item para confirmar.' };
     // a permanent delete in OneDrive is synced: the item disappears from the cloud and from every PC of the person
     if (oneDriveRootOf(p)) return { ok: false, error: 'Este item fica no OneDrive: apagar de vez aqui apaga também na nuvem e em todos os seus PCs. Use "Mover para a Lixeira" ou apague pelo OneDrive.' };
-    const size = Number(this.model.info(id, this._filter(''))?.size) || 0;
-    const why = recycleVerdict(await this.recycleProbe(p), size);
-    if (!why || why === 'unknown') return { ok: false, error: 'Este item pode ir para a Lixeira: use "Mover para a Lixeira".' };
+    const bin = recycleBinPlace(p);
+    if (bin && bin.level !== 'entry') return { ok: false, error: BIN_MSG.root };
+    if (!bin) {
+      const size = Number(this.model.info(id, this._filter(''))?.size) || 0;
+      const why = recycleVerdict(await this.recycleProbe(p), size);
+      if (!why || why === 'unknown') return { ok: false, error: 'Este item pode ir para a Lixeira: use "Mover para a Lixeira".' };
+    }
     // fs.rm removes links/junctions themselves, never what they point to
-    const rm = () => fs.rmSync(p, { recursive: true, force: false, maxRetries: 2 });
+    const rm = () => fs.promises.rm(p, { recursive: true, force: false, maxRetries: 2 });
     try {
-      try { rm(); } catch (e0) {
+      try { await rm(); } catch (e0) {
         // read-only files (a FAT32 stick refuses them with EPERM): clear the attribute without following links, retry once
         if (e0?.code !== 'EPERM' && e0?.code !== 'EACCES') throw e0;
         clearReadOnly(p);
-        rm();
+        await rm();
       }
     } catch (e) {
       if (fs.existsSync(p)) return { ok: false, partial: true, error: `O Windows recusou (${e?.code || e?.message}). Parte do conteúdo pode ter sido apagada: analise de novo para atualizar o mapa.` };
     }
     if (fs.existsSync(p)) return { ok: false, partial: true, error: 'O item continua no disco (em uso ou sem permissão).' };
+    // a whole Recycle Bin entry goes with its record: a $I left without its $R would show a ghost item in Explorer
+    if (bin?.isWhole && bin.iFile && bin.rFile && !fs.existsSync(bin.rFile)) { try { fs.rmSync(bin.iFile, { force: true }); } catch { /* in use */ } }
     this.model.markRemoved(id);
     return { ok: true, path: p };
+  }
+
+  /** For an item inside a Recycle Bin: where it was deleted from ($I record), or orphan when the record is gone. */
+  recycleInfo(id) {
+    const p = this._pathOf(id);
+    const bin = p && recycleBinPlace(p);
+    if (!bin || bin.level !== 'entry' || !bin.iFile) return { ok: true, inBin: Boolean(bin), original: null, orphan: false };
+    const rec = readRecycleInfo(bin.iFile);
+    if (!rec) return { ok: true, inBin: true, original: null, orphan: true };
+    const rest = path.win32.resolve(p).slice(bin.rFile.length); // the part inside the $R folder, if any
+    return { ok: true, inBin: true, original: rec.original + rest, orphan: false };
   }
 
   /** Recycle Bin facts for the drive holding `p` (see RECYCLE_PROBE). */

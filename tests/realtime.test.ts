@@ -16,6 +16,7 @@ import { parseClamscan } from '../electron/services/realtime/ClamAv.js';
 // @ts-ignore
 import { isScanCandidate, RealtimeProtection } from '../electron/services/realtime/RealtimeProtection.js';
 
+const win32It = process.platform === 'win32' ? it : it.skip;
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'dh-rt-'));
 const sha = (buf: Buffer) => crypto.createHash('sha256').update(buf).digest('hex');
 const waitFor = async (fn: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!fn()) { if (Date.now() > end) throw new Error('timeout'); await new Promise((r) => setTimeout(r, 50)); } };
@@ -108,6 +109,25 @@ describe('quarantine', () => {
     expect(q.list()).toHaveLength(0);
     expect(() => q.remove('../../etc')).toThrow();
   });
+  it('refuses a file that changed since the scan and keeps it in place', async () => {
+    const dir = tmp();
+    const file = path.join(dir, 'tool.exe');
+    fs.writeFileSync(file, crypto.randomBytes(2048));
+    const q = new Quarantine(path.join(dir, 'q'));
+    await expect(q.add(file, { sha256: sha(Buffer.from('what was scanned')) })).rejects.toThrow(/changed/);
+    expect(fs.existsSync(file)).toBe(true);
+    expect(fs.readdirSync(path.join(dir, 'q'))).toEqual([]);
+  });
+  win32It('refuses to restore a planted entry into a system folder', async () => {
+    const dir = tmp();
+    const q = new Quarantine(dir);
+    const id = '0123456789abcdef';
+    fs.writeFileSync(path.join(dir, `${id}.q`), 'x');
+    const target = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'evil.dll');
+    fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify({ id, originalPath: target, key: 'ab'.repeat(32), at: 1 }));
+    await expect(q.restore(id)).rejects.toThrow(/system folder/);
+    expect(fs.existsSync(target)).toBe(false);
+  });
 });
 
 describe('scanners', () => {
@@ -143,7 +163,23 @@ describe('scanners', () => {
     } finally {
       prot.stop();
     }
-  }, 12000);
+  }, 15000);
+  it('never marks a batch clean when clamscan aborted with an error', async () => {
+    const dir = tmp();
+    const cfg = { folders: [dir], clamav: true, autoQuarantine: false, maxFileMb: 50, allowHashes: [] as string[] };
+    let calls = 0;
+    const clamav = { status: () => ({ database: true }), scan: async () => { calls++; return { error: 'Can\'t allocate memory', detections: [] }; } };
+    const prot = new RealtimeProtection({ getConfig: () => cfg, getHashDb: () => new HashDb([]), clamav, quarantine: new Quarantine(path.join(tmp(), 'q')) });
+    prot.start();
+    try {
+      fs.writeFileSync(path.join(dir, 'a.exe'), crypto.randomBytes(1024));
+      await waitFor(() => calls > 0, 12000);
+      await new Promise((r) => setTimeout(r, 50));
+      expect((prot as any).clean.size).toBe(0);
+    } finally {
+      prot.stop();
+    }
+  }, 15000);
 });
 
 describe('freshclam config', () => {

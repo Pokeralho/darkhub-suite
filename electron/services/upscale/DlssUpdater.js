@@ -45,12 +45,15 @@ const safe = (fn) => { try { return fn() } catch { return false } }
 
 function verifySignature(file) {
   // Authenticode check through Windows itself; the path travels in an environment variable, never inside the script.
+  // Async: powershell takes 1-30 s to start and check, and must not freeze the main process meanwhile.
   const ps = "$s = Get-AuthenticodeSignature -LiteralPath $env:DH_VERIFY_FILE; '{0}|{1}' -f $s.Status, $s.SignerCertificate.Subject"
-  try {
-    const out = cp.execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { encoding: 'utf8', windowsHide: true, timeout: 30000, env: { ...process.env, DH_VERIFY_FILE: file } }).trim()
-    const [status, subject] = out.split('|')
-    return status === 'Valid' && /O=NVIDIA Corporation/.test(subject || '')
-  } catch { return false }
+  return new Promise((resolve) => {
+    cp.execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { encoding: 'utf8', windowsHide: true, timeout: 30000, env: { ...process.env, DH_VERIFY_FILE: file } }, (err, stdout) => {
+      if (err) return resolve(false)
+      const [status, subject] = String(stdout ?? '').trim().split('|')
+      resolve(status === 'Valid' && /O=NVIDIA Corporation/.test(subject || ''))
+    })
+  })
 }
 
 export class DlssUpdater {
@@ -79,7 +82,7 @@ export class DlssUpdater {
     fs.mkdirSync(dir, { recursive: true })
     const tmp = `${file}.download`
     await this.download(RAW(tag, name), tmp, { allowedHosts: HOSTS, maxBytes: 300 * 1048576, timeoutMs: 10 * 60000 })
-    if (!isPe64(tmp) || !this.verify(tmp)) {
+    if (!isPe64(tmp) || !(await this.verify(tmp))) {
       fs.rmSync(tmp, { force: true })
       throw new Error(`${name}: not a 64-bit DLL signed by NVIDIA, discarded`)
     }

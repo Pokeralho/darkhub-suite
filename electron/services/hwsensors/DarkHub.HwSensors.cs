@@ -28,8 +28,27 @@ namespace DarkHub.Native
     // so an older driver without one of them only loses that field. Signatures: NVIDIA's nvml.h.
     internal sealed class Nvml
     {
-        [DllImport("kernel32.dll", CharSet = CharSet.Ansi, SetLastError = true)] private static extern IntPtr LoadLibrary(string name);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern IntPtr LoadLibraryExW(string path, IntPtr reserved, uint flags);
         [DllImport("kernel32.dll", CharSet = CharSet.Ansi, SetLastError = true)] private static extern IntPtr GetProcAddress(IntPtr module, string name);
+        private const uint LoadLibrarySearchDllLoadDir = 0x100, LoadLibrarySearchSystem32 = 0x800;
+
+        // Never a bare LoadLibrary("nvml.dll"): this runs elevated, so the application directory / CWD / PATH must not
+        // be able to supply it. System32 first (current drivers), then the legacy NVSMI folder by full path.
+        private static IntPtr LoadNvml()
+        {
+            IntPtr lib = IntPtr.Zero;
+            try { lib = LoadLibraryExW("nvml.dll", IntPtr.Zero, LoadLibrarySearchSystem32); } catch { }
+            if (lib != IntPtr.Zero) return lib;
+            try
+            {
+                string pf = Environment.GetEnvironmentVariable("ProgramW6432");
+                if (string.IsNullOrEmpty(pf)) pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                string path = Path.Combine(pf, @"NVIDIA Corporation\NVSMI\nvml.dll");
+                if (File.Exists(path)) lib = LoadLibraryExW(path, IntPtr.Zero, LoadLibrarySearchDllLoadDir | LoadLibrarySearchSystem32);
+            }
+            catch { }
+            return lib;
+        }
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int FInit();
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int FCount(out uint n);
@@ -71,7 +90,7 @@ namespace DarkHub.Native
         {
             try
             {
-                IntPtr lib = LoadLibrary("nvml.dll");
+                IntPtr lib = LoadNvml();
                 if (lib == IntPtr.Zero) return;
                 var init = Fn<FInit>(lib, "nvmlInit_v2", "nvmlInit");
                 var count = Fn<FCount>(lib, "nvmlDeviceGetCount_v2", "nvmlDeviceGetCount");
@@ -549,7 +568,16 @@ namespace DarkHub.Native
             Console.OutputEncoding = new UTF8Encoding(false);
 
             // The parent closing our stdin (or dying) ends the loop: no orphaned sensor process.
-            var stdinWatcher = new Thread(() => { try { Console.In.ReadToEnd(); } catch { } Environment.Exit(0); }) { IsBackground = true };
+            // EOF only signals the main loop, which then calls computer.Close() (releases the global SMBus/ISA/PCI
+            // mutexes and the driver). The hard exit is a last resort if Close() hangs.
+            var stdinClosed = new ManualResetEvent(false);
+            var stdinWatcher = new Thread(() =>
+            {
+                try { Console.In.ReadToEnd(); } catch { }
+                stdinClosed.Set();
+                Thread.Sleep(15000);
+                Environment.Exit(0);
+            }) { IsBackground = true };
             stdinWatcher.Start();
 
             var computer = new Computer
@@ -576,7 +604,9 @@ namespace DarkHub.Native
             var sb = new StringBuilder(32 * 1024);
             var stdout = Console.Out;
             long tick = 0;
-            while (true)
+            try
+            {
+            while (!stdinClosed.WaitOne(0))
             {
                 bool slowTick = tick++ % 5 == 0;
                 sb.Clear();
@@ -598,9 +628,13 @@ namespace DarkHub.Native
                 sb.Append('}');
                 try { stdout.WriteLine(sb.ToString()); stdout.Flush(); }
                 catch (IOException) { break; }
-                Thread.Sleep(interval);
+                if (stdinClosed.WaitOne(interval)) break;
             }
-            computer.Close();
+            }
+            finally
+            {
+                try { computer.Close(); } catch { }
+            }
             return 0;
         }
     }

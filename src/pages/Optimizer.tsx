@@ -8,6 +8,7 @@ import {
 import { useI18n } from '../i18n/I18nProvider';
 import DarkOSOptimizerHint from '../components/darkos/DarkOSOptimizerHint';
 import PageHeader from '../components/ui/PageHeader';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 type OptimizerTab = 'tweaks' | 'gpu' | 'priority' | 'uninstaller' | 'network' | 'defender' | 'debloat' | 'startup' | 'windows';
 type LogLevel = 'info' | 'ok' | 'err' | 'warn';
@@ -243,6 +244,9 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
     setConfirmReq(null);
     if (r) r(v);
   };
+  const confirmDialogRef = useRef<HTMLDivElement>(null);
+  // Escape = Cancel; focus starts on Cancel (first control) and returns to the button that asked.
+  useDialogA11y(confirmDialogRef, Boolean(confirmReq), () => answerConfirm(false));
 
   useEffect(() => {
     // Scroll only the terminal drawer, never the page behind it.
@@ -2160,10 +2164,10 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
       {/* CONFIRM MODAL */}
       {confirmReq && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 animate-fadeIn">
-          <div role="dialog" aria-modal="true" className="w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl p-5 space-y-3 max-h-[85vh] flex flex-col">
+          <div ref={confirmDialogRef} role="dialog" aria-modal="true" aria-labelledby="opt-confirm-title" className="w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl p-5 space-y-3 max-h-[85vh] flex flex-col">
             <div className="flex items-center gap-2">
               <AlertTriangle size={16} className={confirmReq.danger ? 'text-red-400' : 'text-amber-400'} />
-              <h3 className="dh-section-title">{confirmReq.title}</h3>
+              <h3 id="opt-confirm-title" className="dh-section-title">{confirmReq.title}</h3>
             </div>
             <div className="text-[12.5px] text-zinc-300 leading-relaxed whitespace-pre-line overflow-y-auto">{confirmReq.body}</div>
             {confirmReq.items && confirmReq.items.length > 0 && (

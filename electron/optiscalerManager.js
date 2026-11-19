@@ -13,6 +13,7 @@ import {
 
 import { downloadToFile, fetchJson, assetSha256, SYSTEM_TAR } from './services/SecureDownload.js'
 import { isPe64 } from './services/upscale/pe.js'
+import { integrityError } from './services/binaryIntegrity.js'
 
 const fs = fsRaw.promises
 const log = { info: (...a) => console.log(...a) }
@@ -701,7 +702,12 @@ function withMutationLock(fn) {
   return run
 }
 
-function isSameInstall(analysis, payload) {
+/**
+ * onlyIfNeeded: true when the folder already has exactly this install (same release, loader, upscaler, input API,
+ * Agility SDK and frame generation), so applying again would change nothing. A manifest written before frame
+ * generation was recorded never matches: its INI may have FG in any state, so it is rewritten once.
+ */
+export function isSameInstall(analysis, payload) {
   if (!payload?.onlyIfNeeded) return false
   const manifest = analysis.manifest
   if (!manifest?.optiscaler) return false
@@ -713,6 +719,9 @@ function isSameInstall(analysis, payload) {
     opti.upscaler === analysis.choices.upscaler &&
     opti.inputApi === analysis.choices.resolvedInputApi &&
     Boolean(opti.includeAgilitySdk) === Boolean(analysis.choices.includeAgilitySdk) &&
+    typeof opti.frameGen === 'string' &&
+    opti.frameGen === (analysis.frameGen?.mode ?? 'off') &&
+    (opti.frameGen === 'off' || opti.fgInput === (analysis.frameGen?.input ?? 'upscaler')) &&
     fsRaw.existsSync(loaderPath) &&
     fsRaw.existsSync(path.join(analysis.game.targetDir, 'OptiScaler.ini'))
   )
@@ -729,7 +738,10 @@ async function resolveFsr4Rdna2Path(app) {
     candidates.push(path.join(process.env.APPDATA || '', 'DarkHub', 'OptiScaler', 'FSR4_RDNA2', 'amd_fidelityfx_upscaler_dx12.dll'))
   } catch {}
 
-  for (const c of candidates) {
+  // the bundled copy is injected into games: an installed app skips it when it is not the shipped file
+  const bundledTampered = integrityError(['fsr4_rdna2/'], { log: (m) => console.warn('[OptiScaler]', m) })
+  for (const [i, c] of candidates.entries()) {
+    if (i < 2 && bundledTampered) continue
     if (fsRaw.existsSync(c)) return c
   }
 
@@ -800,7 +812,9 @@ async function applyOptiScaler(app, getLibraryStore, payload = {}) {
       loader: analysis.choices.loader,
       upscaler: analysis.choices.upscaler,
       inputApi: analysis.choices.resolvedInputApi,
-      includeAgilitySdk: analysis.choices.includeAgilitySdk
+      includeAgilitySdk: analysis.choices.includeAgilitySdk,
+      frameGen: analysis.frameGen?.mode ?? 'off',
+      fgInput: analysis.frameGen?.input ?? 'upscaler'
     }
   }
 

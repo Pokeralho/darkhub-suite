@@ -84,6 +84,7 @@ export default function WallCalibration({ derived, needs, onSaved, windowMs = CA
   const [busy, setBusy] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const samples = useRef<Sample[]>([]);
+  const statsAt = useRef(0); // the time the stats on screen were computed for
   const lastLoad = useRef<WallCalPoint | null>(null);
   const stress = useRef<{ started: number; stopping: boolean; promise: Promise<unknown> } | null>(null);
 
@@ -105,6 +106,7 @@ export default function WallCalibration({ derived, needs, onSaved, windowMs = CA
       const now = Date.now();
       if (d && (d.cpuW == null || d.gpuW == null)) { setError('no_cpu'); return; }
       if (d) samples.current = [...samples.current.filter((s) => s.t >= now - windowMs * 3), { t: now, w: d.gpuW! + d.cpuW! }];
+      statsAt.current = now;
       setSt(windowStats(samples.current, now, windowMs));
       if (stress.current) setElapsed(now - stress.current.started);
     };
@@ -117,7 +119,10 @@ export default function WallCalibration({ derived, needs, onSaved, windowMs = CA
   useEffect(() => () => { if (stress.current) void gb()?.cancel(); }, []);
 
   const capture = (): Omit<WallCalPoint, 'wallW'> | null => {
-    const s = windowStats(samples.current, Date.now(), windowMs);
+    // capture exactly what is on screen: stats at the last poll, not at the click. A click between two polls would slide
+    // the window past the oldest sample and drop coverage under the threshold although the reading shown was stable.
+    // Every poll (even a failed one) moves statsAt, so a dead sensor still turns the reading unstable.
+    const s = windowStats(samples.current, statsAt.current || Date.now(), windowMs);
     if (!s.stable || s.mean == null) return null;
     return { measW: s.mean, std: s.std ?? 0, spread: s.spread ?? 0 };
   };

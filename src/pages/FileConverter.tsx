@@ -311,12 +311,11 @@ const FileConverter = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-7 space-y-4">
+          {/* Drop zone: clicking anywhere also opens the picker, but only the inner button is a keyboard control
+              (a role="button" wrapper around a <button> nests interactive controls). */}
           <div
-            role="button"
-            tabIndex={0}
             className="px-6 py-8 rounded-xl border border-dashed border-zinc-800 hover:border-zinc-700 transition-colors flex flex-col items-center justify-center text-center gap-3 cursor-pointer"
             onClick={handlePickFiles}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePickFiles(); } }}
             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
             onDrop={async (e) => {
               e.preventDefault();
@@ -326,7 +325,7 @@ const FileConverter = () => {
             }}
           >
             <p className="text-[12.5px] text-zinc-400">{t('conv.drop', 'Arraste e solte arquivos aqui.')}</p>
-            <button type="button" className="dh-btn dh-btn-sm">
+            <button type="button" className="dh-btn dh-btn-sm" onClick={(e) => { e.stopPropagation(); handlePickFiles(); }}>
               <FolderOpen size={14} />
               {t('conv.pick', 'Selecionar arquivos')}
             </button>

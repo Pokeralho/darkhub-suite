@@ -98,7 +98,7 @@ public class DarkHubSensorDaemon {
     }
 
     public static void Main(string[] args) {
-        Console.OutputEncoding = System.Text.Encoding.UTF8;
+        Console.OutputEncoding = new System.Text.UTF8Encoding(false); // no BOM in front of the first JSON line
         IntPtr query = IntPtr.Zero;
         uint rc = PdhOpenQueryW(null, IntPtr.Zero, out query);
         if (rc != 0 || query == IntPtr.Zero) {

@@ -26,6 +26,7 @@ class SensorBus extends EventEmitter {
     this._wire();
     if (this._running) return;
     this._running = true;
+    this._keepAdvanced = false; // the prewarm is over: this session's stop() also stops the advanced sensors
     FastSensorDaemon.start();
     // Começa com as temperaturas WMI/ACPI ligadas (lado seguro) e só as troca pelos sensores avançados
     // quando eles realmente leem a CPU (driver PawnIO + app como administrador).
@@ -59,16 +60,24 @@ class SensorBus extends EventEmitter {
    */
   prewarmAdvanced() {
     this._wire();
-    this._keepAdvanced = true;
+    // only bridges the gap until the first screen starts the bus: once a session starts, its stop() owns the daemon
+    if (!this._running) this._keepAdvanced = true;
     HwSensorsDaemon.start();
   }
 
+  /**
+   * Stops every daemon, the advanced sensors included. Callers (HardwareHAL.shutdown via HardwareService) only get
+   * here when no screen and no overlay hold needs sensors any more, so the prewarm must not keep LHM alive forever.
+   */
   stop() {
-    if (!this._running) return;
+    const wasRunning = this._running;
     this._running = false;
-    FastSensorDaemon.stop();
-    SlowSensorDaemon.stop();
-    if (!this._keepAdvanced) HwSensorsDaemon.stop();
+    this._keepAdvanced = false;
+    if (wasRunning) {
+      FastSensorDaemon.stop();
+      SlowSensorDaemon.stop();
+    }
+    HwSensorsDaemon.stop();
   }
 
   /** Advanced sensors on: they replace the WMI / ACPI / storage-reliability temperature queries of the slow daemon. */

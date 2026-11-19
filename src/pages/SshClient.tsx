@@ -7,8 +7,6 @@ import HostsView, { useConnect } from '../components/ssh/HostsView';
 import KeychainView, { KnownHostsView, HostKeyPrompt } from '../components/ssh/KeychainView';
 import SnippetsView, { SnippetRunnerPanel } from '../components/ssh/SnippetsView';
 import TunnelsView from '../components/ssh/TunnelsView';
-import SftpView from '../components/ssh/SftpView';
-import TerminalPane from '../components/ssh/TerminalPane';
 import { TerminalSettingsDrawer, AuthPromptModal, SerialDrawer } from '../components/ssh/SshExtras';
 import {
   useSshStore, setActive, closeTab, closePane, patchTab, openTerminal, openSftpTab, ensureWired, setPaneLogging, dependentsOf, getSshState, type TermTab
@@ -16,6 +14,10 @@ import {
 import { Modal } from '../components/ssh/ui';
 
 const EditorTabView = lazy(() => import('../components/ssh/EditorTabView'));
+// xterm and the SFTP browser are heavy: load them with the first terminal / SFTP tab, not with the screen.
+const TerminalPane = lazy(() => import('../components/ssh/TerminalPane'));
+const SftpView = lazy(() => import('../components/ssh/SftpView'));
+const PaneFallback = () => <div className="flex-1 min-w-0 min-h-0 rounded-xl bg-zinc-900 animate-pulse" />;
 
 type Section = 'hosts' | 'keychain' | 'tunnels' | 'snippets' | 'knownHosts';
 
@@ -110,11 +112,13 @@ function TerminalTabView({ tab, vault, visible, reload }: { tab: TermTab; vault:
           {tab.panes.map((p) => {
             const host = vault.hosts.find((h) => h.id === p.hostId);
             return (
-              <TerminalPane key={p.sessionId} tabId={tab.id} pane={p} themeId={themeOf(p.hostId)} visible={visible} settings={settings}
+              <Suspense key={p.sessionId} fallback={<PaneFallback />}>
+              <TerminalPane tabId={tab.id} pane={p} themeId={themeOf(p.hostId)} visible={visible} settings={settings}
                 focused={tab.activePane === p.sessionId} broadcastTargets={targets}
                 onOpenSftp={host && p.kind !== 'serial' ? () => openSftpTab(host.id, host.label) : undefined}
                 onFocus={() => { if (tab.activePane !== p.sessionId) patchTab(tab.id, { activePane: p.sessionId }); }}
                 onClose={() => closePane(tab.id, p.sessionId)} />
+              </Suspense>
             );
           })}
         </div>
@@ -252,7 +256,7 @@ export default function SshClient() {
         ) : null}
         {vault ? store.tabs.map((tb) => {
           if (tb.kind === 'terminal') return <TerminalTabView key={tb.id} tab={tb} vault={vault} visible={tb.id === store.active} reload={reload} />;
-          if (tb.kind === 'sftp') return <div key={tb.id} className={tb.id === store.active ? 'h-full' : 'hidden'}><SftpView sftpId={tb.id} hostId={tb.hostId} vault={vault} visible={tb.id === store.active} /></div>;
+          if (tb.kind === 'sftp') return <div key={tb.id} className={tb.id === store.active ? 'h-full' : 'hidden'}><Suspense fallback={<PaneFallback />}><SftpView sftpId={tb.id} hostId={tb.hostId} vault={vault} visible={tb.id === store.active} /></Suspense></div>;
           return (
             <Suspense key={tb.id} fallback={tb.id === store.active ? <div className="h-full rounded-xl bg-zinc-900 animate-pulse" /> : null}>
               <EditorTabView tab={tb} visible={tb.id === store.active} />

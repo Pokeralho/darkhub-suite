@@ -207,13 +207,28 @@ fn shred_overwrites_before_unlink() {
     let d = tmp("ow");
     let p = d.join("secret.txt");
     fs::write(&p, b"TOP-SECRET-TOP-SECRET").unwrap();
-    // A hard link sees the same data: after shred the link must hold no trace of the old content.
-    let link = d.join("link.txt");
-    fs::hard_link(&p, &link).unwrap();
+    // A handle opened before (std shares delete) still sees the file data: it must hold no trace of the old content.
+    let mut held = fs::File::open(&p).unwrap();
     files::shred_file(&p, 2).unwrap();
     assert!(!p.exists());
-    let after = fs::read(&link).unwrap();
+    let mut after = Vec::new();
+    std::io::Read::read_to_end(&mut held, &mut after).unwrap();
     assert!(after.is_empty(), "truncated after overwrite");
+    drop(held);
+    let _ = fs::remove_dir_all(&d);
+}
+
+#[test]
+fn shred_never_overwrites_through_hard_links() {
+    let d = tmp("hl");
+    let p = d.join("cache.bin");
+    let other = d.join("elsewhere.bin");
+    fs::write(&other, b"PRECIOUS").unwrap();
+    // A cache entry hard-linked to a file outside the cleaned folder: only the cache name may go away.
+    fs::hard_link(&other, &p).unwrap();
+    files::shred_file(&p, 3).unwrap();
+    assert!(!p.exists());
+    assert_eq!(fs::read(&other).unwrap(), b"PRECIOUS");
     let _ = fs::remove_dir_all(&d);
 }
 
@@ -286,6 +301,15 @@ mod reg {
         assert_eq!(command_target("rundll32.exe \"C:\\x\\a.dll\",Start"), Some(PathBuf::from("C:\\x\\a.dll")));
         assert_eq!(command_target("app.exe"), None, "relative paths are not judged");
         assert_eq!(command_target("something weird"), None);
+    }
+
+    #[test]
+    fn wow_redirect_is_case_insensitive() {
+        assert_eq!(registry::wow_path("C:\\WINDOWS\\SYSTEM32\\x.dll"), "C:\\WINDOWS\\SysWOW64\\x.dll");
+        assert_eq!(registry::wow_path("C:\\Windows\\System32\\drivers\\y.sys"), "C:\\Windows\\SysWOW64\\drivers\\y.sys");
+        assert_eq!(registry::wow_path("c:\\windows\\system32\\z.exe"), "c:\\windows\\SysWOW64\\z.exe");
+        assert_eq!(registry::wow_path("C:\\Tools\\System32x\\a.exe"), "C:\\Tools\\System32x\\a.exe");
+        assert_eq!(registry::wow_path("C:\\Pasta é\\SYSTEM32\\ü.dll"), "C:\\Pasta é\\SysWOW64\\ü.dll");
     }
 
     #[test]
@@ -581,4 +605,34 @@ fn unix_exclusions_match_files_and_directories() {
     assert!(!cache.join("sub/drop.tmp").exists());
 
     let _ = fs::remove_dir_all(&base);
+}
+#[cfg(windows)]
+#[test]
+fn recycle_orphans_found_and_removed_without_following_junctions() {
+    use crate::recycle;
+    let bin = tmp("bin");
+    let outside = tmp("outside");
+    put(&outside.join("keep.bin"), 64);
+    // a normal item ($R + $I) and an orphan ($R alone) holding a junction to a folder outside the bin
+    put(&bin.join("$RKEEP01.txt"), 10);
+    put(&bin.join("$IKEEP01.txt"), 40);
+    put(&bin.join("$RORPH01").join("romfs").join("a.bin"), 3000);
+    put(&bin.join("$RORPH02.dat"), 500);
+    let j = bin.join("$RORPH01").join("link");
+    let st = std::process::Command::new("cmd").args(["/c", "mklink", "/J"]).arg(&j).arg(&outside).output().unwrap();
+    assert!(st.status.success(), "mklink /J failed");
+    let mut found = recycle::orphans_in(&bin);
+    found.sort_by(|a, b| a.path.cmp(&b.path));
+    let names: Vec<String> = found.iter().map(|o| o.path.file_name().unwrap().to_string_lossy().into_owned()).collect();
+    assert_eq!(names, vec!["$RORPH01", "$RORPH02.dat"]);
+    assert_eq!(found[0].bytes, 3000, "the junction target is not counted");
+    assert_eq!(found[1].bytes, 500);
+    for o in &found {
+        assert!(recycle::remove_orphan(o));
+    }
+    assert!(recycle::orphans_in(&bin).is_empty());
+    assert!(bin.join("$RKEEP01.txt").exists() && bin.join("$IKEEP01.txt").exists(), "items with a record stay");
+    assert!(outside.join("keep.bin").exists(), "the junction target is untouched");
+    let _ = fs::remove_dir_all(&bin);
+    let _ = fs::remove_dir_all(&outside);
 }

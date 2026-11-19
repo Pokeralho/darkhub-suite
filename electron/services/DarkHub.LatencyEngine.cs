@@ -180,7 +180,7 @@ public class DarkHubLatencyEngine
 
     public static void Main(string[] args)
     {
-        Console.OutputEncoding = Encoding.UTF8;
+        Console.OutputEncoding = new UTF8Encoding(false); // no BOM in front of the first JSON line
         Console.InputEncoding = Encoding.UTF8;
 
         try
@@ -627,9 +627,94 @@ public class DarkHubLatencyEngine
         });
     }
 
-    private static Dictionary<string, object> GetCpuTopologyInternal()
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetLogicalProcessorInformationEx(int RelationshipType, IntPtr Buffer, ref uint ReturnedLength);
+
+    const int RelationProcessorCore = 0;
+    const int RelationCache = 2;
+    const int RelationAll = 0xFFFF;
+
+    // One PROCESSOR_RELATIONSHIP (physical core) reduced to its group-0 mask and EfficiencyClass.
+    internal sealed class CpuCoreRecord
     {
-        int logicalCores = Environment.ProcessorCount;
+        public ulong Mask;
+        public int EfficiencyClass;
+        public CpuCoreRecord(ulong mask, int efficiencyClass) { Mask = mask; EfficiencyClass = efficiencyClass; }
+    }
+
+    // One unified/data L3 CACHE_RELATIONSHIP reduced to its group-0 mask and size in bytes.
+    internal sealed class CpuL3Record
+    {
+        public ulong Mask;
+        public uint Size;
+        public CpuL3Record(ulong mask, uint size) { Mask = mask; Size = size; }
+    }
+
+    // Reads GROUP_AFFINITY entries (KAFFINITY Mask, WORD Group, WORD Reserved[3]) and returns the OR of the masks that
+    // belong to processor group 0. Affinity masks handed to SetProcessAffinityMask are per group, so on machines with
+    // more than 64 logical processors only group 0 is considered (the other groups are simply left out).
+    // ptrSize is sizeof(KAFFINITY): 8 on x64 (stride 16), 4 on x86 (stride 12).
+    private static ulong Group0Mask(byte[] buf, int entryEnd, int offset, int groupCount, int ptrSize)
+    {
+        int stride = ptrSize == 8 ? 16 : 12;
+        ulong mask = 0;
+        if (groupCount < 1) groupCount = 1;
+        for (int g = 0; g < groupCount; g++)
+        {
+            int at = offset + g * stride;
+            if (at + ptrSize + 2 > entryEnd) break;
+            ulong m = ptrSize == 8 ? BitConverter.ToUInt64(buf, at) : BitConverter.ToUInt32(buf, at);
+            ushort group = BitConverter.ToUInt16(buf, at + ptrSize);
+            if (group == 0) mask |= m;
+        }
+        return mask;
+    }
+
+    // Pure parser of a SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX buffer (RelationAll). Kept free of P/Invoke so it can
+    // be fed hand-built buffers by tests (tests/native/CpuTopologyHarness.cs).
+    internal static void ParseProcessorInfo(byte[] buf, int len, int ptrSize, List<CpuCoreRecord> cores, List<CpuL3Record> l3)
+    {
+        if (len > buf.Length) len = buf.Length;
+        int pos = 0;
+        while (pos + 8 <= len)
+        {
+            int rel = BitConverter.ToInt32(buf, pos);
+            int size = BitConverter.ToInt32(buf, pos + 4);
+            if (size <= 0 || pos + size > len) break;
+            int end = pos + size;
+            if (rel == RelationProcessorCore && size >= 32)
+            {
+                // PROCESSOR_RELATIONSHIP: Flags@8, EfficiencyClass@9, GroupCount@30, GroupMask[]@32
+                int eff = buf[pos + 9];
+                int gc = BitConverter.ToUInt16(buf, pos + 30);
+                ulong m = Group0Mask(buf, end, pos + 32, gc, ptrSize);
+                if (m != 0) cores.Add(new CpuCoreRecord(m, eff));
+            }
+            else if (rel == RelationCache && size >= 40)
+            {
+                // CACHE_RELATIONSHIP: Level@8, CacheSize@12, Type@16, GroupCount@38 (0 before Win11), GroupMask[]@40
+                int level = buf[pos + 8];
+                int type = BitConverter.ToInt32(buf, pos + 16);
+                if (level == 3 && type != 1 /* not instruction */)
+                {
+                    uint csize = BitConverter.ToUInt32(buf, pos + 12);
+                    int gc = BitConverter.ToUInt16(buf, pos + 38);
+                    ulong m = Group0Mask(buf, end, pos + 40, gc, ptrSize);
+                    if (m != 0) l3.Add(new CpuL3Record(m, csize));
+                }
+            }
+            pos += size;
+        }
+    }
+
+    // Pure selection over parsed records (no OS calls):
+    //   - hybrid CPUs (Intel 12th gen+ / Core Ultra): "P-cores" = cores with the highest EfficiencyClass;
+    //   - uniform cores with several L3 caches (dual-CCD Ryzen): the L3 group with the largest cache (the V-Cache
+    //     CCD on X3D parts); on a size tie, the first L3 reported (CCD0) so a game stays on one CCD;
+    //   - otherwise (no core records, i.e. the API failed) every logical processor up to 64.
+    // Output fields are unchanged; "topology_source"/"hybrid"/"l3_groups" are informational additions.
+    internal static Dictionary<string, object> SelectCpuTopology(int logicalCores, List<CpuCoreRecord> cores, List<CpuL3Record> l3)
+    {
         ulong allCoresMask = 0;
         for (int i = 0; i < Math.Min(64, logicalCores); i++)
         {
@@ -637,10 +722,41 @@ public class DarkHubLatencyEngine
         }
 
         ulong pCoreMask = allCoresMask;
-        if (logicalCores >= 12)
-        {
+        string source = "fallback";
+        bool hybrid = false;
+        int l3Groups = 0;
 
-            pCoreMask = 0xFFFFUL & allCoresMask;
+        if (cores != null && cores.Count > 0)
+        {
+            if (l3 == null) l3 = new List<CpuL3Record>();
+            ulong all = 0;
+            int minEff = int.MaxValue, maxEff = int.MinValue;
+            for (int i = 0; i < cores.Count; i++)
+            {
+                all |= cores[i].Mask;
+                if (cores[i].EfficiencyClass < minEff) minEff = cores[i].EfficiencyClass;
+                if (cores[i].EfficiencyClass > maxEff) maxEff = cores[i].EfficiencyClass;
+            }
+            allCoresMask = all;
+            pCoreMask = all;
+            source = "uniform";
+            l3Groups = l3.Count;
+
+            if (maxEff > minEff)
+            {
+                ulong p = 0;
+                for (int i = 0; i < cores.Count; i++)
+                    if (cores[i].EfficiencyClass == maxEff) p |= cores[i].Mask;
+                if (p != 0) { pCoreMask = p; hybrid = true; source = "efficiency_class"; }
+            }
+            else if (l3.Count > 1)
+            {
+                int best = 0;
+                for (int i = 1; i < l3.Count; i++)
+                    if (l3[i].Size > l3[best].Size) best = i;
+                ulong p = l3[best].Mask & all;
+                if (p != 0) { pCoreMask = p; source = "l3_group"; }
+            }
         }
 
         return new Dictionary<string, object>
@@ -648,8 +764,40 @@ public class DarkHubLatencyEngine
             { "logical_cores", logicalCores },
             { "all_cores_mask_hex", "0x" + allCoresMask.ToString("X") },
             { "p_core_mask_hex", "0x" + pCoreMask.ToString("X") },
-            { "p_core_mask_ulong", pCoreMask }
+            { "p_core_mask_ulong", pCoreMask },
+            { "topology_source", source },
+            { "hybrid", hybrid },
+            { "l3_groups", l3Groups }
         };
+    }
+
+    // Real topology: GetLogicalProcessorInformationEx -> ParseProcessorInfo -> SelectCpuTopology.
+    private static Dictionary<string, object> GetCpuTopologyInternal()
+    {
+        var cores = new List<CpuCoreRecord>();
+        var l3 = new List<CpuL3Record>();
+        IntPtr buf = IntPtr.Zero;
+        try
+        {
+            uint len = 0;
+            GetLogicalProcessorInformationEx(RelationAll, IntPtr.Zero, ref len);
+            if (len > 0 && len < 16 * 1024 * 1024)
+            {
+                buf = Marshal.AllocHGlobal((int)len);
+                if (GetLogicalProcessorInformationEx(RelationAll, buf, ref len))
+                {
+                    var bytes = new byte[len];
+                    Marshal.Copy(buf, bytes, 0, (int)len);
+                    ParseProcessorInfo(bytes, (int)len, IntPtr.Size, cores, l3);
+                }
+            }
+        }
+        catch { cores.Clear(); l3.Clear(); }
+        finally
+        {
+            if (buf != IntPtr.Zero) Marshal.FreeHGlobal(buf);
+        }
+        return SelectCpuTopology(Environment.ProcessorCount, cores, l3);
     }
 
     private static string HandlePingNative(string host, int timeoutMs)
