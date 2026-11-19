@@ -488,7 +488,12 @@ describe.skipIf(process.platform !== 'win32')('walk() with junction loops', () =
     expect(await svc.transfer({ transferId: 'jld1', sftpId: 'jl1', direction: 'download', localPath: back, remotePath: '/loopy' })).toMatchObject({ ok: true })
     expect(fs.readFileSync(path.join(back, 'a', 'b', 'f.txt'), 'utf8')).toBe('hello')
     expect(fs.existsSync(path.join(back, 'a', 'again'))).toBe(false)
-    expect(await svc.du({ sftpId: 'jl1', side: 'remote', path: '/loopy' })).toMatchObject({ files: 2 })
+    // walk() intentionally dereferences a symlink to a file and uploads it as a regular file (see the
+    // link.txt assertion in the previous test). On windows-latest the runner can create that symlink,
+    // so it is part of the uploaded tree and must be counted; junctions/loops stay excluded either way.
+    const symlinkFile = fs.existsSync(path.join(tree, 'link.txt'))
+    expect(await svc.du({ sftpId: 'jl1', side: 'remote', path: '/loopy' }))
+      .toMatchObject({ files: symlinkFile ? 3 : 2, bytes: symlinkFile ? 16 : 8 })
     svc.closeAll()
     manager.disposeAll()
   }, 30_000)
