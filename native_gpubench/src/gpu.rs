@@ -731,7 +731,7 @@ impl Gpu {
             while started.elapsed() < dur {
                 if tick_at.elapsed() >= Duration::from_millis(500) {
                     let fps = (frame - tick_frame) as f64 / tick_at.elapsed().as_secs_f64();
-                    crate::say(serde_json::json!({"type": "tick", "fps": (fps * 10.0).round() / 10.0, "frame": frame}));
+                    crate::win_impl::say(serde_json::json!({"type": "tick", "fps": (fps * 10.0).round() / 10.0, "frame": frame}));
                     (tick_at, tick_frame) = (Instant::now(), frame);
                 }
                 if !self.pump() { self.wait_idle()?; return Ok(None); }

@@ -133,10 +133,22 @@ pub fn run() -> Result<(), String> {
                 let path: Vec<Value> = proof::merkle_path(roots, frame as usize).into_iter().map(|(left, h)| json!({"left": left, "hash": proof::hex(&h)})).collect();
                 say(json!({"type": "opening", "test": test, "frame": frame, "tiles": raw, "tileHashes": u32s_b64(&hashes), "path": path}));
             }
-            "audit" => {
-                let lines = audit::collect();
-                let rows: Vec<Value> = lines.iter().map(|l| json!({"v": l.v, "tag": l.tag, "detail": l.detail})).collect();
-                say(json!({"type": "audit", "lines": rows}));
+            "fingerprint" => {
+                // the same frame must always come out identical: stress test compares this against its reference
+                if rt && !g.info.dxr { say(json!({"type": "error", "error": "dxr_unsupported"})); continue; }
+                let frame = msg["frame"].as_u64().unwrap_or(0) as u32;
+                let (ids, hashes) = g.capture(rt, seed, frame).map_err(|e| format!("capture: {e}"))?;
+                let image = g.read_ldr().map_err(|e| format!("image: {e}"))?;
+                let ids_bytes: Vec<u8> = ids.iter().chain(hashes.iter()).flat_map(|x| x.to_le_bytes()).collect();
+                say(json!({"type": "fingerprint", "ids": proof::hex(&proof::frame_root(&ids_bytes)), "image": proof::hex(&proof::frame_root(&image))}));
+            }
+            "driver" => say(audit::driver(g.info.vendor == 0x10DE)),
+            "modules" => say(json!({"type": "modules", "modules": gpu::loaded_modules()})),
+            "shot" => {
+                let path = msg["path"].as_str().unwrap_or("");
+                let rgba = g.read_ldr().map_err(|e| format!("image: {e}"))?;
+                let ok = std::fs::write(path, rgba).is_ok();
+                say(json!({"type": "shot", "ok": ok, "width": scene::WIDTH, "height": scene::HEIGHT}));
             }
             _ => {}
         }
