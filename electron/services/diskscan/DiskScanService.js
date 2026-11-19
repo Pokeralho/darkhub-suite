@@ -1,5 +1,6 @@
-// "Mapa de disco": runs DarkHub.DiskScan.exe, keeps the tree in the main process and serves the renderer only
-// the part it can draw. One scan at a time.
+// "Mapa de disco": runs DarkHub.DiskScan.exe on Windows, keeps the tree in the main process and serves the renderer only
+// the part it can draw. One scan at a time. On non-Windows platforms this feature is not available and all operations
+// return a structured unsupported response without invoking PowerShell or the native scanner.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -16,6 +17,20 @@ const TAG_COLORS = new Set(['red', 'yellow', 'green', 'blue']);
 function defaultExe() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   return path.join(here.replace(/app\.asar(?![.\w])/, 'app.asar.unpacked'), '..', 'DarkHub.DiskScan.exe');
+}
+
+function unsupported(reason = 'windows-only') {
+  return {
+    ok: false,
+    unsupported: true,
+    platform: process.platform,
+    reason,
+    error: 'O mapa de disco é suportado apenas no Windows.'
+  };
+}
+
+function isSupported() {
+  return process.platform === 'win32';
 }
 
 const csvCell = (v) => `"${String(v).replace(/"/g, '""')}"`;
@@ -148,6 +163,7 @@ export class DiskScanService {
   }
 
   async drives() {
+    if (!isSupported()) return { ...unsupported(), drives: [] };
     const r = await runPowerShell("Get-CimInstance Win32_LogicalDisk | Where-Object { $_.Size -gt 0 } | Select-Object DeviceID, VolumeName, FileSystem, Size, FreeSpace, DriveType | ConvertTo-Json -Compress", { timeoutMs: 20000, trim: true });
     let list = [];
     try { const j = JSON.parse(r.stdout || '[]'); list = Array.isArray(j) ? j : [j]; } catch { list = []; }
@@ -161,6 +177,7 @@ export class DiskScanService {
   }
 
   status() {
+    if (!isSupported()) return { ok: true, active: false, supported: false, unsupported: true, platform: process.platform, reason: 'windows-only' };
     const s = this.state;
     if (!s) return { ok: true, active: false };
     const m = this.model;
@@ -173,6 +190,7 @@ export class DiskScanService {
 
   /** Starts scanning `root`. Progress goes to `onProgress(status)` at most every 250 ms. */
   start(root, onProgress = () => {}) {
+    if (!isSupported()) return unsupported();
     const target = typeof root === 'string' ? path.resolve(root) : '';
     if (!target || !path.isAbsolute(target)) return { ok: false, error: 'Caminho inválido.' };
     let st;
@@ -226,6 +244,7 @@ export class DiskScanService {
   }
 
   cancel() {
+    if (!isSupported()) return unsupported();
     if (this.proc) {
       try { this.proc.kill(); } catch { /* already gone */ }
       this.proc = null;
@@ -237,6 +256,7 @@ export class DiskScanService {
   /** Drawable tree under `id` (default root): { tree, trail, total, filterErrors }. */
   /** `minFraction`: entries smaller than this share of the folder are folded (the renderer derives it from pixels). */
   view({ id = 'd0', minFraction = 0, maxNodes = 6000, filter = '', showFree = false } = {}) {
+    if (!isSupported()) return unsupported();
     const m = this.model;
     if (!m || m.maxDir < 0) return { ok: false, error: 'Nenhuma varredura.' };
     const r = m.parse(id);
@@ -258,11 +278,13 @@ export class DiskScanService {
   }
 
   info(id, filter = '') {
+    if (!isSupported()) return unsupported();
     const info = this.model?.info(id, this._filter(filter));
     return info ? { ok: true, info } : { ok: false, error: 'Item não encontrado.' };
   }
 
   setTag(id, color) {
+    if (!isSupported()) return unsupported();
     if (color !== null && !TAG_COLORS.has(color)) return { ok: false, error: 'Cor inválida.' };
     return this.model?.setTag(id, color) ? { ok: true } : { ok: false, error: 'Item não encontrado.' };
   }
@@ -274,6 +296,7 @@ export class DiskScanService {
   }
 
   async open(id) {
+    if (!isSupported()) return unsupported();
     const p = this._pathOf(id);
     if (!p) return { ok: false, error: 'Item não encontrado.' };
     const err = await this.shell.openPath(p);
@@ -281,6 +304,7 @@ export class DiskScanService {
   }
 
   reveal(id) {
+    if (!isSupported()) return unsupported();
     const p = this._pathOf(id);
     if (!p) return { ok: false, error: 'Item não encontrado.' };
     this.shell.showItemInFolder(p);
@@ -289,6 +313,7 @@ export class DiskScanService {
 
   /** Sends to the Recycle Bin (never a permanent delete) and removes it from the map. The scan root cannot be trashed. */
   async trash(id) {
+    if (!isSupported()) return unsupported();
     if (id === 'd0') return { ok: false, error: 'A pasta analisada não pode ser enviada para a Lixeira daqui.' };
     const p = this._pathOf(id);
     if (!p) return { ok: false, error: 'Item não encontrado.' };
@@ -314,6 +339,7 @@ export class DiskScanService {
    * and only when `confirmName` repeats the item's name (the second confirmation the user types).
    */
   async deletePermanent(id, confirmName) {
+    if (!isSupported()) return unsupported();
     if (id === 'd0') return { ok: false, error: 'A pasta analisada não pode ser apagada daqui.' };
     const p = this._pathOf(id);
     if (!p) return { ok: false, error: 'Item não encontrado.' };
@@ -360,14 +386,16 @@ export class DiskScanService {
 
   /** Recycle Bin facts for the drive holding `p` (see RECYCLE_PROBE). */
   async recycleProbe(p) {
+    if (!isSupported()) return null;
     const r = await runPowerShell(RECYCLE_PROBE(p), { timeoutMs: 20000, trim: true });
     try { return JSON.parse(r.stdout || 'null'); } catch { return null; }
   }
 
-  pathOf(id) { return this._pathOf(id); }
+  pathOf(id) { if (!isSupported()) return null; return this._pathOf(id); }
 
   /** Writes a report of folder `id` to `dest`: 'csv' (every file) or 'txt' (folders + 100 largest files). */
   async exportTo({ id = 'd0', format = 'txt', filter = '' }, dest) {
+    if (!isSupported()) return unsupported();
     const m = this.model; const r = m?.parse(id);
     if (!r || r.kind !== 'dir') return { ok: false, error: 'Pasta não encontrada.' };
     const f = this._filter(filter);

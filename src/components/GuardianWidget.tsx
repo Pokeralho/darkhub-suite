@@ -7,6 +7,7 @@ export const LATENCY_CONFIG_EVENT = 'darkhub:latency-config'
 const GUARDIAN_IDLE_POLL_MS = 15000
 
 export default function GuardianWidget() {
+  const [supported, setSupported] = useState(true)
   const [enabled, setEnabled] = useState(false)
   const [ultraOn, setUltraOn] = useState(false)
   const [ping, setPing] = useState<number | null>(null)
@@ -51,7 +52,10 @@ export default function GuardianWidget() {
     if (!window.darkhub?.latency) return
     try {
       const res = await window.darkhub.latency.getConfig()
-      if (!res?.ok) return
+      if (!res?.ok) {
+        if (res?.unsupported) setSupported(false)
+        return
+      }
       const cfg = res.config ?? {}
       const st = res.status ?? {}
       const m = res.metrics ?? {}
@@ -99,15 +103,17 @@ export default function GuardianWidget() {
   }
 
   useEffect(() => {
+    if (!supported) return
     refresh()
     return () => {
       if (alertTimerRef.current) window.clearTimeout(alertTimerRef.current)
     }
-  }, [])
+  }, [supported])
 
   // Live metrics every 1.5 s only while the widget is shown; when it is off, a slow check (plus the
   // config-changed event from the Ultra Low Latency screen) is enough to notice it being turned on.
   useEffect(() => {
+    if (!supported) return
     const stopPolling = visibleInterval(refresh, enabled ? 1500 : GUARDIAN_IDLE_POLL_MS)
     const onConfig = () => { void refresh() }
     window.addEventListener(LATENCY_CONFIG_EVENT, onConfig)
@@ -115,9 +121,9 @@ export default function GuardianWidget() {
       stopPolling()
       window.removeEventListener(LATENCY_CONFIG_EVENT, onConfig)
     }
-  }, [enabled])
+  }, [supported, enabled])
 
-  if (!enabled) return null
+  if (!supported || !enabled) return null
 
   const fmt = (n: number | null) => (n == null || !Number.isFinite(n) ? null : n.toFixed(0))
 

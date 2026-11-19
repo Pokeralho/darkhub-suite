@@ -51,6 +51,9 @@ class NativeLatencyClient extends EventEmitter {
 
   ensureRunning() {
     if (this.process && !this.process.killed) return true
+    // The native daemon (DarkHub.LatencyEngine.exe) is a Windows-only binary. On Linux/macOS
+    // we must never attempt to spawn it — return false so callers degrade to structured unsupported.
+    if (process.platform !== 'win32') return false
 
     const exePath = this.getExecutablePath()
     if (!this._exists(exePath)) {

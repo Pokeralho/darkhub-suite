@@ -7,7 +7,7 @@ const dict: Record<string, string> = {
   "cleaner.tab.defs": "Definitions (winapp2.ini)",
   "cleaner.title": "Deep clean",
   "cleaner.subtitle": "DarkHub Cleaner Core: temporary files and program caches, compaction of browser databases and dead registry entries. Everything starts as a simulation.",
-  "cleaner.noEngine": "The DarkHub.Cleaner.exe engine was not found (run npm run build:cleaner).",
+  "cleaner.noEngine": "The native Cleaner engine was not found. Build/install the binary for this platform (native_cleaner).",
   "cleaner.cancel": "Cancel",
   "cleaner.loadFail": "Could not list the items.",
   "cleaner.builtin": "DarkHub (built-in)",

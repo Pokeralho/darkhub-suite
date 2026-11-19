@@ -170,9 +170,11 @@ export function assetSha256(asset) {
 }
 
 /**
- * Windows' own bsdtar (reads zip/7z/tar). By absolute path: a bare "tar.exe" can resolve to Git's GNU tar, which reads
- * "C:\..." as a remote host and fails.
+ * Archive tool. Windows ships bsdtar as tar.exe (reads zip/7z/tar) - by absolute path because a bare "tar.exe"
+ * can resolve to Git's GNU tar. On Linux/macOS use system tar from PATH.
  */
-export const SYSTEM_TAR = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe')
+export const SYSTEM_TAR = process.platform === 'win32'
+  ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe')
+  : 'tar'
 
 export default { downloadToFile, fetchJson, assetSha256, GITHUB_HOSTS, SYSTEM_TAR }

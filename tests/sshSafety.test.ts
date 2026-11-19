@@ -49,14 +49,14 @@ describe('editLocalName', () => {
 })
 
 describe('local path guards', () => {
-  it('isInsideLocal', () => {
+  it.skipIf(process.platform !== 'win32')('isInsideLocal', () => {
     expect(isInsideLocal('C:\\dl', 'C:\\dl\\a\\b.txt')).toBe(true)
     expect(isInsideLocal('C:\\dl', 'c:\\DL\\a')).toBe(true)
     expect(isInsideLocal('C:\\dl', 'C:\\dl\\..foo')).toBe(true)
     expect(isInsideLocal('C:\\dl', 'C:\\dl\\..\\x.bat')).toBe(false)
     expect(isInsideLocal('C:\\dl', 'D:\\dl\\x')).toBe(false)
   })
-  it('protectedLocalRoots covers Windows, Program Files and ProgramData\\Microsoft', () => {
+  it.skipIf(process.platform !== 'win32')('protectedLocalRoots covers Windows, Program Files and ProgramData\\Microsoft', () => {
     const roots = protectedLocalRoots(['D:\\Apps\\DarkHub'], { WINDIR: 'C:\\Windows', ProgramFiles: 'C:\\Program Files', 'ProgramFiles(x86)': 'C:\\Program Files (x86)', ProgramData: 'C:\\ProgramData' })
     expect(roots).toEqual(expect.arrayContaining(['C:\\Windows', 'C:\\Program Files', 'C:\\Program Files (x86)', 'C:\\ProgramData\\Microsoft', 'D:\\Apps\\DarkHub']))
   })

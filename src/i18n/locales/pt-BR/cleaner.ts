@@ -7,7 +7,7 @@ const dict: Record<string, string> = {
   "cleaner.tab.defs": "Definições (winapp2.ini)",
   "cleaner.title": "Limpeza profunda",
   "cleaner.subtitle": "DarkHub Cleaner Core: arquivos temporários e caches de programas, compactação dos bancos dos navegadores e entradas mortas do registro. Tudo começa em simulação.",
-  "cleaner.noEngine": "O motor DarkHub.Cleaner.exe não foi encontrado (rode npm run build:cleaner).",
+  "cleaner.noEngine": "O motor nativo do Cleaner não foi encontrado. Compile/instale o binário para esta plataforma (native_cleaner).",
   "cleaner.cancel": "Cancelar",
   "cleaner.loadFail": "Não foi possível listar os itens.",
   "cleaner.builtin": "DarkHub (embutido)",

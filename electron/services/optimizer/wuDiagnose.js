@@ -68,7 +68,7 @@ export function wuFindings(raw) {
 
 /** runner: (script, opts) -> { stdout } (PowerShellRunner.runPowerShell). */
 export async function diagnoseWindowsUpdate(runner) {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only Windows supported' }
+  if (process.platform !== 'win32') return { ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Apenas suportado no Windows.' }
   const res = await runner(fs.readFileSync(SCRIPT, 'utf8'), { timeoutMs: 90000, trim: true })
   let raw = null
   try { raw = JSON.parse(String(res?.stdout || '').trim().split(/\r?\n/).pop()) } catch { /* not JSON */ }

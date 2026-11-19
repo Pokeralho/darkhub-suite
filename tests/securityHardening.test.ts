@@ -84,7 +84,7 @@ describe('secure staging', () => {
   it('names stay inside the folder, files are created fresh and re-checked before use', async () => {
     _resetStagingCache()
     const s = await createSecureStagingDir({ fallbackBase: mkTmp(), elevated: false, platform: 'win32' })
-    expect(() => s.file('..\\x.exe')).toThrow()
+    expect(() => s.file(process.platform === 'win32' ? '..\\x.exe' : '../x.exe')).toThrow()
     expect(() => s.file('a/b.exe')).toThrow()
     const f = await writeStagedFile(s, 'setup.msi', 'payload')
     await expect(writeStagedFile(s, 'setup.msi', 'again')).rejects.toThrow() // never replaces

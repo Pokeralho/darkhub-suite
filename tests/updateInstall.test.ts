@@ -46,6 +46,7 @@ describe('pickInstallerAsset / sameAssetName', () => {
 });
 
 describe('installUpdate', () => {
+  beforeEach(() => { svc._platform = 'win32'; spawnMock.mockClear(); quit.mockClear(); });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-upd-'));
   const file = path.join(dir, 'setup.exe');
   const arm = (content: string, sha = crypto.createHash('sha256').update(content).digest('hex')) => {
@@ -85,6 +86,15 @@ describe('installUpdate', () => {
     const r = await svc.installUpdate();
     expect(r).toMatchObject({ ok: false });
     await new Promise((res) => setTimeout(res, 600));
+    expect(quit).not.toHaveBeenCalled();
+  });
+
+  it('reports unsupported instead of spawning a Windows installer on Linux', async () => {
+    svc._platform = 'linux';
+    arm('installer');
+    const r = await svc.installUpdate();
+    expect(r).toMatchObject({ ok: false, unsupported: true, platform: 'linux', reason: 'windows-only' });
+    expect(spawnMock).not.toHaveBeenCalled();
     expect(quit).not.toHaveBeenCalled();
   });
 });

@@ -3,6 +3,8 @@ use crate::files::{self, Opts};
 use crate::safety::Env;
 use crate::util::wild_match;
 use crate::winapp2::{self, parse};
+#[cfg(not(windows))]
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -25,6 +27,17 @@ fn no_reg(_: &str) -> bool {
     false
 }
 
+/// Build an Env with injected values (never the real process env), so unsafe roots can be probed
+/// without ever pointing the cleaner at a real user path for cleaning.
+#[cfg(not(windows))]
+fn unix_env(vars: &[(&str, &Path)]) -> Env {
+    let mut v: HashMap<String, Vec<PathBuf>> = HashMap::new();
+    for (k, p) in vars {
+        v.entry((*k).to_string()).or_default().push(p.to_path_buf());
+    }
+    Env { vars: v }
+}
+
 #[test]
 fn wildcard_matching() {
     assert!(wild_match("*.*", "noext"));
@@ -35,6 +48,7 @@ fn wildcard_matching() {
     assert!(!wild_match("a*b", "ac"));
 }
 
+#[cfg(windows)]
 #[test]
 fn rules_outside_expected_folders_are_refused() {
     let base = tmp("safety");
@@ -56,6 +70,33 @@ fn rules_outside_expected_folders_are_refused() {
     assert!(env.check_rule(Path::new("\\\\server\\share\\x"), &any, true).is_err());
 }
 
+#[cfg(not(windows))]
+#[test]
+fn rules_outside_expected_folders_are_refused() {
+    let base = tmp("safety");
+    let env = Env::rooted(&base);
+    let cache = base.join("home/me/.cache");
+    let config = base.join("home/me/.config");
+    let data = base.join("home/me/.local/share");
+    let any = vec!["*.*".to_string()];
+    // Allowed: temp/cache roots and their contents
+    let r = env.check_rule(&cache.join("app"), &any, true);
+    assert!(r.is_ok(), "cache subdir allowed: {:?}", r);
+    let r = env.check_rule(&cache, &any, true);
+    assert!(r.is_ok(), "cache root allowed: {:?}", r);
+    let tmpdir = base.join("tmp");
+    let r = env.check_rule(&tmpdir, &any, true);
+    assert!(r.is_ok(), "temp may be emptied: {:?}", r);
+    // Refused: outside allowed roots (home docs, config, data not whitelisted for file cleaning)
+    assert!(env.check_rule(&base.join("home/me/Documents/x"), &any, true).is_err());
+    assert!(env.check_rule(&config.join("app"), &any, true).is_err(), "config not a cleaning root");
+    assert!(env.check_rule(&data.join("app"), &any, true).is_err(), "data not a cleaning root");
+    assert!(env.check_rule(&cache.join("app/../../x"), &any, true).is_err());
+    assert!(env.check_rule(&cache.join("app"), &["../*".into()], true).is_err());
+    assert!(env.check_rule(&cache.join("nvcache"), &any, true).is_err(), "shader cache kept");
+}
+
+#[cfg(windows)]
 #[test]
 fn winapp2_parsing_detection_and_validation() {
     let base = tmp("w2");
@@ -117,6 +158,7 @@ FileKey1=%LocalAppData%\Foo\Cache|*.*
     let _ = fs::remove_dir_all(&base);
 }
 
+#[cfg(windows)]
 #[test]
 fn protected_files_survive_and_shred_unlinks() {
     let base = tmp("shred");
@@ -133,6 +175,28 @@ fn protected_files_survive_and_shred_unlinks() {
     assert_eq!(r["total"]["protected"], 2);
     assert!(!cache.join("x.bin").exists());
     assert!(cache.join("Login Data").exists());
+    let left: Vec<_> = fs::read_dir(&cache).unwrap().flatten().map(|e| e.file_name().to_string_lossy().to_string()).collect();
+    assert!(!left.iter().any(|n| n.ends_with(".dhs")), "no renamed leftovers: {left:?}");
+    let _ = fs::remove_dir_all(&base);
+}
+
+#[cfg(not(windows))]
+#[test]
+fn protected_files_survive_and_shred_unlinks() {
+    let base = tmp("shred");
+    let env = Env::rooted(&base);
+    let cache = base.join("home/me/.cache/app");
+    put(&cache.join("x.bin"), 3 << 20);
+    put(&cache.join("logins.json"), 10);
+    put(&cache.join("vault.kdbx"), 10);
+    let ini = "[App]\nFileKey1=%xdg_cache_home%/app|*.*|RECURSE\n";
+    let (targets, _) = winapp2::load_all(&env, Some(ini), &no_reg);
+    let t = targets.iter().find(|t| t.id == "w2:App").unwrap();
+    let r = files::run(&env, &[t], &Opts { apply: true, shred: 3, sample: 10 });
+    assert_eq!(r["total"]["files"], 1);
+    assert_eq!(r["total"]["protected"], 2);
+    assert!(!cache.join("x.bin").exists());
+    assert!(cache.join("logins.json").exists());
     let left: Vec<_> = fs::read_dir(&cache).unwrap().flatten().map(|e| e.file_name().to_string_lossy().to_string()).collect();
     assert!(!left.iter().any(|n| n.ends_with(".dhs")), "no renamed leftovers: {left:?}");
     let _ = fs::remove_dir_all(&base);
@@ -187,6 +251,7 @@ fn make_db(path: &Path) {
     c.execute("DELETE FROM t WHERE rowid % 4 != 0", []).unwrap();
 }
 
+#[cfg(windows)]
 #[test]
 fn browser_vacuum_shrinks_and_keeps_rows() {
     let base = tmp("vac");
@@ -412,6 +477,135 @@ fn literal_segments_through_junctions_are_refused() {
     let _ = fs::remove_dir_all(&base);
 }
 
+// --- B1: unsafe Unix env roots are validated (all fixtures are injected; nothing real is cleaned) ---
+
+#[cfg(not(windows))]
+#[test]
+fn unix_dangerous_env_roots_are_refused() {
+    let base = tmp("b1-danger");
+    let home = base.join("home");
+    fs::create_dir_all(home.join("Documents")).unwrap();
+    put(&home.join("Documents/secret.txt"), 10);
+    let any = vec!["*.*".to_string()];
+
+    // TMPDIR/TEMP/TMP = $HOME: the home tree must not become a whole_ok root.
+    let env = unix_env(&[("home", &home), ("temp", &home), ("tmp", &home), ("tmpdir", &home)]);
+    assert!(env.check_rule(&home.join("Documents"), &any, true).is_err(), "TMPDIR=$HOME refused");
+    assert!(env.matched_root(&home.join("Documents")).is_none());
+    assert!(home.join("Documents/secret.txt").exists());
+
+    // TMPDIR = /home: an ancestor of home and of every user tree.
+    let env = unix_env(&[("home", &home), ("temp", Path::new("/home"))]);
+    assert!(env.check_rule(Path::new("/home/someone"), &any, true).is_err(), "TMPDIR=/home refused");
+    assert!(env.matched_root(Path::new("/home/someone")).is_none());
+
+    // XDG_CACHE_HOME = /: the filesystem root can never be a cleaning root.
+    let env = unix_env(&[("home", &home), ("xdg_cache_home", Path::new("/"))]);
+    assert!(env.check_rule(Path::new("/etc"), &any, true).is_err(), "XDG_CACHE_HOME=/ refused");
+    assert!(env.matched_root(Path::new("/etc")).is_none());
+
+    // Positive control: a real user temp below $HOME (not home itself) is still a valid root.
+    let user_tmp = home.join("tmp");
+    let env = unix_env(&[("home", &home), ("temp", &user_tmp), ("tmp", &user_tmp)]);
+    assert!(env.check_rule(&user_tmp, &any, true).is_ok(), "legit user temp still allowed");
+    assert!(env.matched_root(&user_tmp).is_some());
+
+    let _ = fs::remove_dir_all(&base);
+}
+
+#[cfg(not(windows))]
+#[test]
+fn unix_symlinked_root_is_validated_before_cleaning() {
+    let base = tmp("b1-link");
+    let home = base.join("home");
+    let secret = home.join("private/secret.txt");
+    put(&secret, 10);
+    let any = vec!["*.*".to_string()];
+
+    // A temp root that is a symlink straight at $HOME is rejected during validation.
+    let to_home = base.join("tmp-to-home");
+    std::os::unix::fs::symlink(&home, &to_home).unwrap();
+    let env = unix_env(&[("home", &home), ("temp", &to_home), ("tmp", &to_home), ("tmpdir", &to_home)]);
+    assert!(env.check_root_target(&to_home).is_err());
+    assert!(env.check_rule(&to_home.join("private"), &any, true).is_err());
+    assert!(env.matched_root(&to_home.join("private")).is_none());
+    assert!(secret.exists());
+
+    // A root validated while pointing at a safe folder stops being valid once the symlink is
+    // retargeted to $HOME; a forged rule that slipped through is refused before deleting anything.
+    let safe = base.join("real-temp");
+    fs::create_dir_all(&safe).unwrap();
+    let pivot = base.join("pivot");
+    std::os::unix::fs::symlink(&safe, &pivot).unwrap();
+    let env2 = unix_env(&[("home", &home), ("temp", &pivot), ("tmp", &pivot), ("tmpdir", &pivot)]);
+    assert!(env2.check_rule(&pivot, &any, true).is_ok(), "valid while pointing at a safe folder");
+    fs::remove_file(&pivot).unwrap();
+    std::os::unix::fs::symlink(&home, &pivot).unwrap();
+    assert!(env2.check_root_target(&pivot).is_err(), "retargeted symlink rejected");
+    assert!(env2.check_rule(&pivot, &any, true).is_err(), "retargeted root no longer valid");
+    let forged = winapp2::Target {
+        id: "w:pivot".into(), name: "pivot".into(), category: "x".into(), source: "winapp2", warning: None,
+        rules: vec![winapp2::Rule { dir: pivot.clone(), patterns: any.clone(), recurse: true, remove_self: false }],
+        excludes: vec![], rejected: vec![], ignored_registry: 0,
+    };
+    let r = files::run(&env2, &[&forged], &Opts { apply: true, shred: 0, sample: 10 });
+    assert_eq!(r["targets"][0]["refused"].as_array().unwrap().len(), 1, "{r}");
+    assert!(secret.exists(), "nothing under $HOME was deleted");
+
+    // A symlink to a real temp folder (both non-dangerous) stays cleanable.
+    put(&safe.join("junk.tmp"), 7);
+    let good = base.join("good-link");
+    std::os::unix::fs::symlink(&safe, &good).unwrap();
+    let env3 = unix_env(&[("home", &home), ("temp", &good), ("tmp", &good), ("tmpdir", &good)]);
+    assert!(env3.check_root_target(&good).is_ok());
+    let t = winapp2::Target {
+        id: "w:good".into(), name: "good".into(), category: "x".into(), source: "winapp2", warning: None,
+        rules: vec![winapp2::Rule { dir: good, patterns: any, recurse: false, remove_self: false }],
+        excludes: vec![], rejected: vec![], ignored_registry: 0,
+    };
+    let r = files::run(&env3, &[&t], &Opts { apply: true, shred: 0, sample: 10 });
+    assert_eq!(r["total"]["files"], 1, "{r}");
+    assert!(!safe.join("junk.tmp").exists());
+
+    let _ = fs::remove_dir_all(&base);
+}
+
+// --- A1: exclusions compare with the platform separator ---
+
+#[cfg(not(windows))]
+#[test]
+fn unix_exclusions_match_files_and_directories() {
+    let base = tmp("b1-excl");
+    let cache = base.join("cache");
+    put(&cache.join("keep.dat"), 10);
+    put(&cache.join("sub/keep.log"), 10);
+    put(&cache.join("sub/drop.tmp"), 10);
+    put(&cache.join("keepdir/inside.tmp"), 10);
+
+    let env = unix_env(&[("home", &base), ("xdg_cache_home", &cache)]);
+    let ini = "[App]\n\
+                FileKey1=%xdg_cache_home%|*.*|RECURSE\n\
+                ExcludeKey1=FILE|%xdg_cache_home%/keep.dat\n\
+                ExcludeKey2=PATH|%xdg_cache_home%/sub|keep.log\n\
+                ExcludeKey3=FILE|%xdg_cache_home%/keepdir\n";
+    let (targets, _) = winapp2::load_all(&env, Some(ini), &no_reg);
+    let t = targets.iter().find(|t| t.id == "w2:App").expect("App target");
+
+    assert!(t.excluded(&cache.join("keep.dat")), "FILE exclusion matches the file");
+    assert!(t.excluded(&cache.join("sub/keep.log")), "PATH|pattern matches the file");
+    assert!(t.excluded(&cache.join("keepdir")), "FILE exclusion of a directory matches");
+    assert!(t.excluded(&cache.join("keepdir/inside.tmp")), "directory exclusion covers its children");
+    assert!(!t.excluded(&cache.join("sub/drop.tmp")), "non-excluded sibling is not protected");
+
+    let r = files::run(&env, &[t], &Opts { apply: true, shred: 0, sample: 10 });
+    assert_eq!(r["total"]["files"], 1, "{r}");
+    assert!(cache.join("keep.dat").exists());
+    assert!(cache.join("sub/keep.log").exists());
+    assert!(cache.join("keepdir/inside.tmp").exists());
+    assert!(!cache.join("sub/drop.tmp").exists());
+
+    let _ = fs::remove_dir_all(&base);
+}
 #[cfg(windows)]
 #[test]
 fn recycle_orphans_found_and_removed_without_following_junctions() {

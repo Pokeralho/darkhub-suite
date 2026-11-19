@@ -31,6 +31,18 @@ export async function bootAdvancedSensors({ app, logger } = {}) {
 
 /** `hwsensors:*`: advanced sensors (LibreHardwareMonitorLib + PawnIO driver). */
 export function registerHwSensorsIPC({ app, ipcMain, logger } = {}) {
+  if (process.platform !== 'win32') {
+    const unsupported = (extra = {}) => ({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Sensores avançados (LibreHardwareMonitor/PawnIO) são suportados apenas no Windows.', ...extra })
+    const handle = (channel, fn) => ipcMain.handle(channel, async (_e, payload) => {
+      try { return await fn(payload ?? {}) } catch (err) {
+        try { logger?.error?.('HwSensors', `${channel}: ${err?.message ?? err}`) } catch { /* ignore */ }
+        return { ok: false, error: err?.message ?? String(err) }
+      }
+    })
+    handle('hwsensors:status', () => ({ ok: true, supported: false, unsupported: true, platform: process.platform, reason: 'windows-only', enabled: false, available: false, running: false, pawnio: false, lastSample: 0, error: null }))
+    handle('hwsensors:setEnabled', () => unsupported({ enabled: false, available: false, running: false, pawnio: false, lastSample: 0 }))
+    return
+  }
   if (app?.whenReady) app.whenReady().then(() => {
     const t = setTimeout(() => { bootAdvancedSensors({ app, logger }).catch((e) => logger?.warn?.('HwSensors', `boot: ${e?.message ?? e}`)) }, 4000)
     t.unref?.()

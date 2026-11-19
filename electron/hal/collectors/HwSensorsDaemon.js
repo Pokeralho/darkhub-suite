@@ -16,6 +16,8 @@ export const HWSENSORS_EXE = path.join(here, '..', '..', 'services', 'hwsensors'
 /** PawnIO registers a kernel service named PawnIO; its registry key exists once the driver is installed. */
 let pawnCache = { at: 0, value: false };
 export function isPawnIoInstalled(execFileSync = cp.execFileSync, maxAgeMs = 10000) {
+  // PawnIO is a Windows kernel driver registered in the registry; never call reg.exe on other platforms.
+  if (process.platform !== 'win32') return false;
   // reg.exe runs synchronously on the main thread: cached for a few seconds
   if (Date.now() - pawnCache.at < maxAgeMs) return pawnCache.value;
   let value = false;
@@ -80,6 +82,7 @@ class HwSensorsDaemon extends EventEmitter {
 
   /** Starts only when the user turned advanced sensors on. */
   start() {
+    if (process.platform !== 'win32') return;
     if (this.process || !this.enabled) return;
     if (!fs.existsSync(HWSENSORS_EXE)) { this.lastError = 'DarkHub.HwSensors.exe não encontrado.'; return; }
     // the helper runs elevated and loads 18 libraries: an installed app starts it only when all of them are the shipped ones

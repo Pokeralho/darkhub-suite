@@ -39,6 +39,7 @@ describe('PowerShellTools runScript', () => {
     const fsImpl: any = { existsSync: () => true };
     if (realpath) fsImpl.realpathSync = realpath;
     const svc = new P.PowerShellToolsService({
+      platform: 'win32',
       root,
       fsImpl,
       runner: async () => ({ code: 0, stdout: JSON.stringify({ status, signer: '' }), stderr: '' }),

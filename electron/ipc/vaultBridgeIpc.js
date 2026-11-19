@@ -168,6 +168,8 @@ export function registerVaultBridgeIPC({ app, ipcMain, dialog, shell, BrowserWin
     return {
       ok: true,
       supported,
+      unsupported: !supported,
+      platform: process.platform,
       serverRunning: server.running,
       unlocked: vault.isUnlocked(),
       hostName: NATIVE_HOST_NAME,
@@ -184,7 +186,14 @@ export function registerVaultBridgeIPC({ app, ipcMain, dialog, shell, BrowserWin
 
   ipcMain.handle('vaultx:bridgeStatus', safe(status))
 
+  const windowsOnly = (action) => process.platform === 'win32' ? null : {
+    ok: false, unsupported: true, platform: process.platform, reason: 'windows-only',
+    error: `${action} do host nativo está disponível apenas no Windows.`
+  }
+
   ipcMain.handle('vaultx:registerHost', safe(async (_e, browser) => {
+    const unsupported = windowsOnly('Registro')
+    if (unsupported) return unsupported
     if (!isBrowserId(browser)) return { ok: false, error: 'Unknown browser' }
     await registry.register(browser)
     await syncServer()
@@ -193,6 +202,8 @@ export function registerVaultBridgeIPC({ app, ipcMain, dialog, shell, BrowserWin
   }))
 
   ipcMain.handle('vaultx:unregisterHost', safe(async (_e, browser) => {
+    const unsupported = windowsOnly('Remoção')
+    if (unsupported) return unsupported
     if (!isBrowserId(browser)) return { ok: false, error: 'Unknown browser' }
     await registry.unregister(browser)
     await syncServer()

@@ -21,7 +21,10 @@ export default function WuDiagnosis({ compact = false }: { compact?: boolean }) 
     try {
       const r = await window.darkhub?.wintools?.diagnoseWu();
       if (r?.ok) setFindings(r.findings ?? []);
-      else setMsg({ ok: false, text: r?.error || t('wudiag.fail', 'Could not run the check.') });
+      else {
+        setFindings(null);
+        setMsg({ ok: false, text: r?.error || t('wudiag.fail', 'Could not run the check.') });
+      }
     } finally { setBusy(null); }
   };
 

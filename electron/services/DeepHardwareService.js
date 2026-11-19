@@ -145,41 +145,43 @@ class DeepHardwareService {
         featureScore: null
       }));
 
-      try {
-        const ps = `Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion, VideoProcessor, VideoArchitecture, CurrentRefreshRate, PNPDeviceID | ConvertTo-Json -Compress`;
-        const wmiRes = await this.runPowerShell(ps, 5000);
-        if (wmiRes.stdout && !wmiRes.timeout) {
-          let parsed = JSON.parse(wmiRes.stdout);
-          if (!Array.isArray(parsed)) parsed = [parsed];
-          // one row per adapter (PCI subsystem id, then exact name): an empty name used to match every row
-          // (includes('')); a row with no match belongs to another adapter (Basic Display, remote), never copied over
-          const pairs = pairWmiRows(gpus, parsed.filter(Boolean));
-          const rows = parsed.filter(Boolean);
-          gpus.forEach((match, i) => {
-            const w = pairs[i] >= 0 ? rows[pairs[i]] : null;
-            if (!w) return;
-            if (!match.driverVersion && w.DriverVersion) match.driverVersion = w.DriverVersion;
-            match.videoProcessor = w.VideoProcessor;
-            match.refreshRate = w.CurrentRefreshRate;
-            match.architecture = w.VideoArchitecture;
-            if (w.PNPDeviceID) match.pnpDeviceId = w.PNPDeviceID;
-          });
-        }
+      if (process.platform === 'win32') {
+        try {
+          const ps = `Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion, VideoProcessor, VideoArchitecture, CurrentRefreshRate, PNPDeviceID | ConvertTo-Json -Compress`;
+          const wmiRes = await this.runPowerShell(ps, 5000);
+          if (wmiRes.stdout && !wmiRes.timeout) {
+            let parsed = JSON.parse(wmiRes.stdout);
+            if (!Array.isArray(parsed)) parsed = [parsed];
+            // one row per adapter (PCI subsystem id, then exact name): an empty name used to match every row
+            // (includes('')); a row with no match belongs to another adapter (Basic Display, remote), never copied over
+            const pairs = pairWmiRows(gpus, parsed.filter(Boolean));
+            const rows = parsed.filter(Boolean);
+            gpus.forEach((match, i) => {
+              const w = pairs[i] >= 0 ? rows[pairs[i]] : null;
+              if (!w) return;
+              if (!match.driverVersion && w.DriverVersion) match.driverVersion = w.DriverVersion;
+              match.videoProcessor = w.VideoProcessor;
+              match.refreshRate = w.CurrentRefreshRate;
+              match.architecture = w.VideoArchitecture;
+              if (w.PNPDeviceID) match.pnpDeviceId = w.PNPDeviceID;
+            });
+          }
 
-        // every display-class key, matched to the adapter by DriverDesc (0000 is often another or a removed adapter)
-        const psReg = `@(Get-ChildItem "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}" -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -match '^\\d{4}$' } | ForEach-Object { Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue } | Where-Object { $_.DriverDesc } | Select-Object DriverDesc, DriverDate, FeatureScore) | ConvertTo-Json -Compress`;
-        const regRes = await this.runPowerShell(psReg, 3000);
-        if (regRes.stdout && !regRes.timeout) {
-          let regs = JSON.parse(regRes.stdout);
-          if (!Array.isArray(regs)) regs = [regs];
-          regs = regs.filter(Boolean);
-          const regPairs = pairGpus(gpus.map((g) => g.model), regs.map((x) => x.DriverDesc));
-          gpus.forEach((g, i) => {
-            const r = regPairs[i] >= 0 ? regs[regPairs[i]] : null;
-            if (r) { g.driverDate = r.DriverDate; g.featureScore = r.FeatureScore; }
-          });
-        }
-      } catch (e) {  }
+          // every display-class key, matched to the adapter by DriverDesc (0000 is often another or a removed adapter)
+          const psReg = `@(Get-ChildItem "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}" -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -match '^\\d{4}$' } | ForEach-Object { Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue } | Where-Object { $_.DriverDesc } | Select-Object DriverDesc, DriverDate, FeatureScore) | ConvertTo-Json -Compress`;
+          const regRes = await this.runPowerShell(psReg, 3000);
+          if (regRes.stdout && !regRes.timeout) {
+            let regs = JSON.parse(regRes.stdout);
+            if (!Array.isArray(regs)) regs = [regs];
+            regs = regs.filter(Boolean);
+            const regPairs = pairGpus(gpus.map((g) => g.model), regs.map((x) => x.DriverDesc));
+            gpus.forEach((g, i) => {
+              const r = regPairs[i] >= 0 ? regs[regPairs[i]] : null;
+              if (r) { g.driverDate = r.DriverDate; g.featureScore = r.FeatureScore; }
+            });
+          }
+        } catch (e) {  }
+      }
 
       // Only spawn nvidia-smi when an NVIDIA adapter is actually present.
       if (gpus.some((g) => /nvidia/i.test(String(g.vendor)))) try {
@@ -214,7 +216,7 @@ class DeepHardwareService {
       const layout = await si.diskLayout().catch(() => []);
 
       let wmiDisks = [];
-      try {
+      if (process.platform === 'win32')       if (process.platform === 'win32') try {
         const ps = `
           $ErrorActionPreference='SilentlyContinue'
           Get-PhysicalDisk | ForEach-Object {

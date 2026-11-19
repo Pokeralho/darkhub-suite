@@ -28,6 +28,7 @@ class LatencyCollector extends BaseCollector {
   }
 
   _ensureDrivers() {
+    if (process.platform !== 'win32') return;
     if (this._driversStarted) return;
     this._driversStarted = true;
 
@@ -53,6 +54,20 @@ class LatencyCollector extends BaseCollector {
 
   poll() {
     this._ensureDrivers();
+
+    if (process.platform !== 'win32') {
+      return this._memo('unsupported', () => ({
+        status: 'OK',
+        timestamp: Date.now(),
+        values: {
+          dpcsQueued: createUnavailableSensor('DPCs/s', 'none', 'Unsupported'),
+          interrupts: createUnavailableSensor('Ints/s', 'none', 'Unsupported'),
+          percentDpc: createUnavailableSensor('%', 'none', 'Unsupported'),
+          percentInt: createUnavailableSensor('%', 'none', 'Unsupported'),
+          drivers: []
+        }
+      }));
+    }
 
     const freshness = this._freshness(this.lastUpdate);
     return this._memo(`${this.lastUpdate}|${freshness}|${this._driversStamp}`, () => {

@@ -157,6 +157,8 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
   const analyzeSeq = React.useRef(0);
   const [confirmAction, setConfirmAction] = useState<null | { kind: 'apply' } | { kind: 'deleteBackup'; backupId: string }>(null);
   const busy = applying || restoring;
+  const isUnsupportedResponse = (res: any) => Boolean(res && res.unsupported);
+  const unsupportedText = (res: any) => String(res?.error || res?.reason || t('optiscaler.unsupported', 'OptiScaler indisponível nesta plataforma.'));
 
   // Selected game reference
   const selectedGame = useMemo(() => {
@@ -291,6 +293,11 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
     try {
       const res = await window.darkhub.optiscaler.listBackups(payload);
       if (stale()) return;
+      if (isUnsupportedResponse(res)) {
+        setBackups([]);
+        setSelectedBackupId('');
+        return;
+      }
       const list = res?.ok && Array.isArray(res.backups) ? res.backups : [];
       setBackups(list);
       // '' = automatic: the backend restores the oldest snapshot (true originals).
@@ -339,8 +346,20 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
         targetDir: gameItem.installDir || effectiveTargetDir
       };
       const res = await window.darkhub.optiscaler.analyze(payload);
-      analysisCache.current[gameItem.id] = res;
       if (seq !== analyzeSeq.current) return;
+      if (isUnsupportedResponse(res)) {
+        setAnalysis(res);
+        setStatus({ ok: false, message: unsupportedText(res) });
+        setBackups([]);
+        setSelectedBackupId('');
+        return;
+      }
+      if (res?.ok === false) {
+        setStatus({ ok: false, message: String(res?.error || 'Falha ao analisar o jogo.') });
+        setAnalysis(res);
+        return;
+      }
+      analysisCache.current[gameItem.id] = res;
       setAnalysis(res);
       await loadBackups(payload, seq);
 
@@ -350,6 +369,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
       }
     } catch (err: any) {
       console.error('Error analyzing game:', err);
+      if (seq === analyzeSeq.current) setStatus({ ok: false, message: String(err?.message || err) });
     } finally {
       if (seq === analyzeSeq.current) setAnalyzing(false);
     }
@@ -423,7 +443,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
         setStatus({ ok: true, message: t('optiscaler.ui.status.manualOk', 'Snapshot de backup manual criado com sucesso!') });
         await loadBackups(payload);
       } else {
-        setStatus({ ok: false, message: res?.error || t('optiscaler.ui.status.manualFail', 'Falha ao criar backup manual.') });
+        setStatus({ ok: false, message: unsupportedText(res) || res?.error || t('optiscaler.ui.status.manualFail', 'Falha ao criar backup manual.') });
       }
     } catch (err: any) {
       setStatus({ ok: false, message: err?.message || String(err) });
@@ -440,7 +460,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
         setStatus({ ok: true, message: t('optiscaler.ui.status.deleteOk', 'Snapshot de backup removido com sucesso.') });
         await loadBackups(makePayload());
       } else {
-        setStatus({ ok: false, message: res?.error || t('optiscaler.ui.status.deleteFail', 'Falha ao remover snapshot de backup.') });
+        setStatus({ ok: false, message: unsupportedText(res) || res?.error || t('optiscaler.ui.status.deleteFail', 'Falha ao remover snapshot de backup.') });
       }
     } catch (err: any) {
       setStatus({ ok: false, message: err?.message || String(err) });
@@ -470,7 +490,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
         await runAnalyzeForGame(selectedGame!);
         await refreshLibraryAndSteam();
       } else {
-        setStatus({ ok: false, message: res?.error || t('optiscaler.ui.status.applyFail', 'Falha ao aplicar OptiScaler.') });
+        setStatus({ ok: false, message: unsupportedText(res) || res?.error || t('optiscaler.ui.status.applyFail', 'Falha ao aplicar OptiScaler.') });
       }
     } catch (err: any) {
       setStatus({ ok: false, message: err?.message || String(err) });
@@ -495,7 +515,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
         await runAnalyzeForGame(selectedGame!);
         await refreshLibraryAndSteam();
       } else {
-        setStatus({ ok: false, message: res?.error || t('optiscaler.ui.status.restoreFail', 'Falha ao restaurar estado original.') });
+        setStatus({ ok: false, message: unsupportedText(res) || res?.error || t('optiscaler.ui.status.restoreFail', 'Falha ao restaurar estado original.') });
       }
     } catch (err: any) {
       setStatus({ ok: false, message: err?.message || String(err) });
@@ -520,7 +540,7 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
   const updateRelease = async () => {
     setRelease((x) => ({ ...x, busy: true, error: undefined }));
     const r = await window.darkhub?.optiscaler?.downloadUpdate?.({ url: '' }).catch((e: Error) => ({ ok: false, error: e.message }));
-    setRelease((x) => (r?.ok ? { ...x, busy: false, current: r.version } : { ...x, busy: false, error: r?.error || t('optiscaler.ui.failed', 'falhou') }));
+    setRelease((x) => (r?.ok ? { ...x, busy: false, current: r.version } : { ...x, busy: false, error: unsupportedText(r) || r?.error || t('optiscaler.ui.failed', 'falhou') }));
   };
 
   return (
@@ -557,6 +577,12 @@ export default function OptiScalerManager({ onNavigate }: OptiScalerManagerProps
       />
 
       <div className="space-y-5">
+      {analysis?.unsupported ? (
+        <div role="status" className="flex items-start gap-2.5 text-[12.5px] text-zinc-300 border border-zinc-800/80 rounded-lg p-3">
+          <AlertTriangle size={14} className="shrink-0 mt-[1px] text-amber-300" />
+          <div className="min-w-0 break-words">{unsupportedText(analysis)}</div>
+        </div>
+      ) : null}
       {status && (
         <div
           role={status.ok ? 'status' : 'alert'}

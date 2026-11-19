@@ -222,7 +222,7 @@ describe('disk map: items already in the Recycle Bin', () => {
     expect(readRecycleInfo(path.join(dir, 'missing'))).toBeNull();
     fs.rmSync(dir, { recursive: true, force: true });
   });
-  it('never tries to recycle a bin item again, and lets it be deleted for good without the bin check', async () => {
+  win32('never tries to recycle a bin item again, and lets it be deleted for good without the bin check', async () => {
     const svc = new DiskScanService({ exePath: 'x', shell: { trashItem: async () => { throw new Error('must not be called'); } } });
     const entry = w(`C:/$Recycle.Bin/${sid}/$RZZTEST9`);
     (svc as any)._pathOf = () => entry;

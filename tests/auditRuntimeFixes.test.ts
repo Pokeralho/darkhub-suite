@@ -66,7 +66,8 @@ function fakeChild() {
   return child
 }
 
-describe('NativeLatencyClient FIFO', () => {
+// The native latency engine is a Windows-only binary (NativeLatencyClient.ensureRunning gates on win32).
+describe.skipIf(process.platform !== 'win32')('NativeLatencyClient FIFO', () => {
   afterEach(() => { vi.useRealTimers() })
 
   const makeClient = () => {

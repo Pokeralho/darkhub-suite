@@ -21,10 +21,12 @@ function writeJson(file, value) {
 }
 
 export function normalizeShareConfig(c = {}, picturesDir = '') {
+  const isWinStyle = typeof picturesDir === 'string' && /^[A-Za-z]:[\\/]/.test(picturesDir)
+  const joinPath = isWinStyle ? path.win32.join : path.join
   return {
     hotkey: typeof c.hotkey === 'string' && c.hotkey.length <= 40 ? c.hotkey : DEFAULT_HOTKEY,
     regionHotkey: typeof c.regionHotkey === 'string' && c.regionHotkey.length <= 40 && c.regionHotkey !== c.hotkey ? c.regionHotkey : DEFAULT_REGION_HOTKEY,
-    folder: typeof c.folder === 'string' && path.isAbsolute(c.folder) ? c.folder : path.join(picturesDir, 'DarkHub Screenshots'),
+    folder: typeof c.folder === 'string' && path.isAbsolute(c.folder) ? c.folder : joinPath(picturesDir, 'DarkHub Screenshots'),
     autoUpload: c.autoUpload === true,
     copyImage: c.copyImage !== false,
     // what ends up in the clipboard: the picture, the Susuya link (only with auto-upload) or both (paste gives the

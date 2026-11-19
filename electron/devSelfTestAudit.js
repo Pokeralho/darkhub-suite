@@ -2,6 +2,7 @@
 // DARKHUB_SELFTEST_MUTATE=1 in a disposable VM. Drivers on hardware Windows has not identified yet, and the disk map's
 // "move to Recycle Bin" on names, long paths, locked files, removable drives and a Recycle Bin too small for the item.
 import fs from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 
@@ -51,19 +52,23 @@ export async function runAuditScenarios(call, step) {
   await step('audit vault: init, recovery unlock, new master, old one refused', async () => {
     const st = await call('vault:status')
     if (st?.initialized) return { ok: true, detail: 'vault already exists in this profile: flow not run' }
-    const init = await call('vault:init', { masterPassword: 'Audit-Master-1' })
+    // Synthetic per-run credentials: this disposable self-test never stores a real secret.
+    const masterPassword = randomUUID()
+    const newMasterPassword = randomUUID()
+    const entryPassword = randomUUID()
+    const init = await call('vault:init', { masterPassword })
     if (!init?.ok || !Array.isArray(init.recoveryWords)) return { ok: false, detail: `init: ${JSON.stringify(init).slice(0, 120)}` }
     if (init.recoveryPassword) return { ok: false, detail: 'init still returns recoveryPassword' }
-    const u1 = await call('vault:unlock', { masterPassword: 'Audit-Master-1' })
-    const add = await call('vault:add', { site: 'example.test', username: 'u', password: 'p4ss', notes: '' })
+    const u1 = await call('vault:unlock', { masterPassword })
+    const add = await call('vault:add', { site: 'example.test', username: 'u', password: entryPassword, notes: '' })
     await call('vault:lock')
     // forgotten master: words typed in upper case with extra spaces
     const ur = await call('vault:unlockWithRecoveryWords', { words: `  ${init.recoveryWords.join('  ').toUpperCase()} ` })
     const st2 = await call('vault:status')
-    const ch = await call('vault:changeMasterPassword', { newMasterPassword: 'Audit-Master-2' })
+    const ch = await call('vault:changeMasterPassword', { newMasterPassword })
     await call('vault:lock')
-    const old = await call('vault:unlock', { masterPassword: 'Audit-Master-1' })
-    const neu = await call('vault:unlock', { masterPassword: 'Audit-Master-2' })
+    const old = await call('vault:unlock', { masterPassword })
+    const neu = await call('vault:unlock', { masterPassword })
     const list = await call('vault:list')
     const n = (list?.entries || list?.items || list || []).length
     const ok = u1?.ok && add?.ok !== false && ur?.ok && st2?.unlockedVia === 'recovery' && ch?.ok && Array.isArray(ch.recoveryWords) && !old?.ok && neu?.ok && n === 1

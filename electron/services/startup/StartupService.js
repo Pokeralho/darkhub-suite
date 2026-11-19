@@ -123,7 +123,9 @@ New-ItemProperty -LiteralPath $k -Name ${psQuote(item.key)} -PropertyType Binary
     const listed = await this.list()
     if (!listed.ok) return { ok: false, error: listed.error }
     const item = listed.items.find((i) => i.id === id)
-    if (!item || !['run', 'folder', 'task', 'service'].includes(item.kind)) return { ok: false, error: 'Item não encontrado na inicialização (a lista mudou; atualize).' }
+    if (!item) return { ok: false, error: 'Item não encontrado na inicialização (a lista mudou; atualize).' }
+    if (process.platform !== 'win32') return this._setEnabledLinux(item, Boolean(enabled))
+    if (!['run', 'folder', 'task', 'service'].includes(item.kind)) return { ok: false, error: 'Item inválido' }
     const want = Boolean(enabled)
     if (item.kind === 'service' && !want && isProtectedService(item.key)) {
       return { ok: false, error: `"${item.name}" é um serviço essencial do Windows e não pode ser tirado da inicialização por aqui.` }
@@ -138,6 +140,44 @@ New-ItemProperty -LiteralPath $k -Name ${psQuote(item.key)} -PropertyType Binary
     if (!r.ok) return { ok: false, error: r.error || 'Falha ao alterar' }
     this._record({ id: item.id, name: item.name, kind: item.kind, item: { kind: item.kind, key: item.key, hive: item.hive, sub: item.sub, taskPath: item.taskPath, scope: item.scope, name: item.name, id: item.id }, from, to: want })
     return { ok: true }
+  }
+
+  async _setEnabledLinux(item, enabled) {
+    if (item.kind !== 'xdg') return { ok: false, unsupported: true, error: 'Item inválido' }
+    const configHome = process.env.XDG_CONFIG_HOME || path.join(process.env.HOME || '', '.config')
+    if (item.scope === 'machine') {
+      const userDir = path.join(configHome, 'autostart')
+      const userPath = path.join(userDir, item.key)
+      const sysPath = path.join(item.location, item.key)
+      try {
+        await fs.promises.mkdir(userDir, { recursive: true })
+        let base = ''
+        try { base = await fs.promises.readFile(userPath, 'utf8') } catch { try { base = await fs.promises.readFile(sysPath, 'utf8') } catch {} }
+        if (!base) return { ok: false, error: 'Entrada de autostart não encontrada' }
+        const val = enabled ? 'true' : 'false'
+        if (/^X-GNOME-Autostart-enabled\s*=.*$/mi.test(base)) base = base.replace(/^X-GNOME-Autostart-enabled\s*=.*$/mi, `X-GNOME-Autostart-enabled=${val}`)
+        else if (/^Hidden\s*=.*$/mi.test(base)) base = base.replace(/^Hidden\s*=.*$/mi, `Hidden=${enabled ? 'false' : 'true'}`)
+        else base = base.replace(/^\[Desktop Entry\]/mi, `[Desktop Entry]\nX-GNOME-Autostart-enabled=${val}`)
+        await fs.promises.writeFile(userPath, base, 'utf8')
+        this._record({ id: item.id, name: item.name, kind: item.kind, item, from: !enabled, to: Boolean(enabled) })
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: err?.message ?? String(err) }
+      }
+    }
+    const full = path.join(item.location, item.key)
+    try {
+      let base = await fs.promises.readFile(full, 'utf8')
+      const val = enabled ? 'true' : 'false'
+      if (/^X-GNOME-Autostart-enabled\s*=.*$/mi.test(base)) base = base.replace(/^X-GNOME-Autostart-enabled\s*=.*$/mi, `X-GNOME-Autostart-enabled=${val}`)
+      else if (/^Hidden\s*=.*$/mi.test(base)) base = base.replace(/^Hidden\s*=.*$/mi, `Hidden=${enabled ? 'false' : 'true'}`)
+      else base = base.replace(/^\[Desktop Entry\]/mi, `[Desktop Entry]\nX-GNOME-Autostart-enabled=${val}`)
+      await fs.promises.writeFile(full, base, 'utf8')
+      this._record({ id: item.id, name: item.name, kind: item.kind, item, from: !enabled, to: Boolean(enabled) })
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err?.message ?? String(err) }
+    }
   }
 
   /** Undo one history entry: put the item back to the state it had before. */

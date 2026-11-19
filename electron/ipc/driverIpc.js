@@ -7,6 +7,37 @@ import { DriverInstallService } from '../services/drivers/DriverInstallService.j
  * (vendor, kind) pair, never an arbitrary URL.
  */
 export function registerDriverIPC({ ipcMain, shell, logger, service, elevatedRunner, darkos } = {}) {
+  const unsupported = (extra = {}) => ({ ok: false, unsupported: true, platform: process.platform, reason: 'windows-only', error: 'Central de drivers é suportada apenas no Windows.', ...extra })
+  if (process.platform !== 'win32') {
+    const handle = (channel, fn) => {
+      ipcMain.handle(channel, async (event, payload) => {
+        try { return await fn(payload ?? {}, event) } catch (err) {
+          try { logger?.error?.('Driver', `${channel}: ${err?.message ?? err}`) } catch { /* ignore */ }
+          return { ok: false, error: err?.message ?? String(err) }
+        }
+      })
+    }
+    handle('driver:detect', () => unsupported({ adapters: [] }))
+    handle('driver:cameraStatus', () => unsupported())
+    handle('driver:repairCamera', () => unsupported())
+    handle('driver:scanMissing', () => unsupported({ devices: [], wu: null }))
+    handle('driver:findDrivers', () => unsupported({ plan: [] }))
+    handle('driver:install', () => unsupported())
+    handle('driver:openOfficial', async (payload) => {
+      // Allow opening official vendor pages on non-Windows; only actual install/detect flows are Windows-only.
+      try {
+        const svc = service || new DriverCenterService({ elevatedRunner })
+        const r = svc.resolveOfficialUrl(payload?.vendor, payload?.kind)
+        if (!r.ok) return r
+        await shell.openExternal(r.url)
+        return { ok: true, url: r.url, vendor: r.vendor, kind: r.kind }
+      } catch (err) {
+        return { ok: false, error: err?.message ?? String(err) }
+      }
+    })
+    return null
+  }
+
   const svc = service || new DriverCenterService({ elevatedRunner })
 
   const handle = (channel, fn) => {

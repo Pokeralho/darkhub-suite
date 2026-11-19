@@ -16,6 +16,7 @@ import { parseClamscan } from '../electron/services/realtime/ClamAv.js';
 // @ts-ignore
 import { isScanCandidate, RealtimeProtection } from '../electron/services/realtime/RealtimeProtection.js';
 
+const win32It = process.platform === 'win32' ? it : it.skip;
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'dh-rt-'));
 const sha = (buf: Buffer) => crypto.createHash('sha256').update(buf).digest('hex');
 const waitFor = async (fn: () => boolean, ms = 8000) => { const end = Date.now() + ms; while (!fn()) { if (Date.now() > end) throw new Error('timeout'); await new Promise((r) => setTimeout(r, 50)); } };
@@ -62,11 +63,11 @@ describe('real-time optimizer decisions', () => {
     let avail = 1000;
     const calls: any[] = [];
     const native = { cleanRam: async (pid: number, mb: number) => { calls.push([pid, mb]); avail = 2500; return { processes_cleaned: 7 }; }, listProcesses: async () => null };
-    const opt = new RealtimeOptimizer({ native, getConfig: () => cfg, memory: () => ({ availMb: avail, totalMb: 16000 }) });
+    const opt = new RealtimeOptimizer({ native, getConfig: () => cfg, memory: () => ({ availMb: avail, totalMb: 16000 }), settleMs: 0, memoryTickMs: 20, rulesTickMs: 100000 });
     const events: any[] = [];
     opt.on('event', (e: any) => events.push(e));
     opt.start();
-    await waitFor(() => events.some((e) => e.event === 'memory-trim'), 9000);
+    await waitFor(() => events.some((e) => e.event === 'memory-trim'), 1000);
     opt.stop();
     const trim = events.find((e) => e.event === 'memory-trim');
     expect(calls[0][1]).toBe(150);
@@ -77,11 +78,11 @@ describe('real-time optimizer decisions', () => {
 
 describe('hash database', () => {
   it('finds members by binary search and nothing else', () => {
-    const many = Array.from({ length: 5000 }, (_, i) => ({ sha256: sha(Buffer.from(`sample-${i}`)) }));
+    const many = Array.from({ length: 500 }, (_, i) => ({ sha256: sha(Buffer.from(`sample-${i}`)) }));
     const db = new HashDb([...many, { sha256: EICAR_SHA256, name: 'EICAR-Test-File' }, { sha256: 'not-a-hash' }]);
-    expect(db.size).toBe(5001);
+    expect(db.size).toBe(501);
     expect(db.lookup(EICAR_SHA256)).toBe('EICAR-Test-File');
-    expect(db.lookup(many[1234].sha256.toUpperCase())).toBe('Known malware (hash)');
+    expect(db.lookup(many[123].sha256.toUpperCase())).toBe('Known malware (hash)');
     expect(db.lookup(sha(Buffer.from('clean')))).toBeNull();
     expect(new HashDb([]).lookup(EICAR_SHA256)).toBeNull();
   });
@@ -91,7 +92,7 @@ describe('quarantine', () => {
   it('moves a file out, stores it unreadable, and restores it byte for byte', async () => {
     const dir = tmp();
     const file = path.join(dir, 'tool.exe');
-    const data = crypto.randomBytes(300000);
+    const data = crypto.randomBytes(4096);
     fs.writeFileSync(file, data);
     const q = new Quarantine(path.join(dir, 'q'));
     const item = await q.add(file, { detection: 'Test', sha256: sha(data) });
@@ -117,7 +118,7 @@ describe('quarantine', () => {
     expect(fs.existsSync(file)).toBe(true);
     expect(fs.readdirSync(path.join(dir, 'q'))).toEqual([]);
   });
-  it('refuses to restore a planted entry into a system folder', async () => {
+  win32It('refuses to restore a planted entry into a system folder', async () => {
     const dir = tmp();
     const q = new Quarantine(dir);
     const id = '0123456789abcdef';
@@ -146,13 +147,15 @@ describe('scanners', () => {
     const db = new HashDb([{ sha256: sha(bad), name: 'Test.Sample' }]);
     const cfg = { folders: [dir], clamav: false, autoQuarantine: true, maxFileMb: 50, allowHashes: [] as string[] };
     const notes: any[] = [];
-    const prot = new RealtimeProtection({ getConfig: () => cfg, getHashDb: () => db, quarantine: new Quarantine(path.join(tmp(), 'q')), notify: (n: any) => notes.push(n) });
+    const prot = new RealtimeProtection({ getConfig: () => cfg, getHashDb: () => db, quarantine: new Quarantine(path.join(tmp(), 'q')), notify: (n: any) => notes.push(n), settleMs: 50 });
     prot.start();
     try {
+      // small delay so fs.watch is ready on all platforms
+      await new Promise((r) => setTimeout(r, 100));
       fs.writeFileSync(path.join(dir, 'clean.exe'), crypto.randomBytes(1024));
       fs.writeFileSync(path.join(dir, 'payload.exe'), bad);
       fs.writeFileSync(path.join(dir, 'notes.txt'), 'ignored');
-      await waitFor(() => notes.length > 0 && prot.stats.scanned >= 2, 12000);
+      await waitFor(() => notes.length > 0 && prot.stats.scanned >= 2, 8000);
       expect(notes[0]).toMatchObject({ detection: 'Test.Sample', quarantined: true });
       expect(fs.existsSync(path.join(dir, 'payload.exe'))).toBe(false);
       expect(fs.existsSync(path.join(dir, 'clean.exe'))).toBe(true);

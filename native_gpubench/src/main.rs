@@ -1,18 +1,33 @@
 //! DarkHub GPU benchmark engine. D3D12 rasterization and DXR 1.1 inline ray tracing over the closed-form scene in
 //! scene.rs. Talks JSON lines on stdin/stdout; the app relays to the server. Contract: docs/GPU_BENCHMARK.md.
-#![windows_subsystem = "console"]
+#![cfg_attr(windows, windows_subsystem = "console")]
 
+#[cfg(not(windows))]
+fn main() {
+    use std::io::Write;
+    let mut out = std::io::stdout().lock();
+    let _ = writeln!(out, "{{\"type\":\"error\",\"error\":\"unsupported_platform\",\"platform\":\"{}\"}}", std::env::consts::OS);
+}
+
+#[cfg(windows)]
 mod audit;
+#[cfg(windows)]
 mod gpu;
+#[cfg(windows)]
 mod proof;
+#[cfg(windows)]
 mod scene;
 
+#[cfg(windows)]
+mod win_impl {
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::{BufRead, Write};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+
+use crate::{audit, gpu, proof, scene};
 
 pub(crate) fn say(v: Value) {
     let mut out = std::io::stdout().lock();
@@ -43,7 +58,7 @@ fn vectors() -> Value {
     json!({"pcg": pcgs, "hash2": hash2(7, 9), "boxes": boxes, "cameras": cams})
 }
 
-fn run() -> Result<(), String> {
+pub fn run() -> Result<(), String> {
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a == "--vectors") {
         say(vectors());
@@ -131,7 +146,7 @@ fn run() -> Result<(), String> {
             "modules" => say(json!({"type": "modules", "modules": gpu::loaded_modules()})),
             "shot" => {
                 let path = msg["path"].as_str().unwrap_or("");
-                let rgba = g.read_ldr().map_err(|e| format!("shot: {e}"))?;
+                let rgba = g.read_ldr().map_err(|e| format!("image: {e}"))?;
                 let ok = std::fs::write(path, rgba).is_ok();
                 say(json!({"type": "shot", "ok": ok, "width": scene::WIDTH, "height": scene::HEIGHT}));
             }
@@ -139,10 +154,12 @@ fn run() -> Result<(), String> {
         }
     }
 }
+}
 
+#[cfg(windows)]
 fn main() {
-    if let Err(e) = run() {
-        say(json!({"type": "error", "error": e}));
+    if let Err(e) = win_impl::run() {
+        win_impl::say(serde_json::json!({"type": "error", "error": e}));
         std::process::exit(1);
     }
 }

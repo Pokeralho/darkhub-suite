@@ -26,6 +26,7 @@ const parseErrors = (script: string) => {
 
 describe('RestoreService', () => {
   it('builds ASCII, parseable elevated scripts for capabilities, features (WU and ISO) and the Store', async () => {
+    if (process.platform !== 'win32') return // requires Windows PowerShell/elevation and component APIs
     const svc = new RestoreService()
     expect((await svc.install('wmp-legacy')).ok).toBe(true)
     expect(await svc.install('directplay')).toMatchObject({ ok: true, restartNeeded: true })

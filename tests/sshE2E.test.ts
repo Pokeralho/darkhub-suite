@@ -212,7 +212,7 @@ describe('DarkHub SSH end to end', () => {
     await expect(sftp.fsOp({ sftpId: 'f1', side: 'remote', op: 'delete', path: '/' })).rejects.toMatchObject({ code: 'VALIDATION' })
     sftp.closeAll()
     manager.disposeAll()
-  })
+  }, 60_000)
 
   it('local port forwarding carries traffic and reports a busy port', async () => {
     const { store, manager, host } = setup()
@@ -275,7 +275,7 @@ describe('DarkHub SSH end to end', () => {
     expect(await sftp.du({ sftpId: 'f2', side: 'remote', path: '/site' })).toMatchObject({ files: 4, dirs: 3 })
     sftp.closeAll()
     manager.disposeAll()
-  })
+  }, 60_000)
 
   it('editor: reads and saves remote text atomically, keeps CRLF, detects conflicts and binaries', async () => {
     const { manager, host } = setup()
@@ -374,5 +374,5 @@ describe('DarkHub SSH end to end', () => {
     expect((await sftp.listRemote('u1', '/')).entries.map((e: any) => e.name)).not.toContain('etc')
     sftp.closeAll()
     manager.disposeAll()
-  })
+  }, 60_000)
 })

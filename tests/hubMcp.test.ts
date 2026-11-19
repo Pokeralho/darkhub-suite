@@ -75,7 +75,7 @@ describe('MCP server', () => {
   })
 
   it('the stdio bridge relays to the server and reports when it is off', async () => {
-    if (!fs.existsSync(BRIDGE_EXE)) return // npm run build:native
+    if (process.platform !== 'win32' || !fs.existsSync(BRIDGE_EXE)) return // npm run build:native (Windows only)
     const run = (lines: string[]) => new Promise<string[]>((resolve) => {
       const p = spawn(BRIDGE_EXE, ['--config', path.join(dir, 'mcp.json')])
       let out = ''

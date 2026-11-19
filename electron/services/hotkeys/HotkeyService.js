@@ -19,6 +19,9 @@ export class HotkeyService {
   }
 
   _watcher() {
+    // The watcher is a Windows-only .exe. On Linux/macOS return no process so register() falls back
+    // to Electron's globalShortcut instead of trying to spawn it.
+    if (process.platform !== 'win32') return null
     if (this.proc && this.proc.exitCode === null) return this.proc
     if (!fs.existsSync(this.watcherPath)) return null
     const tampered = integrityError(['DarkHub.HotkeyWatch.exe'], { log: (m) => this.logger?.warn?.('[Hotkeys]', m) })

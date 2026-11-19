@@ -8,11 +8,19 @@ import { createMetadataService } from '../services/metadata/MetadataService.js'
  */
 export function registerMetadataIPC({ ipcMain, assertFileAccessGranted, hasFileAccessGrant, getFfmpegPath, logger } = {}) {
   async function getExiftoolPath() {
-    const mod = await import('exiftool-vendored')
-    let p = await mod.exiftoolPath()
-    // ExifTool (Perl) cannot run from inside the asar archive.
-    if (p && p.includes(`app.asar${path.sep}`)) p = p.replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`)
-    return p && fs.existsSync(p) ? p : null
+    try {
+      const mod = await import('exiftool-vendored')
+      let p = await mod.exiftoolPath()
+      // ExifTool (Perl) cannot run from inside the asar archive.
+      if (p && p.includes(`app.asar${path.sep}`)) p = p.replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`)
+      if (p && fs.existsSync(p)) return p
+    } catch {}
+    try {
+      const { findOnPath } = await import('../services/binResolver.js')
+      const onPath = await findOnPath('exiftool')
+      if (onPath) return onPath
+    } catch {}
+    return null
   }
   const service = createMetadataService({ getExiftoolPath, getFfmpegPath, logger })
 
@@ -51,11 +59,18 @@ export function registerMetadataIPC({ ipcMain, assertFileAccessGranted, hasFileA
     }
     return service.write(req)
   })
-  handle('metax:setFileProps', async (p) => service.setFileProps(granted(p.path, 'arquivo'), {
+  // Alternate Data Streams and Win32 file attributes have no cross-platform equivalent; degrade explicitly
+  // instead of surfacing a raw "PowerShell is not available on this platform" error. metax:read/write use
+  // ExifTool and remain cross-platform.
+  const windowsOnly = (what) => process.platform === 'win32' ? null : {
+    ok: false, unsupported: true, platform: process.platform, reason: 'windows-only',
+    error: `${what} está disponível apenas no Windows.`
+  }
+  handle('metax:setFileProps', async (p) => windowsOnly('Propriedades de arquivo') || service.setFileProps(granted(p.path, 'arquivo'), {
     created: p.created, modified: p.modified, accessed: p.accessed,
     readOnly: typeof p.readOnly === 'boolean' ? p.readOnly : undefined,
     hidden: typeof p.hidden === 'boolean' ? p.hidden : undefined
   }))
-  handle('metax:removeStream', async (p) => service.removeStream(granted(p.path, 'arquivo'), p.name))
+  handle('metax:removeStream', async (p) => windowsOnly('Fluxos alternativos (ADS)') || service.removeStream(granted(p.path, 'arquivo'), p.name))
   return service
 }

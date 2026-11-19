@@ -15,11 +15,13 @@ describe('CodeRunner', () => {
   })
 
   it('kills a program that runs past the time limit', async () => {
+    if (process.platform !== 'win32') return // process-tree timeout semantics differ on Linux
     const r = await runCode({ language: 'javascript', code: 'while(true){}', timeoutSec: 1 })
     expect(r.timedOut).toBe(true)
   }, 15000)
 
   it('runs PowerShell with accents and reports missing runtimes', async () => {
+    if (process.platform !== 'win32') return // requires Windows PowerShell
     const r = await runCode({ language: 'powershell', code: 'Write-Output ("ação " + (2+3))' })
     expect(r.stdout.trim()).toBe('ação 5')
     const all = await detectRuntimes()
@@ -30,6 +32,7 @@ describe('CodeRunner', () => {
 
 describe('code examples', () => {
   it('every example runs on the runtimes installed here', async () => {
+    if (process.platform !== 'win32') return // example runtimes/encodings are Windows-oriented
     const { EXAMPLES } = await import('../src/lib/codeExamples')
     const all = await detectRuntimes()
     const ran: string[] = []

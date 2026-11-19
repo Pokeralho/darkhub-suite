@@ -24,6 +24,15 @@ export function runCommand(command, args = [], {
   onStderr = null,
   input = null
 } = {}) {
+  // On non-Windows hosts, Windows-specific tool invocations are not supported.
+  // Fail fast with a structured error so callers can degrade gracefully.
+  if (process.platform !== 'win32' && /^(powershell(\.exe)?|pwsh(\.exe)?|where(\.exe)?|cmd(\.exe)?|schtasks(\.exe)?|reg(\.exe)?|taskkill(\.exe)?|msiexec(\.exe)?|winget(\.exe)?)$/i.test(command)) {
+    return Promise.resolve({
+      code: 1,
+      stdout: '',
+      stderr: `Windows-only command not available on ${process.platform}: ${command}`
+    })
+  }
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       windowsHide: true,
@@ -75,6 +84,8 @@ export function runCommand(command, args = [], {
           try {
             if (process.platform === 'win32' && child.pid) {
               spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }).on('error', () => {})
+            } else if (child.pid) {
+              try { process.kill(-child.pid, 'SIGKILL') } catch { child.kill('SIGKILL') }
             }
           } catch {}
           try {

@@ -33,6 +33,35 @@ jobs:
       - name: Renderer build
         run: npx vite build
 
+  check-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # unit tests mock electron; the 100 MB binary is not needed
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit -p .
+      - name: Unit tests
+        run: npx vitest run
+      - name: Renderer build
+        run: npx vite build
+      - name: Rust crates (Linux)
+        run: |
+          cargo check --manifest-path native_cleaner/Cargo.toml
+          cargo test --manifest-path native_cleaner/Cargo.toml
+          cargo check --manifest-path native_disk/Cargo.toml
+          cargo check --manifest-path native_pacer/Cargo.toml
+          cargo check --manifest-path native_gpubench/Cargo.toml
+      - name: Linux package smoke (dir)
+        run: npm run build:linux
   native:
     runs-on: windows-latest
     timeout-minutes: 40
@@ -67,7 +96,18 @@ jobs:
           )
           foreach ($j in $jobs) {
             $out = Join-Path out ([IO.Path]::GetFileNameWithoutExtension($j[0]) + '.exe')
-            & $csc /nologo /target:exe "/platform:$($j[1])" /optimize+ "/out:$out" @($j[2]) $j[0]
+            # The .NET Framework csc.exe treats '/' as an option switch: resolve source and file-based
+            # references to absolute Windows paths before invoking it (same pattern as build:native).
+            $src = (Resolve-Path -LiteralPath $j[0]).Path
+            $refs = @($j[2] | ForEach-Object {
+              if ($_ -like '/r:*') {
+                $ref = $_.Substring(3)
+                # Bare assembly names (System.Management.dll, ...) are resolved by csc via the GAC;
+                # only file paths need resolving. csc.exe rejects '/' as a path separator.
+                if ($ref -match '[/\\]') { '/r:' + (Resolve-Path -LiteralPath $ref).Path } else { $_ }
+              } else { $_ }
+            })
+            & $csc /nologo /target:exe "/platform:$($j[1])" /optimize+ "/out:$out" @refs $src
             if ($LASTEXITCODE -ne 0) { throw "csc failed: $($j[0])" }
           }
       # Vulkan low-latency layer (C++23, MSVC + CMake + Ninja from the runner's Visual Studio)

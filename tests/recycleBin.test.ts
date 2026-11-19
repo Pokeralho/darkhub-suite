@@ -50,10 +50,16 @@ describe('Recycle Bin in the temp clean', () => {
     const calls: any[] = []
     e.cleaner = fakeCleaner(calls)
     const r = await e.cleanTempFiles({ recycleBin: true })
-    expect(calls).toEqual([true])
-    expect(r.recycleBin).toEqual({ items: 2, bytes: 5000, left: 0 })
-    expect(r.freedBytes).toBe(5100)
-    expect(r.msg).toMatch(/Lixeira esvaziada: 2 item/)
+    if (process.platform === 'win32') {
+      expect(calls).toEqual([true])
+      expect(r.recycleBin).toEqual({ items: 2, bytes: 5000, left: 0 })
+      expect(r.freedBytes).toBe(5100)
+      expect(r.msg).toMatch(/Lixeira esvaziada: 2 item/)
+    } else {
+      expect(calls).toEqual([])
+      expect(r.recycleBin).toMatchObject({ unsupported: true })
+      expect(r.freedBytes).toBe(100)
+    }
   })
 
   it('a failure to empty the bin is reported without failing the temp clean', async () => {
@@ -61,7 +67,12 @@ describe('Recycle Bin in the temp clean', () => {
     e.cleaner = { recycleBin: async () => ({ ok: false, error: 'negado' }) }
     const r = await e.cleanTempFiles({ recycleBin: true })
     expect(r.ok).toBe(true)
-    expect(r.msg).toMatch(/Lixeira não esvaziada: negado/)
+    if (process.platform === 'win32') {
+      expect(r.msg).toMatch(/Lixeira não esvaziada: negado/)
+    } else {
+      expect(r.recycleBin).toMatchObject({ unsupported: true })
+      expect(r.msg).toMatch(/áreas temporárias\/cache do usuário no Linux/)
+    }
   })
 
   it('the dashboard estimate counts what is in the bin', async () => {
@@ -69,8 +80,13 @@ describe('Recycle Bin in the temp clean', () => {
     const calls: any[] = []
     e.cleaner = fakeCleaner(calls)
     const r = await e.analyzeTempFiles({ recycleBin: true })
-    expect(calls).toEqual([false])
-    expect(r.summary).toMatchObject({ bytes: 5100, files: 3, recycleBin: { items: 2, bytes: 5000 } })
+    if (process.platform === 'win32') {
+      expect(calls).toEqual([false])
+      expect(r.summary).toMatchObject({ bytes: 5100, files: 3, recycleBin: { items: 2, bytes: 5000 } })
+    } else {
+      expect(calls).toEqual([])
+      expect(r.summary).toMatchObject({ bytes: 100, files: 1, recycleBin: { bytes: 0, items: 0, unsupported: true } })
+    }
   })
 
   it('the Optimizer item includes the bin from its screen, not from a Hub package', async () => {
@@ -80,7 +96,11 @@ describe('Recycle Bin in the temp clean', () => {
     const op = svc.operations.get('optimizer:cleanTemp')
     await op.execute(() => {})
     await op.execute()
-    expect(spy.mock.calls.map((c: any[]) => c[0])).toEqual([{ recycleBin: true }, { recycleBin: false }])
+    if (process.platform === 'win32') {
+      expect(spy.mock.calls.map((c: any[]) => c[0])).toEqual([{ recycleBin: true }, { recycleBin: false }])
+    } else {
+      expect(spy.mock.calls.map((c: any[]) => c[0])).toEqual([{ recycleBin: false }, { recycleBin: false }])
+    }
     spy.mockRestore()
   })
 })
