@@ -197,7 +197,7 @@ describe('disk map protected paths', () => {
 
 describe('disk map: items already in the Recycle Bin', () => {
   const w = (s: string) => s.replace(/\//g, '\\');
-  const sid = 'S-1-5-21-2147948401-4266930342-983689016-1000';
+  const sid = 'S-1-5-21-1111111111-2222222222-3333333333-1001';
   it('places paths in the bin', () => {
     expect(recycleBinPlace(w('C:/$Recycle.Bin'))).toEqual({ level: 'root' });
     expect(recycleBinPlace(w(`D:/$RECYCLE.BIN/${sid}`))?.level).toBe('user');
