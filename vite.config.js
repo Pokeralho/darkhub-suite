@@ -41,5 +41,11 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    env: {
+      // Since Electron 42 a plain require('electron') downloads the ~100 MB binary when it is missing. Tests mock
+      // the module, but electron-log requires it on its own (CommonJS, not seen by vi.mock) and would start that
+      // download in the middle of a run. With this set, Electron's index.js returns a path and downloads nothing.
+      ELECTRON_OVERRIDE_DIST_PATH: path.resolve(__dirname, 'node_modules', '.electron-not-needed-for-unit-tests')
+    }
   }
 });

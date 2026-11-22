@@ -5,7 +5,8 @@ import { SusuyaClient, SUSUYA_ORIGIN } from '../services/susuya/SusuyaClient.js'
 import { captureScreen, captureRegion, grabRegionImage, listDisplays } from '../services/susuya/Screenshot.js'
 import { makeRegionPicker } from '../services/susuya/RegionPicker.js'
 import { AiUpscaler } from '../services/susuya/AiUpscaler.js'
-import { nativeImage } from 'electron'
+import { nativeImage, ClipboardItem } from 'electron'
+import { writeClipboardImage, clipboardImageSize } from '../services/clipboardImages.js'
 
 const HISTORY_MAX = 100
 const TTLS = [3600, 21600, 86400]
@@ -115,6 +116,9 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotke
     }
   }
 
+  // Electron 44+: the clipboard is asynchronous and pictures go through ClipboardItem (services/clipboardImages.js)
+  const copyImage = (image, text = null) => writeClipboardImage({ clipboard, ClipboardItem }, image, text)
+
   async function enhanceInBackground(shot, region) {
     const r = await enhance(shot.file, region)
     let file = shot.file
@@ -125,9 +129,8 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotke
       // swap the clipboard picture only if it is still the one this shot put there
       if (config.clip === 'image' || config.clip === 'both' || (config.clip === 'link' && !config.autoUpload)) {
         try {
-          const cur = clipboard.readImage()
-          const a = cur.getSize(), b = shot.image.getSize()
-          if (!cur.isEmpty() && a.width === b.width && a.height === b.height) clipboard.writeImage(image)
+          const a = await clipboardImageSize({ clipboard, nativeImage }), b = shot.image.getSize()
+          if (a && a.width === b.width && a.height === b.height) await copyImage(image)
         } catch { /* clipboard busy */ }
       }
     }
@@ -135,8 +138,8 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotke
       const u = await upload(file, 'screenshot')
       if (u.ok) {
         try {
-          if (config.clip === 'link') clipboard.writeText(u.entry.directUrl)
-          else if (config.clip === 'both') clipboard.write({ image, text: u.entry.directUrl })
+          if (config.clip === 'link') await clipboard.writeText(u.entry.directUrl)
+          else if (config.clip === 'both') await copyImage(image, u.entry.directUrl)
         } catch { /* clipboard busy */ }
       }
       notify(u.ok ? 'DarkHub: print aprimorado enviado ao Susuya' : 'DarkHub: print salvo', r.error ? `IA falhou: ${r.error}` : u.ok ? `${r.width}x${r.height} · link copiado` : `Falha ao enviar: ${u.error}`)
@@ -158,15 +161,15 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotke
     // (and is what gets uploaded when auto-upload is on).
     if (useAi) setImmediate(() => { enhanceInBackground(shot, region).catch((e) => logger?.warn?.('Share', `enhance: ${e?.message ?? e}`)) })
     const aiNote = useAi ? ' · aprimorando com IA...' : ''
-    if (config.clip === 'image' || config.clip === 'both' || (config.clip === 'link' && !config.autoUpload)) { try { clipboard.writeImage(shot.image) } catch { /* clipboard busy */ } }
+    if (config.clip === 'image' || config.clip === 'both' || (config.clip === 'link' && !config.autoUpload)) { try { await copyImage(shot.image) } catch { /* clipboard busy */ } }
     const info = { file: shot.file, width: shot.width, height: shot.height, bytes: shot.bytes, ms: shot.ms, scale: shot.scale || 1 }
     const size = (shot.scale > 1 ? `${shot.width}x${shot.height} (ampliado ${Math.round(shot.scale * 10) / 10}x)` : `${shot.width}x${shot.height}`) + aiNote
     if (config.autoUpload && !useAi) {
       const r = await upload(shot.file, 'screenshot')
       if (r.ok) {
         try {
-          if (config.clip === 'link') clipboard.writeText(r.entry.directUrl)
-          else if (config.clip === 'both') clipboard.write({ image: shot.image, text: r.entry.directUrl })
+          if (config.clip === 'link') await clipboard.writeText(r.entry.directUrl)
+          else if (config.clip === 'both') await copyImage(shot.image, r.entry.directUrl)
         } catch { /* clipboard busy */ }
         const copied = config.clip === 'link' ? 'link direto copiado' : config.clip === 'both' ? 'imagem e link copiados' : config.clip === 'image' ? 'imagem copiada' : 'link no histórico'
         notify('DarkHub: print enviado ao Susuya', `${size} · ${copied}`)
@@ -244,10 +247,10 @@ export function registerShareIPC({ app, ipcMain, dialog, shell, clipboard, hotke
     writeJson(historyFile, history)
     return state()
   })
-  handle('share:copy', ({ text }) => {
+  handle('share:copy', async ({ text }) => {
     const s = String(text || '')
     if (!s.startsWith(`${SUSUYA_ORIGIN}/`)) return { ok: false, error: 'only Susuya links' }
-    clipboard.writeText(s)
+    await clipboard.writeText(s)
     return { ok: true }
   })
   // QR code of a Susuya link, so a phone camera opens the file without typing (same as the site)

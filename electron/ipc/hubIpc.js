@@ -43,7 +43,8 @@ export function registerHubIPC({ app, ipcMain, dialog, BrowserWindow, logger, ge
     app, hub: svc, catalog, approve,
     sensors: { read: () => HardwareService.snapshot(), hold: (tag) => HardwareService.holdSensors(tag), release: (tag) => HardwareService.releaseSensors(tag) },
     notify: async (title, body) => { if (Notification.isSupported()) new Notification({ title, body }).show() },
-    clipboard: (t) => clipboard.writeText(t),
+    // asynchronous since Electron 44; the extension call does not wait for it
+    clipboard: (t) => { Promise.resolve(clipboard.writeText(t)).catch(() => {}) },
     openExternal: (url) => shell.openExternal(url),
     pickColor: () => picker.pick()
   })

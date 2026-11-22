@@ -16,9 +16,8 @@ jobs:
   check:
     runs-on: windows-latest
     timeout-minutes: 20
-    env:
-      # unit tests mock electron; the 100 MB binary is not needed
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    # Unit tests mock electron and nothing here starts it, so its binary is never downloaded: since Electron 42 the
+    # package fetches it on first use, not on npm ci (vite.config.js keeps the test run from triggering that).
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:

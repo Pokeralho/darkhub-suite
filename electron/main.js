@@ -656,9 +656,10 @@ function createMainWindow() {
     })
   })
 
-  win.webContents.on('console-message', (_event, level, message, line, sourceId) => {
-    const prefix = level >= 2 ? 'warn' : 'info'
-    log[prefix](`[renderer] ${message} (${sourceId}:${line})`)
+  // one details object since Electron 35 (level is a word there); the positional arguments are deprecated
+  win.webContents.on('console-message', (details) => {
+    const prefix = details?.level === 'warning' || details?.level === 'error' ? 'warn' : 'info'
+    log[prefix](`[renderer] ${details?.message} (${details?.sourceId}:${details?.lineNumber})`)
   })
 
   win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
@@ -2802,9 +2803,13 @@ ipcMain.handle('vault:copyPassword', async (_event, payload) => {
   const entry = (vaultData.entries ?? []).find((e) => e.id === id)
   if (!entry) return { ok: false, error: 'Not found' }
   const copied = String(entry.password ?? '')
-  clipboard.writeText(copied)
+  // the clipboard is asynchronous since Electron 44
+  await clipboard.writeText(copied)
   setTimeout(() => {
-    try { if (clipboard.readText() === copied) clipboard.clear() } catch {}
+    Promise.resolve()
+      .then(() => clipboard.readText())
+      .then((current) => { if (current === copied) clipboard.clear() })
+      .catch(() => {})
   }, 20000).unref?.()
   return { ok: true }
 })
