@@ -6,6 +6,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **Overlay editor**: an imported layout code could inject HTML into the main window (the CSS sanitizer removed
+  `</style` in a single pass, so `</st</styleyle>` turned back into `</style>`). The installed app's content policy
+  blocks inline script, so there it was limited to injected markup such as a remote image that reports when a
+  layout is previewed; in development builds it could run script. `<` is now escaped and the preview no longer
+  builds the style element from a string.
+- **DarkOS module**: the copy in `C:\ProgramData\DarkOS\bin` is run only when nobody but SYSTEM, Administrators
+  and TrustedInstaller can change that folder and its two files. On a stock Windows any standard user could create
+  the folder and have DarkHub run a planted module as Administrator. Otherwise the bundled module is used.
+- **PowerShell quoting**: values with typographic quotes (a game folder such as `Baldur’s Gate`, or a tampered
+  `latency-undo.json`) could end a quoted string in an elevated script. Every script uses the same helper now.
+- **Hub packages**: the registry block list is checked against the canonical path (`ControlSet001` and
+  `WOW6432Node` reached blocked areas) and covers `RunOnce`, `Command Processor`, Active Setup, App Paths and
+  others; value names that point at a program (`ImagePath`, `ServiceDll`, `Debugger`, `AutoRun`, `Shell`...) are
+  refused in community packages.
+- **Hardening restore**: a tampered state file could inject a command through an ASR action or make "restore" write
+  a registry value the item does not own.
+- **Embedded sites** (LuluFlix, Juuzou): they get no camera, microphone, location, clipboard or notifications and
+  cannot open other URL schemes; only fullscreen is allowed.
+- The installed app no longer loads a `.env` file from the folder it is started in.
+- Custom scripts start `powershell.exe` by its full path.
+- OptiScaler is downloaded only when GitHub publishes a SHA-256 to check it against.
+
+### Fixed
+- **Compress to archive** did nothing useful: `tar` was started in the wrong folder and did not find the files.
+- **Block tracking** deleted every line of the hosts file after a DarkHub section whose end marker was missing.
+- `install.ps1` fell back to 0.9.4 when the GitHub API could not be reached.
+
+### Changed
+- Electron 41 → 45, sharp 0.35, exiftool-vendored 39, Vitest 5, rusqlite 0.43 in the cleaner helper. `npm audit`
+  went from 36 advisories (5 critical) to 6 moderate ones in the build tool.
+- The FSR 4 INT8 DLL is no longer in the repository; it is downloaded on demand, as the installed app already did.
+
 ## [0.9.5] - 2026-11-18
 
 ### Changed
