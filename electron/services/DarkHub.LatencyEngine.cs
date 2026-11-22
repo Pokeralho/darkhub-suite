@@ -205,9 +205,8 @@ public class DarkHubLatencyEngine
             { "pid", Process.GetCurrentProcess().Id }
         });
 
-        Thread pipeThread = new Thread(NamedPipeServerWorker);
-        pipeThread.IsBackground = true;
-        pipeThread.Start();
+        // Commands come only over stdin from the app that started this process. There is deliberately no named
+        // pipe: one reachable by the user's non-elevated processes would let them drive this elevated engine.
 
         AppDomain.CurrentDomain.ProcessExit += (s, e) => { isRunning = false; UnlockTimerResolution(); };
         Console.CancelKeyPress += (s, e) => { isRunning = false; UnlockTimerResolution(); };
@@ -231,36 +230,6 @@ public class DarkHubLatencyEngine
         {
             isRunning = false;
             UnlockTimerResolution();
-        }
-    }
-
-    private static void NamedPipeServerWorker()
-    {
-        while (isRunning)
-        {
-            try
-            {
-                var pipeSecurity = new PipeSecurity();
-                pipeSecurity.AddAccessRule(new PipeAccessRule(WindowsIdentity.GetCurrent().User, PipeAccessRights.ReadWrite, AccessControlType.Allow));
-                using (var server = new NamedPipeServerStream("DarkHubLatencyEngine", PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 4096, 4096, pipeSecurity))
-                {
-                    server.WaitForConnection();
-                    using (var reader = new StreamReader(server, Encoding.UTF8))
-                    using (var writer = new StreamWriter(server, Encoding.UTF8) { AutoFlush = true })
-                    {
-                        string request = reader.ReadLine();
-                        if (!string.IsNullOrWhiteSpace(request))
-                        {
-                            string response = HandleCommand(request.Trim());
-                            writer.WriteLine(response);
-                        }
-                    }
-                }
-            }
-            catch
-            {
-                Thread.Sleep(100);
-            }
         }
     }
 

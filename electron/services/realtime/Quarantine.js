@@ -45,31 +45,46 @@ async function transcode(src, dest, key) {
   return hash.digest('hex')
 }
 
-/** Locks `dir` to Administrators and SYSTEM (owner Administrators, no inherited ACEs). Windows only. */
-export function lockDownDir(dir) {
+/**
+ * Locks `dir` to Administrators and SYSTEM (owner Administrators, no inherited ACEs). `usersRead` also lets Users read
+ * (never write), for folders Explorer opens from the app. Windows only.
+ */
+export function lockDownDir(dir, { usersRead = false } = {}) {
   if (process.platform !== 'win32') return Promise.resolve(true)
   const icacls = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'icacls.exe')
   const run = (args) => new Promise((resolve) => execFile(icacls, args, { windowsHide: true, timeout: 20000 }, (err) => resolve(!err)))
+  const grants = ['*S-1-5-32-544:(OI)(CI)F', '*S-1-5-18:(OI)(CI)F', ...(usersRead ? ['*S-1-5-32-545:(OI)(CI)RX'] : [])]
   return run([dir, '/setowner', '*S-1-5-32-544'])
-    .then(() => run([dir, '/inheritance:r', '/grant:r', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-18:(OI)(CI)F']))
+    .then((owned) => owned && run([dir, '/inheritance:r', '/grant:r', ...grants]))
 }
 
 const TRUSTED_OWNERS = new Set(['S-1-5-32-544', 'S-1-5-18'])
 
 /**
- * Files under `dir` (recursive) owned by anyone but Administrators / SYSTEM. Before the first lockdown ProgramData lets
- * a standard user create the folder and files in it; the lockdown cuts its access, but what it planted (a .json naming
- * any restore target, with its own key and payload) would still be listed and restored as admin. Windows only.
+ * Files and links under `dir` (recursive) owned by anyone but Administrators / SYSTEM. Before the first lockdown
+ * ProgramData lets a standard user create the folder and files in it; the lockdown cuts its access, but what it planted
+ * (a .json naming any restore target, with its own key and payload) would still be listed and restored as admin.
+ * Junctions and symbolic links are reported themselves and never entered: Windows PowerShell's -Recurse follows them,
+ * which would have let a planted junction make this elevated process delete files somewhere else. Windows only.
  */
 export function foreignOwnedFiles(dir) {
   if (process.platform !== 'win32') return Promise.resolve([])
   const lit = psQuote(dir)
+  const foreign = [...TRUSTED_OWNERS].map((s) => `$o -ne '${s}'`).join(' -and ')
   const script = [
     "$ErrorActionPreference = 'Stop'",
     '[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)',
-    `Get-ChildItem -LiteralPath ${lit} -Recurse -Force -File | ForEach-Object {`,
-    '  $o = (Get-Acl -LiteralPath $_.FullName).GetOwner([Security.Principal.SecurityIdentifier]).Value',
-    `  if (${[...TRUSTED_OWNERS].map((s) => `$o -ne '${s}'`).join(' -and ')}) { $_.FullName }`,
+    '$rp = [IO.FileAttributes]::ReparsePoint',
+    '$stack = New-Object System.Collections.Stack',
+    `$stack.Push(${lit})`,
+    'while ($stack.Count -gt 0) {',
+    '  foreach ($c in (Get-ChildItem -LiteralPath $stack.Pop() -Force)) {',
+    '    $link = ($c.Attributes -band $rp) -ne 0',
+    '    if ($link) { $c.FullName; continue }',
+    '    if ($c.PSIsContainer) { $stack.Push($c.FullName); continue }',
+    '    $o = (Get-Acl -LiteralPath $c.FullName).GetOwner([Security.Principal.SecurityIdentifier]).Value',
+    `    if (${foreign}) { $c.FullName }`,
+    '  }',
     '}'
   ].join('\n')
   const ps = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
@@ -82,11 +97,23 @@ export function foreignOwnedFiles(dir) {
   })
 }
 
-/** lockDownDir + removes what a non-admin planted there before. Resolves the removed paths; throws when unsure. */
-export async function secureDir(dir, { foreignOwned = foreignOwnedFiles } = {}) {
-  if (!(await lockDownDir(dir))) throw new Error(`could not secure ${dir}`)
+/** Makes Administrators the owner of everything under `dir` (links themselves, not their targets). Windows only. */
+export function ownTree(dir) {
+  if (process.platform !== 'win32') return Promise.resolve(true)
+  const icacls = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'icacls.exe')
+  return new Promise((resolve) => execFile(icacls, [dir, '/setowner', '*S-1-5-32-544', '/T', '/C', '/L', '/Q'], { windowsHide: true, timeout: 120000 }, (err) => resolve(!err)))
+}
+
+/**
+ * lockDownDir + removes what a non-admin planted there before (files, junctions, links), then takes ownership of the
+ * rest: a folder a standard user created keeps that user as owner, and an owner can always rewrite its ACL.
+ * Resolves the removed paths; throws when unsure.
+ */
+export async function secureDir(dir, { foreignOwned = foreignOwnedFiles, takeOwnership = ownTree, lockDown = lockDownDir, usersRead = false } = {}) {
+  if (!(await lockDown(dir, { usersRead }))) throw new Error(`could not secure ${dir}`)
   const bad = await foreignOwned(dir)
-  for (const f of bad) fs.rmSync(f, { force: true })
+  for (const f of bad) fs.rmSync(f, { force: true }) // not recursive: a junction is unlinked, never emptied
+  if (!(await takeOwnership(dir))) throw new Error(`could not take ownership of ${dir}`)
   return bad
 }
 

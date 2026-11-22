@@ -28,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The installed app no longer loads a `.env` file from the folder it is started in.
 - Custom scripts start `powershell.exe` by its full path.
 - OptiScaler is downloaded only when GitHub publishes a SHA-256 to check it against.
+- **Latency engine**: it no longer listens on the `DarkHubLatencyEngine` named pipe. Nothing in DarkHub used it, and
+  any non-elevated program of the same user could ask the elevated engine to change process priority and affinity,
+  trim memory or exit. The app keeps talking to it over stdin as before.
+- **`C:\ProgramData\DarkHub`**: on a stock Windows a standard user could create this folder before DarkHub and plant
+  files the elevated app trusts (the Windows-mode recovery manifest, Cleaner and Disk Rescue backups). At startup the
+  folder is now writable only by Administrators and SYSTEM (users keep read access), anything a non-admin left there
+  is removed and Administrators own the rest.
+- The cleanup of planted files no longer follows junctions or links, which could have made it delete files
+  outside the folder being secured.
 
 ### Fixed
 - **Compress to archive** did nothing useful: `tar` was started in the wrong folder and did not find the files.

@@ -3715,6 +3715,10 @@ app.whenReady().then(async () => {
 
     // Earlier versions kept a hidden hardware fingerprint; remove what they left behind.
     fs.rm(path.join(process.env.ProgramData || 'C:\\ProgramData', 'DarkHub', 'm.dat'), { force: true }).catch(() => {})
+      .then(() => import('./services/programDataRoot.js'))
+      .then(({ secureProgramDataRoot }) => secureProgramDataRoot())
+      .then((r) => { if (r?.removed?.length) log.warn('[startup-bg] removed files a non-admin planted in ProgramData\\DarkHub:', r.removed) })
+      .catch((e) => log.warn('[startup-bg] could not secure ProgramData\\DarkHub:', e?.message ?? String(e)))
     runCommand('reg.exe', ['delete', 'HKCU\\Software\\DarkHub\\MM', '/f'], { timeoutMs: 8000 }).catch(() => {})
 
     if (liveServices.latencyGuardian === false) latencyServiceState = 'disabled'
