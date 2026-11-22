@@ -256,7 +256,7 @@ describe('progress protocol and install script', () => {
     expect(s).toContain("sha = 'ABC'");
     expect(s).toContain("args = @('-s','-noreboot')");
     expect(s).toContain('DEVICE_DRIVER_INSTALL');
-    expect(s).toContain('if ($true) { Unlock-DhWu }');
+    expect(s).toContain('Unlock-DhWu $true');
     expect(s).toContain('O=NVIDIA Corporation');
   });
 });
@@ -311,6 +311,6 @@ describe('DriverInstallService (mocked I/O)', () => {
     expect(events.some((e) => e.status === 'reboot')).toBe(true);
     const script = elevatedRunner.mock.calls.at(-1)?.[0] as string;
     expect(script).toContain("$wuIds = @('11111111-1111-1111-1111-111111111111')");
-    expect(script).toContain('if ($true) { Unlock-DhWu }');
+    expect(script).toContain('Unlock-DhWu $true');
   });
 });

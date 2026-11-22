@@ -85,7 +85,9 @@ export function normalizeScan(raw = {}) {
     env: {
       osBuild: Number(raw.osBuild) || 0,
       laptop: Boolean(raw.laptop),
-      cpu: str(raw.cpu)
+      cpu: str(raw.cpu),
+      // PROCESSOR_ARCHITECTURE of the 64-bit shell: AMD64 or ARM64 (the names the update catalog uses too).
+      arch: /^(AMD64|ARM64|X86)$/i.test(str(raw.arch)) ? str(raw.arch).toUpperCase() : 'AMD64'
     },
     wu: {
       serviceStatus: str(wu.status),
@@ -300,14 +302,17 @@ export function interpretExitCode(code) {
  *   devices:  normalizeScan().devices
  *   updates:  normalizeWuUpdates()
  *   vendor:   [{ vendor, deviceId, version, url, name, date, gpuName, needsDriver, installedVersion }]
- * Returns items [{ id, source: 'wu'|'vendor', title, ..., recommended, fixes: [instanceId] }].
+ *   catalog:  [{ id, title, version, date, sizeBytes, driverClass, manufacturer, fixes: [instanceId] }]
+ *             (Microsoft Update Catalog packages found for devices nothing above covers)
+ * Returns items [{ id, source: 'wu'|'vendor'|'catalog', title, ..., recommended, fixes: [instanceId] }].
  *
  * Rules: a Windows Update driver is recommended when it targets a device that needs a driver. A GPU on the
  * generic driver gets the vendor's silent package (NVIDIA, Intel) when one was found; then a Windows Update
  * display driver for the same GPU is kept as an alternative (not both). AMD's tool is interactive, so a WU
- * display driver wins for AMD and the tool is only recommended when Windows Update has nothing.
+ * display driver wins for AMD and the tool is only recommended when Windows Update has nothing. A catalog
+ * package is only looked up for a device the other sources left without a driver, so it is recommended.
  */
-export function buildPlan({ devices = [], updates = [], vendor = [] } = {}) {
+export function buildPlan({ devices = [], updates = [], vendor = [], catalog = [] } = {}) {
   const items = []
   const needs = (d) => Boolean(d.reason && d.reason !== 'restart')
   const vendorFor = (gpu) => vendor.find((v) => v.vendor === gpu.vendor && v.deviceId === gpu.pci?.dev)
@@ -364,6 +369,28 @@ export function buildPlan({ devices = [], updates = [], vendor = [] } = {}) {
       updateAvailable: !gpuNeeds && newer
     })
   }
+
+  for (const c of catalog) {
+    const covered = new Set(items.filter((i) => i.recommended).flatMap((i) => i.fixes))
+    const fixes = asArray(c.fixes).filter((id) => devices.some((d) => d.instanceId === id && needs(d)) && !covered.has(id))
+    if (!fixes.length || items.some((i) => i.id === `cat:${c.id}`)) continue
+    const first = devices.find((d) => d.instanceId === fixes[0])
+    items.push({
+      id: `cat:${c.id}`,
+      source: 'catalog',
+      title: c.title,
+      device: fixes.length > 1 ? `${first?.name || c.title} (+${fixes.length - 1})` : (first?.name || c.title),
+      driverClass: c.driverClass || '',
+      manufacturer: c.manufacturer || '',
+      version: c.version || '',
+      date: c.date || '',
+      sizeBytes: Number(c.sizeBytes) || 0,
+      silent: true,
+      fixes,
+      recommended: true,
+      alternative: false
+    })
+  }
   return items
 }
 
@@ -383,7 +410,7 @@ const PROGRESS_STATUSES = new Set(['start', 'downloading', 'installing', 'verify
 
 /**
  * One line written by the elevated job: DHP|<itemId>|<status>|<detail>. Returns { id, status, detail } or null.
- * itemId: wu:<guid>, vendor:<vendor>:<dev>, or one of restore / wuservice / job.
+ * itemId: wu:<guid>, vendor:<vendor>:<dev>, cat:<guid>, or one of restore / wuservice / job.
  */
 export function parseProgressLine(line = '') {
   const m = /^DHP\|([A-Za-z0-9:._-]{1,80})\|([a-z]+)\|(.*)$/.exec(String(line).trim())

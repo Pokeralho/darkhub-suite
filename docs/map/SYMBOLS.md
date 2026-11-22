@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-22T11:18:30. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-22T14:11:27. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -490,11 +490,15 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/drivers/DriverInstallService.js`
 
-`foreach`:83, `foreach`:93, `foreach`:126, `foreach`:127, `dhpFunc`:152, `wuSearchScript`:162, `wuSearchElevatedScript`:173, `buildInstallScript`:192, `foreach`:297, `readWuOutput`:336, `wuErrorKind`:346, `fetchText`:354, `driversDir`:371, `sha256File`:378, `DriverInstallService`:384 _class_, `scan`:395, `searchWindowsUpdate`:411, `lookupVendor`:433, `findDrivers`:469, `download`:495, `signature`:537, `note`:557, `pump`:602
+`foreach`:104, `DhHr`:127, `foreach`:138, `foreach`:178, `foreach`:179, `dhpFunc`:214, `wuSearchScript`:224, `wuSearchElevatedScript`:235, `buildInstallScript`:257, `list`:259, `foreach`:371, `foreach`:463, `foreach`:471, `readWuOutput`:480, `wuErrorKind`:490, `errText`:499, `withRetry`:510, `fetchText`:523, `fetchTextOnce`:527, `driversDir`:549, `sha256File`:556, `mapLimit`:563, `worker`:566, `mergeCabs`:580, `clean`:582, `isWuFailure`:596, `DriverInstallService`:598 _class_, `scan`:609, `searchWindowsUpdate`:625, `lookupVendor`:647, `catalogFor`:691, `once`:694, `lookupCatalog`:744, `findDrivers`:771, `download`:807, `downloadCatalog`:852, `_downloadCab`:883, `signature`:909, `_runJob`:918, `take`:925, `pump`:931, `deliveryOptimizationOff`:960, `_catalogCabs`:971, `_catalogFallback`:982, `note`:1033
+
+## `electron/services/drivers/driverCatalog.js`
+
+`isCatalogId`:16, `catalogSearchUrl`:18, `catalogDetailsUrl`:19, `catalogDownloadBody`:22, `text`:28, `catalogDate`:38, `parseCatalogSearch`:45, `parseCatalogDetails`:70, `span`:72, `isCatalogHost`:95, `isCatalogPackageUrl`:107, `parseCatalogDownload`:116, `productFloors`:145, `productFloorFor`:160, `isInstallableRow`:170, `rankCatalogRows`:181, `catalogQueries`:197, `matchRank`:217, `detailsFit`:224
 
 ## `electron/services/drivers/driverPlan.js`
 
-`problemReason`:19, `asArray`:28, `str`:29, `parsePciIds`:32, `normalizeDevice`:44, `normalizeScan`:78, `wuBlockers`:105, `isUpdateId`:115, `normalizeWuUpdates`:118, `devicesForUpdate`:140, `isTrustedPackageUrl`:155, `isExpectedSigner`:179, `nvidiaLookupUrl`:187, `parseNvidiaLookup`:199, `safeJson`:209, `nvidiaVersionFromWindows`:214, `compareVersions`:223, `parseAmdDriversPage`:236, `intelPackageFor`:255, `parseIntelDownloadPage`:273, `meta`:274, `vendorInstallArgs`:281, `vendorIsSilent`:287, `interpretExitCode`:290, `buildPlan`:310, `needs`:312, `vendorFor`:313, `recommendedIds`:371, `uncoveredDevices`:376, `parseProgressLine`:388, `parseProgressText`:395
+`problemReason`:19, `asArray`:28, `str`:29, `parsePciIds`:32, `normalizeDevice`:44, `normalizeScan`:78, `wuBlockers`:107, `isUpdateId`:117, `normalizeWuUpdates`:120, `devicesForUpdate`:142, `isTrustedPackageUrl`:157, `isExpectedSigner`:181, `nvidiaLookupUrl`:189, `parseNvidiaLookup`:201, `safeJson`:211, `nvidiaVersionFromWindows`:216, `compareVersions`:225, `parseAmdDriversPage`:238, `intelPackageFor`:257, `parseIntelDownloadPage`:275, `meta`:276, `vendorInstallArgs`:283, `vendorIsSilent`:289, `interpretExitCode`:292, `buildPlan`:315, `needs`:317, `vendorFor`:318, `recommendedIds`:398, `uncoveredDevices`:403, `parseProgressLine`:415, `parseProgressText`:422
 
 ## `electron/services/ensureElevated.js`
 
@@ -754,7 +758,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/realtime/Quarantine.js`
 
-`xorStream`:19, `transcode`:33, `lockDownDir`:52, `run`:55, `foreignOwnedFiles`:70, `ownTree`:101, `secureDir`:112, `Quarantine`:120 _class_, `ensureRoot`:135, `paths`:147, `add`:156, `public`:187, `list`:192, `restore`:204, `remove`:228
+`xorStream`:19, `transcode`:33, `lockDownDir`:52, `run`:55, `foreignOwnedFiles`:70, `ownTree`:105, `secureDir`:116, `Quarantine`:124 _class_, `ensureRoot`:139, `paths`:151, `add`:160, `public`:191, `list`:196, `restore`:208, `remove`:232
 
 ## `electron/services/realtime/RealtimeOptimizer.js`
 
@@ -1194,7 +1198,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `src/components/drivers/MissingDrivers.tsx`
 
-`api`:9, `fill`:10, `mb`:12, `ItemState`:14 _type_, `MissingDrivers`:18 _component_, `itemTitle`:75, `toggle`:77, `runInstall`:83, `reasonText`:110, `sourceText`:116, `statusLine`:118, `itemRow`:139, `wuHintKey`:350
+`api`:9, `fill`:10, `mb`:12, `ItemState`:14 _type_, `MissingDrivers`:18 _component_, `itemTitle`:75, `toggle`:77, `runInstall`:83, `reasonText`:110, `sourceText`:116, `statusLine`:122, `itemRow`:143, `wuHintKey`:360
 
 ## `src/components/gpubench/RankingTop.tsx`
 
@@ -1859,6 +1863,14 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/downloads.test.ts`
 
 `sha`:13, `at`:43, `startServer`:72, `tick`:93, `newManager`:109, `waitFor`:118
+
+## `tests/driverCatalog.test.ts`
+
+`row`:18, `details`:57, `swap`:123, `cab`:200, `site`:247, `it`:320
+
+## `tests/driverCatalogNet.test.ts`
+
+`flaky`:20
 
 ## `tests/elevatedNoExit.test.ts`
 

@@ -63,7 +63,7 @@ Obs.: no `preload.js` o namespace do FramePacer é `darkpacer`, com o apelido `f
 | Rota | Tela | Backend principal |
 |---|---|---|
 | `monitor` | `src/pages/SystemMonitor.tsx` | `electron/services/HardwareService.js`, `DeepHardwareService.js`, `electron/hal/**`, `DarkHub.SensorDaemon.cs` |
-| `driver` | `src/pages/DriverCenter.tsx` | `electron/ipc/driverIpc.js` → `electron/services/DriverCenterService.js` |
+| `driver` | `src/pages/DriverCenter.tsx` | `electron/ipc/driverIpc.js` → `electron/services/DriverCenterService.js` (GPU, câmera) e `electron/services/drivers/` (`DriverInstallService.js`: busca e instalação; `driverPlan.js`: plano; `driverCatalog.js`: Catálogo do Microsoft Update, usado para o que o Windows Update não oferece ou não consegue baixar) |
 | `networktools` | `src/pages/NetworkTools.tsx` | `electron/networkIPC.js` |
 | `setuphub` | `src/pages/SetupHub.tsx` | `electron/main.js` (`setup:*`, winget) |
 | `ssh` | `src/pages/SshClient.tsx` + `src/components/ssh/*` | `electron/ipc/sshIpc.js` (`ssh:*`) → `electron/services/ssh/` (`SshVaultStore` cofre AES-GCM/DPAPI, `SshSessionManager` sessões/ProxyJump/TOFU/2FA, `SftpService` SFTP + modo root via `sudo sftp-server`, `PortForwardService` -L/-R/-D, `SerialService` porta COM via ponte PowerShell/C#) |

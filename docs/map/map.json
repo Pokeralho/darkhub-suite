@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-22T11:18:30",
+ "generated_at": "2026-11-22T14:11:27",
  "bridge": "darkhub",
  "preload": "electron/preload.js",
  "features": [
@@ -316,7 +316,7 @@
     },
     {
      "api": "restore.status",
-     "from": "src/components/drivers/MissingDrivers.tsx:315",
+     "from": "src/components/drivers/MissingDrivers.tsx:324",
      "channel": "restore:status",
      "handler": "electron/ipc/restoreIpc.js:12",
      "calls": [
@@ -24824,117 +24824,324 @@
    {
     "name": "foreach",
     "kind": "method",
-    "line": 83
+    "line": 104
    },
    {
-    "name": "foreach",
-    "kind": "method",
-    "line": 93
-   },
-   {
-    "name": "foreach",
-    "kind": "method",
-    "line": 126
-   },
-   {
-    "name": "foreach",
-    "kind": "method",
+    "name": "DhHr",
+    "kind": "function",
     "line": 127
+   },
+   {
+    "name": "foreach",
+    "kind": "method",
+    "line": 138
+   },
+   {
+    "name": "foreach",
+    "kind": "method",
+    "line": 178
+   },
+   {
+    "name": "foreach",
+    "kind": "method",
+    "line": 179
    },
    {
     "name": "dhpFunc",
     "kind": "function",
-    "line": 152
+    "line": 214
    },
    {
     "name": "wuSearchScript",
     "kind": "function",
-    "line": 162
+    "line": 224
    },
    {
     "name": "wuSearchElevatedScript",
     "kind": "function",
-    "line": 173
+    "line": 235
    },
    {
     "name": "buildInstallScript",
     "kind": "function",
-    "line": 192
+    "line": 257
+   },
+   {
+    "name": "list",
+    "kind": "function",
+    "line": 259
    },
    {
     "name": "foreach",
     "kind": "method",
-    "line": 297
+    "line": 371
+   },
+   {
+    "name": "foreach",
+    "kind": "method",
+    "line": 463
+   },
+   {
+    "name": "foreach",
+    "kind": "method",
+    "line": 471
    },
    {
     "name": "readWuOutput",
     "kind": "function",
-    "line": 336
+    "line": 480
    },
    {
     "name": "wuErrorKind",
     "kind": "function",
-    "line": 346
+    "line": 490
+   },
+   {
+    "name": "errText",
+    "kind": "function",
+    "line": 499
+   },
+   {
+    "name": "withRetry",
+    "kind": "function",
+    "line": 510
    },
    {
     "name": "fetchText",
     "kind": "function",
-    "line": 354
+    "line": 523
+   },
+   {
+    "name": "fetchTextOnce",
+    "kind": "function",
+    "line": 527
    },
    {
     "name": "driversDir",
     "kind": "function",
-    "line": 371
+    "line": 549
    },
    {
     "name": "sha256File",
     "kind": "function",
-    "line": 378
+    "line": 556
+   },
+   {
+    "name": "mapLimit",
+    "kind": "function",
+    "line": 563
+   },
+   {
+    "name": "worker",
+    "kind": "function",
+    "line": 566
+   },
+   {
+    "name": "mergeCabs",
+    "kind": "function",
+    "line": 580
+   },
+   {
+    "name": "clean",
+    "kind": "function",
+    "line": 582
+   },
+   {
+    "name": "isWuFailure",
+    "kind": "function",
+    "line": 596
    },
    {
     "name": "DriverInstallService",
     "kind": "class",
-    "line": 384
+    "line": 598
    },
    {
     "name": "scan",
     "kind": "method",
-    "line": 395
+    "line": 609
    },
    {
     "name": "searchWindowsUpdate",
     "kind": "method",
-    "line": 411
+    "line": 625
    },
    {
     "name": "lookupVendor",
     "kind": "method",
-    "line": 433
+    "line": 647
+   },
+   {
+    "name": "catalogFor",
+    "kind": "method",
+    "line": 691
+   },
+   {
+    "name": "once",
+    "kind": "function",
+    "line": 694
+   },
+   {
+    "name": "lookupCatalog",
+    "kind": "method",
+    "line": 744
    },
    {
     "name": "findDrivers",
     "kind": "method",
-    "line": 469
+    "line": 771
    },
    {
     "name": "download",
     "kind": "method",
-    "line": 495
+    "line": 807
+   },
+   {
+    "name": "downloadCatalog",
+    "kind": "method",
+    "line": 852
+   },
+   {
+    "name": "_downloadCab",
+    "kind": "method",
+    "line": 883
    },
    {
     "name": "signature",
     "kind": "method",
-    "line": 537
+    "line": 909
    },
    {
-    "name": "note",
+    "name": "_runJob",
+    "kind": "method",
+    "line": 918
+   },
+   {
+    "name": "take",
     "kind": "function",
-    "line": 557
+    "line": 925
    },
    {
     "name": "pump",
     "kind": "function",
-    "line": 602
+    "line": 931
+   },
+   {
+    "name": "deliveryOptimizationOff",
+    "kind": "method",
+    "line": 960
+   },
+   {
+    "name": "_catalogCabs",
+    "kind": "method",
+    "line": 971
+   },
+   {
+    "name": "_catalogFallback",
+    "kind": "method",
+    "line": 982
+   },
+   {
+    "name": "note",
+    "kind": "function",
+    "line": 1033
+   }
+  ],
+  "electron/services/drivers/driverCatalog.js": [
+   {
+    "name": "isCatalogId",
+    "kind": "function",
+    "line": 16
+   },
+   {
+    "name": "catalogSearchUrl",
+    "kind": "function",
+    "line": 18
+   },
+   {
+    "name": "catalogDetailsUrl",
+    "kind": "function",
+    "line": 19
+   },
+   {
+    "name": "catalogDownloadBody",
+    "kind": "function",
+    "line": 22
+   },
+   {
+    "name": "text",
+    "kind": "function",
+    "line": 28
+   },
+   {
+    "name": "catalogDate",
+    "kind": "function",
+    "line": 38
+   },
+   {
+    "name": "parseCatalogSearch",
+    "kind": "function",
+    "line": 45
+   },
+   {
+    "name": "parseCatalogDetails",
+    "kind": "function",
+    "line": 70
+   },
+   {
+    "name": "span",
+    "kind": "function",
+    "line": 72
+   },
+   {
+    "name": "isCatalogHost",
+    "kind": "function",
+    "line": 95
+   },
+   {
+    "name": "isCatalogPackageUrl",
+    "kind": "function",
+    "line": 107
+   },
+   {
+    "name": "parseCatalogDownload",
+    "kind": "function",
+    "line": 116
+   },
+   {
+    "name": "productFloors",
+    "kind": "function",
+    "line": 145
+   },
+   {
+    "name": "productFloorFor",
+    "kind": "function",
+    "line": 160
+   },
+   {
+    "name": "isInstallableRow",
+    "kind": "function",
+    "line": 170
+   },
+   {
+    "name": "rankCatalogRows",
+    "kind": "function",
+    "line": 181
+   },
+   {
+    "name": "catalogQueries",
+    "kind": "function",
+    "line": 197
+   },
+   {
+    "name": "matchRank",
+    "kind": "function",
+    "line": 217
+   },
+   {
+    "name": "detailsFit",
+    "kind": "function",
+    "line": 224
    }
   ],
   "electron/services/drivers/driverPlan.js": [
@@ -24971,127 +25178,127 @@
    {
     "name": "wuBlockers",
     "kind": "function",
-    "line": 105
+    "line": 107
    },
    {
     "name": "isUpdateId",
     "kind": "function",
-    "line": 115
+    "line": 117
    },
    {
     "name": "normalizeWuUpdates",
     "kind": "function",
-    "line": 118
+    "line": 120
    },
    {
     "name": "devicesForUpdate",
     "kind": "function",
-    "line": 140
+    "line": 142
    },
    {
     "name": "isTrustedPackageUrl",
     "kind": "function",
-    "line": 155
+    "line": 157
    },
    {
     "name": "isExpectedSigner",
     "kind": "function",
-    "line": 179
+    "line": 181
    },
    {
     "name": "nvidiaLookupUrl",
     "kind": "function",
-    "line": 187
+    "line": 189
    },
    {
     "name": "parseNvidiaLookup",
     "kind": "function",
-    "line": 199
+    "line": 201
    },
    {
     "name": "safeJson",
     "kind": "function",
-    "line": 209
+    "line": 211
    },
    {
     "name": "nvidiaVersionFromWindows",
     "kind": "function",
-    "line": 214
+    "line": 216
    },
    {
     "name": "compareVersions",
     "kind": "function",
-    "line": 223
+    "line": 225
    },
    {
     "name": "parseAmdDriversPage",
     "kind": "function",
-    "line": 236
+    "line": 238
    },
    {
     "name": "intelPackageFor",
     "kind": "function",
-    "line": 255
+    "line": 257
    },
    {
     "name": "parseIntelDownloadPage",
     "kind": "function",
-    "line": 273
+    "line": 275
    },
    {
     "name": "meta",
     "kind": "function",
-    "line": 274
+    "line": 276
    },
    {
     "name": "vendorInstallArgs",
     "kind": "function",
-    "line": 281
+    "line": 283
    },
    {
     "name": "vendorIsSilent",
     "kind": "function",
-    "line": 287
+    "line": 289
    },
    {
     "name": "interpretExitCode",
     "kind": "function",
-    "line": 290
+    "line": 292
    },
    {
     "name": "buildPlan",
     "kind": "function",
-    "line": 310
+    "line": 315
    },
    {
     "name": "needs",
     "kind": "function",
-    "line": 312
+    "line": 317
    },
    {
     "name": "vendorFor",
     "kind": "function",
-    "line": 313
+    "line": 318
    },
    {
     "name": "recommendedIds",
     "kind": "function",
-    "line": 371
+    "line": 398
    },
    {
     "name": "uncoveredDevices",
     "kind": "function",
-    "line": 376
+    "line": 403
    },
    {
     "name": "parseProgressLine",
     "kind": "function",
-    "line": 388
+    "line": 415
    },
    {
     "name": "parseProgressText",
     "kind": "function",
-    "line": 395
+    "line": 422
    }
   ],
   "electron/services/ensureElevated.js": [
@@ -30136,52 +30343,52 @@
    {
     "name": "ownTree",
     "kind": "function",
-    "line": 101
+    "line": 105
    },
    {
     "name": "secureDir",
     "kind": "function",
-    "line": 112
+    "line": 116
    },
    {
     "name": "Quarantine",
     "kind": "class",
-    "line": 120
+    "line": 124
    },
    {
     "name": "ensureRoot",
     "kind": "method",
-    "line": 135
+    "line": 139
    },
    {
     "name": "paths",
     "kind": "method",
-    "line": 147
+    "line": 151
    },
    {
     "name": "add",
     "kind": "method",
-    "line": 156
+    "line": 160
    },
    {
     "name": "public",
     "kind": "method",
-    "line": 187
+    "line": 191
    },
    {
     "name": "list",
     "kind": "method",
-    "line": 192
+    "line": 196
    },
    {
     "name": "restore",
     "kind": "method",
-    "line": 204
+    "line": 208
    },
    {
     "name": "remove",
     "kind": "method",
-    "line": 228
+    "line": 232
    }
   ],
   "electron/services/realtime/RealtimeOptimizer.js": [
@@ -37156,17 +37363,17 @@
    {
     "name": "statusLine",
     "kind": "function",
-    "line": 118
+    "line": 122
    },
    {
     "name": "itemRow",
     "kind": "function",
-    "line": 139
+    "line": 143
    },
    {
     "name": "wuHintKey",
     "kind": "function",
-    "line": 350
+    "line": 360
    }
   ],
   "src/components/gpubench/RankingTop.tsx": [
@@ -45174,6 +45381,45 @@
     "name": "waitFor",
     "kind": "function",
     "line": 118
+   }
+  ],
+  "tests/driverCatalog.test.ts": [
+   {
+    "name": "row",
+    "kind": "function",
+    "line": 18
+   },
+   {
+    "name": "details",
+    "kind": "function",
+    "line": 57
+   },
+   {
+    "name": "swap",
+    "kind": "function",
+    "line": 123
+   },
+   {
+    "name": "cab",
+    "kind": "function",
+    "line": 200
+   },
+   {
+    "name": "site",
+    "kind": "function",
+    "line": 247
+   },
+   {
+    "name": "it",
+    "kind": "method",
+    "line": 320
+   }
+  ],
+  "tests/driverCatalogNet.test.ts": [
+   {
+    "name": "flaky",
+    "kind": "function",
+    "line": 20
    }
   ],
   "tests/elevatedNoExit.test.ts": [

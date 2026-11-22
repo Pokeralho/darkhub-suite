@@ -318,7 +318,7 @@ export interface DriverDevice {
 
 export interface DriverPlanItem {
   id: string;
-  source: 'wu' | 'vendor';
+  source: 'wu' | 'vendor' | 'catalog';
   vendor?: string;
   title: string;
   device: string;
@@ -346,6 +346,8 @@ export interface DriverFindResult {
     serviceStatus: string; serviceStart: number; excludeDrivers: boolean; noInternetLocations: boolean; wsus: boolean;
   };
   vendorLookups?: Array<{ vendor: string; deviceId: string; ok: boolean; error: string; version: string }>;
+  /** Microsoft Update Catalog lookups for the devices Windows Update and the vendors left without a driver. */
+  catalog?: { searched: number; found: number; error: string };
   items?: DriverPlanItem[];
   recommended?: string[];
   uncovered?: string[];
@@ -1325,6 +1327,8 @@ export interface DarkHubAPI {
       error?: string;
       results?: DriverInstallEvent[];
       rebootRequired?: boolean;
+      /** Windows Update drivers that failed and were fetched from the Microsoft Update Catalog instead. */
+      catalogFallback?: { tried: number; ok: number };
       after?: { missing: DriverDevice[]; gpus: DriverDevice[] } | null;
     }>;
     onInstallEvent: (callback: (ev: DriverInstallEvent) => void) => () => void;

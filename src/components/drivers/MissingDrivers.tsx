@@ -29,7 +29,7 @@ export default function MissingDrivers({ onInstalled }: { onInstalled?: () => vo
   const [log, setLog] = useState<string[]>([]);
   const [logOpen, setLogOpen] = useState(false);
   const [othersOpen, setOthersOpen] = useState(false);
-  const [outcome, setOutcome] = useState<{ ok: boolean; message: string; reboot?: boolean; still?: number } | null>(null);
+  const [outcome, setOutcome] = useState<{ ok: boolean; message: string; reboot?: boolean; still?: number; viaCatalog?: number } | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true; // StrictMode mounts twice: the ref must come back to true
@@ -97,7 +97,7 @@ export default function MissingDrivers({ onInstalled }: { onInstalled?: () => vo
         setOutcome({ ok: false, message: fill(t('drvx.error', 'Could not install: {error}'), { error: r.error || r.results?.find((x) => x.status === 'failed')?.detail || '?' }) });
       } else {
         const still = (r.after?.missing ?? []).length;
-        setOutcome({ ok: r.ok, message: r.ok ? t('drvx.done.ok', 'Install finished.') : t('drvx.done.partial', ''), reboot: r.rebootRequired, still });
+        setOutcome({ ok: r.ok, message: r.ok ? t('drvx.done.ok', 'Install finished.') : t('drvx.done.partial', ''), reboot: r.rebootRequired, still, viaCatalog: r.catalogFallback?.ok ?? 0 });
       }
       onInstalled?.();
     } catch (e: any) {
@@ -113,7 +113,11 @@ export default function MissingDrivers({ onInstalled }: { onInstalled?: () => vo
     if (d.reason === 'driverError') return fill(t('drvx.reason.driverError', ''), { code: d.code });
     return t('drvx.reason.restart', '');
   };
-  const sourceText = (i: DriverPlanItem) => (i.source === 'wu' ? t('drvx.src.wu', 'Windows Update') : t(`drvx.src.${i.vendor}`, i.vendor ?? ''));
+  const sourceText = (i: DriverPlanItem) => (
+    i.source === 'wu' ? t('drvx.src.wu', 'Windows Update')
+      : i.source === 'catalog' ? t('drvx.src.catalog', 'Microsoft Update Catalog')
+        : t(`drvx.src.${i.vendor}`, i.vendor ?? '')
+  );
 
   const statusLine = (id: string) => {
     const st = states[id];
@@ -239,6 +243,11 @@ export default function MissingDrivers({ onInstalled }: { onInstalled?: () => vo
               {wu.kind === 'offline' ? t('drvx.wu.offline', '') : fill(t('drvx.wu.error', ''), { error: wu.error })}
             </p>
           ) : null}
+          {data.catalog?.error ? (
+            <p className="mt-2 text-[11.5px] text-zinc-500 flex items-center gap-1.5">
+              <Info size={12} />{fill(t('drvx.catalog.error', ''), { error: data.catalog.error })}
+            </p>
+          ) : null}
           {vendorErrors.map((v) => (
             <p key={`${v.vendor}-${v.deviceId}`} className="mt-2 text-[11.5px] text-zinc-500 flex items-center gap-1.5">
               <Info size={12} />{fill(t('drvx.vendor.error', ''), { vendor: v.vendor.toUpperCase(), error: v.error })}
@@ -320,6 +329,7 @@ export default function MissingDrivers({ onInstalled }: { onInstalled?: () => vo
       {outcome ? (
         <div role="status" className={`mt-4 border-l-2 pl-3 py-1 text-[12.5px] ${outcome.ok ? 'border-emerald-400 text-emerald-200' : 'border-red-400 text-red-300'}`}>
           <p>{outcome.message}</p>
+          {outcome.viaCatalog ? <p className="text-zinc-300">{fill(t('drvx.done.viaCatalog', ''), { n: outcome.viaCatalog })}</p> : null}
           {outcome.reboot ? <p className="text-amber-200">{t('drvx.done.reboot', '')}</p> : null}
           {outcome.still ? <p className="text-amber-200">{fill(t('drvx.done.stillMissing', ''), { n: outcome.still })}</p> : null}
         </div>
@@ -350,6 +360,8 @@ export default function MissingDrivers({ onInstalled }: { onInstalled?: () => vo
 export function wuHintKey(detail: string): string | null {
   const h = /\b(8[0-9A-F]{7})\b/i.exec(detail || '')?.[1]?.toUpperCase();
   if (!h) return null;
+  // Windows Update failed and the catalog does not carry this driver either: nothing more DarkHub can try
+  if (/not in the Microsoft Update Catalog/i.test(detail)) return 'nocatalog';
   if (['80072EE7', '80072EFD', '80072EE2', '80072F8F', '8024401C', '80244022', '8024402C', '8024402F', '80244017'].includes(h)) return h === '80072F8F' ? 'clock' : 'network';
   if (['800B0101', '800B0109', '800B010A', '80096004'].includes(h)) return 'clock';
   if (['80070422', '8024A000', '80070426'].includes(h)) return 'service';
@@ -359,5 +371,7 @@ export function wuHintKey(detail: string): string | null {
   if (['80073712', '800F081F', '800F0922', '8007000D'].includes(h)) return 'store';
   if (h === '80070005') return 'denied';
   if (h === '80070070' || h === '80070008') return 'space';
+  // COM / RPC failures inside the Windows Update client itself: its pieces are missing, unregistered or were restarted
+  if (['80004002', '80040154', '80070424', '8007007E', '80080005', '800706BA', '800706BE', '80010108'].includes(h)) return 'component';
   return 'other';
 }
