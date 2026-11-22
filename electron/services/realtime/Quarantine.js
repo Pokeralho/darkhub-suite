@@ -82,7 +82,9 @@ export function foreignOwnedFiles(dir) {
     '    $link = ($c.Attributes -band $rp) -ne 0',
     '    if ($link) { $c.FullName; continue }',
     '    if ($c.PSIsContainer) { $stack.Push($c.FullName); continue }',
-    '    $o = (Get-Acl -LiteralPath $c.FullName).GetOwner([Security.Principal.SecurityIdentifier]).Value',
+    // .NET directly instead of Get-Acl: that cmdlet lives in a module that fails to load when PowerShell 7 left its
+    // PSModulePath in the environment (seen on the GitHub runner)
+    "    $o = (New-Object System.Security.AccessControl.FileSecurity($c.FullName, 'Owner')).GetOwner([Security.Principal.SecurityIdentifier]).Value",
     `    if (${foreign}) { $c.FullName }`,
     '  }',
     '}'
@@ -90,7 +92,9 @@ export function foreignOwnedFiles(dir) {
   const ps = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
   const args = ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')]
   return new Promise((resolve, reject) => {
-    execFile(ps, args, { windowsHide: true, timeout: 60000, maxBuffer: 16 << 20, encoding: 'utf8' }, (err, out) => {
+    const env = { ...process.env }
+    delete env.PSModulePath // Windows PowerShell 5.1 rebuilds its own; one inherited from PowerShell 7 breaks autoloading
+    execFile(ps, args, { windowsHide: true, timeout: 60000, maxBuffer: 16 << 20, encoding: 'utf8', env }, (err, out) => {
       if (err) return reject(new Error(`could not check who owns the files in ${dir}: ${err.message}`))
       resolve(String(out).split(/\r?\n/).map((l) => l.trim()).filter(Boolean))
     })
