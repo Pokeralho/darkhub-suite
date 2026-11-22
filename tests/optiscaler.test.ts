@@ -3,12 +3,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 describe('OptiScaler Manager - FSR 4.1.1b RDNA 2 (the3rdparty1917) Integration', () => {
-  it('should verify the existence and size of the FSR 4.1.1b INT8 DLL', () => {
-    const dllPath = path.resolve('electron/services/fsr4_rdna2/amd_fidelityfx_upscaler_dx12.dll');
-    expect(fs.existsSync(dllPath)).toBe(true);
-
-    const stat = fs.statSync(dllPath);
-    expect(stat.size).toBe(34013696);
+  it('does not carry the FSR 4.1.1b INT8 DLL: it is downloaded on demand and checked against the hash GitHub publishes', () => {
+    // AMD's code repackaged by a third party: not ours to redistribute, in the repository or in the installer
+    expect(fs.existsSync(path.resolve('electron/services/fsr4_rdna2'))).toBe(false);
+    const src = fs.readFileSync(path.resolve('electron/optiscalerManager.js'), 'utf8');
+    const fn = src.slice(src.indexOf('async function resolveFsr4Rdna2Path'), src.indexOf('async function applyOptiScaler'));
+    expect(fn).toContain('the3rdparty1917/fsr4xyz/releases/tags/4.1.1b');
+    expect(fn).toMatch(/if \(!expectedSha256\) throw/);
+    expect(fn).not.toMatch(/services['"], ['"]fsr4_rdna2/);
   });
 
 

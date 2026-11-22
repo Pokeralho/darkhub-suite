@@ -1,7 +1,6 @@
 import path from 'node:path'
 import os from 'node:os'
 import fsRaw from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import {
@@ -13,7 +12,6 @@ import {
 
 import { downloadToFile, fetchJson, assetSha256, SYSTEM_TAR } from './services/SecureDownload.js'
 import { isPe64 } from './services/upscale/pe.js'
-import { integrityError } from './services/binaryIntegrity.js'
 
 const fs = fsRaw.promises
 const log = { info: (...a) => console.log(...a) }
@@ -731,21 +729,18 @@ export function isSameInstall(analysis, payload) {
   )
 }
 
+// The FSR 4 INT8 DLL is AMD's code repackaged by a third party: DarkHub does not redistribute it (it was never in
+// the installer and is no longer in the repository). It is downloaded on demand from the mod's own release and
+// checked against the SHA-256 GitHub publishes for the file.
 async function resolveFsr4Rdna2Path(app) {
-  const candidates = [
-    path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'services', 'fsr4_rdna2', 'amd_fidelityfx_upscaler_dx12.dll'),
-    path.resolve(process.cwd(), 'electron', 'services', 'fsr4_rdna2', 'amd_fidelityfx_upscaler_dx12.dll')
-  ]
+  const candidates = []
   try {
     const userData = app?.getPath ? app.getPath('userData') : (process.env.APPDATA || path.join(process.cwd(), '.data'))
     candidates.push(path.join(userData, 'OptiScaler', 'FSR4_RDNA2', 'amd_fidelityfx_upscaler_dx12.dll'))
     candidates.push(path.join(process.env.APPDATA || '', 'DarkHub', 'OptiScaler', 'FSR4_RDNA2', 'amd_fidelityfx_upscaler_dx12.dll'))
   } catch {}
 
-  // the bundled copy is injected into games: an installed app skips it when it is not the shipped file
-  const bundledTampered = integrityError(['fsr4_rdna2/'], { log: (m) => console.warn('[OptiScaler]', m) })
-  for (const [i, c] of candidates.entries()) {
-    if (i < 2 && bundledTampered) continue
+  for (const c of candidates) {
     if (fsRaw.existsSync(c)) return c
   }
 

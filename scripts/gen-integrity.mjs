@@ -8,8 +8,6 @@ import { fileURLToPath } from 'node:url'
 
 const services = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'electron', 'services')
 const BINARY = /\.(exe|dll|config)$/i
-// not shipped (package.json build.files excludes it): optiscalerManager downloads it on demand, pinned to GitHub's hash
-const NOT_SHIPPED = new Set(['fsr4_rdna2'])
 
 /** Every native file shipped under electron/services, in any subfolder (e.g. hwsensors/, lowlatency/), as 'sub/name'. */
 export function listBinaries(dir = services) {
@@ -18,7 +16,7 @@ export function listBinaries(dir = services) {
     const entries = fs.readdirSync(path.join(dir, rel), { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
     for (const e of entries) {
       const child = rel ? `${rel}/${e.name}` : e.name
-      if (e.isDirectory()) { if (!(rel === '' && NOT_SHIPPED.has(e.name))) walk(child) }
+      if (e.isDirectory()) walk(child)
       else if (e.isFile() && BINARY.test(e.name)) out.push(child)
     }
   }

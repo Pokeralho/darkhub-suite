@@ -116,8 +116,7 @@
     "files": [
       "dist/**",
       "electron/**",
-      "package.json",
-      "!electron/services/fsr4_rdna2/**"
+      "package.json"
     ],
     "compression": "maximum",
     "electronLanguages": [

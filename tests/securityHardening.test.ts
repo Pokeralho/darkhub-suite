@@ -157,8 +157,7 @@ describe('native helper integrity coverage', () => {
       const dir = path.resolve(__dirname, '../electron/services', rel)
       for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
         const r = rel ? `${rel}/${e.name}` : e.name
-        // fsr4_rdna2/ stays in the repo for dev but is not packaged (downloaded on demand, see package.json build.files)
-        if (e.isDirectory()) { if (r !== 'fsr4_rdna2') walk(r) }
+        if (e.isDirectory()) walk(r)
         else if (/\.(exe|dll)$/i.test(e.name)) onDisk.push(r)
       }
     }
@@ -183,8 +182,7 @@ describe('native helper integrity coverage', () => {
       'electron/services/hotkeys/HotkeyService.js': 'DarkHub.HotkeyWatch.exe',
       'electron/services/NativeLatencyClient.js': 'DarkHub.LatencyEngine.exe',
       'electron/services/vaultBridge/nativeHost.js': 'HOST_EXE_NAME',
-      'electron/services/gpubench/GpuBenchService.js': 'DarkHub.GpuBench.exe',
-      'electron/optiscalerManager.js': 'fsr4_rdna2/'
+      'electron/services/gpubench/GpuBenchService.js': 'DarkHub.GpuBench.exe'
     }
     for (const [file, name] of Object.entries(sites)) {
       const src = fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8')
