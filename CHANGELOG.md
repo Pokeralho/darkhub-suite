@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-11-22
+
 ### Security
 - **Overlay editor**: an imported layout code could inject HTML into the main window (the CSS sanitizer removed
   `</style` in a single pass, so `</st</styleyle>` turned back into `</style>`). The installed app's content policy
@@ -50,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on quit anymore. The fallback download goes to the same protected folder instead of `%TEMP%`.
 
 ### Fixed
+- **Driver Center**: on DarkOS every Windows Update driver failed with `failed download 80004002`. DarkOS ships
+  Delivery Optimization (DoSvc) disabled and Windows 11 downloads updates only through it. Drivers now also come
+  from the Microsoft Update Catalog: for devices Windows Update offers nothing for, instead of Windows Update when
+  Delivery Optimization cannot start, and as a fallback when a Windows Update download fails. The package must
+  match the catalog's SHA-256 and be signed by Microsoft; it is installed with `pnputil`.
 - **Compress to archive** did nothing useful: `tar` was started in the wrong folder and did not find the files.
 - **Block tracking** deleted every line of the hosts file after a DarkHub section whose end marker was missing.
 - `install.ps1` fell back to 0.9.4 when the GitHub API could not be reached.
