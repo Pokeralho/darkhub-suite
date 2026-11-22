@@ -3449,7 +3449,7 @@ ipcMain.handle('metadata:remove', async (_event, payload) => {
     await fs.copyFile(inputPath, outputPath)
     try {
       const exiftool = await getExiftool()
-      await exiftool.write(outputPath, {}, ['-all=', '-overwrite_original'])
+      await exiftool.write(outputPath, {}, { writeArgs: ['-all=', '-overwrite_original'] })
       return { ok: true, path: outputPath }
     } catch {
       const sharp = await getSharp()
@@ -3475,7 +3475,7 @@ ipcMain.handle('metadata:update', async (_event, payload) => {
     assertFileAccessGranted(outputPath, 'arquivo de saída')
     const exiftool = await getExiftool()
     await fs.copyFile(inputPath, outputPath)
-    await exiftool.write(outputPath, tags, ['-overwrite_original'])
+    await exiftool.write(outputPath, tags, { writeArgs: ['-overwrite_original'] })
     return { ok: true, path: outputPath }
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) }
