@@ -8,7 +8,27 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+
+  # the workflows pin every action to a commit SHA; Dependabot moves the SHA and the version comment together
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    groups:
+      actions:
+        patterns: ['*']
+
+  # Rust helpers shipped in the installer (each one has its own Cargo.lock)
+  - package-ecosystem: cargo
+    directories:
+      - /native_cleaner
+      - /native_disk
+      - /native_gpubench
+      - /native_pacer
+      - /native_sysops
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      rust:
+        patterns: ['*']

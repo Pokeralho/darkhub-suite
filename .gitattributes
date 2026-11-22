@@ -18,6 +18,8 @@
 *.rs text eol=lf
 *.cs text eol=lf
 *.ps1 text eol=lf
+*.psm1 text eol=lf
+*.toml text eol=lf
 *.sh text eol=lf
 *.bat text eol=crlf
 *.cmd text eol=crlf
@@ -25,6 +27,7 @@
 *.dll binary
 *.pdb binary
 *.obj binary
+*.dxil binary
 
 # Images
 *.png binary

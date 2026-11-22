@@ -85,6 +85,18 @@ lerna-debug.log*
 *.pem
 *.pfx
 *.cert
+*.p12
+*.crt
+*.cer
+*.jks
+*.keystore
+# SSH keys used while testing the SSH module
+*.ppk
+id_rsa*
+id_ed25519*
+id_ecdsa*
+# registry tokens
+.npmrc
 
 # ── Internal Manifests, Agent Artifacts & Scratch Files ──
 GIT_COMMIT_MANIFEST.md

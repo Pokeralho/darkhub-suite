@@ -1,0 +1,14 @@
+# Every change needs the maintainer's review. With "Require review from Code Owners" on in the main branch
+# ruleset, a pull request cannot merge without it.
+*                                   @Pokeralho
+
+# Highest-risk paths: what GitHub Actions runs, the binaries shipped as-is and the hashes the app trusts.
+/.github/                           @Pokeralho
+/electron/services/*.exe            @Pokeralho
+/electron/services/*.dll            @Pokeralho
+/electron/services/**/*.exe         @Pokeralho
+/electron/services/**/*.dll         @Pokeralho
+/electron/services/integrity.json   @Pokeralho
+/install.ps1                        @Pokeralho
+/build/                             @Pokeralho
+/scripts/                           @Pokeralho
