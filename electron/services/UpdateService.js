@@ -6,6 +6,8 @@ import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import Logger from './LoggerService.js';
 import { downloadToFile, assetSha256, GITHUB_HOSTS } from './SecureDownload.js';
+import { createSecureStagingDir } from './secureStaging.js';
+import { stageVerifiedInstaller, publishedSha512 } from './stageInstaller.js';
 
 /** Asset names compared loosely: GitHub turns spaces into dots, latest.yml uses dashes ("DarkHub Setup 1.0.exe"). */
 export const normalizeAssetName = (name) => String(name ?? '').toLowerCase().replace(/[\s._-]+/g, '-');
@@ -73,7 +75,9 @@ class UpdateService {
       const updater = (mod.default ?? mod).autoUpdater;
 
       updater.autoDownload = false;
-      updater.autoInstallOnAppQuit = true;
+      // never: electron-updater would run the installer from its cache in %LOCALAPPDATA%, which the user can write.
+      // installUpdate runs a verified copy kept where only Administrators can write (stageInstaller.js).
+      updater.autoInstallOnAppQuit = false;
       updater.allowPrerelease = false;
       updater.setFeedURL({
         provider: 'github',
@@ -127,15 +131,21 @@ class UpdateService {
         });
       });
 
-      updater.on('update-downloaded', (info) => {
+      updater.on('update-downloaded', async (info) => {
         Logger.info('UpdateService', `Update downloaded successfully: v${info.version}`);
         this._setState('verifying');
         this._emit({ type: 'verifying', stage: 'verifying', percent: 100 });
-
-        setTimeout(() => {
-          this._setState('downloaded');
-          this._emit({ type: 'downloaded', stage: 'downloaded', version: info.version });
-        }, 1200);
+        try {
+          await this._stageElectronUpdaterDownload(info);
+        } catch (e) {
+          Logger.warn('UpdateService', `Could not stage the downloaded installer: ${e?.message ?? e}`);
+          this._downloadedFilePath = null;
+          this._setState('error');
+          this._emit({ type: 'error', stage: 'error', message: `The downloaded installer could not be verified: ${e?.message ?? e}` });
+          return;
+        }
+        this._setState('downloaded');
+        this._emit({ type: 'downloaded', stage: 'downloaded', version: info.version });
       });
 
       updater.on('error', (err) => {
@@ -267,10 +277,15 @@ class UpdateService {
       return fail('Integrity data (SHA-256) unavailable for this release. Download it manually from GitHub.');
     }
 
-    const destDir = path.join(app.getPath('temp'), 'DarkHubUpdates');
-    try { fs.mkdirSync(destDir, { recursive: true }); } catch {}
+    // downloaded straight into a folder only Administrators can write: this elevated app runs it afterwards
     const safeName = path.basename(String(info.assetName || `DarkHub-Setup-${info.version}.exe`)).replace(/[<>:"|?*\u0000-\u001f]/g, '_');
-    const destFile = path.join(destDir, safeName);
+    let destFile;
+    try {
+      const staging = await createSecureStagingDir(this._stagingOptions());
+      destFile = staging.file(safeName);
+    } catch (err) {
+      return fail(err?.message ?? String(err));
+    }
     this._downloadedFilePath = null;
 
     let lastTime = Date.now();
@@ -304,6 +319,7 @@ class UpdateService {
     Logger.info('UpdateService', 'Download complete. SHA-256 verified.');
     this._downloadedFilePath = destFile;
     this._downloadedSha256 = String(info.sha256).toLowerCase();
+    this._installArgs = ['/S'];
     this._setState('downloaded');
     this._emit({ type: 'downloaded', stage: 'downloaded', version: info.version });
     return { ok: true };
@@ -315,16 +331,10 @@ class UpdateService {
     }
 
     try {
-      if (this._updater && app.isPackaged && !this._downloadedFilePath) {
-        Logger.info('UpdateService', 'Executing electron-updater quitAndInstall...');
-        this._updater.quitAndInstall(false, true);
-        return { ok: true };
-      }
-
       const file = this._downloadedFilePath;
       if (file && fs.existsSync(file)) {
-        // The installer sat in the user's %TEMP% since the download, and this process is elevated: anything running
-        // unelevated as the same user could have replaced it. Hash it again right before running it.
+        // The installer is kept where only Administrators can write (or, in a non-elevated run, in the user's temp
+        // folder). Hash it again right before running it anyway.
         let actual = null;
         try { actual = await sha256File(file); } catch { /* unreadable */ }
         if (!this._downloadedSha256 || actual !== this._downloadedSha256) {
@@ -336,7 +346,7 @@ class UpdateService {
         Logger.info('UpdateService', `Launching downloaded installer: ${file}`);
         // quit only once the installer process really started: a failed spawn (AV block, missing file) keeps the app open
         await new Promise((resolve, reject) => {
-          const child = spawn(file, ['/S'], { detached: true, stdio: 'ignore' });
+          const child = spawn(file, this._installArgs || ['/S'], { detached: true, stdio: 'ignore' });
           child.once('error', reject);
           child.once('spawn', () => { child.unref(); resolve(); });
         });
@@ -353,6 +363,29 @@ class UpdateService {
       Logger.error('UpdateService', 'Error installing update:', err);
       return { ok: false, error: err?.message ?? String(err) };
     }
+  }
+
+  /** Where installers are kept until they run: protected when elevated; a dev (unpackaged) run never touches ProgramData. */
+  _stagingOptions() {
+    return { prefix: 'upd-', fallbackBase: path.join(app.getPath('temp'), 'DarkHubUpdates'), ...(app.isPackaged ? {} : { elevated: false }) };
+  }
+
+  /**
+   * electron-updater checked the sha512 from latest.yml, but its file stays in the user's %LOCALAPPDATA%. Copy it into
+   * the protected staging folder, checking that sha512 again on the bytes copied; only the copy is ever run.
+   */
+  async _stageElectronUpdaterDownload(info, stage = stageVerifiedInstaller) {
+    const source = info?.downloadedFile;
+    if (!source) throw new Error('electron-updater did not report the downloaded file');
+    const sha512 = publishedSha512(info, source);
+    if (!sha512) throw new Error('no published sha512 for the installer');
+    const { fallbackBase, elevated } = this._stagingOptions();
+    const staged = await stage({ source, sha512, fallbackBase, elevated });
+    this._downloadedFilePath = staged.file;
+    this._downloadedSha256 = staged.sha256;
+    // what electron-updater's quitAndInstall(false, true) passes to the NSIS installer
+    this._installArgs = ['--updated', '--force-run'];
+    return staged;
   }
 
   /** The digest GitHub publishes for exactly this version and file. Anything else is null, and the download is refused. */

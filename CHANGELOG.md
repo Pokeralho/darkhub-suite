@@ -37,6 +37,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is removed and Administrators own the rest.
 - The cleanup of planted files no longer follows junctions or links, which could have made it delete files
   outside the folder being secured.
+- **Downloaded tools**: yt-dlp, ffmpeg, PresentMon and DLSS 5 Autopilot were kept in `%APPDATA%\DarkHub\tools` and
+  run by the elevated app, so any non-elevated program of the same user could replace them and get Administrator
+  rights. They now live in `C:\ProgramData\DarkHub\tools`, which only Administrators and SYSTEM can write, and the
+  NVIDIA DLSS runtimes copied into game folders are cached in `C:\ProgramData\DarkHub\dlss-runtimes`. yt-dlp, the
+  DLSS runtimes and Autopilot are downloaded again on first use, ffmpeg is copied again from the app, and an existing
+  PresentMon is reused only when it matches its pinned SHA-256. As administrator, an ffmpeg found on `PATH` is no
+  longer used.
+- **Updates**: the installer downloaded by electron-updater stayed in the user's `%LOCALAPPDATA%` until it ran (also
+  automatically on quit). It is now copied into a folder only Administrators can write, checked again against the
+  sha512 from `latest.yml`, hashed once more right before it starts, and only that copy runs; nothing is installed
+  on quit anymore. The fallback download goes to the same protected folder instead of `%TEMP%`.
 
 ### Fixed
 - **Compress to archive** did nothing useful: `tar` was started in the wrong folder and did not find the files.

@@ -75,7 +75,12 @@ export async function ensureYtDlp(toolsDir, platform, { downloadToFile = null } 
   return dest
 }
 
-export async function ensureFfmpeg(toolsDir, platform) {
+/**
+ * ffmpeg for the converter, metadata and yt-dlp: the copy in `toolsDir`, else the bundled ffmpeg-static (copied there).
+ * searchPath: also accept an ffmpeg found on PATH. The elevated app passes false: the user's own PATH entries are
+ * folders that user can write, and an exe from there would run as admin.
+ */
+export async function ensureFfmpeg(toolsDir, platform, { searchPath = true } = {}) {
   const binaryName = platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
   const dest = path.join(toolsDir, binaryName)
 
@@ -119,7 +124,7 @@ export async function ensureFfmpeg(toolsDir, platform) {
     }
   } catch {}
 
-  if (platform === 'win32') {
+  if (platform === 'win32' && searchPath) {
     try {
       // async lookup: execSync here blocked the Electron main process
       const stdout = await new Promise((resolve, reject) => {

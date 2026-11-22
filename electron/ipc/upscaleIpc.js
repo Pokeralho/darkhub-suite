@@ -3,12 +3,15 @@ import path from 'node:path'
 import Dlss5Service from '../services/dlss5/Dlss5Service.js'
 import { DlssUpdater } from '../services/upscale/DlssUpdater.js'
 import { Autopilot } from '../services/upscale/Autopilot.js'
+import { trustedDataDir, trustedToolsDir } from '../services/programDataRoot.js'
 
 /** `upscale:*`: NVIDIA DLSS runtime updates per game and DLSS 5 neural rendering through DLSS 5 Autopilot. */
 export function registerUpscaleIPC({ app, ipcMain, BrowserWindow, logger } = {}) {
   const userData = app.getPath('userData')
-  const updater = new DlssUpdater(path.join(userData, 'dlss-runtimes'))
-  const autopilot = new Autopilot(path.join(userData, 'tools'))
+  // Both run or copy executables as admin (Autopilot.exe; NVIDIA DLLs into game folders, often under Program Files), so
+  // they live where only Administrators can write. Older copies in %APPDATA% are not reused: they are fetched again.
+  const updater = new DlssUpdater(() => trustedDataDir('dlss-runtimes', { userData }))
+  const autopilot = new Autopilot(() => trustedToolsDir({ userData }))
   const steam = new Dlss5Service(app)
   let chain = Promise.resolve() // game-folder writes run one at a time
 
@@ -46,7 +49,7 @@ export function registerUpscaleIPC({ app, ipcMain, BrowserWindow, logger } = {})
 
   handle('upscale:autopilotStatus', async () => ({ ok: true, ...(await autopilot.status()) }))
   handle('upscale:autopilotInstall', async () => ({ ok: true, installed: await autopilot.install() }))
-  handle('upscale:autopilotLaunch', () => ({ ok: true, ...autopilot.launch() }))
+  handle('upscale:autopilotLaunch', async () => ({ ok: true, ...(await autopilot.launch()) }))
 }
 
 export default registerUpscaleIPC

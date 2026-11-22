@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { PresentMonService } from '../services/overlay/PresentMonService.js'
+import { trustedToolsDir } from '../services/programDataRoot.js'
 import { OverlayService } from '../services/overlay/OverlayService.js'
 import HardwareService from '../services/HardwareService.js'
 import nativeLatencyClient from '../services/NativeLatencyClient.js'
@@ -21,7 +22,11 @@ export function registerOverlayIPC({ app, ipcMain, BrowserWindow, screen, hotkey
   // created after "ready": BrowserWindow and screen need it
   const get = () => (svc ||= new OverlayService({
     app, BrowserWindow, screen, hotkeys, hardware: HardwareService, native: nativeLatencyClient, onEvent: broadcast, lhmSource: HwSensorsDaemon,
-    presentMon: new PresentMonService({ toolsDir: path.join(app.getPath('userData'), 'tools') })
+    // the exe runs elevated: it lives where only Administrators can write (programDataRoot.js), never in %APPDATA%
+    presentMon: new PresentMonService({
+      toolsDir: () => trustedToolsDir({ userData: app.getPath('userData') }),
+      legacyDir: path.join(app.getPath('userData'), 'tools')
+    })
   }))
 
   const handle = (channel, fn) => ipcMain.handle(channel, async (event, payload) => {

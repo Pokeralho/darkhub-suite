@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-22T10:54:21. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-22T11:18:30. NAO edite a mao: rode `npm run map`. -->
 
 # Mapa de funcionalidades (tela -> IPC -> backend)
 Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/preload.js` -> canal IPC -> handler -> servico.
@@ -48,7 +48,7 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | `share.qr` | `share:qr` | `electron/ipc/shareIpc.js:257` | `s.startsWith`<br>`QRCode.toDataURL` |
 | `share.recentShots` | `share:recentShots` | `electron/ipc/shareIpc.js:284` | `i.test` |
 | `share.state` | `share:state` | `electron/ipc/shareIpc.js:204` |  |
-| `shell.openExternal` | `shell:openExternal` | `electron/main.js:1444` | `RENDERER_SYSTEM_URIS.has`<br>`raw.toLowerCase`<br>`parsed.toString`<br>`cp.spawn` |
+| `shell.openExternal` | `shell:openExternal` | `electron/main.js:1457` | `RENDERER_SYSTEM_URIS.has`<br>`raw.toLowerCase`<br>`parsed.toString`<br>`cp.spawn` |
 
 ## Diagnostics & Hardware
 
@@ -89,7 +89,7 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `app.getResourceUsage` | `app:getResourceUsage` | `electron/main.js:1517` | `metrics.map`<br>`processes.reduce` |
+| `app.getResourceUsage` | `app:getResourceUsage` | `electron/main.js:1530` | `metrics.map`<br>`processes.reduce` |
 | `gpubench.cancel` | `gpubench:cancel` | `electron/ipc/gpuBenchIpc.js:35` | `svc.cancel` |
 | `gpubench.onEvent` | `gpubench:event` | `nao encontrado` |  |
 | `gpubench.viewport` | `gpubench:viewport` | `electron/ipc/gpuBenchIpc.js:30` | `svc.viewport` |
@@ -97,16 +97,16 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | `hardware.startPolling` | `hardware:startPolling` | `electron/services/HardwareService.js:51` | `hookedSenders.has`<br>`hookedSenders.add`<br>`sender.once`<br>`hookedSenders.delete` |
 | `hardware.stopPolling` | `hardware:stopPolling` | `electron/services/HardwareService.js:69` | `perSender.get`<br>`perSender.set`<br>`perSender.delete`<br>`HAL.getSnapshot (electron/hal/HardwareHAL.js)` |
 | `hwsensors.status` | `hwsensors:status` | `electron/ipc/hwSensorsIpc.js:46` | `HwSensorsDaemon.status (electron/hal/collectors/HwSensorsDaemon.js)` |
-| `overlay.calibrate` | `overlay:calibrate` | `electron/ipc/overlayIpc.js:45` | `svc.power`<br>`points.slice`<br>`pts.some`<br>`svc.setSettings` |
-| `overlay.clearCalibration` | `overlay:clearCalibration` | `electron/ipc/overlayIpc.js:61` |  |
-| `overlay.power` | `overlay:power` | `electron/ipc/overlayIpc.js:37` |  |
-| `overlay.psuSearch` | `overlay:psuSearch` | `electron/ipc/overlayIpc.js:43` |  |
-| `overlay.resetEnergy` | `overlay:resetEnergy` | `electron/ipc/overlayIpc.js:38` |  |
-| `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:36` |  |
-| `overlay.show` | `overlay:show` | `electron/ipc/overlayIpc.js:34` |  |
-| `overlay.status` | `overlay:status` | `electron/ipc/overlayIpc.js:33` |  |
-| `system.enableProcessTracking` | `system:enableProcessTracking` | `electron/main.js:905` |  |
-| `system.runBenchmark` | `system:runBenchmark` | `electron/main.js:1012` | `hrtime.bigint`<br>`parentPort.postMessage`<br>`mops.toFixed`<br>`ms.toFixed` |
+| `overlay.calibrate` | `overlay:calibrate` | `electron/ipc/overlayIpc.js:50` | `svc.power`<br>`points.slice`<br>`pts.some`<br>`svc.setSettings` |
+| `overlay.clearCalibration` | `overlay:clearCalibration` | `electron/ipc/overlayIpc.js:66` |  |
+| `overlay.power` | `overlay:power` | `electron/ipc/overlayIpc.js:42` |  |
+| `overlay.psuSearch` | `overlay:psuSearch` | `electron/ipc/overlayIpc.js:48` |  |
+| `overlay.resetEnergy` | `overlay:resetEnergy` | `electron/ipc/overlayIpc.js:43` |  |
+| `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:41` |  |
+| `overlay.show` | `overlay:show` | `electron/ipc/overlayIpc.js:39` |  |
+| `overlay.status` | `overlay:status` | `electron/ipc/overlayIpc.js:38` |  |
+| `system.enableProcessTracking` | `system:enableProcessTracking` | `electron/main.js:918` |  |
+| `system.runBenchmark` | `system:runBenchmark` | `electron/main.js:1025` | `hrtime.bigint`<br>`parentPort.postMessage`<br>`mops.toFixed`<br>`ms.toFixed` |
 
 ### Network & Latency  (rota `networktools`)
 - Tela: `src/pages/NetworkTools.tsx`
@@ -131,10 +131,10 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | `network.restoreLatencyTweak` | `network:restoreLatencyTweak` | `electron/networkIPC.js:123` | `NetLatencyService.restoreTweak (electron/services/NetLatencyService.js)` |
 | `network.traceHops` | `network:traceHops` | `electron/networkIPC.js:118` | `NetLatencyService.traceroute (electron/services/NetLatencyService.js)` |
 | `network.tracert` | `network:tracert` | `electron/networkIPC.js:129` | `runCommand() (electron/services/PowerShellRunner.js)`<br>`assertSafeHost() (electron/services/network/hostValidation.js)` |
-| `optimizer.applyDns` | `optimizer:applyDns` | `electron/main.js:2001` | `DnsEngine.apply (electron/services/optimizer/DnsEngine.js)` |
-| `optimizer.dnsBenchmark` | `optimizer:dnsBenchmark` | `electron/main.js:2011` | `DnsEngine.benchmark (electron/services/optimizer/DnsEngine.js)` |
-| `optimizer.getDnsState` | `optimizer:getDnsState` | `electron/main.js:1992` | `DnsEngine.getState (electron/services/optimizer/DnsEngine.js)` |
-| `optimizer.undoDns` | `optimizer:undoDns` | `electron/main.js:2006` | `DnsEngine.undo (electron/services/optimizer/DnsEngine.js)` |
+| `optimizer.applyDns` | `optimizer:applyDns` | `electron/main.js:2014` | `DnsEngine.apply (electron/services/optimizer/DnsEngine.js)` |
+| `optimizer.dnsBenchmark` | `optimizer:dnsBenchmark` | `electron/main.js:2024` | `DnsEngine.benchmark (electron/services/optimizer/DnsEngine.js)` |
+| `optimizer.getDnsState` | `optimizer:getDnsState` | `electron/main.js:2005` | `DnsEngine.getState (electron/services/optimizer/DnsEngine.js)` |
+| `optimizer.undoDns` | `optimizer:undoDns` | `electron/main.js:2019` | `DnsEngine.undo (electron/services/optimizer/DnsEngine.js)` |
 
 ### Post-Install Hub  (rota `setuphub`)
 - Tela: `src/pages/SetupHub.tsx`
@@ -143,11 +143,11 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `dialog.selectFolder` | `dialog:selectFolder` | `electron/main.js:1914` |  |
+| `dialog.selectFolder` | `dialog:selectFolder` | `electron/main.js:1927` |  |
 | `restore.install` | `restore:install` | `electron/ipc/restoreIpc.js:13` | `svc.install` |
 | `restore.status` | `restore:status` | `electron/ipc/restoreIpc.js:12` | `svc.status` |
-| `setup.detectHardware` | `setup:detectHardware` | `electron/main.js:3653` | `si.cpu`<br>`si.graphics`<br>`si.baseboard`<br>`si.memLayout` |
-| `setup.installWinget` | `setup:installWinget` | `electron/main.js:3580` | `sender.isDestroyed`<br>`sender.send`<br>`appIds.map`<br>`id.startsWith` |
+| `setup.detectHardware` | `setup:detectHardware` | `electron/main.js:3666` | `si.cpu`<br>`si.graphics`<br>`si.baseboard`<br>`si.memLayout` |
+| `setup.installWinget` | `setup:installWinget` | `electron/main.js:3593` | `sender.isDestroyed`<br>`sender.send`<br>`appIds.map`<br>`id.startsWith` |
 | `setup.onInstallProgress` | `setup:installProgress` | `nao encontrado` |  |
 
 ### DarkHub SSH  (rota `ssh`)
@@ -203,16 +203,16 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `darkpacer.lowLatencyApply` | `lowlatency:apply` | `electron/main.js:1879` | `LowLatencyLayer.apply (electron/services/LowLatencyLayerService.js)` |
-| `darkpacer.lowLatencyStatus` | `lowlatency:getStatus` | `electron/main.js:1875` | `LowLatencyLayer.getStatus (electron/services/LowLatencyLayerService.js)` |
-| `framepacer.getMetrics` | `framepacer:getMetrics` | `electron/main.js:1844` | `FramePacerEngine.getMetrics (electron/services/FramePacerEngine.js)` |
-| `framepacer.getOverlayStatus` | `framepacer:getOverlayStatus` | `electron/main.js:1870` | `getOverlayStatus() (electron/services/FramePacerOverlay.js)` |
+| `darkpacer.lowLatencyApply` | `lowlatency:apply` | `electron/main.js:1892` | `LowLatencyLayer.apply (electron/services/LowLatencyLayerService.js)` |
+| `darkpacer.lowLatencyStatus` | `lowlatency:getStatus` | `electron/main.js:1888` | `LowLatencyLayer.getStatus (electron/services/LowLatencyLayerService.js)` |
+| `framepacer.getMetrics` | `framepacer:getMetrics` | `electron/main.js:1857` | `FramePacerEngine.getMetrics (electron/services/FramePacerEngine.js)` |
+| `framepacer.getOverlayStatus` | `framepacer:getOverlayStatus` | `electron/main.js:1883` | `getOverlayStatus() (electron/services/FramePacerOverlay.js)` |
 | `framepacer.onMetrics` | `framepacer:metrics` | `nao encontrado` |  |
-| `framepacer.setOverlayClickThrough` | `framepacer:setOverlayClickThrough` | `electron/main.js:1862` | `setOverlayClickThrough() (electron/services/FramePacerOverlay.js)` |
-| `framepacer.start` | `framepacer:start` | `electron/main.js:1832` | `FramePacerEngine.start (electron/services/FramePacerEngine.js)` |
-| `framepacer.stop` | `framepacer:stop` | `electron/main.js:1836` | `FramePacerEngine.stop (electron/services/FramePacerEngine.js)` |
-| `framepacer.toggleOverlay` | `framepacer:toggleOverlay` | `electron/main.js:1858` | `toggleFramePacerOverlay() (electron/services/FramePacerOverlay.js)` |
-| `framepacer.updateConfig` | `framepacer:updateConfig` | `electron/main.js:1840` | `FramePacerEngine.updateConfig (electron/services/FramePacerEngine.js)` |
+| `framepacer.setOverlayClickThrough` | `framepacer:setOverlayClickThrough` | `electron/main.js:1875` | `setOverlayClickThrough() (electron/services/FramePacerOverlay.js)` |
+| `framepacer.start` | `framepacer:start` | `electron/main.js:1845` | `FramePacerEngine.start (electron/services/FramePacerEngine.js)` |
+| `framepacer.stop` | `framepacer:stop` | `electron/main.js:1849` | `FramePacerEngine.stop (electron/services/FramePacerEngine.js)` |
+| `framepacer.toggleOverlay` | `framepacer:toggleOverlay` | `electron/main.js:1871` | `toggleFramePacerOverlay() (electron/services/FramePacerOverlay.js)` |
+| `framepacer.updateConfig` | `framepacer:updateConfig` | `electron/main.js:1853` | `FramePacerEngine.updateConfig (electron/services/FramePacerEngine.js)` |
 
 ### DLL Injector  (rota `dll-injector`)
 - Tela: `src/pages/DllInjector.tsx`
@@ -221,8 +221,8 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1903` |  |
-| `injector.inject` | `injector:inject` | `electron/main.js:1790` | `i.test`<br>`dllPath.trim`<br>`stdout.includes`<br>`stdout.trim` |
+| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1916` |  |
+| `injector.inject` | `injector:inject` | `electron/main.js:1803` | `i.test`<br>`dllPath.trim`<br>`stdout.includes`<br>`stdout.trim` |
 
 ### DLSS Manager  (rota `dlss5`)
 - Tela: `src/pages/Dlss5Manager.tsx`
@@ -234,9 +234,9 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | `diskscan.pickFolder` | `diskscan:pickFolder` | `electron/ipc/diskScanIpc.js:15` |  |
 | `dlss5.detectGpu` | `dlss5:detectGpu` | `electron/services/dlss5/Dlss5Service.js:748` | `service.detectGpu` |
 | `dlss5.getSteamGames` | `dlss5:getSteamGames` | `electron/services/dlss5/Dlss5Service.js:739` | `service.getInstalledSteamGames` |
-| `shell.openExternal` | `shell:openExternal` | `electron/main.js:1444` | `RENDERER_SYSTEM_URIS.has`<br>`raw.toLowerCase`<br>`parsed.toString`<br>`cp.spawn` |
-| `upscale.autopilotStatus` | `upscale:autopilotStatus` | `electron/ipc/upscaleIpc.js:47` | `autopilot.status` |
-| `upscale.dlssLatest` | `upscale:dlssLatest` | `electron/ipc/upscaleIpc.js:29` | `updater.latest` |
+| `shell.openExternal` | `shell:openExternal` | `electron/main.js:1457` | `RENDERER_SYSTEM_URIS.has`<br>`raw.toLowerCase`<br>`parsed.toString`<br>`cp.spawn` |
+| `upscale.autopilotStatus` | `upscale:autopilotStatus` | `electron/ipc/upscaleIpc.js:50` | `autopilot.status` |
+| `upscale.dlssLatest` | `upscale:dlssLatest` | `electron/ipc/upscaleIpc.js:32` | `updater.latest` |
 
 ### GPU benchmark  (rota `gpubench`)
 - Tela: `src/pages/GpuBench.tsx`
@@ -266,44 +266,44 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | API | canal | handler | chama |
 |---|---|---|---|
 | `darkos.isDarkOS` | `darkos:isDarkOS` | `electron/ipc/darkosIpc.js:65` | `darkhub.ink` |
-| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1903` |  |
-| `optimizer.advancedNetworkApply` | `optimizer:advancedNetworkApply` | `electron/main.js:1953` | `NetworkEngine.advancedNetworkApply (electron/services/optimizer/NetworkEngine.js)` |
-| `optimizer.advancedNetworkRevert` | `optimizer:advancedNetworkRevert` | `electron/main.js:1954` | `NetworkEngine.advancedNetworkRevert (electron/services/optimizer/NetworkEngine.js)` |
-| `optimizer.applyDefenderControl` | `optimizer:applyDefenderControl` | `electron/main.js:2112` | `DefenderControlEngine.runNativeDefenderControl (electron/services/optimizer/DefenderControlEngine.js)` |
-| `optimizer.applyDns` | `optimizer:applyDns` | `electron/main.js:2001` | `DnsEngine.apply (electron/services/optimizer/DnsEngine.js)` |
-| `optimizer.checkIsAdmin` | `optimizer:checkIsAdmin` | `electron/main.js:772` | `SystemOptimizerService.checkIsAdmin (electron/services/optimizer/SystemOptimizerService.js)` |
-| `optimizer.checkOperationsStatus` | `optimizer:checkOperationsStatus` | `electron/main.js:753` | `SystemOptimizerService.checkOperationsStatus (electron/services/optimizer/SystemOptimizerService.js)` |
-| `optimizer.createRestorePoint` | `optimizer:createRestorePoint` | `electron/main.js:776` | `SystemEngine.createRestorePoint (electron/services/optimizer/SystemEngine.js)` |
-| `optimizer.deepTweaksApply` | `optimizer:deepTweaksApply` | `electron/main.js:1980` | `DeepTweaksEngine.applyTweaks (electron/services/optimizer/DeepTweaksEngine.js)`<br>`sender.send` |
-| `optimizer.deepTweaksList` | `optimizer:deepTweaksList` | `electron/main.js:1956` | `DeepTweaksEngine.ensureResolved (electron/services/optimizer/DeepTweaksEngine.js)`<br>`DeepTweaksEngine.listTweaks (electron/services/optimizer/DeepTweaksEngine.js)` |
-| `optimizer.deepTweaksRevert` | `optimizer:deepTweaksRevert` | `electron/main.js:1981` | `DeepTweaksEngine.revertTweaks (electron/services/optimizer/DeepTweaksEngine.js)`<br>`sender.send` |
-| `optimizer.deepTweaksStatus` | `optimizer:deepTweaksStatus` | `electron/main.js:1973` | `DeepTweaksEngine.checkTweaksStatus (electron/services/optimizer/DeepTweaksEngine.js)` |
-| `optimizer.deepTweaksUndo` | `optimizer:deepTweaksUndo` | `electron/main.js:1982` | `DeepTweaksEngine.undoTweaks (electron/services/optimizer/DeepTweaksEngine.js)` |
-| `optimizer.disableStartupItem` | `optimizer:disableStartupItem` | `electron/main.js:1935` | `AppManagerEngine.disableStartupItem (electron/services/optimizer/AppManagerEngine.js)` |
-| `optimizer.dnsBenchmark` | `optimizer:dnsBenchmark` | `electron/main.js:2011` | `DnsEngine.benchmark (electron/services/optimizer/DnsEngine.js)` |
-| `optimizer.getDefenderControlStatus` | `optimizer:getDefenderControlStatus` | `electron/main.js:2109` | `DefenderControlEngine.getStatus (electron/services/optimizer/DefenderControlEngine.js)` |
-| `optimizer.getDnsState` | `optimizer:getDnsState` | `electron/main.js:1992` | `DnsEngine.getState (electron/services/optimizer/DnsEngine.js)` |
-| `optimizer.getGpuInfo` | `optimizer:getGpuInfo` | `electron/main.js:1947` | `AppManagerEngine.getGpuInfo (electron/services/optimizer/AppManagerEngine.js)` |
-| `optimizer.getGpuPreferences` | `optimizer:getGpuPreferences` | `electron/main.js:1944` | `AppManagerEngine.getGpuPreferences (electron/services/optimizer/AppManagerEngine.js)` |
-| `optimizer.getHagsStatus` | `optimizer:getHagsStatus` | `electron/main.js:1948` | `AppManagerEngine.getHagsStatus (electron/services/optimizer/AppManagerEngine.js)` |
-| `optimizer.getInstalledPrograms` | `optimizer:getInstalledPrograms` | `electron/main.js:1938` | `AppManagerEngine.getInstalledPrograms (electron/services/optimizer/AppManagerEngine.js)` |
-| `optimizer.getRunningProcesses` | `optimizer:getRunningProcesses` | `electron/main.js:1942` | `AppManagerEngine.getRunningProcesses (electron/services/optimizer/AppManagerEngine.js)` |
-| `optimizer.getStartupItems` | `optimizer:getStartupItems` | `electron/main.js:1934` | `AppManagerEngine.getStartupItems (electron/services/optimizer/AppManagerEngine.js)` |
-| `optimizer.listBloatware` | `optimizer:listBloatware` | `electron/main.js:1940` | `AppManagerEngine.listBloatware (electron/services/optimizer/AppManagerEngine.js)` |
-| `optimizer.listOperations` | `optimizer:listOperations` | `electron/main.js:749` | `SystemOptimizerService.listOperations (electron/services/optimizer/SystemOptimizerService.js)` |
-| `optimizer.listProfiles` | `optimizer:listProfiles` | `electron/main.js:768` | `SystemOptimizerService.listProfiles (electron/services/optimizer/SystemOptimizerService.js)` |
+| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1916` |  |
+| `optimizer.advancedNetworkApply` | `optimizer:advancedNetworkApply` | `electron/main.js:1966` | `NetworkEngine.advancedNetworkApply (electron/services/optimizer/NetworkEngine.js)` |
+| `optimizer.advancedNetworkRevert` | `optimizer:advancedNetworkRevert` | `electron/main.js:1967` | `NetworkEngine.advancedNetworkRevert (electron/services/optimizer/NetworkEngine.js)` |
+| `optimizer.applyDefenderControl` | `optimizer:applyDefenderControl` | `electron/main.js:2125` | `DefenderControlEngine.runNativeDefenderControl (electron/services/optimizer/DefenderControlEngine.js)` |
+| `optimizer.applyDns` | `optimizer:applyDns` | `electron/main.js:2014` | `DnsEngine.apply (electron/services/optimizer/DnsEngine.js)` |
+| `optimizer.checkIsAdmin` | `optimizer:checkIsAdmin` | `electron/main.js:785` | `SystemOptimizerService.checkIsAdmin (electron/services/optimizer/SystemOptimizerService.js)` |
+| `optimizer.checkOperationsStatus` | `optimizer:checkOperationsStatus` | `electron/main.js:766` | `SystemOptimizerService.checkOperationsStatus (electron/services/optimizer/SystemOptimizerService.js)` |
+| `optimizer.createRestorePoint` | `optimizer:createRestorePoint` | `electron/main.js:789` | `SystemEngine.createRestorePoint (electron/services/optimizer/SystemEngine.js)` |
+| `optimizer.deepTweaksApply` | `optimizer:deepTweaksApply` | `electron/main.js:1993` | `DeepTweaksEngine.applyTweaks (electron/services/optimizer/DeepTweaksEngine.js)`<br>`sender.send` |
+| `optimizer.deepTweaksList` | `optimizer:deepTweaksList` | `electron/main.js:1969` | `DeepTweaksEngine.ensureResolved (electron/services/optimizer/DeepTweaksEngine.js)`<br>`DeepTweaksEngine.listTweaks (electron/services/optimizer/DeepTweaksEngine.js)` |
+| `optimizer.deepTweaksRevert` | `optimizer:deepTweaksRevert` | `electron/main.js:1994` | `DeepTweaksEngine.revertTweaks (electron/services/optimizer/DeepTweaksEngine.js)`<br>`sender.send` |
+| `optimizer.deepTweaksStatus` | `optimizer:deepTweaksStatus` | `electron/main.js:1986` | `DeepTweaksEngine.checkTweaksStatus (electron/services/optimizer/DeepTweaksEngine.js)` |
+| `optimizer.deepTweaksUndo` | `optimizer:deepTweaksUndo` | `electron/main.js:1995` | `DeepTweaksEngine.undoTweaks (electron/services/optimizer/DeepTweaksEngine.js)` |
+| `optimizer.disableStartupItem` | `optimizer:disableStartupItem` | `electron/main.js:1948` | `AppManagerEngine.disableStartupItem (electron/services/optimizer/AppManagerEngine.js)` |
+| `optimizer.dnsBenchmark` | `optimizer:dnsBenchmark` | `electron/main.js:2024` | `DnsEngine.benchmark (electron/services/optimizer/DnsEngine.js)` |
+| `optimizer.getDefenderControlStatus` | `optimizer:getDefenderControlStatus` | `electron/main.js:2122` | `DefenderControlEngine.getStatus (electron/services/optimizer/DefenderControlEngine.js)` |
+| `optimizer.getDnsState` | `optimizer:getDnsState` | `electron/main.js:2005` | `DnsEngine.getState (electron/services/optimizer/DnsEngine.js)` |
+| `optimizer.getGpuInfo` | `optimizer:getGpuInfo` | `electron/main.js:1960` | `AppManagerEngine.getGpuInfo (electron/services/optimizer/AppManagerEngine.js)` |
+| `optimizer.getGpuPreferences` | `optimizer:getGpuPreferences` | `electron/main.js:1957` | `AppManagerEngine.getGpuPreferences (electron/services/optimizer/AppManagerEngine.js)` |
+| `optimizer.getHagsStatus` | `optimizer:getHagsStatus` | `electron/main.js:1961` | `AppManagerEngine.getHagsStatus (electron/services/optimizer/AppManagerEngine.js)` |
+| `optimizer.getInstalledPrograms` | `optimizer:getInstalledPrograms` | `electron/main.js:1951` | `AppManagerEngine.getInstalledPrograms (electron/services/optimizer/AppManagerEngine.js)` |
+| `optimizer.getRunningProcesses` | `optimizer:getRunningProcesses` | `electron/main.js:1955` | `AppManagerEngine.getRunningProcesses (electron/services/optimizer/AppManagerEngine.js)` |
+| `optimizer.getStartupItems` | `optimizer:getStartupItems` | `electron/main.js:1947` | `AppManagerEngine.getStartupItems (electron/services/optimizer/AppManagerEngine.js)` |
+| `optimizer.listBloatware` | `optimizer:listBloatware` | `electron/main.js:1953` | `AppManagerEngine.listBloatware (electron/services/optimizer/AppManagerEngine.js)` |
+| `optimizer.listOperations` | `optimizer:listOperations` | `electron/main.js:762` | `SystemOptimizerService.listOperations (electron/services/optimizer/SystemOptimizerService.js)` |
+| `optimizer.listProfiles` | `optimizer:listProfiles` | `electron/main.js:781` | `SystemOptimizerService.listProfiles (electron/services/optimizer/SystemOptimizerService.js)` |
 | `optimizer.onRunEvent` | `optimizer:runEvent` | `nao encontrado` |  |
-| `optimizer.openTamperSettings` | `optimizer:openTamperSettings` | `electron/main.js:2118` | `DefenderControlEngine.openTamperSettings (electron/services/optimizer/DefenderControlEngine.js)` |
-| `optimizer.removeGpuPreference` | `optimizer:removeGpuPreference` | `electron/main.js:1946` | `AppManagerEngine.removeGpuPreference (electron/services/optimizer/AppManagerEngine.js)` |
-| `optimizer.removeSelectedBloatware` | `optimizer:removeSelectedBloatware` | `electron/main.js:1941` | `AppManagerEngine.removeSelectedBloatware (electron/services/optimizer/AppManagerEngine.js)` |
-| `optimizer.restoreImageDefender` | `optimizer:restoreImageDefender` | `electron/main.js:2115` | `DefenderControlEngine.restoreImageDefender (electron/services/optimizer/DefenderControlEngine.js)` |
-| `optimizer.revertHags` | `optimizer:revertHags` | `electron/main.js:1950` | `AppManagerEngine.revertHags (electron/services/optimizer/AppManagerEngine.js)` |
-| `optimizer.run` | `optimizer:run` | `electron/main.js:761` | `sender.send`<br>`SystemOptimizerService.runTasks (electron/services/optimizer/SystemOptimizerService.js)` |
-| `optimizer.setGpuPreference` | `optimizer:setGpuPreference` | `electron/main.js:1945` | `AppManagerEngine.setGpuPreference (electron/services/optimizer/AppManagerEngine.js)` |
-| `optimizer.setHagsStatus` | `optimizer:setHagsStatus` | `electron/main.js:1949` | `AppManagerEngine.setHagsStatus (electron/services/optimizer/AppManagerEngine.js)` |
-| `optimizer.setProcessPriority` | `optimizer:setProcessPriority` | `electron/main.js:1943` | `AppManagerEngine.setProcessPriority (electron/services/optimizer/AppManagerEngine.js)` |
-| `optimizer.undoDns` | `optimizer:undoDns` | `electron/main.js:2006` | `DnsEngine.undo (electron/services/optimizer/DnsEngine.js)` |
-| `optimizer.uninstallProgramWithLeftovers` | `optimizer:uninstallProgramWithLeftovers` | `electron/main.js:1952` | `AppManagerEngine.uninstallProgramWithLeftovers (electron/services/optimizer/AppManagerEngine.js)` |
+| `optimizer.openTamperSettings` | `optimizer:openTamperSettings` | `electron/main.js:2131` | `DefenderControlEngine.openTamperSettings (electron/services/optimizer/DefenderControlEngine.js)` |
+| `optimizer.removeGpuPreference` | `optimizer:removeGpuPreference` | `electron/main.js:1959` | `AppManagerEngine.removeGpuPreference (electron/services/optimizer/AppManagerEngine.js)` |
+| `optimizer.removeSelectedBloatware` | `optimizer:removeSelectedBloatware` | `electron/main.js:1954` | `AppManagerEngine.removeSelectedBloatware (electron/services/optimizer/AppManagerEngine.js)` |
+| `optimizer.restoreImageDefender` | `optimizer:restoreImageDefender` | `electron/main.js:2128` | `DefenderControlEngine.restoreImageDefender (electron/services/optimizer/DefenderControlEngine.js)` |
+| `optimizer.revertHags` | `optimizer:revertHags` | `electron/main.js:1963` | `AppManagerEngine.revertHags (electron/services/optimizer/AppManagerEngine.js)` |
+| `optimizer.run` | `optimizer:run` | `electron/main.js:774` | `sender.send`<br>`SystemOptimizerService.runTasks (electron/services/optimizer/SystemOptimizerService.js)` |
+| `optimizer.setGpuPreference` | `optimizer:setGpuPreference` | `electron/main.js:1958` | `AppManagerEngine.setGpuPreference (electron/services/optimizer/AppManagerEngine.js)` |
+| `optimizer.setHagsStatus` | `optimizer:setHagsStatus` | `electron/main.js:1962` | `AppManagerEngine.setHagsStatus (electron/services/optimizer/AppManagerEngine.js)` |
+| `optimizer.setProcessPriority` | `optimizer:setProcessPriority` | `electron/main.js:1956` | `AppManagerEngine.setProcessPriority (electron/services/optimizer/AppManagerEngine.js)` |
+| `optimizer.undoDns` | `optimizer:undoDns` | `electron/main.js:2019` | `DnsEngine.undo (electron/services/optimizer/DnsEngine.js)` |
+| `optimizer.uninstallProgramWithLeftovers` | `optimizer:uninstallProgramWithLeftovers` | `electron/main.js:1965` | `AppManagerEngine.uninstallProgramWithLeftovers (electron/services/optimizer/AppManagerEngine.js)` |
 | `wintools.diagnoseWu` | `wintools:diagnoseWu` | `electron/ipc/winToolsIpc.js:17` | `diagnoseWindowsUpdate() (electron/services/optimizer/wuDiagnose.js)` |
 | `wintools.listFeatures` | `wintools:listFeatures` | `electron/ipc/winToolsIpc.js:13` | `engine.listFeatures` |
 | `wintools.run` | `wintools:run` | `electron/ipc/winToolsIpc.js:15` | `engine.run` |
@@ -315,12 +315,12 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1903` |  |
+| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1916` |  |
 | `dlss5.getSteamGames` | `dlss5:getSteamGames` | `electron/services/dlss5/Dlss5Service.js:739` | `service.getInstalledSteamGames` |
 | `dlss5.scanGame` | `dlss5:scanGame` | `electron/services/dlss5/Dlss5Service.js:756` | `service.scanGameDirectory` |
-| `library.list` | `library:list` | `electron/main.js:1197` | `webContents.send` |
-| `library.remove` | `library:remove` | `electron/main.js:1245` |  |
-| `library.upsert` | `library:upsert` | `electron/main.js:1209` |  |
+| `library.list` | `library:list` | `electron/main.js:1210` | `webContents.send` |
+| `library.remove` | `library:remove` | `electron/main.js:1258` |  |
+| `library.upsert` | `library:upsert` | `electron/main.js:1222` |  |
 | `optiscaler.analyze` | `optiscaler:analyze` | `electron/optiscalerManager.js:1264` |  |
 | `optiscaler.apply` | `optiscaler:apply` | `electron/optiscalerManager.js:1272` |  |
 | `optiscaler.checkUpdate` | `optiscaler:checkUpdate` | `electron/optiscalerManager.js:1312` | `i.test`<br>`fetchJson() (electron/services/SecureDownload.js)`<br>`assetSha256() (electron/services/SecureDownload.js)` |
@@ -340,19 +340,19 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | `gpubench.cancel` | `gpubench:cancel` | `electron/ipc/gpuBenchIpc.js:35` | `svc.cancel` |
 | `gpubench.onEvent` | `gpubench:event` | `nao encontrado` |  |
 | `gpubench.viewport` | `gpubench:viewport` | `electron/ipc/gpuBenchIpc.js:30` | `svc.viewport` |
-| `overlay.calibrate` | `overlay:calibrate` | `electron/ipc/overlayIpc.js:45` | `svc.power`<br>`points.slice`<br>`pts.some`<br>`svc.setSettings` |
-| `overlay.clearCalibration` | `overlay:clearCalibration` | `electron/ipc/overlayIpc.js:61` |  |
-| `overlay.hide` | `overlay:hide` | `electron/ipc/overlayIpc.js:35` |  |
-| `overlay.layouts` | `overlay:layouts` | `electron/ipc/overlayIpc.js:63` |  |
+| `overlay.calibrate` | `overlay:calibrate` | `electron/ipc/overlayIpc.js:50` | `svc.power`<br>`points.slice`<br>`pts.some`<br>`svc.setSettings` |
+| `overlay.clearCalibration` | `overlay:clearCalibration` | `electron/ipc/overlayIpc.js:66` |  |
+| `overlay.hide` | `overlay:hide` | `electron/ipc/overlayIpc.js:40` |  |
+| `overlay.layouts` | `overlay:layouts` | `electron/ipc/overlayIpc.js:68` |  |
 | `overlay.onEvent` | `overlay:event` | `nao encontrado` |  |
-| `overlay.pickLogFolder` | `overlay:pickLogFolder` | `electron/ipc/overlayIpc.js:73` |  |
-| `overlay.power` | `overlay:power` | `electron/ipc/overlayIpc.js:37` |  |
-| `overlay.processes` | `overlay:processes` | `electron/ipc/overlayIpc.js:69` | `nativeLatencyClient.listProcesses (electron/services/NativeLatencyClient.js)` |
-| `overlay.psuSearch` | `overlay:psuSearch` | `electron/ipc/overlayIpc.js:43` |  |
-| `overlay.resetEnergy` | `overlay:resetEnergy` | `electron/ipc/overlayIpc.js:38` |  |
-| `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:36` |  |
-| `overlay.show` | `overlay:show` | `electron/ipc/overlayIpc.js:34` |  |
-| `overlay.status` | `overlay:status` | `electron/ipc/overlayIpc.js:33` |  |
+| `overlay.pickLogFolder` | `overlay:pickLogFolder` | `electron/ipc/overlayIpc.js:78` |  |
+| `overlay.power` | `overlay:power` | `electron/ipc/overlayIpc.js:42` |  |
+| `overlay.processes` | `overlay:processes` | `electron/ipc/overlayIpc.js:74` | `nativeLatencyClient.listProcesses (electron/services/NativeLatencyClient.js)` |
+| `overlay.psuSearch` | `overlay:psuSearch` | `electron/ipc/overlayIpc.js:48` |  |
+| `overlay.resetEnergy` | `overlay:resetEnergy` | `electron/ipc/overlayIpc.js:43` |  |
+| `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:41` |  |
+| `overlay.show` | `overlay:show` | `electron/ipc/overlayIpc.js:39` |  |
+| `overlay.status` | `overlay:status` | `electron/ipc/overlayIpc.js:38` |  |
 
 ### Save backup  (rota `savebackup`)
 - Tela: `src/pages/SaveBackup.tsx`
@@ -372,7 +372,7 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1903` |  |
+| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1916` |  |
 | `latency.boostNow` | `latency:boostNow` | `electron/latencyGuardian.js:1266` |  |
 | `latency.disableUltra` | `latency:disableUltra` | `electron/latencyGuardian.js:1247` |  |
 | `latency.enableUltra` | `latency:enableUltra` | `electron/latencyGuardian.js:1202` |  |
@@ -400,11 +400,11 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | `library.onActivityLogged` | `library:activityLogged` | `nao encontrado` |  |
 | `library.onGameStarted` | `library:gameStarted` | `nao encontrado` |  |
 | `library.onGameStopped` | `library:gameStopped` | `nao encontrado` |  |
-| `optimizer.applyTweak` | `optimizer:applyTweak` | `electron/main.js:1957` | `MemoryEngine.optimizeRAM (electron/services/optimizer/MemoryEngine.js)`<br>`StorageEngine.cleanTempFiles (electron/services/optimizer/StorageEngine.js)`<br>`SystemEngine.repairWindows (electron/services/optimizer/SystemEngine.js)` |
-| `optimizer.createRestorePoint` | `optimizer:createRestorePoint` | `electron/main.js:776` | `SystemEngine.createRestorePoint (electron/services/optimizer/SystemEngine.js)` |
-| `security.getSecurityScore` | `security:getSecurityScore` | `electron/main.js:3118` |  |
-| `shell.openExternal` | `shell:openExternal` | `electron/main.js:1444` | `RENDERER_SYSTEM_URIS.has`<br>`raw.toLowerCase`<br>`parsed.toString`<br>`cp.spawn` |
-| `system.getJunkEstimate` | `system:getJunkEstimate` | `electron/main.js:1189` |  |
+| `optimizer.applyTweak` | `optimizer:applyTweak` | `electron/main.js:1970` | `MemoryEngine.optimizeRAM (electron/services/optimizer/MemoryEngine.js)`<br>`StorageEngine.cleanTempFiles (electron/services/optimizer/StorageEngine.js)`<br>`SystemEngine.repairWindows (electron/services/optimizer/SystemEngine.js)` |
+| `optimizer.createRestorePoint` | `optimizer:createRestorePoint` | `electron/main.js:789` | `SystemEngine.createRestorePoint (electron/services/optimizer/SystemEngine.js)` |
+| `security.getSecurityScore` | `security:getSecurityScore` | `electron/main.js:3131` |  |
+| `shell.openExternal` | `shell:openExternal` | `electron/main.js:1457` | `RENDERER_SYSTEM_URIS.has`<br>`raw.toLowerCase`<br>`parsed.toString`<br>`cp.spawn` |
+| `system.getJunkEstimate` | `system:getJunkEstimate` | `electron/main.js:1202` |  |
 
 ### Home  (rota `home`)
 - Tela: `src/pages/Home.tsx`
@@ -414,9 +414,9 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | API | canal | handler | chama |
 |---|---|---|---|
 | `driver.detect` | `driver:detect` | `electron/ipc/driverIpc.js:23` | `svc.detectAdapters` |
-| `pge.openPortable` | `pge:openPortable` | `electron/main.js:1508` |  |
-| `system.getInfo` | `system:getInfo` | `electron/main.js:836` | `cpuModel.includes`<br>`si.cpu`<br>`runCommand() (electron/services/PowerShellRunner.js)` |
-| `system.getMemory` | `system:getMemory` | `electron/main.js:1760` |  |
+| `pge.openPortable` | `pge:openPortable` | `electron/main.js:1521` |  |
+| `system.getInfo` | `system:getInfo` | `electron/main.js:849` | `cpuModel.includes`<br>`si.cpu`<br>`runCommand() (electron/services/PowerShellRunner.js)` |
+| `system.getMemory` | `system:getMemory` | `electron/main.js:1773` |  |
 
 ### Presets e módulos  (rota `presets`)
 - Tela: `src/pages/Presets.tsx`
@@ -447,7 +447,7 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | `hub.pendingLink` | `hub:pendingLink` | `electron/ipc/hubIpc.js:147` |  |
 | `hub.saveFile` | `hub:saveFile` | `electron/ipc/hubIpc.js:172` | `mcp.init`<br>`host.response`<br>`watchers.values`<br>`w.close` |
 | `hub.uninstall` | `hub:uninstall` | `electron/ipc/hubIpc.js:136` | `svc.uninstall` |
-| `shell.openExternal` | `shell:openExternal` | `electron/main.js:1444` | `RENDERER_SYSTEM_URIS.has`<br>`raw.toLowerCase`<br>`parsed.toString`<br>`cp.spawn` |
+| `shell.openExternal` | `shell:openExternal` | `electron/main.js:1457` | `RENDERER_SYSTEM_URIS.has`<br>`raw.toLowerCase`<br>`parsed.toString`<br>`cp.spawn` |
 
 ### Real-time  (rota `realtime`)
 - Tela: `src/pages/Realtime.tsx`
@@ -471,24 +471,24 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `autoclicker.macroClear` | `autoclicker:macroClear` | `electron/main.js:3384` | `autoClicker.macroClear` |
-| `autoclicker.macroCompileExe` | `autoclicker:macroCompileExe` | `electron/main.js:3408` | `autoClicker.macroCompileExe`<br>`makePointPicker() (electron/services/autoclicker/PointPicker.js)` |
-| `autoclicker.macroOpenFile` | `autoclicker:macroOpenFile` | `electron/main.js:3385` | `autoClicker.state`<br>`autoClicker.macroLoadFromPath` |
-| `autoclicker.macroPlayStart` | `autoclicker:macroPlayStart` | `electron/main.js:3382` | `autoClicker.macroPlayStart` |
-| `autoclicker.macroPlayStop` | `autoclicker:macroPlayStop` | `electron/main.js:3383` | `autoClicker.macroPlayStop` |
-| `autoclicker.macroRecordStart` | `autoclicker:macroRecordStart` | `electron/main.js:3380` | `autoClicker.macroRecordStart` |
-| `autoclicker.macroRecordStop` | `autoclicker:macroRecordStop` | `electron/main.js:3381` | `autoClicker.macroRecordStop` |
-| `autoclicker.macroSaveFile` | `autoclicker:macroSaveFile` | `electron/main.js:3398` | `autoClicker.macroSaveToPath` |
-| `autoclicker.macroSetConfig` | `autoclicker:macroSetConfig` | `electron/main.js:3379` | `autoClicker.macroSetConfig` |
+| `autoclicker.macroClear` | `autoclicker:macroClear` | `electron/main.js:3397` | `autoClicker.macroClear` |
+| `autoclicker.macroCompileExe` | `autoclicker:macroCompileExe` | `electron/main.js:3421` | `autoClicker.macroCompileExe`<br>`makePointPicker() (electron/services/autoclicker/PointPicker.js)` |
+| `autoclicker.macroOpenFile` | `autoclicker:macroOpenFile` | `electron/main.js:3398` | `autoClicker.state`<br>`autoClicker.macroLoadFromPath` |
+| `autoclicker.macroPlayStart` | `autoclicker:macroPlayStart` | `electron/main.js:3395` | `autoClicker.macroPlayStart` |
+| `autoclicker.macroPlayStop` | `autoclicker:macroPlayStop` | `electron/main.js:3396` | `autoClicker.macroPlayStop` |
+| `autoclicker.macroRecordStart` | `autoclicker:macroRecordStart` | `electron/main.js:3393` | `autoClicker.macroRecordStart` |
+| `autoclicker.macroRecordStop` | `autoclicker:macroRecordStop` | `electron/main.js:3394` | `autoClicker.macroRecordStop` |
+| `autoclicker.macroSaveFile` | `autoclicker:macroSaveFile` | `electron/main.js:3411` | `autoClicker.macroSaveToPath` |
+| `autoclicker.macroSetConfig` | `autoclicker:macroSetConfig` | `electron/main.js:3392` | `autoClicker.macroSetConfig` |
 | `autoclicker.onChanged` | `autoclicker:changed` | `nao encontrado` |  |
-| `autoclicker.setHotkey` | `autoclicker:setHotkey` | `electron/main.js:3377` | `autoClicker.setHotkey` |
-| `autoclicker.setTabActive` | `autoclicker:setTabActive` | `electron/main.js:3378` |  |
-| `autoclicker.start` | `autoclicker:start` | `electron/main.js:3373` | `autoClicker.start` |
-| `autoclicker.status` | `autoclicker:status` | `electron/main.js:3372` | `autoClicker.state` |
-| `autoclicker.stop` | `autoclicker:stop` | `electron/main.js:3374` | `autoClicker.stop` |
-| `autoclicker.waypointsPickScreen` | `autoclicker:waypointsPickScreen` | `electron/main.js:3426` | `autoClicker.state`<br>`autoClicker.waypointsAddPicked` |
-| `autoclicker.waypointsPlay` | `autoclicker:waypointsPlay` | `electron/main.js:3425` | `autoClicker.waypointsPlay` |
-| `autoclicker.waypointsSave` | `autoclicker:waypointsSave` | `electron/main.js:3424` | `autoClicker.waypointsSave` |
+| `autoclicker.setHotkey` | `autoclicker:setHotkey` | `electron/main.js:3390` | `autoClicker.setHotkey` |
+| `autoclicker.setTabActive` | `autoclicker:setTabActive` | `electron/main.js:3391` |  |
+| `autoclicker.start` | `autoclicker:start` | `electron/main.js:3386` | `autoClicker.start` |
+| `autoclicker.status` | `autoclicker:status` | `electron/main.js:3385` | `autoClicker.state` |
+| `autoclicker.stop` | `autoclicker:stop` | `electron/main.js:3387` | `autoClicker.stop` |
+| `autoclicker.waypointsPickScreen` | `autoclicker:waypointsPickScreen` | `electron/main.js:3439` | `autoClicker.state`<br>`autoClicker.waypointsAddPicked` |
+| `autoclicker.waypointsPlay` | `autoclicker:waypointsPlay` | `electron/main.js:3438` | `autoClicker.waypointsPlay` |
+| `autoclicker.waypointsSave` | `autoclicker:waypointsSave` | `electron/main.js:3437` | `autoClicker.waypointsSave` |
 
 ### Limpeza profunda  (rota `cleaner`)
 - Tela: `src/pages/Cleaner.tsx`
@@ -517,10 +517,10 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `dialog.grantDroppedFiles` | `dialog:grantDroppedFiles` | `electron/main.js:1889` | `filePaths.slice`<br>`granted.push` |
-| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1903` |  |
-| `dialog.selectFolder` | `dialog:selectFolder` | `electron/main.js:1914` |  |
-| `files.archiveOperation` | `files:archiveOperation` | `electron/main.js:2143` | `inputFiles.map`<br>`runCommand() (electron/services/PowerShellRunner.js)` |
+| `dialog.grantDroppedFiles` | `dialog:grantDroppedFiles` | `electron/main.js:1902` | `filePaths.slice`<br>`granted.push` |
+| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1916` |  |
+| `dialog.selectFolder` | `dialog:selectFolder` | `electron/main.js:1927` |  |
+| `files.archiveOperation` | `files:archiveOperation` | `electron/main.js:2156` | `inputFiles.map`<br>`runCommand() (electron/services/PowerShellRunner.js)` |
 | `files.cancelConvert` | `files:cancelConvert` | `electron/ipc/converterIpc.js:96` | `jobs.get`<br>`job.cancel` |
 | `files.convertDocuments` | `files:convertDocuments` | `electron/ipc/converterIpc.js:94` | `documents.convert` |
 | `files.convertImages` | `files:convertImages` | `electron/ipc/converterIpc.js:86` | `images.convert` |
@@ -587,16 +587,16 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1903` |  |
-| `dialog.selectFolder` | `dialog:selectFolder` | `electron/main.js:1914` |  |
+| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1916` |  |
+| `dialog.selectFolder` | `dialog:selectFolder` | `electron/main.js:1927` |  |
 | `latency.launchGameWithProfile` | `latency:launchGameWithProfile` | `electron/latencyGuardian.js:1311` | `argsArray.map`<br>`pingHost.trim`<br>`proc.once`<br>`proc.on` |
-| `library.discover` | `library:discover` | `electron/main.js:1331` | `steamSvc.getSteamPath`<br>`steamSvc.getLibraryPaths`<br>`steamPaths.push`<br>`content.matchAll` |
-| `library.fetchCover` | `library:fetchCover` | `electron/main.js:1260` | `service.fetchCover`<br>`i.test`<br>`folder.startsWith`<br>`exeKey.startsWith` |
-| `library.list` | `library:list` | `electron/main.js:1197` | `webContents.send` |
+| `library.discover` | `library:discover` | `electron/main.js:1344` | `steamSvc.getSteamPath`<br>`steamSvc.getLibraryPaths`<br>`steamPaths.push`<br>`content.matchAll` |
+| `library.fetchCover` | `library:fetchCover` | `electron/main.js:1273` | `service.fetchCover`<br>`i.test`<br>`folder.startsWith`<br>`exeKey.startsWith` |
+| `library.list` | `library:list` | `electron/main.js:1210` | `webContents.send` |
 | `library.onUpdated` | `library:updated` | `nao encontrado` |  |
-| `library.remove` | `library:remove` | `electron/main.js:1245` |  |
-| `library.upsert` | `library:upsert` | `electron/main.js:1209` |  |
-| `library.upsertBulk` | `library:upsertBulk` | `electron/main.js:1227` |  |
+| `library.remove` | `library:remove` | `electron/main.js:1258` |  |
+| `library.upsert` | `library:upsert` | `electron/main.js:1222` |  |
+| `library.upsertBulk` | `library:upsertBulk` | `electron/main.js:1240` |  |
 | `optiscaler.apply` | `optiscaler:apply` | `electron/optiscalerManager.js:1272` |  |
 
 ### EXIF Editor  (rota `metadata`)
@@ -606,9 +606,9 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `dialog.grantDroppedFiles` | `dialog:grantDroppedFiles` | `electron/main.js:1889` | `filePaths.slice`<br>`granted.push` |
-| `dialog.saveFile` | `dialog:saveFile` | `electron/main.js:1924` |  |
-| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1903` |  |
+| `dialog.grantDroppedFiles` | `dialog:grantDroppedFiles` | `electron/main.js:1902` | `filePaths.slice`<br>`granted.push` |
+| `dialog.saveFile` | `dialog:saveFile` | `electron/main.js:1937` |  |
+| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1916` |  |
 | `metax.read` | `metax:read` | `electron/ipc/metadataIpc.js:38` | `service.read` |
 | `metax.removeStream` | `metax:removeStream` | `electron/ipc/metadataIpc.js:59` | `service.removeStream` |
 | `metax.setFileProps` | `metax:setFileProps` | `electron/ipc/metadataIpc.js:54` | `service.setFileProps` |
@@ -621,8 +621,8 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1903` |  |
-| `ocr.extractText` | `ocr:extractText` | `electron/main.js:2419` | `base64Data.replace`<br>`img.resize`<br>`img.grayscale`<br>`img.clone` |
+| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1916` |  |
+| `ocr.extractText` | `ocr:extractText` | `electron/main.js:2432` | `base64Data.replace`<br>`img.resize`<br>`img.grayscale`<br>`img.clone` |
 | `share.grabRegion` | `share:grabRegion` | `electron/ipc/shareIpc.js:265` | `img.toDataURL`<br>`img.getSize`<br>`grabRegionImage() (electron/services/susuya/Screenshot.js)` |
 
 ### Password Vault  (rota `passwords`)
@@ -632,28 +632,28 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1903` |  |
-| `dialog.selectFolder` | `dialog:selectFolder` | `electron/main.js:1914` |  |
+| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1916` |  |
+| `dialog.selectFolder` | `dialog:selectFolder` | `electron/main.js:1927` |  |
 | `share.qr` | `share:qr` | `electron/ipc/shareIpc.js:257` | `s.startsWith`<br>`QRCode.toDataURL` |
-| `vault.add` | `vault:add` | `electron/main.js:2737` | `crypto.randomUUID` |
+| `vault.add` | `vault:add` | `electron/main.js:2750` | `crypto.randomUUID` |
 | `vault.bridgeStatus` | `vaultx:bridgeStatus` | `electron/ipc/vaultBridgeIpc.js:185` |  |
-| `vault.changeMasterPassword` | `vault:changeMasterPassword` | `electron/main.js:2817` | `crypto.randomBytes`<br>`recoveryWords.join`<br>`buildKdf() (electron/vaultCrypto.js)`<br>`encryptVaultData() (electron/vaultCrypto.js)` |
-| `vault.copyPassword` | `vault:copyPassword` | `electron/main.js:2800` | `clipboard.writeText`<br>`clipboard.readText`<br>`clipboard.clear` |
-| `vault.export` | `vault:export` | `electron/main.js:2876` |  |
-| `vault.import` | `vault:import` | `electron/main.js:2885` | `backupVaultFile() (electron/services/vaultBridge/vaultHardening.js)` |
-| `vault.init` | `vault:init` | `electron/main.js:2630` | `crypto.randomBytes`<br>`recoveryWords.join`<br>`buildKdf() (electron/vaultCrypto.js)`<br>`encryptVaultData() (electron/vaultCrypto.js)` |
-| `vault.list` | `vault:list` | `electron/main.js:2722` |  |
-| `vault.lock` | `vault:lock` | `electron/main.js:2717` |  |
+| `vault.changeMasterPassword` | `vault:changeMasterPassword` | `electron/main.js:2830` | `crypto.randomBytes`<br>`recoveryWords.join`<br>`buildKdf() (electron/vaultCrypto.js)`<br>`encryptVaultData() (electron/vaultCrypto.js)` |
+| `vault.copyPassword` | `vault:copyPassword` | `electron/main.js:2813` | `clipboard.writeText`<br>`clipboard.readText`<br>`clipboard.clear` |
+| `vault.export` | `vault:export` | `electron/main.js:2889` |  |
+| `vault.import` | `vault:import` | `electron/main.js:2898` | `backupVaultFile() (electron/services/vaultBridge/vaultHardening.js)` |
+| `vault.init` | `vault:init` | `electron/main.js:2643` | `crypto.randomBytes`<br>`recoveryWords.join`<br>`buildKdf() (electron/vaultCrypto.js)`<br>`encryptVaultData() (electron/vaultCrypto.js)` |
+| `vault.list` | `vault:list` | `electron/main.js:2735` |  |
+| `vault.lock` | `vault:lock` | `electron/main.js:2730` |  |
 | `vault.onBridgeChanged` | `vaultx:changed` | `nao encontrado` |  |
 | `vault.openExtensionFolder` | `vaultx:openExtensionFolder` | `electron/ipc/vaultBridgeIpc.js:211` |  |
 | `vault.registerBrowserHost` | `vaultx:registerHost` | `electron/ipc/vaultBridgeIpc.js:187` | `registry.register`<br>`isBrowserId() (electron/services/vaultBridge/nativeHost.js)` |
-| `vault.remove` | `vault:remove` | `electron/main.js:2783` |  |
-| `vault.reveal` | `vault:reveal` | `electron/main.js:2792` |  |
+| `vault.remove` | `vault:remove` | `electron/main.js:2796` |  |
+| `vault.reveal` | `vault:reveal` | `electron/main.js:2805` |  |
 | `vault.revokeBrowserClient` | `vaultx:revokeClient` | `electron/ipc/vaultBridgeIpc.js:203` | `pairingStore.revoke`<br>`server.disconnectClient` |
 | `vault.setBridgeLanguage` | `vaultx:setLanguage` | `electron/ipc/vaultBridgeIpc.js:218` | `lang.toLowerCase` |
-| `vault.status` | `vault:status` | `electron/main.js:2620` |  |
-| `vault.unlock` | `vault:unlock` | `electron/main.js:2665` |  |
-| `vault.unlockWithRecoveryWords` | `vault:unlockWithRecoveryWords` | `electron/main.js:2677` | `words.trim`<br>`buildKdf() (electron/vaultCrypto.js)`<br>`derivePasswordFromRecoveryWords() (electron/vaultCrypto.js)`<br>`recoveryDeriveOrder() (electron/vaultCrypto.js)` |
+| `vault.status` | `vault:status` | `electron/main.js:2633` |  |
+| `vault.unlock` | `vault:unlock` | `electron/main.js:2678` |  |
+| `vault.unlockWithRecoveryWords` | `vault:unlockWithRecoveryWords` | `electron/main.js:2690` | `words.trim`<br>`buildKdf() (electron/vaultCrypto.js)`<br>`derivePasswordFromRecoveryWords() (electron/vaultCrypto.js)`<br>`recoveryDeriveOrder() (electron/vaultCrypto.js)` |
 | `vault.unregisterBrowserHost` | `vaultx:unregisterHost` | `electron/ipc/vaultBridgeIpc.js:195` | `registry.unregister`<br>`isBrowserId() (electron/services/vaultBridge/nativeHost.js)` |
 
 ### PowerShell Tools  (rota `powershell`)
@@ -663,7 +663,7 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `app.getResourceUsage` | `app:getResourceUsage` | `electron/main.js:1517` | `metrics.map`<br>`processes.reduce` |
+| `app.getResourceUsage` | `app:getResourceUsage` | `electron/main.js:1530` | `metrics.map`<br>`processes.reduce` |
 | `gpubench.cancel` | `gpubench:cancel` | `electron/ipc/gpuBenchIpc.js:35` | `svc.cancel` |
 | `gpubench.onEvent` | `gpubench:event` | `nao encontrado` |  |
 | `gpubench.viewport` | `gpubench:viewport` | `electron/ipc/gpuBenchIpc.js:30` | `svc.viewport` |
@@ -671,16 +671,16 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | `hardware.startPolling` | `hardware:startPolling` | `electron/services/HardwareService.js:51` | `hookedSenders.has`<br>`hookedSenders.add`<br>`sender.once`<br>`hookedSenders.delete` |
 | `hardware.stopPolling` | `hardware:stopPolling` | `electron/services/HardwareService.js:69` | `perSender.get`<br>`perSender.set`<br>`perSender.delete`<br>`HAL.getSnapshot (electron/hal/HardwareHAL.js)` |
 | `hwsensors.status` | `hwsensors:status` | `electron/ipc/hwSensorsIpc.js:46` | `HwSensorsDaemon.status (electron/hal/collectors/HwSensorsDaemon.js)` |
-| `overlay.calibrate` | `overlay:calibrate` | `electron/ipc/overlayIpc.js:45` | `svc.power`<br>`points.slice`<br>`pts.some`<br>`svc.setSettings` |
-| `overlay.clearCalibration` | `overlay:clearCalibration` | `electron/ipc/overlayIpc.js:61` |  |
-| `overlay.power` | `overlay:power` | `electron/ipc/overlayIpc.js:37` |  |
-| `overlay.psuSearch` | `overlay:psuSearch` | `electron/ipc/overlayIpc.js:43` |  |
-| `overlay.resetEnergy` | `overlay:resetEnergy` | `electron/ipc/overlayIpc.js:38` |  |
-| `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:36` |  |
-| `overlay.show` | `overlay:show` | `electron/ipc/overlayIpc.js:34` |  |
-| `overlay.status` | `overlay:status` | `electron/ipc/overlayIpc.js:33` |  |
-| `system.enableProcessTracking` | `system:enableProcessTracking` | `electron/main.js:905` |  |
-| `system.runBenchmark` | `system:runBenchmark` | `electron/main.js:1012` | `hrtime.bigint`<br>`parentPort.postMessage`<br>`mops.toFixed`<br>`ms.toFixed` |
+| `overlay.calibrate` | `overlay:calibrate` | `electron/ipc/overlayIpc.js:50` | `svc.power`<br>`points.slice`<br>`pts.some`<br>`svc.setSettings` |
+| `overlay.clearCalibration` | `overlay:clearCalibration` | `electron/ipc/overlayIpc.js:66` |  |
+| `overlay.power` | `overlay:power` | `electron/ipc/overlayIpc.js:42` |  |
+| `overlay.psuSearch` | `overlay:psuSearch` | `electron/ipc/overlayIpc.js:48` |  |
+| `overlay.resetEnergy` | `overlay:resetEnergy` | `electron/ipc/overlayIpc.js:43` |  |
+| `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:41` |  |
+| `overlay.show` | `overlay:show` | `electron/ipc/overlayIpc.js:39` |  |
+| `overlay.status` | `overlay:status` | `electron/ipc/overlayIpc.js:38` |  |
+| `system.enableProcessTracking` | `system:enableProcessTracking` | `electron/main.js:918` |  |
+| `system.runBenchmark` | `system:runBenchmark` | `electron/main.js:1025` | `hrtime.bigint`<br>`parentPort.postMessage`<br>`mops.toFixed`<br>`ms.toFixed` |
 
 ### Advanced Security  (rota `security`)
 - Tela: `src/pages/AdvancedSecurity.tsx`
@@ -689,9 +689,9 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `optimizer.applyDns` | `optimizer:applyDns` | `electron/main.js:2001` | `DnsEngine.apply (electron/services/optimizer/DnsEngine.js)` |
-| `optimizer.getDnsState` | `optimizer:getDnsState` | `electron/main.js:1992` | `DnsEngine.getState (electron/services/optimizer/DnsEngine.js)` |
-| `optimizer.undoDns` | `optimizer:undoDns` | `electron/main.js:2006` | `DnsEngine.undo (electron/services/optimizer/DnsEngine.js)` |
+| `optimizer.applyDns` | `optimizer:applyDns` | `electron/main.js:2014` | `DnsEngine.apply (electron/services/optimizer/DnsEngine.js)` |
+| `optimizer.getDnsState` | `optimizer:getDnsState` | `electron/main.js:2005` | `DnsEngine.getState (electron/services/optimizer/DnsEngine.js)` |
+| `optimizer.undoDns` | `optimizer:undoDns` | `electron/main.js:2019` | `DnsEngine.undo (electron/services/optimizer/DnsEngine.js)` |
 | `security.advApplyFirewall` | `security:advApplyFirewall` | `electron/services/SecurityService.js:88` | `adv.applyFirewall` |
 | `security.advApplyHashes` | `security:advApplyHashes` | `electron/services/SecurityService.js:90` | `adv.applyHashes` |
 | `security.advApplyHosts` | `security:advApplyHosts` | `electron/services/SecurityService.js:86` | `adv.applyHosts` |
@@ -703,20 +703,20 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | `security.advSetFeedEnabled` | `security:advSetFeedEnabled` | `electron/services/SecurityService.js:84` | `adv.setEnabled` |
 | `security.advStatus` | `security:advStatus` | `electron/services/SecurityService.js:83` | `adv.status` |
 | `security.advUpdateFeeds` | `security:advUpdateFeeds` | `electron/services/SecurityService.js:85` | `adv.updateFeeds`<br>`ids.map` |
-| `security.auditTracking` | `security:auditTracking` | `electron/main.js:3122` | `custom.map`<br>`content.split`<br>`l.trim`<br>`line.startsWith` |
-| `security.blockTracking` | `security:blockTracking` | `electron/main.js:3229` | `custom.map`<br>`d.toLowerCase`<br>`content.split`<br>`trackingDomains.map` |
+| `security.auditTracking` | `security:auditTracking` | `electron/main.js:3135` | `custom.map`<br>`content.split`<br>`l.trim`<br>`line.startsWith` |
+| `security.blockTracking` | `security:blockTracking` | `electron/main.js:3242` | `custom.map`<br>`d.toLowerCase`<br>`content.split`<br>`trackingDomains.map` |
 | `security.disablePhishingShield` | `security:disablePhishingShield` | `electron/services/SecurityService.js:114` |  |
 | `security.getCommunityRules` | `security:getCommunityRules` | `electron/services/SecurityService.js:134` |  |
 | `security.getLiveNetworkConnections` | `security:getLiveNetworkConnections` | `electron/services/SecurityService.js:122` |  |
 | `security.getPhishingShieldStatus` | `security:getPhishingShieldStatus` | `electron/services/SecurityService.js:118` |  |
-| `security.getTrackingDomains` | `security:getTrackingDomains` | `electron/main.js:3172` | `custom.map`<br>`HOSTNAME_RE.test` |
+| `security.getTrackingDomains` | `security:getTrackingDomains` | `electron/main.js:3185` | `custom.map`<br>`HOSTNAME_RE.test` |
 | `security.importCommunityRules` | `security:importCommunityRules` | `electron/services/SecurityService.js:138` |  |
-| `security.killProcess` | `security:killProcess` | `electron/main.js:3294` |  |
+| `security.killProcess` | `security:killProcess` | `electron/main.js:3307` |  |
 | `security.resetCommunityRules` | `security:resetCommunityRules` | `electron/services/SecurityService.js:142` | `promises.stat`<br>`entropyCache.has`<br>`entropyCache.get`<br>`stream.on` |
 | `security.scanProcesses` | `security:scanProcesses` | `electron/services/SecurityService.js:102` |  |
 | `security.scanUrl` | `security:scanUrl` | `electron/services/SecurityService.js:106` |  |
-| `security.setCustomTrackingDomains` | `security:setCustomTrackingDomains` | `electron/main.js:3216` |  |
-| `security.unblockTracking` | `security:unblockTracking` | `electron/main.js:3267` |  |
+| `security.setCustomTrackingDomains` | `security:setCustomTrackingDomains` | `electron/main.js:3229` |  |
+| `security.unblockTracking` | `security:unblockTracking` | `electron/main.js:3280` |  |
 
 ### Disk map  (rota `spacesniffer`)
 - Tela: `src/pages/SpaceSniffer/index.tsx`
@@ -741,8 +741,8 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1903` |  |
-| `fs.readFile` | `fs:readFile` | `electron/main.js:3307` | `readTextFile() (electron/services/textFile.js)` |
+| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1916` |  |
+| `fs.readFile` | `fs:readFile` | `electron/main.js:3320` | `readTextFile() (electron/services/textFile.js)` |
 
 ### Text Editor  (rota `texteditor`)
 - Tela: `src/pages/TextEditor.tsx`
@@ -754,10 +754,10 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | `code.cancel` | `code:cancel` | `electron/ipc/codeRunnerIpc.js:13` | `cancelRun() (electron/services/CodeRunner.js)` |
 | `code.run` | `code:run` | `electron/ipc/codeRunnerIpc.js:12` | `runCode() (electron/services/CodeRunner.js)` |
 | `code.runtimes` | `code:runtimes` | `electron/ipc/codeRunnerIpc.js:11` | `detectRuntimes() (electron/services/CodeRunner.js)` |
-| `dialog.saveFile` | `dialog:saveFile` | `electron/main.js:1924` |  |
-| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1903` |  |
-| `fs.readFile` | `fs:readFile` | `electron/main.js:3307` | `readTextFile() (electron/services/textFile.js)` |
-| `fs.writeFile` | `fs:writeFile` | `electron/main.js:3326` | `devPath.includes`<br>`writeTextFile() (electron/services/textFile.js)` |
+| `dialog.saveFile` | `dialog:saveFile` | `electron/main.js:1937` |  |
+| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1916` |  |
+| `fs.readFile` | `fs:readFile` | `electron/main.js:3320` | `readTextFile() (electron/services/textFile.js)` |
+| `fs.writeFile` | `fs:writeFile` | `electron/main.js:3339` | `devPath.includes`<br>`writeTextFile() (electron/services/textFile.js)` |
 
 ### Video Downloader  (rota `youtube`)
 - Tela: `src/pages/YoutubeDownloader.tsx`
@@ -766,11 +766,11 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1903` |  |
-| `dialog.selectFolder` | `dialog:selectFolder` | `electron/main.js:1914` |  |
-| `youtube.cancel` | `youtube:cancel` | `electron/main.js:2409` | `cancelActiveYtDlp() (electron/ytdlp.js)` |
-| `youtube.download` | `youtube:download` | `electron/main.js:2276` | `cookiesPath.trim`<br>`cookiesFromBrowser.trim`<br>`userAgent.trim`<br>`client.trim` |
-| `youtube.getVideoInfo` | `youtube:getVideoInfo` | `electron/main.js:2171` | `cookiesPath.trim`<br>`cookiesFromBrowserRaw.trim`<br>`userAgentRaw.trim`<br>`clientRaw.trim` |
+| `dialog.selectFiles` | `dialog:selectFiles` | `electron/main.js:1916` |  |
+| `dialog.selectFolder` | `dialog:selectFolder` | `electron/main.js:1927` |  |
+| `youtube.cancel` | `youtube:cancel` | `electron/main.js:2422` | `cancelActiveYtDlp() (electron/ytdlp.js)` |
+| `youtube.download` | `youtube:download` | `electron/main.js:2289` | `cookiesPath.trim`<br>`cookiesFromBrowser.trim`<br>`userAgent.trim`<br>`client.trim` |
+| `youtube.getVideoInfo` | `youtube:getVideoInfo` | `electron/main.js:2184` | `cookiesPath.trim`<br>`cookiesFromBrowserRaw.trim`<br>`userAgentRaw.trim`<br>`clientRaw.trim` |
 | `youtube.onProgress` | `youtube:downloadProgress` | `nao encontrado` |  |
 
 ## Outros
@@ -793,16 +793,16 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | `darkos.usbPickIso` | `darkos:usbPickIso` | `electron/ipc/darkosIpc.js:88` | `usb.allowIso` |
 | `darkos.usbWrite` | `darkos:usbWrite` | `electron/ipc/darkosIpc.js:96` | `usb.write` |
 | `downloads.add` | `downloads:add` | `electron/services/downloads/registerDownloadsIPC.js:49` | `manager.add` |
-| `optimizer.getGpuInfo` | `optimizer:getGpuInfo` | `electron/main.js:1947` | `AppManagerEngine.getGpuInfo (electron/services/optimizer/AppManagerEngine.js)` |
-| `optimizer.run` | `optimizer:run` | `electron/main.js:761` | `sender.send`<br>`SystemOptimizerService.runTasks (electron/services/optimizer/SystemOptimizerService.js)` |
-| `settings.getConfig` | `settings:getConfig` | `electron/main.js:1640` | `loadPersistedConfig() (electron/configManager.js)` |
-| `settings.updateStartupBehavior` | `settings:updateStartupBehavior` | `electron/main.js:1720` | `runPowerShell() (electron/services/PowerShellRunner.js)`<br>`stripBom() (electron/services/PowerShellRunner.js)`<br>`loadPersistedConfig() (electron/configManager.js)`<br>`saveConfig() (electron/configManager.js)` |
-| `shell.openExternal` | `shell:openExternal` | `electron/main.js:1444` | `RENDERER_SYSTEM_URIS.has`<br>`raw.toLowerCase`<br>`parsed.toString`<br>`cp.spawn` |
-| `system.getLiveStats` | `system:getLiveStats` | `electron/main.js:1765` | `liveCpu.sample` |
-| `updater.check` | `updater:check` | `electron/services/UpdateService.js:426` |  |
-| `updater.download` | `updater:download` | `electron/services/UpdateService.js:427` |  |
-| `updater.getStatus` | `updater:getStatus` | `electron/services/UpdateService.js:420` |  |
-| `updater.install` | `updater:install` | `electron/services/UpdateService.js:428` | `webContents.send` |
+| `optimizer.getGpuInfo` | `optimizer:getGpuInfo` | `electron/main.js:1960` | `AppManagerEngine.getGpuInfo (electron/services/optimizer/AppManagerEngine.js)` |
+| `optimizer.run` | `optimizer:run` | `electron/main.js:774` | `sender.send`<br>`SystemOptimizerService.runTasks (electron/services/optimizer/SystemOptimizerService.js)` |
+| `settings.getConfig` | `settings:getConfig` | `electron/main.js:1653` | `loadPersistedConfig() (electron/configManager.js)` |
+| `settings.updateStartupBehavior` | `settings:updateStartupBehavior` | `electron/main.js:1733` | `runPowerShell() (electron/services/PowerShellRunner.js)`<br>`stripBom() (electron/services/PowerShellRunner.js)`<br>`loadPersistedConfig() (electron/configManager.js)`<br>`saveConfig() (electron/configManager.js)` |
+| `shell.openExternal` | `shell:openExternal` | `electron/main.js:1457` | `RENDERER_SYSTEM_URIS.has`<br>`raw.toLowerCase`<br>`parsed.toString`<br>`cp.spawn` |
+| `system.getLiveStats` | `system:getLiveStats` | `electron/main.js:1778` | `liveCpu.sample` |
+| `updater.check` | `updater:check` | `electron/services/UpdateService.js:459` |  |
+| `updater.download` | `updater:download` | `electron/services/UpdateService.js:460` |  |
+| `updater.getStatus` | `updater:getStatus` | `electron/services/UpdateService.js:453` |  |
+| `updater.install` | `updater:install` | `electron/services/UpdateService.js:461` | `webContents.send` |
 | `updater.onEvent` | `updater:event` | `nao encontrado` |  |
 
 ### dev-icons  (rota `dev-icons`)
@@ -813,9 +813,9 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 | API | canal | handler | chama |
 |---|---|---|---|
 | `driver.detect` | `driver:detect` | `electron/ipc/driverIpc.js:23` | `svc.detectAdapters` |
-| `pge.openPortable` | `pge:openPortable` | `electron/main.js:1508` |  |
-| `system.getInfo` | `system:getInfo` | `electron/main.js:836` | `cpuModel.includes`<br>`si.cpu`<br>`runCommand() (electron/services/PowerShellRunner.js)` |
-| `system.getMemory` | `system:getMemory` | `electron/main.js:1760` |  |
+| `pge.openPortable` | `pge:openPortable` | `electron/main.js:1521` |  |
+| `system.getInfo` | `system:getInfo` | `electron/main.js:849` | `cpuModel.includes`<br>`si.cpu`<br>`runCommand() (electron/services/PowerShellRunner.js)` |
+| `system.getMemory` | `system:getMemory` | `electron/main.js:1773` |  |
 
 ### framepacer  (rota `framepacer`)
 - Tela: `src/pages/FramePacer.tsx`
@@ -824,16 +824,16 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `darkpacer.lowLatencyApply` | `lowlatency:apply` | `electron/main.js:1879` | `LowLatencyLayer.apply (electron/services/LowLatencyLayerService.js)` |
-| `darkpacer.lowLatencyStatus` | `lowlatency:getStatus` | `electron/main.js:1875` | `LowLatencyLayer.getStatus (electron/services/LowLatencyLayerService.js)` |
-| `framepacer.getMetrics` | `framepacer:getMetrics` | `electron/main.js:1844` | `FramePacerEngine.getMetrics (electron/services/FramePacerEngine.js)` |
-| `framepacer.getOverlayStatus` | `framepacer:getOverlayStatus` | `electron/main.js:1870` | `getOverlayStatus() (electron/services/FramePacerOverlay.js)` |
+| `darkpacer.lowLatencyApply` | `lowlatency:apply` | `electron/main.js:1892` | `LowLatencyLayer.apply (electron/services/LowLatencyLayerService.js)` |
+| `darkpacer.lowLatencyStatus` | `lowlatency:getStatus` | `electron/main.js:1888` | `LowLatencyLayer.getStatus (electron/services/LowLatencyLayerService.js)` |
+| `framepacer.getMetrics` | `framepacer:getMetrics` | `electron/main.js:1857` | `FramePacerEngine.getMetrics (electron/services/FramePacerEngine.js)` |
+| `framepacer.getOverlayStatus` | `framepacer:getOverlayStatus` | `electron/main.js:1883` | `getOverlayStatus() (electron/services/FramePacerOverlay.js)` |
 | `framepacer.onMetrics` | `framepacer:metrics` | `nao encontrado` |  |
-| `framepacer.setOverlayClickThrough` | `framepacer:setOverlayClickThrough` | `electron/main.js:1862` | `setOverlayClickThrough() (electron/services/FramePacerOverlay.js)` |
-| `framepacer.start` | `framepacer:start` | `electron/main.js:1832` | `FramePacerEngine.start (electron/services/FramePacerEngine.js)` |
-| `framepacer.stop` | `framepacer:stop` | `electron/main.js:1836` | `FramePacerEngine.stop (electron/services/FramePacerEngine.js)` |
-| `framepacer.toggleOverlay` | `framepacer:toggleOverlay` | `electron/main.js:1858` | `toggleFramePacerOverlay() (electron/services/FramePacerOverlay.js)` |
-| `framepacer.updateConfig` | `framepacer:updateConfig` | `electron/main.js:1840` | `FramePacerEngine.updateConfig (electron/services/FramePacerEngine.js)` |
+| `framepacer.setOverlayClickThrough` | `framepacer:setOverlayClickThrough` | `electron/main.js:1875` | `setOverlayClickThrough() (electron/services/FramePacerOverlay.js)` |
+| `framepacer.start` | `framepacer:start` | `electron/main.js:1845` | `FramePacerEngine.start (electron/services/FramePacerEngine.js)` |
+| `framepacer.stop` | `framepacer:stop` | `electron/main.js:1849` | `FramePacerEngine.stop (electron/services/FramePacerEngine.js)` |
+| `framepacer.toggleOverlay` | `framepacer:toggleOverlay` | `electron/main.js:1871` | `toggleFramePacerOverlay() (electron/services/FramePacerOverlay.js)` |
+| `framepacer.updateConfig` | `framepacer:updateConfig` | `electron/main.js:1853` | `FramePacerEngine.updateConfig (electron/services/FramePacerEngine.js)` |
 
 ### overlay-editor  (rota `overlay-editor`)
 - Tela: `src/pages/OverlayEditor.tsx`
@@ -842,13 +842,13 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `overlay.activateLayout` | `overlay:activateLayout` | `electron/ipc/overlayIpc.js:67` |  |
-| `overlay.deleteLayout` | `overlay:deleteLayout` | `electron/ipc/overlayIpc.js:66` |  |
-| `overlay.layouts` | `overlay:layouts` | `electron/ipc/overlayIpc.js:63` |  |
-| `overlay.newLayout` | `overlay:newLayout` | `electron/ipc/overlayIpc.js:65` |  |
-| `overlay.preview` | `overlay:preview` | `electron/ipc/overlayIpc.js:68` |  |
-| `overlay.saveLayout` | `overlay:saveLayout` | `electron/ipc/overlayIpc.js:64` |  |
-| `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:36` |  |
+| `overlay.activateLayout` | `overlay:activateLayout` | `electron/ipc/overlayIpc.js:72` |  |
+| `overlay.deleteLayout` | `overlay:deleteLayout` | `electron/ipc/overlayIpc.js:71` |  |
+| `overlay.layouts` | `overlay:layouts` | `electron/ipc/overlayIpc.js:68` |  |
+| `overlay.newLayout` | `overlay:newLayout` | `electron/ipc/overlayIpc.js:70` |  |
+| `overlay.preview` | `overlay:preview` | `electron/ipc/overlayIpc.js:73` |  |
+| `overlay.saveLayout` | `overlay:saveLayout` | `electron/ipc/overlayIpc.js:69` |  |
+| `overlay.setSettings` | `overlay:setSettings` | `electron/ipc/overlayIpc.js:41` |  |
 
 ### settings  (rota `settings`)
 - Tela: `src/pages/Settings.tsx`
@@ -857,12 +857,12 @@ Fluxo: `src/pages/*.tsx` chama `window.darkhub.<ns>.<metodo>()` -> `electron/pre
 
 | API | canal | handler | chama |
 |---|---|---|---|
-| `app.getResourceUsage` | `app:getResourceUsage` | `electron/main.js:1517` | `metrics.map`<br>`processes.reduce` |
-| `settings.getConfig` | `settings:getConfig` | `electron/main.js:1640` | `loadPersistedConfig() (electron/configManager.js)` |
-| `settings.updateLiveServices` | `settings:updateLiveServices` | `electron/main.js:1664` | `autoClicker.load`<br>`autoClicker.arm`<br>`autoClicker.dispose`<br>`loadPersistedConfig() (electron/configManager.js)` |
-| `settings.updateStartupBehavior` | `settings:updateStartupBehavior` | `electron/main.js:1720` | `runPowerShell() (electron/services/PowerShellRunner.js)`<br>`stripBom() (electron/services/PowerShellRunner.js)`<br>`loadPersistedConfig() (electron/configManager.js)`<br>`saveConfig() (electron/configManager.js)` |
-| `settings.updateWindowBehavior` | `settings:updateWindowBehavior` | `electron/main.js:1701` | `loadPersistedConfig() (electron/configManager.js)`<br>`saveConfig() (electron/configManager.js)` |
-| `updater.check` | `updater:check` | `electron/services/UpdateService.js:426` |  |
-| `updater.getStatus` | `updater:getStatus` | `electron/services/UpdateService.js:420` |  |
+| `app.getResourceUsage` | `app:getResourceUsage` | `electron/main.js:1530` | `metrics.map`<br>`processes.reduce` |
+| `settings.getConfig` | `settings:getConfig` | `electron/main.js:1653` | `loadPersistedConfig() (electron/configManager.js)` |
+| `settings.updateLiveServices` | `settings:updateLiveServices` | `electron/main.js:1677` | `autoClicker.load`<br>`autoClicker.arm`<br>`autoClicker.dispose`<br>`loadPersistedConfig() (electron/configManager.js)` |
+| `settings.updateStartupBehavior` | `settings:updateStartupBehavior` | `electron/main.js:1733` | `runPowerShell() (electron/services/PowerShellRunner.js)`<br>`stripBom() (electron/services/PowerShellRunner.js)`<br>`loadPersistedConfig() (electron/configManager.js)`<br>`saveConfig() (electron/configManager.js)` |
+| `settings.updateWindowBehavior` | `settings:updateWindowBehavior` | `electron/main.js:1714` | `loadPersistedConfig() (electron/configManager.js)`<br>`saveConfig() (electron/configManager.js)` |
+| `updater.check` | `updater:check` | `electron/services/UpdateService.js:459` |  |
+| `updater.getStatus` | `updater:getStatus` | `electron/services/UpdateService.js:453` |  |
 | `updater.onEvent` | `updater:event` | `nao encontrado` |  |
-| `vault.setAutoLockMinutes` | `vault:setAutoLockMinutes` | `electron/main.js:2625` |  |
+| `vault.setAutoLockMinutes` | `vault:setAutoLockMinutes` | `electron/main.js:2638` |  |

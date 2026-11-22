@@ -1,4 +1,4 @@
-<!-- GERADO por electron_feature_map.py em 2026-11-22T10:54:21. NAO edite a mao: rode `npm run map`. -->
+<!-- GERADO por electron_feature_map.py em 2026-11-22T11:18:30. NAO edite a mao: rode `npm run map`. -->
 
 # Indice de simbolos (arquivo -> funcoes com linha)
 
@@ -178,7 +178,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ipc/overlayIpc.js`
 
-`registerOverlayIPC`:13, `broadcast`:15, `get`:22, `handle`:27, `psuCatalog`:41
+`registerOverlayIPC`:14, `broadcast`:16, `get`:23, `handle`:32, `psuCatalog`:46
 
 ## `electron/ipc/powershellIpc.js`
 
@@ -214,7 +214,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ipc/upscaleIpc.js`
 
-`registerUpscaleIPC`:8, `send`:15, `serial`:16, `gameDir`:17, `handle`:22
+`registerUpscaleIPC`:9, `send`:18, `serial`:19, `gameDir`:20, `handle`:25
 
 ## `electron/ipc/usbIpc.js`
 
@@ -238,7 +238,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/main.js`
 
-`getSystemInformation`:142, `get`:148, `getSharp`:157, `getOcrWorker`:166, `getExiftool`:186, `getFfmpegPath`:194, `getLibraryStore`:226, `safeRegister`:233, `getYtDlpTools`:274, `isDev`:279, `normalizeAccessPath`:303, `isPathInside`:313, `grantFilePath`:319, `grantDirectoryPath`:324, `hasFileAccessGrant`:329, `assertOutputDirGranted`:341, `assertFileAccessGranted`:347, `assertFileAccessGrantedMany`:356, `psSingleQuote`:362, `loadRuntimeConfig`:366, `isAllowedExternalProtocol`:376, `getAllowedExternalUrl`:380, `openAllowedExternalUrlDetached`:390, `isEmbeddedExternalProtocol`:401, `handleEmbeddedExternalNavigation`:407, `isTrustedAppNavigation`:425, `getAppIconPath`:435, `showMainWindow`:450, `ensureTray`:463, `hideWindowToBackground`:490, `computeJunkEstimate`:498, `work`:508, `createMainWindow`:533, `kickWindowsPaint`:598, `showWhenReady`:671, `guestMay`:731, `eventSender`:764, `measureLatency`:791, `getActiveAdapterName`:822, `getMainCpuLoad`:1059, `broadcastLibraryEvent`:1203, `scoreExecutable`:1279, `key`:1284, `scanDirectoryForBestExe`:1305, `walk`:1308, `findPgeBat`:1462, `launchPgeBat`:1482, `setFramePacerLive`:1563, `auditStartupTask`:1597, `isStartupTaskEnabled`:1610, `setStartupTask`:1620, `refreshLiveCounts`:1748, `sendEvent`:2023, `buildArgs`:2195, `vaultFilePath`:2471, `setVaultAutoLockMinutes`:2479, `clearVaultAutoLock`:2486, `scheduleVaultAutoLock`:2493, `touchVault`:2502, `vaultFileExists`:2506, `readVaultFile`:2515, `writeVaultFile`:2520, `withVaultWriteLock`:2536, `lockVault`:2547, `removeVaultBackups`:2565, `ensureUnlocked`:2574, `loadVaultUsingWrapper`:2579, `persistVaultData`:2601, `getSecurityScoreV2`:3030, `add`:3035, `isValidHostname`:3212, `getClickEnginePath`:3341, `autoClickerCall`:3367, `isValidWingetId`:3500, `installGithubReleaseMsi`:3512, `installFromOfficialUrl`:3542, `progress`:3583, `runWinget`:3608, `runDeferredStartup`:3690
+`getSystemInformation`:142, `get`:148, `getSharp`:157, `getOcrWorker`:166, `getExiftool`:186, `getToolsDir`:196, `getFfmpegPath`:201, `getLibraryStore`:239, `safeRegister`:246, `getYtDlpTools`:287, `isDev`:292, `normalizeAccessPath`:316, `isPathInside`:326, `grantFilePath`:332, `grantDirectoryPath`:337, `hasFileAccessGrant`:342, `assertOutputDirGranted`:354, `assertFileAccessGranted`:360, `assertFileAccessGrantedMany`:369, `psSingleQuote`:375, `loadRuntimeConfig`:379, `isAllowedExternalProtocol`:389, `getAllowedExternalUrl`:393, `openAllowedExternalUrlDetached`:403, `isEmbeddedExternalProtocol`:414, `handleEmbeddedExternalNavigation`:420, `isTrustedAppNavigation`:438, `getAppIconPath`:448, `showMainWindow`:463, `ensureTray`:476, `hideWindowToBackground`:503, `computeJunkEstimate`:511, `work`:521, `createMainWindow`:546, `kickWindowsPaint`:611, `showWhenReady`:684, `guestMay`:744, `eventSender`:777, `measureLatency`:804, `getActiveAdapterName`:835, `getMainCpuLoad`:1072, `broadcastLibraryEvent`:1216, `scoreExecutable`:1292, `key`:1297, `scanDirectoryForBestExe`:1318, `walk`:1321, `findPgeBat`:1475, `launchPgeBat`:1495, `setFramePacerLive`:1576, `auditStartupTask`:1610, `isStartupTaskEnabled`:1623, `setStartupTask`:1633, `refreshLiveCounts`:1761, `sendEvent`:2036, `buildArgs`:2208, `vaultFilePath`:2484, `setVaultAutoLockMinutes`:2492, `clearVaultAutoLock`:2499, `scheduleVaultAutoLock`:2506, `touchVault`:2515, `vaultFileExists`:2519, `readVaultFile`:2528, `writeVaultFile`:2533, `withVaultWriteLock`:2549, `lockVault`:2560, `removeVaultBackups`:2578, `ensureUnlocked`:2587, `loadVaultUsingWrapper`:2592, `persistVaultData`:2614, `getSecurityScoreV2`:3043, `add`:3048, `isValidHostname`:3225, `getClickEnginePath`:3354, `autoClickerCall`:3380, `isValidWingetId`:3513, `installGithubReleaseMsi`:3525, `installFromOfficialUrl`:3555, `progress`:3596, `runWinget`:3621, `runDeferredStartup`:3703
 
 ## `electron/networkIPC.js`
 
@@ -286,7 +286,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/DarkHub.LatencyEngine.cs`
 
-`PROCESS_POWER_THROTTLING_STATE`:17 _class_, `DarkHubLatencyEngine`:24 _class_, `NtSetTimerResolution`:29, `NtQueryTimerResolution`:32, `TimeBeginPeriod`:35, `TimeEndPeriod`:38, `AvSetMmThreadCharacteristicsW`:41, `AvRevertMmThreadCharacteristics`:44, `OpenProcess`:47, `SetPriorityClass`:50, `SetProcessPriorityBoost`:53, `SetProcessAffinityMask`:56, `GetProcessAffinityMask`:59, `CloseHandle`:62, `GetCurrentProcess`:65, `GetCurrentThread`:68, `SetThreadPriority`:71, `SetProcessInformation`:74, `IcmpCreateFile`:77, `IcmpCloseHandle`:80, `IcmpSendEcho`:83, `EmptyWorkingSet`:95, `GetForegroundWindow`:98, `GetWindowThreadProcessId`:101, `ForegroundPid`:104, `RECT`:114 _class_, `MONITORINFO`:117 _class_, `MonitorFromWindow`:120, `GetMonitorInfo`:123, `SetThreadDpiAwarenessContext`:126, `ForegroundMonitor`:129, `Main`:181, `NamedPipeServerWorker`:237, `HandleCommand`:267, `LockTimerResolution`:366, `UnlockTimerResolution`:390, `TimerWorkerLoop`:404, `QueryTimerResolutionInternal`:463, `HandleBoostProcess`:489, `HandleSetAffinity`:541, `HandleListProcesses`:573, `HandleCleanRam`:591, `GetLogicalProcessorInformationEx`:631, `CpuCoreRecord`:638 _class_, `CpuL3Record`:646 _class_, `Group0Mask`:657, `ParseProcessorInfo`:675, `SelectCpuTopology`:716, `GetCpuTopologyInternal`:775, `HandlePingNative`:803, `IP_OPTION_INFORMATION`:890 _class_, `ICMP_ECHO_REPLY`:900 _class_, `SendJson`:911, `FormatResponse`:916, `DictionaryToJson`:927, `ObjectToJson`:943, `GetJsonStringValue`:968, `GetJsonIntValue`:980, `GetJsonBoolValue`:994
+`PROCESS_POWER_THROTTLING_STATE`:17 _class_, `DarkHubLatencyEngine`:24 _class_, `NtSetTimerResolution`:29, `NtQueryTimerResolution`:32, `TimeBeginPeriod`:35, `TimeEndPeriod`:38, `AvSetMmThreadCharacteristicsW`:41, `AvRevertMmThreadCharacteristics`:44, `OpenProcess`:47, `SetPriorityClass`:50, `SetProcessPriorityBoost`:53, `SetProcessAffinityMask`:56, `GetProcessAffinityMask`:59, `CloseHandle`:62, `GetCurrentProcess`:65, `GetCurrentThread`:68, `SetThreadPriority`:71, `SetProcessInformation`:74, `IcmpCreateFile`:77, `IcmpCloseHandle`:80, `IcmpSendEcho`:83, `EmptyWorkingSet`:95, `GetForegroundWindow`:98, `GetWindowThreadProcessId`:101, `ForegroundPid`:104, `RECT`:114 _class_, `MONITORINFO`:117 _class_, `MonitorFromWindow`:120, `GetMonitorInfo`:123, `SetThreadDpiAwarenessContext`:126, `ForegroundMonitor`:129, `Main`:181, `HandleCommand`:236, `LockTimerResolution`:335, `UnlockTimerResolution`:359, `TimerWorkerLoop`:373, `QueryTimerResolutionInternal`:432, `HandleBoostProcess`:458, `HandleSetAffinity`:510, `HandleListProcesses`:542, `HandleCleanRam`:560, `GetLogicalProcessorInformationEx`:600, `CpuCoreRecord`:607 _class_, `CpuL3Record`:615 _class_, `Group0Mask`:626, `ParseProcessorInfo`:644, `SelectCpuTopology`:685, `GetCpuTopologyInternal`:744, `HandlePingNative`:772, `IP_OPTION_INFORMATION`:859 _class_, `ICMP_ECHO_REPLY`:869 _class_, `SendJson`:880, `FormatResponse`:885, `DictionaryToJson`:896, `ObjectToJson`:912, `GetJsonStringValue`:937, `GetJsonIntValue`:949, `GetJsonBoolValue`:963
 
 ## `electron/services/DarkHub.Mcp.cs`
 
@@ -358,7 +358,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/UpdateService.js`
 
-`normalizeAssetName`:11, `sameAssetName`:12, `pickInstallerAsset`:15, `sha256File`:21, `UpdateService`:34 _class_, `init`:48, `_setupUpdater`:70, `_scheduleAutoCheck`:152, `_setState`:159, `checkForUpdates`:163, `downloadUpdate`:224, `fail`:254, `installUpdate`:312, `_publishedSha256`:359, `_fetchLatestGitHubRelease`:373, `_isNewerVersion`:407, `_registerIPC`:419, `_emit`:431, `destroy`:437
+`normalizeAssetName`:13, `sameAssetName`:14, `pickInstallerAsset`:17, `sha256File`:23, `UpdateService`:36 _class_, `init`:50, `_setupUpdater`:72, `_scheduleAutoCheck`:162, `_setState`:169, `checkForUpdates`:173, `downloadUpdate`:234, `fail`:264, `installUpdate`:328, `_stagingOptions`:369, `_stageElectronUpdaterDownload`:377, `_publishedSha256`:392, `_fetchLatestGitHubRelease`:406, `_isNewerVersion`:440, `_registerIPC`:452, `_emit`:464, `destroy`:470
 
 ## `electron/services/autoclicker/AutoClickerService.js`
 
@@ -702,7 +702,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/overlay/PresentMonService.js`
 
-`PresentMonService`:19 _class_, `installed`:28, `ensure`:30, `running`:54, `start`:57, `finish`:83, `stop`:94
+`PresentMonService`:20 _class_, `_resolveExe`:37, `installed`:44, `ensure`:46, `running`:73, `start`:76, `finish`:102, `stop`:113
 
 ## `electron/services/overlay/customModel.js`
 
@@ -732,6 +732,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `num`:54, `readingSigma`:57, `readingWatts`:63, `windowStats`:80, `checkPoint`:96, `fitXk`:108, `k`:109, `f`:113, `solveCalibration`:141, `calHardwareId`:180, `normalizeCalibration`:192, `calibrationState`:207
 
+## `electron/services/programDataRoot.js`
+
+`defaultProgramDataRoot`:15, `isLink`:19, `secureProgramDataRoot`:24, `resetToInherited`:50, `trustedDataDir`:66, `p`:81, `trustedToolsDir`:97, `migratePinnedFile`:104, `_resetProgramDataRoot`:120
+
 ## `electron/services/psTools/PsToolkitService.js`
 
 `safeJson`:27, `stamp`:31, `p`:32, `hostsFilePath`:36, `PsToolkitService`:40 _class_, `_dir`:58, `_privateTmp`:63, `_runElevated`:70, `preview`:76, `runTool`:83, `_shape`:109, `_native`:138, `_exportWlan`:146, `listWifiProfiles`:161, `revealWifiKey`:171, `readHosts`:182, `readHostsBackup`:196, `previewHosts`:205, `writeHosts`:212, `isCustomRunning`:224, `send`:240, `decode`:283, `finish`:287, `stopCustom`:301, `_snippetFile`:315, `listSnippets`:319, `_writeSnippets`:329, `saveSnippet`:337, `deleteSnippet`:357, `exportTo`:368
@@ -750,7 +754,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/realtime/Quarantine.js`
 
-`xorStream`:19, `transcode`:33, `lockDownDir`:49, `run`:52, `foreignOwnedFiles`:64, `secureDir`:86, `Quarantine`:93 _class_, `ensureRoot`:108, `paths`:120, `add`:129, `public`:160, `list`:165, `restore`:177, `remove`:201
+`xorStream`:19, `transcode`:33, `lockDownDir`:52, `run`:55, `foreignOwnedFiles`:70, `ownTree`:101, `secureDir`:112, `Quarantine`:120 _class_, `ensureRoot`:135, `paths`:147, `add`:156, `public`:187, `list`:192, `restore`:204, `remove`:228
 
 ## `electron/services/realtime/RealtimeOptimizer.js`
 
@@ -864,6 +868,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `utils`:6, `fingerprintOfBlob`:9, `keyTypeOfBlob`:14, `hostKeyInfo`:23, `publicKeyInfo`:29, `rsaBits`:36, `next`:40, `algorithmOf`:49, `parsePrivateKey`:60, `generateSshKeyPair`:84, `done`:88
 
+## `electron/services/stageInstaller.js`
+
+`publishedSha512`:13, `stageVerifiedInstaller`:26
+
 ## `electron/services/startup/StartupService.js`
 
 `Approved`:16, `foreach`:41, `StartupService`:68 _class_, `_history`:73, `_record`:74, `list`:79, `_toggleScript`:98, `setEnabled`:120, `undo`:144
@@ -898,11 +906,11 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/services/upscale/Autopilot.js`
 
-`findExe`:14, `Autopilot`:24 _class_, `installed`:30, `latest`:41, `status`:50, `launch`:77
+`findExe`:14, `Autopilot`:24 _class_, `_root`:31, `installed`:36, `latest`:48, `status`:57, `launch`:85
 
 ## `electron/services/upscale/DlssUpdater.js`
 
-`RAW`:13, `scanGameFolder`:23, `walk`:26, `safe`:44, `verifySignature`:46, `DlssUpdater`:59 _class_, `latest`:67, `officialDll`:78, `inspect`:94, `restore`:126, `record`:139
+`RAW`:13, `scanGameFolder`:23, `walk`:26, `safe`:44, `verifySignature`:46, `DlssUpdater`:59 _class_, `latest`:67, `officialDll`:78, `inspect`:96, `restore`:128, `record`:141
 
 ## `electron/services/upscale/pe.js`
 
@@ -958,7 +966,7 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 ## `electron/ytdlp.js`
 
-`platformAssetName`:11, `parseChecksumList`:23, `fetchExpectedChecksum`:31, `ensureYtDlp`:45, `ensureFfmpeg`:78, `killTree`:143, `cancelActiveYtDlp`:153, `runYtDlp`:162
+`platformAssetName`:11, `parseChecksumList`:23, `fetchExpectedChecksum`:31, `ensureYtDlp`:45, `ensureFfmpeg`:83, `killTree`:148, `cancelActiveYtDlp`:158, `runYtDlp`:167
 
 ## `install.ps1`
 
@@ -2000,6 +2008,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 
 `make`:37
 
+## `tests/programDataRoot.test.ts`
+
+`tmp`:10, `secure`:17, `secure`:26
+
 ## `tests/psQuoteEverywhere.test.ts`
 
 `walk`:27
@@ -2091,6 +2103,10 @@ Busque aqui com Ctrl+F / grep pelo nome da funcao.
 ## `tests/terminalKeys.test.ts`
 
 `k`:7
+
+## `tests/trustedTools.test.ts`
+
+`tmp`:21, `sha256`:22, `it`:27, `b64`:136, `staging`:137
 
 ## `tests/updateService.test.ts`
 

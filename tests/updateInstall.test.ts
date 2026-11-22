@@ -79,6 +79,32 @@ describe('installUpdate', () => {
     expect(quit).not.toHaveBeenCalled();
   });
 
+  it('electron-updater download: runs only the verified copy outside the user cache, with its NSIS arguments', async () => {
+    const cache = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-upd-cache-'));
+    const downloaded = path.join(cache, 'DarkHub-Setup-9.9.9.exe');
+    fs.writeFileSync(downloaded, 'nsis installer');
+    const sha512 = crypto.createHash('sha512').update('nsis installer').digest('base64');
+    const staged = await svc._stageElectronUpdaterDownload({ version: '9.9.9', downloadedFile: downloaded, files: [{ url: 'DarkHub-Setup-9.9.9.exe', sha512 }] });
+    expect(staged.file.startsWith(cache)).toBe(false);
+    fs.writeFileSync(downloaded, 'swapped in the cache afterwards'); // has no effect: the cache file is never run
+    svc._state = 'downloaded';
+    const p = svc.installUpdate();
+    for (let i = 0; i < 500 && !spawnMock.mock.calls.length; i++) await new Promise((r) => setImmediate(r));
+    expect(await p).toEqual({ ok: true });
+    expect((spawnMock.mock.calls[0] as unknown[])[0]).toBe(staged.file);
+    expect((spawnMock.mock.calls[0] as unknown[])[1]).toEqual(['--updated', '--force-run']);
+    await new Promise((res) => setTimeout(res, 600));
+    quit.mockClear();
+  });
+
+  it('electron-updater download: a cache file that no longer matches latest.yml is refused', async () => {
+    const cache = fs.mkdtempSync(path.join(os.tmpdir(), 'dh-upd-cache-'));
+    const downloaded = path.join(cache, 'DarkHub-Setup-9.9.9.exe');
+    fs.writeFileSync(downloaded, 'swapped');
+    const sha512 = crypto.createHash('sha512').update('nsis installer').digest('base64');
+    await expect(svc._stageElectronUpdaterDownload({ version: '9.9.9', downloadedFile: downloaded, files: [{ url: 'DarkHub-Setup-9.9.9.exe', sha512 }] })).rejects.toThrow(/sha512/);
+  });
+
   it('keeps the app open when the installer cannot be started', async () => {
     spawnBehavior = 'error';
     arm('installer');

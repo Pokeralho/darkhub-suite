@@ -6,6 +6,7 @@ import crypto from 'node:crypto'
 import { spawn, execFile } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { createCsvParser } from './frameStats.js'
+import { migratePinnedFile } from '../programDataRoot.js'
 
 export const PRESENTMON = {
   version: '2.6.0',
@@ -17,18 +18,36 @@ const SESSION = 'DarkHubOverlay'
 const MAX_BYTES = 8 * 1024 * 1024
 
 export class PresentMonService extends EventEmitter {
-  constructor({ toolsDir }) {
+  /**
+   * toolsDir: a folder, or an async function resolving it (trustedToolsDir: C:\ProgramData\DarkHub\tools when elevated).
+   * legacyDir: where older versions kept the exe (%APPDATA%\DarkHub\tools). The user can write there, so a copy is
+   * taken over only when its SHA-256 is the pinned one; anything else is downloaded again.
+   */
+  constructor({ toolsDir, legacyDir = null }) {
     super()
-    this.exe = path.join(toolsDir, PRESENTMON.file)
+    this.exe = typeof toolsDir === 'string' ? path.join(toolsDir, PRESENTMON.file) : null
+    this._dir = typeof toolsDir === 'function' ? toolsDir : null
+    this._exeReady = null
+    this.legacyDir = legacyDir
     this.child = null
     this._terminating = null
     this._startSeq = 0
   }
 
-  installed() { return fs.existsSync(this.exe) }
+  async _resolveExe() {
+    if (this.exe) return this.exe
+    this._exeReady ||= Promise.resolve(this._dir()).then((dir) => (this.exe = path.join(dir, PRESENTMON.file)))
+      .catch((e) => { this._exeReady = null; throw e })
+    return this._exeReady
+  }
+
+  installed() { return Boolean(this.exe) && fs.existsSync(this.exe) }
 
   async ensure() {
-    if (this.installed()) return this.exe
+    const exe = await this._resolveExe()
+    if (fs.existsSync(exe)) return exe
+    const legacy = this.legacyDir ? path.join(this.legacyDir, PRESENTMON.file) : null
+    if (legacy && path.resolve(legacy) !== path.resolve(exe) && await migratePinnedFile(legacy, exe, PRESENTMON.sha256)) return exe
     // a few tries: name resolution can fail for a moment (e.g. while Windows reloads a large hosts file)
     let buf = null
     let lastErr = null
@@ -44,11 +63,11 @@ export class PresentMonService extends EventEmitter {
     if (buf.length > MAX_BYTES) throw new Error('PresentMon: arquivo grande demais')
     const hash = crypto.createHash('sha256').update(buf).digest('hex')
     if (hash !== PRESENTMON.sha256) throw new Error('PresentMon: o arquivo baixado não confere com a versão esperada')
-    fs.mkdirSync(path.dirname(this.exe), { recursive: true })
-    const tmp = `${this.exe}.${process.pid}.tmp`
+    fs.mkdirSync(path.dirname(exe), { recursive: true })
+    const tmp = `${exe}.${process.pid}.tmp`
     fs.writeFileSync(tmp, buf)
-    fs.renameSync(tmp, this.exe)
-    return this.exe
+    fs.renameSync(tmp, exe)
+    return exe
   }
 
   get running() { return Boolean(this.child) }
@@ -95,7 +114,7 @@ export class PresentMonService extends EventEmitter {
     this._startSeq++ // a start still waiting must not spawn after this stop
     const c = this.child
     this.child = null
-    if (!c) return this._terminating || Promise.resolve()
+    if (!c || !this.exe) return this._terminating || Promise.resolve()
     try { c.kill() } catch { /* gone */ }
     // the ETW session outlives a killed PresentMon: end it so the next start is clean (start() waits for this)
     this._terminating = new Promise((resolve) => {

@@ -22,17 +22,24 @@ function findExe(dir, depth = 0) {
 }
 
 export class Autopilot {
+  /** root: the tools folder, or an async function resolving it (trustedToolsDir: the exe is started elevated). */
   constructor(root, { fetchJsonImpl = fetchJson, download = downloadToFile } = {}) {
-    this.root = path.join(root, 'DLSS5-Autopilot')
+    this.toolsRoot = root
     Object.assign(this, { fetchJsonImpl, download })
   }
 
-  installed() {
+  async _root() {
+    const base = typeof this.toolsRoot === 'function' ? await this.toolsRoot() : this.toolsRoot
+    return path.join(base, 'DLSS5-Autopilot')
+  }
+
+  async installed() {
+    const root = await this._root()
     let tags = []
-    try { tags = fs.readdirSync(this.root).filter((t) => /^v[\d.]+$/.test(t)) } catch { return null }
+    try { tags = fs.readdirSync(root).filter((t) => /^v[\d.]+$/.test(t)) } catch { return null }
     tags.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
     for (const tag of tags) {
-      const exe = findExe(path.join(this.root, tag))
+      const exe = findExe(path.join(root, tag))
       if (exe) return { tag, exe }
     }
     return null
@@ -48,7 +55,7 @@ export class Autopilot {
   }
 
   async status() {
-    const local = this.installed()
+    const local = await this.installed()
     let remote = null
     try { remote = await this.latest() } catch (e) { return { installed: local, latest: null, error: String(e.message) } }
     return { installed: local, latest: remote.tag, updateAvailable: Boolean(local && remote.tag !== local.tag), notesUrl: remote.notesUrl }
@@ -57,9 +64,10 @@ export class Autopilot {
   /** Downloads and unpacks the newest release (verified against GitHub's SHA-256); older versions are removed. */
   async install(onProgress = () => {}) {
     const rel = await this.latest()
-    const dir = path.join(this.root, rel.tag)
-    const zip = path.join(this.root, `${rel.tag}.zip`)
-    fs.mkdirSync(this.root, { recursive: true })
+    const root = await this._root()
+    const dir = path.join(root, rel.tag)
+    const zip = path.join(root, `${rel.tag}.zip`)
+    fs.mkdirSync(root, { recursive: true })
     await this.download(rel.url, zip, { expectedSha256: rel.sha256, maxBytes: 200 * 1048576, timeoutMs: 120000, onProgress })
     fs.rmSync(dir, { recursive: true, force: true })
     fs.mkdirSync(dir, { recursive: true })
@@ -70,12 +78,12 @@ export class Autopilot {
     })
     fs.rmSync(zip, { force: true })
     if (!findExe(dir)) throw new Error('package unpacked but the executable was not found')
-    for (const old of fs.readdirSync(this.root)) if (old !== rel.tag && /^v[\d.]+$/.test(old)) fs.rmSync(path.join(this.root, old), { recursive: true, force: true })
+    for (const old of fs.readdirSync(root)) if (old !== rel.tag && /^v[\d.]+$/.test(old)) fs.rmSync(path.join(root, old), { recursive: true, force: true })
     return this.installed()
   }
 
-  launch() {
-    const local = this.installed()
+  async launch() {
+    const local = await this.installed()
     if (!local) throw new Error('DLSS 5 Autopilot is not installed')
     const child = cp.spawn(local.exe, [], { cwd: path.dirname(local.exe), detached: true, stdio: 'ignore' })
     // spawn failure (blocked by SmartScreen/antivirus, file removed) is async: without a listener it crashes main

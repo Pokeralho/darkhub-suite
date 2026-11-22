@@ -191,26 +191,37 @@ async function getExiftool() {
   return exiftoolPromise
 }
 
+// Folder of the executables this app downloads and runs: C:\ProgramData\DarkHub\tools when elevated (only
+// Administrators can write there), userData/tools in a non-elevated dev run. See programDataRoot.js.
+async function getToolsDir() {
+  const { trustedToolsDir } = await import('./services/programDataRoot.js')
+  return trustedToolsDir({ userData: app.getPath('userData') })
+}
+
 async function getFfmpegPath() {
   if (ffmpegStaticPromise) return ffmpegStaticPromise
   ffmpegStaticPromise = (async () => {
+    const { isProcessElevated } = await import('./services/secureStaging.js')
+    // elevated: never an ffmpeg from PATH (the user's PATH entries are folders that user can write)
+    const searchPath = !isProcessElevated()
     try {
-      const toolsDir = path.join(app.getPath ? app.getPath('userData') : '', 'tools')
+      const toolsDir = await getToolsDir()
       const { ensureFfmpeg } = await getYtDlpTools()
       if (typeof ensureFfmpeg === 'function') {
-        const p = await ensureFfmpeg(toolsDir, process.platform)
+        const p = await ensureFfmpeg(toolsDir, process.platform, { searchPath })
         if (p && fsRaw.existsSync(p)) return p
       }
-    } catch {}
+    } catch (e) {
+      log.warn('ffmpeg: trusted tools folder unavailable', e?.message ?? String(e))
+    }
 
-    try {
-      const { code, stdout } = await runCommand('where.exe', ['ffmpeg'], { timeoutMs: 5000 })
-      const whereOut = code === 0 ? String(stdout ?? '').trim().split(/\r?\n/)[0] : ''
-      if (whereOut && fsRaw.existsSync(whereOut)) return whereOut
-    } catch {}
-
-    const localBin = path.join(app.getPath ? app.getPath('userData') : '', 'tools', 'ffmpeg.exe')
-    if (fsRaw.existsSync(localBin)) return localBin
+    if (searchPath) {
+      try {
+        const { code, stdout } = await runCommand('where.exe', ['ffmpeg'], { timeoutMs: 5000 })
+        const whereOut = code === 0 ? String(stdout ?? '').trim().split(/\r?\n/)[0] : ''
+        if (whereOut && fsRaw.existsSync(whereOut)) return whereOut
+      } catch {}
+    }
 
     try {
       const mod = await import('ffmpeg-static')
@@ -220,6 +231,8 @@ async function getFfmpegPath() {
 
     return null
   })()
+  // a failure is not cached: the next call tries again (e.g. once the tools folder can be secured)
+  ffmpegStaticPromise.then((p) => { if (!p) ffmpegStaticPromise = null })
   return ffmpegStaticPromise
 }
 
@@ -2181,7 +2194,7 @@ ipcMain.handle('youtube:getVideoInfo', async (_event, payload) => {
       assertFileAccessGranted(cookiesPath, 'arquivo de cookies')
     }
 
-    const toolsDir = path.join(app.getPath('userData'), 'tools')
+    const toolsDir = await getToolsDir()
     const ffmpegPath = await getFfmpegPath()
     const ffmpegLocation = typeof ffmpegPath === 'string' && fsRaw.existsSync(ffmpegPath)
       ? path.dirname(ffmpegPath)
@@ -2296,7 +2309,7 @@ ipcMain.handle('youtube:download', async (event, payload) => {
   }
 
   try {
-    const toolsDir = path.join(app.getPath('userData'), 'tools')
+    const toolsDir = await getToolsDir()
     const { ensureYtDlp, runYtDlp } = await getYtDlpTools()
     const ytdlpPath = await ensureYtDlp(toolsDir, process.platform)
     const ffmpegPath = await getFfmpegPath()

@@ -76,7 +76,9 @@ export class DlssUpdater {
 
   /** Local path of NVIDIA's verified DLL for this tag (downloaded once, then reused for every game). */
   async officialDll(tag, name) {
-    const dir = path.join(this.cacheRoot, tag)
+    // cacheRoot may be an async function (trustedDataDir: the DLL is copied into game folders by this elevated process)
+    const root = typeof this.cacheRoot === 'function' ? await this.cacheRoot() : this.cacheRoot
+    const dir = path.join(root, tag)
     const file = path.join(dir, name)
     if (fs.existsSync(file)) return file
     fs.mkdirSync(dir, { recursive: true })
