@@ -20,8 +20,10 @@ jobs:
       # unit tests mock electron; the 100 MB binary is not needed
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -37,8 +39,10 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
           targets: x86_64-pc-windows-msvc,i686-pc-windows-msvc
       # Rust engines: unit tests (the pacer's tests share global hooks, so one thread)
@@ -48,22 +52,24 @@ jobs:
       - run: cargo test --manifest-path native_pacer/Cargo.toml -- --test-threads=1
       - run: cargo build --release --target i686-pc-windows-msvc --manifest-path native_pacer/Cargo.toml --lib --bins
       - run: cargo build --release --manifest-path native_gpubench/Cargo.toml
-      # C# helpers (.NET Framework 4 csc that ships with Windows): compile only, into a scratch folder
+      # C# helpers (.NET Framework 4 csc that ships with Windows): compile only, into a scratch folder.
+      # Source paths use backslashes: this csc drops the folder of a path written with forward slashes and then
+      # looks for the file in the working directory (CS1504).
       - name: C# helpers compile
         shell: pwsh
         run: |
           $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
           New-Item -ItemType Directory -Force out | Out-Null
           $jobs = @(
-            @('electron/services/DarkHub.LatencyEngine.cs', 'x64', @()),
-            @('electron/services/DarkHub.FrameLimiter.cs', 'x64', @()),
-            @('electron/services/DarkHub.ClickEngine.cs', 'x64', @()),
-            @('electron/services/DarkHub.SensorDaemon.cs', 'x64', @()),
-            @('electron/services/DarkHub.DiskScan.cs', 'x64', @()),
-            @('electron/services/hwsensors/DarkHub.HwSensors.cs', 'x64', @('/r:electron/services/hwsensors/LibreHardwareMonitorLib.dll', '/r:System.Management.dll')),
-            @('electron/services/DarkHub.VaultBridgeHost.cs', 'anycpu', @()),
-            @('electron/services/DarkHub.Mcp.cs', 'anycpu', @('/r:System.Web.Extensions.dll')),
-            @('electron/services/DarkHub.HotkeyWatch.cs', 'anycpu', @())
+            @('electron\services\DarkHub.LatencyEngine.cs', 'x64', @()),
+            @('electron\services\DarkHub.FrameLimiter.cs', 'x64', @()),
+            @('electron\services\DarkHub.ClickEngine.cs', 'x64', @()),
+            @('electron\services\DarkHub.SensorDaemon.cs', 'x64', @()),
+            @('electron\services\DarkHub.DiskScan.cs', 'x64', @()),
+            @('electron\services\hwsensors\DarkHub.HwSensors.cs', 'x64', @('/r:electron\services\hwsensors\LibreHardwareMonitorLib.dll', '/r:System.Management.dll')),
+            @('electron\services\DarkHub.VaultBridgeHost.cs', 'anycpu', @()),
+            @('electron\services\DarkHub.Mcp.cs', 'anycpu', @('/r:System.Web.Extensions.dll')),
+            @('electron\services\DarkHub.HotkeyWatch.cs', 'anycpu', @())
           )
           foreach ($j in $jobs) {
             $out = Join-Path out ([IO.Path]::GetFileNameWithoutExtension($j[0]) + '.exe')

@@ -484,7 +484,10 @@ describe.skipIf(process.platform !== 'win32')('walk() with junction loops', () =
     expect(await svc.transfer({ transferId: 'jld1', sftpId: 'jl1', direction: 'download', localPath: back, remotePath: '/loopy' })).toMatchObject({ ok: true })
     expect(fs.readFileSync(path.join(back, 'a', 'b', 'f.txt'), 'utf8')).toBe('hello')
     expect(fs.existsSync(path.join(back, 'a', 'again'))).toBe(false)
-    expect(await svc.du({ sftpId: 'jl1', side: 'remote', path: '/loopy' })).toMatchObject({ files: 2 })
+    // f.txt and top.txt, plus link.txt when the previous test could create the file symlink (admin or developer
+    // mode, which is the case on CI runners): it is uploaded as a regular file
+    const files = 2 + (fs.existsSync(path.join(remoteDir, 'loopy', 'link.txt')) ? 1 : 0)
+    expect(await svc.du({ sftpId: 'jl1', side: 'remote', path: '/loopy' })).toMatchObject({ files })
     svc.closeAll()
     manager.disposeAll()
   }, 30_000)

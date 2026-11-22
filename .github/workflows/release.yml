@@ -27,9 +27,11 @@ jobs:
       # passed through the environment, never pasted into a script (a crafted tag would run as code)
       TAG: ${{ inputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ inputs.tag }}
+          # npm ci and the cargo builds run third-party code: do not leave the write token in .git/config
+          persist-credentials: false
 
       - name: Tag matches package.json
         shell: pwsh
@@ -38,12 +40,12 @@ jobs:
           if ("v$v" -ne $env:TAG) { throw "tag $($env:TAG) does not match package.json $v" }
           "VERSION=$v" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
           # the frame limiter hook is built for 64-bit and 32-bit games (npm run build:pacer)
           targets: x86_64-pc-windows-msvc,i686-pc-windows-msvc
@@ -111,7 +113,7 @@ jobs:
           Copy-Item dist_release\latest.yml out\latest.yml
           Get-ChildItem out | Get-FileHash -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } | Set-Content out\SHA256SUMS.txt
 
-      - uses: actions/attest-build-provenance@v2
+      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
           subject-path: |
             out/*.exe
