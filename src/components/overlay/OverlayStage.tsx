@@ -77,9 +77,15 @@ export default function OverlayStage({ preview, mode, background, onDrag, select
     if (!host || !preview) return;
     const root = host.shadowRoot || host.attachShadow({ mode: 'open' });
     const screen = mode === 'screen';
-    root.innerHTML = `<style>${BASE}</style><style>${sanitizeImportedCss(preview.css)}</style>`
-      + `<div id="stage" style="${screen ? `width:1920px;height:1080px;transform:scale(${fit});transform-origin:top left;` : 'padding:24px;min-height:120px;'}background:${BACKGROUNDS[background] || BACKGROUNDS.dark}">`
+    // The layout's CSS comes from a shared code: it goes in through textContent, which cannot close the element
+    // and become markup, never through the HTML string below (that part is built and escaped by the main process).
+    const baseStyle = document.createElement('style');
+    baseStyle.textContent = BASE;
+    const userStyle = document.createElement('style');
+    userStyle.textContent = sanitizeImportedCss(preview.css);
+    root.innerHTML = `<div id="stage" style="${screen ? `width:1920px;height:1080px;transform:scale(${fit});transform-origin:top left;` : 'padding:24px;min-height:120px;'}background:${BACKGROUNDS[background] || BACKGROUNDS.dark}">`
       + `<div id="box" class="custom${screen ? ' drag' : ''}${selectedId ? ' sel-hint' : ''}">${preview.html}</div></div>`;
+    root.prepend(baseStyle, userStyle);
     const box = root.getElementById('box') as HTMLDivElement;
     const b = preview.box;
     if (screen) {

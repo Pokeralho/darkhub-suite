@@ -7,6 +7,7 @@ import { execFile } from 'node:child_process';
 import Logger from './LoggerService.js';
 import { runPowerShell as runPowerShellShared } from './PowerShellRunner.js';
 import ElevationHelper from './optimizer/ElevationHelper.js';
+import { psQuote } from './optimizer/OptimizerUtils.js';
 import { AdvancedProtectionService } from './security/AdvancedProtectionService.js';
 
 const HOSTNAME_RE = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
@@ -474,7 +475,7 @@ class SecurityService {
     } catch (e) {
       try { fs.unlinkSync(tmp); } catch { /* never created */ }
       if (e?.code !== 'EPERM' && e?.code !== 'EACCES') throw e;
-      const q = (s) => `'${String(s).replace(/'/g, "''")}'`;
+      const q = psQuote;
       const b64 = Buffer.from(content, 'utf8').toString('base64');
       const script = `
         $ErrorActionPreference = 'Stop'

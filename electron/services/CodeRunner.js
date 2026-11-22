@@ -5,6 +5,7 @@ import { spawn, execFile } from 'node:child_process'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { psQuote } from './optimizer/OptimizerUtils.js'
 
 const OUTPUT_CAP = 512 * 1024
 const DETECT_TTL_MS = 60 * 1000
@@ -13,7 +14,7 @@ const DETECT_TTL_MS = 60 * 1000
 export const RUNTIMES = {
   javascript: { label: 'JavaScript (Node)', ext: 'js', builtin: true, run: (_exe, f) => [process.execPath, [f]], env: { ELECTRON_RUN_AS_NODE: '1' } },
   python: { label: 'Python', ext: 'py', candidates: ['python', 'py', 'python3'], run: (exe, f) => [exe, /\bpy(\.exe)?$/i.test(exe) ? ['-3', '-u', f] : ['-u', f]], env: { PYTHONIOENCODING: 'utf-8' } },
-  powershell: { label: 'PowerShell', ext: 'ps1', candidates: ['pwsh', 'powershell'], run: (exe, f) => [exe, ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', `[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); & '${f.replace(/'/g, "''")}'; exit $LASTEXITCODE`]] },
+  powershell: { label: 'PowerShell', ext: 'ps1', candidates: ['pwsh', 'powershell'], run: (exe, f) => [exe, ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', `[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); & ${psQuote(f)}; exit $LASTEXITCODE`]] },
   c: { label: 'C', ext: 'c', candidates: ['gcc', 'clang'], compile: (exe, f, out) => [exe, [f, '-O1', '-o', out]], run: (_exe, _f, out) => [out, []] },
   cpp: { label: 'C++', ext: 'cpp', candidates: ['g++', 'clang++'], compile: (exe, f, out) => [exe, [f, '-O1', '-std=c++20', '-o', out]], run: (_exe, _f, out) => [out, []] },
   csharp: { label: 'C# (.NET 10+)', ext: 'cs', candidates: ['dotnet'], run: (exe, f) => [exe, ['run', f]], env: { DOTNET_CLI_TELEMETRY_OPTOUT: '1', DOTNET_NOLOGO: '1' } },

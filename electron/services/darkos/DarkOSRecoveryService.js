@@ -11,7 +11,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import { fileURLToPath } from 'node:url'
-import { isValidAppxName } from '../optimizer/OptimizerUtils.js'
+import { isValidAppxName, psQuote } from '../optimizer/OptimizerUtils.js'
 
 export const DARKOS_ROOT = 'C:\\ProgramData\\DarkOS'
 /** State folder of "Windows mode" (DarkOS tweaks applied on a stock Windows); never shared with a real DarkOS. */
@@ -237,9 +237,9 @@ export function summarizeChangeResults(data, { securityDeclined = false } = {}) 
   }
 }
 
-/** PowerShell single-quoted literal. */
+/** PowerShell single-quoted literal (psQuote also doubles the typographic quotes PowerShell accepts as delimiters). */
 function psq(value) {
-  return `'${String(value ?? '').replace(/'/g, "''")}'`
+  return psQuote(value)
 }
 
 function defaultBundledDir() {
@@ -296,6 +296,15 @@ async function defaultIsElevated() {
   }
 }
 
+/** Reuses the ACL audit of the elevated autostart task. Paths that do not exist are skipped by the script. */
+async function defaultUntrustedWriters(paths) {
+  if (process.platform !== 'win32') return []
+  const { runPowerShell } = await import('../PowerShellRunner.js')
+  const { UNTRUSTED_WRITERS_SCRIPT, parseUntrustedWriters } = await import('../startup/elevatedTaskSafety.js')
+  const r = await runPowerShell(UNTRUSTED_WRITERS_SCRIPT(paths), { timeoutMs: 20000, trim: true })
+  return parseUntrustedWriters(r.stdout)
+}
+
 let runSeq = 0
 
 export class DarkOSRecoveryService extends EventEmitter {
@@ -308,6 +317,8 @@ export class DarkOSRecoveryService extends EventEmitter {
    * @param {object} [opts.fsImpl]
    * @param {object} [opts.logger]
    * @param {'darkos'|'windows'} [opts.mode]  'windows' runs the bundled module + catalog against WINMODS_ROOT
+   * @param {Function} [opts.untrustedWriters]  (paths) => Promise<[{path, who}] | null>: who, besides SYSTEM,
+   *   Administrators and TrustedInstaller, can change those paths (null = could not check)
    */
   constructor(opts = {}) {
     super()
@@ -318,6 +329,11 @@ export class DarkOSRecoveryService extends EventEmitter {
     this.isElevated = opts.isElevated || defaultIsElevated
     this.fs = opts.fsImpl || fs
     this.logger = opts.logger || null
+    // A fake filesystem (tests) has no ACLs to read; real disks are always checked.
+    this.untrustedWriters = opts.untrustedWriters || (opts.fsImpl ? async () => [] : defaultUntrustedWriters)
+    /** undefined = not checked yet, true = only administrators can change bin\, false = do not run it */
+    this._installedTrusted = undefined
+    this._installedTrustCheck = null
     this._tail = Promise.resolve()
     this._pending = 0
     this._current = null
@@ -349,10 +365,36 @@ export class DarkOSRecoveryService extends EventEmitter {
     return this.bundledDir ? path.join(this.bundledDir, 'policy', 'catalog.json') : null
   }
 
+  /**
+   * The installed copy lives in C:\ProgramData\DarkOS\bin and DarkHub runs it as Administrator. On a stock Windows
+   * any standard user can create that folder (C:\ProgramData lets Users create subfolders), plant a module with a
+   * high "# ModuleVersion" and wait for an administrator to open the DarkOS screen. So the installed copy is used
+   * only when nobody but SYSTEM, Administrators and TrustedInstaller can change the root, bin\ or the two files;
+   * otherwise the module shipped inside DarkHub runs. Checked once per session, before the first run.
+   */
+  async ensureInstalledTrust() {
+    if (this.mode === 'windows' || this._installedTrusted !== undefined) return this._installedTrusted !== false
+    if (!this._installedTrustCheck) {
+      const bin = path.win32.join(this.root, 'bin')
+      const targets = [this.root, bin, path.win32.join(bin, CLI_FILE), path.win32.join(bin, MODULE_FILE)]
+      this._installedTrustCheck = (async () => {
+        let writers = null
+        try { writers = await this.untrustedWriters(targets) } catch { /* could not check: not trusted */ }
+        this._installedTrusted = Array.isArray(writers) && writers.length === 0
+        if (!this._installedTrusted) {
+          const who = Array.isArray(writers) ? [...new Set(writers.map((w) => `${w.who} -> ${w.path}`))].slice(0, 6).join('; ') : 'ACL check failed'
+          this.logger?.warn?.(`[DarkOS] ${bin} can be changed by non-administrators (${who}); using the module bundled with DarkHub`)
+        }
+        return this._installedTrusted
+      })()
+    }
+    return this._installedTrustCheck
+  }
+
   resolveCli() {
     const candidates = [
       // Windows mode always uses the bundled module: it is the one that knows -Mode / -CatalogPath.
-      ...(this.mode === 'windows' ? [] : [{ dir: path.win32.join(this.root, 'bin'), source: 'installed' }]),
+      ...(this.mode === 'windows' || this._installedTrusted === false ? [] : [{ dir: path.win32.join(this.root, 'bin'), source: 'installed' }]),
       ...(this.bundledDir ? [{ dir: this.bundledDir, source: 'bundled' }] : [])
     ]
     let best = null
@@ -430,6 +472,8 @@ export class DarkOSRecoveryService extends EventEmitter {
       if (!this.available()) {
         return { ok: false, runId, error: this.mode === 'windows' ? 'Modulo de mods do DarkOS nao encontrado no DarkHub.' : 'Este Windows nao e o DarkOS (manifest.json nao encontrado).' }
       }
+      // decides whether bin\ may be used before anything from it is executed
+      await this.ensureInstalledTrust()
       const cli = this.resolveCli()
       if (!cli) {
         return { ok: false, runId, error: 'Modulo DarkOS.Recovery nao encontrado (nem instalado, nem embutido no DarkHub).' }

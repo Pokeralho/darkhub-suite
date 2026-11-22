@@ -3,6 +3,7 @@
 import log from 'electron-log'
 import { spawn } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
+import { psQuote } from './optimizer/OptimizerUtils.js'
 
 /** Longest -EncodedCommand value that keeps the whole command line under Windows' 32767-char limit. */
 export const MAX_ENCODED_ARG = 30000
@@ -163,8 +164,9 @@ export function parseJsonOutput(stdout, fallback = null) {
   }
 }
 
+// one quoting rule for the whole app: psQuote also doubles the typographic quotes PowerShell accepts as delimiters
 function psSingleQuote(value) {
-  return `'${String(value ?? '').replace(/'/g, "''")}'`
+  return psQuote(value)
 }
 
 export async function runPowerShell(script, {

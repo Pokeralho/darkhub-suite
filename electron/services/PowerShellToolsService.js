@@ -11,6 +11,7 @@
 import fsDefault from 'node:fs'
 import path from 'node:path'
 import { runPowerShell, runCommand, parseJsonOutput } from './PowerShellRunner.js'
+import { psQuote } from './optimizer/OptimizerUtils.js'
 
 export const DARKOS_ROOT = 'C:\\ProgramData\\DarkOS'
 
@@ -74,10 +75,6 @@ export function normalizeSignature(sig) {
   if (!sig) return { status: 'Unknown', trusted: false, signer: '' }
   const status = String(sig.status ?? sig.Status ?? 'Unknown').trim() || 'Unknown'
   return { status, trusted: status === 'Valid', signer: String(sig.signer ?? '').trim() }
-}
-
-function psQuote(value) {
-  return `'${String(value ?? '').replace(/'/g, "''")}'`
 }
 
 /** parseJsonOutput throws on non-JSON output; here a bad payload is just "no data". */

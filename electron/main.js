@@ -5,9 +5,14 @@ import log from 'electron-log'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import os from 'node:os'
+import { psQuote } from './services/optimizer/OptimizerUtils.js'
+import { TRACKING_BEGIN, TRACKING_END, stripTrackingBlocks } from './services/security/hostsBlock.js'
 
+// Development only. The installed app runs as Administrator and can be started from any folder (the portable
+// build from Downloads, a shortcut with a custom "Start in"): loading a .env from the current directory there
+// would let whoever can write to that folder set environment variables for an elevated process and its children.
 try {
-  if (typeof process.loadEnvFile === 'function') {
+  if (!app.isPackaged && typeof process.loadEnvFile === 'function') {
     process.loadEnvFile()
   }
 } catch {}
@@ -355,7 +360,7 @@ function assertFileAccessGrantedMany(filePaths, label = 'arquivo') {
 }
 
 function psSingleQuote(value) {
-  return `'${String(value ?? '').replace(/'/g, "''")}'`
+  return psQuote(value)
 }
 
 async function loadRuntimeConfig() {
@@ -397,16 +402,24 @@ function isEmbeddedExternalProtocol(protocol) {
   return protocol === 'magnet:' || protocol === 'ms-settings:'
 }
 
+const EMBEDDED_PAGE_PROTOCOLS = new Set(['https:', 'http:', 'about:', 'blob:', 'data:'])
+
 function handleEmbeddedExternalNavigation(event, url, source) {
   const targetUrl = url || event?.url
   if (!targetUrl) return
 
   try {
     const parsed = new URL(targetUrl)
-    if (!isEmbeddedExternalProtocol(parsed.protocol)) return
+    if (!isEmbeddedExternalProtocol(parsed.protocol)) {
+      // an embedded site stays on the web: any other scheme (app links, file:, ms-msdt:...) is dropped here
+      if (!EMBEDDED_PAGE_PROTOCOLS.has(parsed.protocol)) event.preventDefault()
+      return
+    }
     event.preventDefault()
     openAllowedExternalUrlDetached(parsed.toString(), source)
-  } catch {}
+  } catch {
+    try { event.preventDefault() } catch { /* not cancellable */ }
+  }
 }
 
 function isTrustedAppNavigation(url) {
@@ -702,13 +715,21 @@ function createMainWindow() {
   }
 
   try {
-    session.fromPartition('persist:darkhub_media').webRequest.onHeadersReceived((details, callback) => {
+    const mediaSession = session.fromPartition('persist:darkhub_media')
+    mediaSession.webRequest.onHeadersReceived((details, callback) => {
       const newHeaders = { ...details.responseHeaders };
       Object.keys(newHeaders).forEach(k => {
         if (k.toLowerCase() === 'x-frame-options') delete newHeaders[k];
       });
       callback({ responseHeaders: newHeaders });
     });
+    // Electron grants every permission request when a session has no handler. These are remote sites inside an
+    // app that runs as Administrator: no camera, microphone, location, clipboard read or notifications, and no
+    // "openExternal" (a page launching any URL scheme registered on the PC from an elevated process). Fullscreen
+    // is what a video player needs.
+    const guestMay = (permission) => permission === 'fullscreen'
+    mediaSession.setPermissionRequestHandler((_wc, permission, callback) => callback(guestMay(permission)))
+    mediaSession.setPermissionCheckHandler((_wc, permission) => guestMay(permission))
   } catch (err) {
     log.warn('[session] failed to configure media partition headers', err?.message ?? String(err))
   }
@@ -2124,9 +2145,13 @@ ipcMain.handle('files:archiveOperation', async (_event, payload) => {
     if (!Array.isArray(inputFiles) || inputFiles.length === 0 || !outputArchive) throw new Error('Invalid arguments')
     assertFileAccessGrantedMany(inputFiles, 'arquivo para compactar')
     assertOutputDirGranted(path.dirname(outputArchive), inputFiles)
-    const args = ['-a', '-c', '-f', outputArchive, ...inputFiles.map(f => path.basename(f))]
+    // "--" ends the options and "./" keeps a file called "-x..." or "@other.tar" a plain file name for bsdtar
+    const names = inputFiles.map((f) => path.basename(f)).map((n) => (/^[-@]/.test(n) ? `./${n}` : n))
+    const args = ['-a', '-c', '-f', outputArchive, '--', ...names]
     const cwd = path.dirname(inputFiles[0])
-    const { code, stderr } = await runCommand(SYSTEM_TAR, args, { cwd, timeoutMs: 10 * 60 * 1000 })
+    // runCommand only forwards spawnOptions: a top-level cwd was ignored and tar looked for the names in the
+    // app's own folder
+    const { code, stderr } = await runCommand(SYSTEM_TAR, args, { spawnOptions: { cwd }, timeoutMs: 10 * 60 * 1000 })
     if (code !== 0) throw new Error(stderr || `tar exited with code ${code}`)
     return { ok: true, outputArchive }
   } else if (action === 'extract') {
@@ -3220,23 +3245,9 @@ ipcMain.handle('security:blockTracking', async () => {
       await fs.writeFile(backupPath, content, 'utf8')
     }
 
-    const beginMarker = '# DarkHub Tracking Blocker - BEGIN'
-    const endMarker = '# DarkHub Tracking Blocker - END'
-
-    const lines = content.split(/\r?\n/g)
-    const filtered = []
-    let inside = false
-    for (const line of lines) {
-      if (line.includes(beginMarker)) {
-        inside = true
-        continue
-      }
-      if (line.includes(endMarker)) {
-        inside = false
-        continue
-      }
-      if (!inside) filtered.push(line)
-    }
+    const beginMarker = TRACKING_BEGIN
+    const endMarker = TRACKING_END
+    const filtered = stripTrackingBlocks(content.split(/\r?\n/g))
 
     const section = [beginMarker, ...trackingDomains.map((d) => `127.0.0.1 ${d}`), endMarker].join(os.EOL)
     const nextContent = [...filtered, '', section, ''].join(os.EOL)

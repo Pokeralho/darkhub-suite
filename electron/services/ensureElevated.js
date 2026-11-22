@@ -2,6 +2,7 @@
 // (requireAdministrator), but some launch paths can still start it without: a shell that elevates silently, tools that
 // ignore the manifest. In that case reopen through UAC; if the user declines, explain and let them choose.
 import { spawn } from 'node:child_process'
+import { psQuote } from './optimizer/OptimizerUtils.js'
 
 const RETRY_FLAG = '--elevated-retry'
 
@@ -13,8 +14,8 @@ export function quoteArg(a) {
 
 /** PowerShell command that starts `exe` elevated; exit code 0 only when the UAC prompt was accepted. */
 export function buildRelaunchCommand(exe, args) {
-  const list = args.map(quoteArg).join(' ').replace(/'/g, "''")
-  return `try { Start-Process -FilePath '${String(exe).replace(/'/g, "''")}'${list ? ` -ArgumentList '${list}'` : ''} -Verb RunAs -ErrorAction Stop; exit 0 } catch { exit 1 }`
+  const list = args.map(quoteArg).join(' ')
+  return `try { Start-Process -FilePath ${psQuote(exe)}${list ? ` -ArgumentList ${psQuote(list)}` : ''} -Verb RunAs -ErrorAction Stop; exit 0 } catch { exit 1 }`
 }
 
 function relaunchAsAdmin(exe, args) {

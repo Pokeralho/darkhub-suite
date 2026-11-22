@@ -88,7 +88,11 @@ async function installOfficialRelease(app, expectedUrl = null) {
     const archive = path.join(workDir, `release${asset.name.toLowerCase().endsWith('.7z') ? '.7z' : '.zip'}`)
     const extractDir = path.join(workDir, 'extracted')
     await fs.mkdir(extractDir, { recursive: true })
-    await downloadToFile(asset.browser_download_url, archive, { expectedSha256: assetSha256(asset), maxBytes: 300 * 1024 * 1024, timeoutMs: 120000 })
+    // DLLs that get copied into game folders: without a hash published by GitHub there is nothing to check the
+    // download against (downloadToFile skips the check when expectedSha256 is empty), so it is refused
+    const expectedSha256 = assetSha256(asset)
+    if (!expectedSha256) throw new Error('O release oficial do OptiScaler nao publica o hash SHA-256 do arquivo; download recusado.')
+    await downloadToFile(asset.browser_download_url, archive, { expectedSha256, maxBytes: 300 * 1024 * 1024, timeoutMs: 120000 })
     await execFileAsync(SYSTEM_TAR, ['-xf', archive, '-C', extractDir], { windowsHide: true })
     const root = await findReleaseRoot(extractDir)
     if (!root) throw new Error('OptiScaler.dll nao encontrado no pacote oficial.')

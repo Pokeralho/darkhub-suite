@@ -12,6 +12,7 @@ import { execFile } from 'node:child_process'
 import { Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { protectedPathReason } from '../diskscan/DiskScanService.js'
+import { psQuote } from '../optimizer/OptimizerUtils.js'
 
 const ID_RE = /^[0-9a-f]{16}$/
 
@@ -62,7 +63,7 @@ const TRUSTED_OWNERS = new Set(['S-1-5-32-544', 'S-1-5-18'])
  */
 export function foreignOwnedFiles(dir) {
   if (process.platform !== 'win32') return Promise.resolve([])
-  const lit = `'${String(dir).replace(/'/g, "''")}'`
+  const lit = psQuote(dir)
   const script = [
     "$ErrorActionPreference = 'Stop'",
     '[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)',

@@ -254,7 +254,11 @@ export function buildHardeningRestoreScript(id, snap) {
   if (!snap) throw new Error('no snapshot');
   switch (id) {
     case 'asr': {
-      const prev = new Map((snap.rules || []).map((r) => [r.id, r.action]));
+      // The snapshot is read back from a file in userData and this script runs elevated: only a known action
+      // number is ever written into it. A rule with anything else goes back to "not configured".
+      const prev = new Map((Array.isArray(snap.rules) ? snap.rules : [])
+        .filter((r) => r && typeof r.action === 'number' && [0, 1, 2, 6].includes(r.action))
+        .map((r) => [String(r.id).toLowerCase(), r.action]));
       const lines = [];
       const restoreIds = ASR_RULES.filter((r) => prev.has(r.id));
       const removeIds = ASR_RULES.filter((r) => !prev.has(r.id));
@@ -292,7 +296,11 @@ export function buildHardeningRestoreScript(id, snap) {
     }
     default: {
       if (!REGISTRY_ITEMS[id]) throw new Error(`unknown hardening item: ${id}`);
-      const ops = (snap.entries || []).flatMap((e) => snapshotEntryToOps(e));
+      // only the values this item owns: a tampered snapshot must not turn "restore" into a write anywhere in HKLM
+      const owned = new Set(REGISTRY_ITEMS[id].map((c) => `${c.key}\n${c.name}`.toLowerCase()));
+      const ops = (Array.isArray(snap.entries) ? snap.entries : [])
+        .filter((e) => e && owned.has(`${e.key}\n${e.name}`.toLowerCase()))
+        .flatMap((e) => snapshotEntryToOps(e));
       return buildRegistryScript(ops);
     }
   }

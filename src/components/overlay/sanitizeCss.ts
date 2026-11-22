@@ -29,8 +29,10 @@ export function isExternalCssUrl(raw: string): boolean {
 
 export function sanitizeImportedCss(input: string): string {
   let css = decodeHarmlessEscapes(String(input ?? ''))
-  // No markup break-outs (the CSS goes inside a <style> element built as a string).
-  css = css.replace(/<\/?style/gi, '')
+  // No markup at all. Removing "</style" in one pass was not enough: "</st</styleyle>" collapses back into
+  // "</style>" and what follows used to be parsed as HTML in the main window. "\3c " is the CSS escape for "<",
+  // so a selector or string that really needs the character still works and no tag can be spelled.
+  css = css.replace(/</g, '\\3c ')
   // @import always fetches a stylesheet; local imports are not useful in a single-file layout either.
   css = css.replace(/@import\b[^;]*;?/gi, '')
   // url(...) with or without quotes.

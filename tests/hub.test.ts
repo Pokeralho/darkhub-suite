@@ -76,6 +76,36 @@ describe('hub: security rules', () => {
     expect(refused([{ task: { path: '\\Microsoft\\Windows\\Windows Defender\\', name: 'Windows Defender Scheduled Scan', state: 'disabled' } }])).toMatch(/segurança/)
     expect(refused([{ use: 'darkhub:tweak:disableVBS' }])).toMatch(/oficiais/)
   })
+  it('refuses the same areas under their other names and the remaining code-loading keys', () => {
+    // ControlSetNNN is the storage behind CurrentControlSet; WOW6432Node is the 32-bit view of SOFTWARE
+    expect(refused([reg('HKLM\\SYSTEM\\ControlSet001\\Services\\Spooler', 'ImagePath', 'c:\\x.exe', 'expandString')])).toMatch(/service/)
+    expect(refused([reg('HKLM\\SYSTEM\\ControlSet002\\Control\\Lsa', 'RunAsPPL', 0)])).toMatch(/LSA/)
+    expect(refused([reg('HKLM\\SYSTEM\\ControlSet001\\Control\\Session Manager\\KnownDLLs', 'x', 'y', 'string')])).toMatch(/DLL/)
+    expect(refused([reg('HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\a.exe', 'x', 'y', 'string')])).toMatch(/IFEO/)
+    expect(refused([reg('HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon', 'x', 'y', 'string')])).toMatch(/Winlogon/)
+    // doubled or trailing separators never reach the block list: the schema already refuses the path
+    expect(refused([reg('HKLM\\SOFTWARE\\\\Microsoft\\Windows\\CurrentVersion\\Run\\', 'evil', 'c:\\x.exe', 'string')])).toMatch(/formato/)
+    for (const hive of ['HKLM', 'HKCU']) {
+      for (const key of ['RunOnce', 'RunOnceEx', 'RunServices', 'RunOnce\\Setup']) {
+        expect(refused([reg(`${hive}\\Software\\Microsoft\\Windows\\CurrentVersion\\${key}`, 'evil', 'c:\\x.exe', 'string')])).toMatch(/iniciam/)
+      }
+      expect(refused([reg(`${hive}\\Software\\Microsoft\\Command Processor`, 'DisableUNCCheck', 1)])).toMatch(/Prompt de Comando/)
+      expect(refused([reg(`${hive}\\Software\\Microsoft\\Active Setup\\Installed Components\\{x}`, 'x', 'y', 'string')])).toMatch(/Active Setup/)
+      expect(refused([reg(`${hive}\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders`, 'Startup', 'c:\\x', 'string')])).toMatch(/Inicializar/)
+    }
+    expect(refused([reg('HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce', 'evil', 'c:\\x.exe', 'string')])).toMatch(/iniciam/)
+    expect(refused([reg('HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon', 'x', 'y', 'string')])).toMatch(/Winlogon/)
+    expect(refused([reg('HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AeDebug', 'Auto', '1', 'string')])).toMatch(/AeDebug/)
+    expect(refused([reg('HKLM\\SYSTEM\\CurrentControlSet\\Control\\Print\\Monitors\\x', 'Driver', 'x.dll', 'string')])).toMatch(/DLL/)
+    // values that name what Windows runs are refused wherever the key is
+    for (const name of ['ImagePath', 'ServiceDll', 'Debugger', 'AutoRun', 'Shell', 'Userinit', 'Load', 'StubPath', 'AppInit_DLLs']) {
+      expect(refused([reg('HKLM\\SOFTWARE\\Vendor\\App', name, 'c:\\x.exe', 'string')])).toBeTruthy()
+    }
+    // look-alikes are not caught by mistake
+    expect(v([reg('HKLM\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl', 'Win32PrioritySeparation', 38)]).ok).toBe(true)
+    expect(v([reg('HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Runtime', 'X', 1)]).ok).toBe(true)
+    expect(v([reg('HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced', 'ShowSecondsInSystemClock', 1)]).ok).toBe(true)
+  })
   it('checks operations: unknown, never in packages, official only', () => {
     expect(refused([{ op: 'darkhub:op:doesNotExist' }])).toMatch(/desconhecida/)
     expect(refused([{ op: 'darkhub:op:powerPlanBalanced' }])).toMatch(/sem ter como desfazer/)

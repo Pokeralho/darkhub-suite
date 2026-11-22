@@ -4,13 +4,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
+import { psQuote } from './services/optimizer/OptimizerUtils.js'
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const ps = (script) => {
   const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { encoding: 'utf8', windowsHide: true })
   return String(r.stdout || '').trim()
 }
-const psq = (s) => `'${String(s).replace(/'/g, "''")}'`
+const psq = psQuote
 // Original paths of everything in the Recycle Bin (Shell namespace 10).
 const binPaths = () => ps(`[Console]::OutputEncoding = [Text.Encoding]::UTF8; $b = (New-Object -ComObject Shell.Application).Namespace(10); foreach ($i in $b.Items()) { $b.GetDetailsOf($i, 1) + '\\' + $i.Name }`).split(/\r?\n/).filter(Boolean)
 const inBin = (p) => { const n = path.basename(p).toLowerCase(); return binPaths().some((x) => x.toLowerCase().endsWith(n)) }

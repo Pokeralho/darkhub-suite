@@ -219,6 +219,21 @@ describe('hardening catalog', () => {
     const regSnap = H.parseHardeningSnapshot('rdpOff', JSON.stringify([{ key: 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server', name: 'fDenyTSConnections', keyExists: true, exists: true, kind: 'DWord', value: 0 }]));
     expect(regSnap.entries[0]).toMatchObject({ existed: true, data: 0 });
     expect(H.buildHardeningRestoreScript('rdpOff', regSnap)).toContain('fDenyTSConnections');
+
+    // The snapshot comes back from a file in userData and the script runs elevated: a tampered one must not
+    // inject code through an ASR action or point "restore" at a registry value the item does not own.
+    const rule = H.ASR_RULES[0].id;
+    const evil = H.buildHardeningRestoreScript('asr', { rules: [{ id: rule, action: '0) -ErrorAction SilentlyContinue; Start-Process cmd #' }] });
+    expect(evil).not.toMatch(/Start-Process|SilentlyContinue/);
+    expect(evil).not.toContain('Add-MpPreference');
+    expect(evil).toContain(`Remove-MpPreference`);
+    expect(evil).toContain(rule);
+    const foreign = H.buildHardeningRestoreScript('rdpOff', { entries: [
+      { key: 'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\sethc.exe', name: 'Debugger', existed: true, type: 'REG_SZ', data: 'cmd.exe' },
+      { key: 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server', name: 'fDenyTSConnections', existed: true, type: 'REG_DWORD', data: 0 }
+    ] });
+    expect(foreign).toContain('fDenyTSConnections');
+    expect(foreign).not.toMatch(/Image File Execution Options|Debugger|cmd\.exe/);
     const absent = H.parseHardeningSnapshot('psLogging', '[]');
     expect(H.buildHardeningRestoreScript('psLogging', absent)).toContain('DeleteValue');
   });

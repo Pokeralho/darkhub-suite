@@ -2,6 +2,26 @@ import { describe, it, expect } from 'vitest'
 import { sanitizeImportedCss, isExternalCssUrl } from '../src/components/overlay/sanitizeCss'
 
 describe('sanitizeImportedCss (imported overlay layouts)', () => {
+  it('leaves no way to spell a tag: nested, split and escaped </style> all stay text', () => {
+    for (const css of [
+      'x{}</style><img src=x onerror=alert(1)>',
+      // one-pass removal of "</style" used to rebuild the tag out of this
+      'x{}</st</styleyle><img src=x onerror=alert(1)>',
+      'x{}</STYLE ><script>alert(1)</script>',
+      String.raw`x{}\3c /style><img src=x onerror=alert(1)>`
+    ]) {
+      const out = sanitizeImportedCss(css)
+      expect(out).not.toContain('<')
+      // parsed the way the preview used to build it, nothing escapes the <style> element
+      const host = document.createElement('div')
+      host.innerHTML = `<style>${out}</style>`
+      expect(host.children).toHaveLength(1)
+      expect(host.querySelector('img, script')).toBeNull()
+    }
+    // a selector that really contains "<" still means the same thing
+    expect(sanitizeImportedCss('[data-x="a<b"]{color:red}')).toBe(String.raw`[data-x="a\3c b"]{color:red}`)
+  })
+
   it('neutralises external url() in every spelling', () => {
     const css = [
       '.a{background:url(https://t.example/p.gif)}',

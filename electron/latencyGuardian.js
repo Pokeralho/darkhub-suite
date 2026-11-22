@@ -14,6 +14,7 @@ import { isSafeHost } from './services/network/hostValidation.js'
 import nativeLatencyClient from './services/NativeLatencyClient.js'
 import appEvents from './services/appEvents.js'
 import { persistableUndo, writeUndoRecord, readUndoRecord, clearUndoRecord, normalizeTcpPrev } from './services/latencyUndoStore.js'
+import { psQuote } from './services/optimizer/OptimizerUtils.js'
 
 const PROCESS_OWNER = 'latencyGuardian'
 
@@ -41,8 +42,10 @@ function safeJsonParse(text, fallback) {
   }
 }
 
+// psQuote also doubles the typographic quotes (U+2018..U+201B) that PowerShell accepts as delimiters: values here
+// come from game paths and from the undo file in userData
 function psSingleQuote(value) {
-  return `'${String(value ?? '').replace(/'/g, "''")}'`
+  return psQuote(value)
 }
 
 function encodedPowerShellArgs(script) {

@@ -268,7 +268,10 @@ export class PsToolkitService {
     try {
       // UTF-8 pipe so accents survive; `& file` keeps the user's line numbers in error messages.
       const launcher = `try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}; & ${psQuote(file)}; exit $LASTEXITCODE`
-      child = this._spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-NonInteractive', '-Command', launcher], {
+      // Full path: with a bare name Windows looks in the child's working folder first, and that folder is the
+      // user's profile, where any program can drop a "powershell.exe" that would then run as Administrator.
+      const powershell = path.win32.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+      child = this._spawn(powershell, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-NonInteractive', '-Command', launcher], {
         windowsHide: true, cwd: process.env.USERPROFILE || undefined
       })
     } catch (e) {

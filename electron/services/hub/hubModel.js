@@ -53,14 +53,40 @@ const BLOCKED_REG = [
   ['hklm\\software\\microsoft\\cryptography', 'criptografia do sistema'],
   ['hklm\\software\\policies\\microsoft\\systemcertificates', 'certificados'],
   ['hklm\\software\\microsoft\\systemcertificates', 'certificados'],
-  ['hkcu\\software\\microsoft\\systemcertificates', 'certificados']
+  ['hkcu\\software\\microsoft\\systemcertificates', 'certificados'],
+  // more places Windows runs or loads code from (matched after canonRegPath, so WOW6432Node and ControlSetNNN count)
+  ...['hklm', 'hkcu'].flatMap((h) => [
+    [`${h}\\software\\microsoft\\windows\\currentversion\\runonce`, 'programas que iniciam com o Windows'],
+    [`${h}\\software\\microsoft\\windows\\currentversion\\runonceex`, 'programas que iniciam com o Windows'],
+    [`${h}\\software\\microsoft\\windows\\currentversion\\runservices`, 'programas que iniciam com o Windows'],
+    [`${h}\\software\\microsoft\\windows\\currentversion\\runservicesonce`, 'programas que iniciam com o Windows'],
+    [`${h}\\software\\microsoft\\command processor`, 'o Prompt de Comando (AutoRun)'],
+    [`${h}\\software\\microsoft\\active setup\\installed components`, 'programas executados no logon (Active Setup)'],
+    [`${h}\\software\\microsoft\\windows\\currentversion\\explorer\\shell folders`, 'pastas do sistema (Inicializar)'],
+    [`${h}\\software\\microsoft\\windows\\currentversion\\explorer\\user shell folders`, 'pastas do sistema (Inicializar)'],
+    [`${h}\\software\\microsoft\\windows\\currentversion\\app paths`, 'caminhos de programas (App Paths)'],
+    [`${h}\\software\\microsoft\\windows nt\\currentversion\\drivers32`, 'carregamento de DLLs (drivers de mídia)']
+  ]),
+  ['hkcu\\software\\microsoft\\windows nt\\currentversion\\winlogon', 'inicialização da sessão (Winlogon)'],
+  ['hkcu\\software\\microsoft\\windows nt\\currentversion\\windows', 'programas executados no logon (Load/Run)'],
+  ['hklm\\software\\microsoft\\windows nt\\currentversion\\aedebug', 'depurador automático (AeDebug)'],
+  ['hklm\\software\\microsoft\\windows nt\\currentversion\\silentprocessexit', 'execução de programas (SilentProcessExit)'],
+  ['hklm\\software\\microsoft\\netsh', 'carregamento de DLLs (netsh)'],
+  ['hklm\\system\\currentcontrolset\\control\\print\\monitors', 'carregamento de DLLs (impressão)'],
+  ['hklm\\system\\currentcontrolset\\control\\print\\providers', 'carregamento de DLLs (impressão)'],
+  ['hklm\\system\\currentcontrolset\\control\\networkprovider', 'provedores de rede (credenciais)']
 ]
 const BLOCKED_REG_NAMES = [
   ['enablesmartscreen', 'SmartScreen'], ['shellsmartscreenlevel', 'SmartScreen'], ['smartscreenenabled', 'SmartScreen'],
   ['enablelua', 'Controle de Conta de Usuário (UAC)'], ['consentpromptbehavioradmin', 'Controle de Conta de Usuário (UAC)'],
   ['bootexecute', 'programas executados no boot'], ['setupexecute', 'programas executados no boot'], ['execute', 'programas executados no boot'],
   ['pendingfilerenameoperations', 'substituição de arquivos no boot'], ['pendingfilerenameoperations2', 'substituição de arquivos no boot'],
-  ['safedllsearchmode', 'busca segura de DLLs'], ['cwdillegalindllsearch', 'busca segura de DLLs']
+  ['safedllsearchmode', 'busca segura de DLLs'], ['cwdillegalindllsearch', 'busca segura de DLLs'],
+  // values that name a program or DLL Windows will run, wherever the key is
+  ['imagepath', 'o programa de um serviço'], ['servicedll', 'a DLL de um serviço'], ['debugger', 'execução de programas (Debugger)'],
+  ['autorun', 'o Prompt de Comando (AutoRun)'], ['shell', 'inicialização da sessão (Shell)'], ['userinit', 'inicialização da sessão (Userinit)'],
+  ['load', 'programas executados no logon (Load)'], ['stubpath', 'programas executados no logon (Active Setup)'],
+  ['appinit_dlls', 'carregamento de DLLs (AppInit)']
 ]
 /** Services packages may not touch: security, updates and what Windows needs to start or stay manageable. */
 const BLOCKED_SERVICES = new Set([
@@ -74,6 +100,18 @@ const BLOCKED_TASK_FOLDERS = ['\\microsoft\\windows\\windows defender\\', '\\mic
 
 const lower = (s) => String(s || '').toLowerCase()
 const under = (p, prefix) => p === prefix || p.startsWith(`${prefix}\\`)
+/**
+ * The form the block list is written in. Windows reaches the same key under other names, which a prefix match on
+ * the raw text misses: HKLM\SYSTEM\ControlSet001 is the storage behind CurrentControlSet (services, LSA, KnownDLLs...)
+ * and SOFTWARE\WOW6432Node\X is the 32-bit view of SOFTWARE\X (Run, Winlogon, IFEO...).
+ */
+export function canonRegPath(p) {
+  return lower(p).trim()
+    .replace(/[\\/]+/g, '\\')
+    .replace(/\\+$/, '')
+    .replace(/^(hklm\\system)\\controlset\d+(?=\\|$)/, '$1\\currentcontrolset')
+    .replace(/^(hk(?:lm|cu)\\software(?:\\classes)?)\\wow6432node(?=\\|$)/, '$1')
+}
 
 const pathOf = (instancePath) => instancePath.replace(/^\//, '').replace(/\//g, '.') || '(raiz)'
 
@@ -159,7 +197,7 @@ export function validatePackage(input, builtins = new Map(), { official = false 
     }
     if (official) return
     if (it.registry) {
-      const p = lower(it.registry.path)
+      const p = canonRegPath(it.registry.path)
       const hit = BLOCKED_REG.find(([prefix]) => under(p, prefix))
       if (hit) errors.push({ path: at, message: `pacotes não podem alterar ${hit[1]} (${it.registry.path}).` })
       const nameHit = it.registry.name != null && BLOCKED_REG_NAMES.find(([n]) => lower(it.registry.name) === n)

@@ -1,6 +1,6 @@
 # ==============================================================================
 #  DarkHub Suite - Official One-Liner PowerShell Installer
-#  Usage: irm darkhub.ink/win | iex
+#  Usage: irm https://darkhub.ink/win | iex
 # ==============================================================================
 
 function Start-DarkHubInstall {
@@ -134,7 +134,8 @@ function Start-DarkHubInstall {
         $sha = [System.Security.Cryptography.SHA512]::Create()
         $fs = [System.IO.File]::OpenRead($tempInstaller)
         try { $actual = [Convert]::ToBase64String($sha.ComputeHash($fs)) } finally { $fs.Dispose(); $sha.Dispose() }
-        if ($actual -ne $expected) {
+        # -cne: base64 is case-sensitive, and -ne would accept a hash that differs only in letter case
+        if ($actual -cne $expected) {
             Remove-Item $tempInstaller -Force -ErrorAction SilentlyContinue
             Write-Host "[!] Error: the downloaded installer does not match the SHA-512 published in the release. Aborted." -ForegroundColor Red
             return

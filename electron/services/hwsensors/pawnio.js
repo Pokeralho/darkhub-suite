@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { downloadToFile } from '../SecureDownload.js';
+import { psQuote } from '../optimizer/OptimizerUtils.js';
 
 export const PAWNIO = Object.freeze({
   version: '2.2.0',
@@ -19,10 +20,10 @@ export async function installPawnIo(runElevated) {
   const file = path.join(dir, `PawnIO_setup_${PAWNIO.version}.exe`);
   try {
     await downloadToFile(PAWNIO.url, file, { expectedSha256: PAWNIO.sha256, timeoutMs: 300000 });
-    const q = file.replace(/'/g, "''");
-    const r = await runElevated(`$sig = Get-AuthenticodeSignature -LiteralPath '${q}'
+    const q = psQuote(file);
+    const r = await runElevated(`$sig = Get-AuthenticodeSignature -LiteralPath ${q}
 if ($sig.Status -ne 'Valid') { throw ('Assinatura do instalador do PawnIO invalida: ' + $sig.Status) }
-$p = Start-Process -FilePath '${q}' -ArgumentList '-install','-silent' -Wait -PassThru -WindowStyle Hidden
+$p = Start-Process -FilePath ${q} -ArgumentList '-install','-silent' -Wait -PassThru -WindowStyle Hidden
 if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { throw ('O instalador do PawnIO terminou com codigo ' + $p.ExitCode) }
 $svc = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\PawnIO'
 for ($i = 0; $i -lt 30 -and -not (Test-Path $svc); $i++) { Start-Sleep -Seconds 1 }
