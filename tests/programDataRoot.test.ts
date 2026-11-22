@@ -50,7 +50,8 @@ describe('C:\\ProgramData\\DarkHub is secured at startup', () => {
 
 describe.skipIf(process.platform !== 'win32')('secureDir never follows a planted junction', () => {
   it('reports and unlinks the junction, leaves the files it points to alone', async () => {
-    const dir = tmp();
+    // long path: PowerShell reports C:\Users\runneradmin\... where os.tmpdir() can give the 8.3 name RUNNER~1
+    const dir = fs.realpathSync.native(tmp());
     const victim = tmp();
     fs.writeFileSync(path.join(victim, 'victim.txt'), 'do not delete');
     fs.mkdirSync(path.join(dir, 'sub'));
