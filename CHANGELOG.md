@@ -6,6 +6,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.7] - 2026-11-23
+
+### Fixed
+- **Microsoft Defender in the DarkOS section** said "applied and verified" while Defender kept real-time protection
+  on. On a stock Windows 11, Tamper Protection is on by default and makes Windows keep the policy values but ignore
+  them; the item only read the registry back. Reproduced in a stock Windows 11 26300 VM. The DarkOS module (v7) now
+  checks Defender itself: with Tamper Protection on it changes nothing and says so, after applying it confirms that
+  real-time protection is really off (otherwise it undoes the change and explains why), and an item only shows as
+  active when the effect is there. The screen shows the manual step with a button that opens Windows Security.
+- The texts pointed to "Proteção contra Adulteração", but current Windows 11 in Portuguese calls it
+  **"Proteção contra Violações"**. Renamed everywhere.
+- **Optimizer > Defender**: a PC where Defender is not running (removed by the DarkOS image) or is passive (another
+  antivirus) now gets a clear answer instead of a cryptic failure; the result is shown on the tab, not only in the
+  terminal, and the state is read again for a few seconds after a change.
+- **"Restore everything" (DarkOS / Windows mode)** failed on TrkWks and DPS: the revert wrote `DelayedAutostart` into
+  service keys that are read-only even for administrators. The value is now changed only when needed, through the
+  service manager first. A full apply + restore of a profile on a stock Windows now ends with no failures.
+- **Tab bars** on every screen (Optimizer, Network, Security, PowerShell, Post-install, SSH, DevTools, DarkOS,
+  hardware details, startup, game editor) hid tabs on smaller windows: the mouse wheel could not scroll them and
+  the scrollbar was hidden. They now scroll with the wheel, show arrows at the edges and keep the selected tab in
+  view.
+- Messages that claimed more than was done: "Boost now" reported DNS flush and Smart Clean even when they failed;
+  the updater said "up to date" when it could not read any release and invented release notes when a release had
+  none; five Optimizer routines answered "ok" without doing anything.
+- **Security score**: an antivirus that is installed but turned off no longer counts as real-time protection, and the
+  Dashboard no longer shows the last saved score as if it were current.
+- **Network speed test**: "Ping" now measures latency (ICMP, or one round trip on an open connection) instead of a
+  full HTTPS request.
+
+### Changed
+- **Optimizer, Tweaks tab** reorganized: a quick path ("Apply recommended") at the top, ready-made profiles on
+  demand, filters by goal (Games, Performance, Privacy, Network, Look & feel, Cleanup, System) and by state, and
+  details per item on demand. Search ignores accents, accepts words in any order and understands words like "fps",
+  "ping" or "telemetry". Shorter tab names, most used first; the HAGS card moved to Games & GPU.
+- DLSS Manager marks the per-card cost as an estimate from the card generation.
+
+### Removed
+- Unused backend handlers with misleading results (`security:scanMalware`, `security:optimizeLatency`,
+  `security:enableRansomwareArmor`) and unused components.
+
 ## [0.9.6] - 2026-11-22
 
 ### Security
