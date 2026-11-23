@@ -13,6 +13,7 @@ import {
 } from '../components/ssh/sshStore';
 import { Modal } from '../components/ssh/ui';
 
+import ScrollRow from '../components/ui/ScrollRow';
 const EditorTabView = lazy(() => import('../components/ssh/EditorTabView'));
 // xterm and the SFTP browser are heavy: load them with the first terminal / SFTP tab, not with the screen.
 const TerminalPane = lazy(() => import('../components/ssh/TerminalPane'));
@@ -211,7 +212,7 @@ export default function SshClient() {
           <button type="button" className="dh-btn" onClick={() => setQuick(true)} title="Ctrl+Shift+T"><Plus size={14} />{t('ssh.quick.button', 'Conexão rápida')}</button>
         </>} />
 
-      <div className="flex items-center gap-1 -mt-3 mb-3 overflow-x-auto border-b border-zinc-900">
+      <ScrollRow className="-mt-3 mb-3" innerClassName="items-center gap-1 border-b border-zinc-900">
         <button type="button" onClick={() => setActive('vault')} className={`flex items-center gap-1.5 h-8 px-3 text-[12.5px] border-b-2 shrink-0 ${store.active === 'vault' ? 'border-blue-400 text-zinc-50' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}><Server size={13} />{t('ssh.tab.vault', 'Cofre')}</button>
         {store.tabs.map((tb) => {
           const title = tb.kind === 'terminal' ? (tb.panes.length > 1 ? `${tb.panes[0].title} +${tb.panes.length - 1}` : tb.panes[0]?.title) : tb.title;
@@ -228,7 +229,7 @@ export default function SshClient() {
             </div>
           );
         })}
-      </div>
+      </ScrollRow>
 
       <div className="flex-1 min-h-0">
         {store.active === 'vault' ? (

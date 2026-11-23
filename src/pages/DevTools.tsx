@@ -8,6 +8,7 @@ import { EncodeTool, IdTool, JwtTool, RegexTool, CronTool, LoremTool, PasswordTo
 import { jsonMinify } from '../devtools/textTools';
 import { CopyButton, textareaCls, useDevT } from '../devtools/ui';
 
+import ScrollRow from '../components/ui/ScrollRow';
 type ToolId = 'unit' | 'color' | 'rule3' | 'json' | 'encode' | 'hash' | 'diff' | 'regex' | 'jwt' | 'cron' | 'ids' | 'password' | 'lorem';
 
 const DevTools = () => {
@@ -115,7 +116,7 @@ const DevTools = () => {
           {groups.map(g => (
             <div key={g.label}>
               <div className="dh-tag uppercase tracking-wider px-2 mb-1">{g.label}</div>
-              <div role="tablist" aria-orientation="vertical" className="flex md:flex-col gap-0.5 overflow-x-auto md:overflow-visible">
+              <ScrollRow role="tablist" aria-orientation="vertical" innerClassName="md:flex-col gap-0.5 md:overflow-visible">
                 {g.items.map(({ id, icon: Icon, label }) => {
                   const active = activeTab === id;
                   return (
@@ -131,7 +132,7 @@ const DevTools = () => {
                     </button>
                   );
                 })}
-              </div>
+              </ScrollRow>
             </div>
           ))}
         </nav>

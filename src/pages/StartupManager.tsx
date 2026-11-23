@@ -4,6 +4,7 @@ import PageHeader from '../components/ui/PageHeader';
 import { useI18n } from '../i18n/I18nProvider';
 import type { StartupItem } from '../global';
 
+import ScrollRow from '../components/ui/ScrollRow';
 type ListResult = Awaited<ReturnType<NonNullable<typeof window.darkhub>['startup']['list']>>;
 type Tab = 'apps' | 'task' | 'service';
 
@@ -116,14 +117,14 @@ export default function StartupManager() {
       </section>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div role="tablist" className="flex gap-1">
+        <ScrollRow role="tablist" innerClassName="gap-1">
           {tabs.map((x) => (
             <button key={x.id} role="tab" aria-selected={tab === x.id} onClick={() => setTab(x.id)}
               className={`h-8 px-3 rounded-md text-[13px] ${tab === x.id ? 'bg-zinc-800/80 text-zinc-50' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}`}>
               {x.label} <span className="text-zinc-500 tabular-nums">{counts[x.id]}</span>
             </button>
           ))}
-        </div>
+        </ScrollRow>
         <div className="relative ml-auto w-64 max-w-full">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
           <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('boot.search', 'Procurar...')} className="dh-input w-full pl-8" />

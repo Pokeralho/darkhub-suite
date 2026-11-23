@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSystemMetrics } from '../hooks/useSystemMetrics';
 
+import ScrollRow from './ui/ScrollRow';
 interface HardwareInfo {
   cpu: any;
   gpu: any[];
@@ -126,7 +127,7 @@ export const DetailedHardwareInfo: React.FC = () => {
 
   return (
     <div className="dh-card overflow-hidden">
-      <div role="tablist" className="flex overflow-x-auto px-2 border-b border-zinc-800/80">
+      <ScrollRow role="tablist" innerClassName="px-2 border-b border-zinc-800/80">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -142,7 +143,7 @@ export const DetailedHardwareInfo: React.FC = () => {
             {tab.label}
           </button>
         ))}
-      </div>
+      </ScrollRow>
 
       <div className="p-5">
         {activeTab === 'cpu' && (

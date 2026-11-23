@@ -10,6 +10,7 @@ import ToolCategory from '../components/pstools/ToolCategory';
 import CustomScriptRunner from '../components/pstools/CustomScriptRunner';
 import { PS_SCHEMA } from '../components/pstools/psSchema';
 
+import ScrollRow from '../components/ui/ScrollRow';
 type TabId = 'overview' | 'system' | 'apps' | 'disk' | 'network' | 'maintenance' | 'custom';
 const TAB_ICONS: Record<TabId, typeof Home> = { overview: Home, system: Cpu, apps: Package, disk: HardDrive, network: Network, maintenance: Wrench, custom: Code };
 const TAB_KEY = 'darkhub.pstools.tab';
@@ -170,7 +171,7 @@ export default function PowerShellTools() {
     <div className="w-full max-w-6xl pb-16 space-y-8">
       {header}
 
-      <div role="tablist" aria-label={t('pstools.title', 'PowerShell Tools')} className="-mt-3 flex gap-5 border-b border-zinc-800/80 overflow-x-auto overflow-y-hidden custom-scrollbar">
+      <ScrollRow role="tablist" aria-label={t('pstools.title', 'PowerShell Tools')} className="-mt-3" innerClassName="gap-5 border-b border-zinc-800/80">
         {tabs.map(({ id, label }) => {
           const Icon = TAB_ICONS[id];
           const active = tab === id;
@@ -183,7 +184,7 @@ export default function PowerShellTools() {
             </button>
           );
         })}
-      </div>
+      </ScrollRow>
 
       {tab === 'custom' ? <CustomScriptRunner /> : null}
       {tab !== 'overview' && tab !== 'custom' ? <ToolCategory key={tab} category={tab} /> : null}

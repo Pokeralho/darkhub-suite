@@ -4,6 +4,7 @@ import { Game, GameProfile, OptiScalerConfig, defaultProfile } from './types'
 import { ProfileEditor } from './ProfileEditor'
 import { useI18n } from '../../i18n/I18nProvider'
 
+import ScrollRow from '../ui/ScrollRow';
 interface GameEditorModalProps {
   game: Game
   onSave: (game: Game) => void
@@ -96,7 +97,7 @@ export function GameEditorModal({
           </button>
         </div>
 
-        <div role="tablist" className="flex gap-1 px-5 border-b border-zinc-800 shrink-0">
+        <ScrollRow role="tablist" className="shrink-0" innerClassName="gap-1 px-5 border-b border-zinc-800">
           <button
             type="button"
             role="tab"
@@ -121,7 +122,7 @@ export function GameEditorModal({
           >
             {t('library.tab.optiscaler', 'OptiScaler (Upscaling)')}
           </button>
-        </div>
+        </ScrollRow>
 
         <div className="p-5 overflow-y-auto flex-1">
           {activeTab === 'info' && (

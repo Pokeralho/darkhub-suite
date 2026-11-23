@@ -7,6 +7,10 @@ import ErrorBoundary from './components/ErrorBoundary';
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
 import './style.css';
+import { installHorizontalWheel } from './utils/horizontalWheel';
+
+// a normal mouse wheel scrolls tab bars and other horizontal rows that overflow (see utils/horizontalWheel)
+installHorizontalWheel();
 
 function render() {
   ReactDOM.createRoot(document.getElementById('app')!).render(

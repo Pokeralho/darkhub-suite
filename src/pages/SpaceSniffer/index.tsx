@@ -437,7 +437,7 @@ export default function DiskMap() {
             <Home size={14} />
           </button>
         </div>
-        <nav ref={crumbsRef} aria-label={t('diskmap.path', 'Path')} className="flex min-w-[12rem] flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] font-mono text-[12px]">
+        <nav ref={crumbsRef} data-hwheel="on" aria-label={t('diskmap.path', 'Path')} className="flex min-w-[12rem] flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] font-mono text-[12px]">
           {trail.map((c, i) => (
             <React.Fragment key={c.id}>
               {i > 0 ? <ChevronRight size={12} className="text-zinc-600 shrink-0" /> : null}

@@ -157,6 +157,10 @@ button:disabled { cursor: not-allowed !important; }
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-zinc-700); background-clip: padding-box; border: 2px solid transparent; }
 ::-webkit-scrollbar-corner { background: transparent; }
+/* Horizontal rows (ScrollRow): a 4px bar so users can see there is more to the side */
+.dh-scroll-x { scroll-behavior: smooth; }
+.dh-scroll-x::-webkit-scrollbar { height: 4px; }
+.dh-scroll-x > * { flex-shrink: 0; }
 
 /* Inputs share one quiet field style unless a page overrides it */
 input::placeholder, textarea::placeholder { color: var(--color-zinc-500); }

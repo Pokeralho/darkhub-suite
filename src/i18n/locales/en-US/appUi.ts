@@ -5,7 +5,9 @@ const dict: Record<string, string> = {
   "setuphub.log.start": "Starting batch install through Winget...",
   "setuphub.log.done": "Install finished successfully!",
   "setuphub.log.failed": "Install failed",
-  "setuphub.log.noApi": "The install function is not exposed by the preload."
+  "setuphub.log.noApi": "The install function is not exposed by the preload.",
+  "common.scrollLeft": "Scroll left",
+  "common.scrollRight": "Scroll right"
 };
 
 export default dict;

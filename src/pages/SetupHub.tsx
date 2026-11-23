@@ -29,6 +29,7 @@ import {
 import PageHeader from '../components/ui/PageHeader';
 import RestoreComponentsPanel from '../components/setup/RestoreComponentsPanel';
 
+import ScrollRow from '../components/ui/ScrollRow';
 const appCatalog: Record<string, { id: string, name: string, desc?: string }[]> = {
   'Drivers & Desinstaladores Limpos': [
     { id: 'Wagnardsoft.DisplayDriverUninstaller', name: 'Display Driver Uninstaller (DDU)', desc: 'Remove completamente drivers GPU sem sobras' },
@@ -403,7 +404,7 @@ const SetupHub = ({ onNavigate }: { onNavigate?: (page: string) => void } = {}) 
         title={t('setuphub.title', 'Pós-Formatação & Instalação em Massa')}
         subtitle={t('setuphub.subtitle', 'Instale softwares essenciais, utilitários de sistema e runtimes via Winget com 1 clique.')}
       >
-        <div role="tablist" className="flex gap-5 -mb-5 overflow-x-auto overflow-y-hidden">
+        <ScrollRow role="tablist" className="-mb-5" innerClassName="gap-5">
           {([
             ['apps', Package, t('setuphub.tab.winget', 'Post-Install (Winget)')],
             ['drivers', Cpu, t('setuphub.tab.drivers', 'Drivers & Hardware')],
@@ -423,7 +424,7 @@ const SetupHub = ({ onNavigate }: { onNavigate?: (page: string) => void } = {}) 
               </button>
             );
           })}
-        </div>
+        </ScrollRow>
       </PageHeader>
 
       {onNavigate ? (

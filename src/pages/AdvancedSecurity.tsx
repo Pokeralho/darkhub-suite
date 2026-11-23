@@ -10,6 +10,7 @@ import BlocklistsPanel from '../components/security/BlocklistsPanel';
 import HardeningPanel from '../components/security/HardeningPanel';
 import { SectionHead, StatRow, OnOff, Skel, fmtDate, fmtNum, errorText } from '../components/security/ui';
 
+import ScrollRow from '../components/ui/ScrollRow';
 type SecurityTab = 'overview' | 'blocklists' | 'hardening' | 'malware' | 'phishing' | 'network' | 'tracking' | 'community';
 
 export default function AdvancedSecurity() {
@@ -291,7 +292,7 @@ export default function AdvancedSecurity() {
           </span>
         ) : null}
       >
-        <div role="tablist" aria-label={t('secx.title', 'Central de segurança')} className="flex gap-5 -mb-5 overflow-x-auto overflow-y-hidden custom-scrollbar">
+        <ScrollRow role="tablist" aria-label={t('secx.title', 'Central de segurança')} className="-mb-5" innerClassName="gap-5">
           {tabs.map(({ id, icon: Icon, label, onSelect }) => {
             const active = activeTab === id;
             return (
@@ -307,7 +308,7 @@ export default function AdvancedSecurity() {
               </button>
             );
           })}
-        </div>
+        </ScrollRow>
       </PageHeader>
 
       {statusMsg && (

@@ -9,6 +9,14 @@
         "dev"
       ],
       "port": 5173
+    },
+    {
+      "name": "vite",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite"
+      ],
+      "port": 5173
     }
   ]
 }
