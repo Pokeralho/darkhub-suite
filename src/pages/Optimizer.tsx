@@ -10,6 +10,8 @@ import DarkOSOptimizerHint from '../components/darkos/DarkOSOptimizerHint';
 import PageHeader from '../components/ui/PageHeader';
 import { useDialogA11y } from '../hooks/useDialogA11y';
 
+import ScrollRow from '../components/ui/ScrollRow';
+import { GOAL_ORDER, GoalId, goalOf, scoreItem, searchItems } from '../components/optimizer/tweakSearch';
 type OptimizerTab = 'tweaks' | 'gpu' | 'priority' | 'uninstaller' | 'network' | 'defender' | 'debloat' | 'startup' | 'windows';
 type LogLevel = 'info' | 'ok' | 'err' | 'warn';
 type LogLine = { ts: string; level: LogLevel; text: string };
@@ -146,6 +148,8 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
   // Navigation & View
   const [activeTab, setActiveTab] = useState<OptimizerTab>('tweaks');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'on' | 'off'>('all');
+  const [showProfiles, setShowProfiles] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTweakIds, setSelectedTweakIds] = useState<Set<string>>(new Set());
 
@@ -218,6 +222,7 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
   const [defenderStatus, setDefenderStatus] = useState<any>(null);
   const [defenderLoading, setDefenderLoading] = useState(false);
   const [defenderTamperBlocked, setDefenderTamperBlocked] = useState(false);
+  const [defenderResult, setDefenderResult] = useState<{ ok: boolean; text: string } | null>(null);
 
   const logBottomRef = useRef<HTMLDivElement>(null);
   const labelsRef = useRef<Record<string, string>>({});
@@ -588,61 +593,69 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [operations, deepTweaks, opStatus, opPartial, tweakStatus, tweakPartial, isCheckingStatus, t]);
 
-  const filteredTweaks = useMemo(() => {
-    const q = searchQuery.toLowerCase();
-    return allTweaksList.filter((it) => {
-      const matchesSearch = !q || it.title.toLowerCase().includes(q) || it.description.toLowerCase().includes(q) || it.altText.toLowerCase().includes(q);
-      const matchesCat =
-        categoryFilter === 'all' ||
-        it.category === categoryFilter ||
-        (categoryFilter === 'system' && (it.category === 'security' || it.category === 'system'));
-      return matchesSearch && matchesCat;
-    });
-  }, [allTweaksList, searchQuery, categoryFilter]);
+  const goalLabel = (g: GoalId) => ({
+    games: t('optui.goal.games', 'Jogos'),
+    performance: t('optui.goal.performance', 'Desempenho'),
+    privacy: t('optui.goal.privacy', 'Privacidade'),
+    network: t('optui.goal.network', 'Rede'),
+    visual: t('optui.goal.visual', 'Visual'),
+    cleanup: t('optui.goal.cleanup', 'Limpeza'),
+    system: t('optui.goal.system', 'Sistema'),
+  }[g]);
 
-  const categories = [
-    { id: 'all', label: t('optimizer.audit.cat.all', 'Todos os Ajustes') },
-    { id: 'customization', label: t('optimizer.audit.cat.customization', 'Customização & UI') },
-    { id: 'privacy', label: t('optimizer.audit.cat.privacy', 'Privacidade & IA') },
-    { id: 'gaming', label: t('optimizer.audit.cat.gaming', 'Performance & Jogos') },
-    { id: 'storage', label: t('optimizer.audit.cat.storage', 'Limpeza & Disco') },
-    { id: 'memory', label: t('optimizer.audit.cat.memory', 'Memória RAM') },
-    { id: 'network', label: t('optimizer.audit.cat.network', 'Rede & Conexão') },
-    { id: 'power', label: t('optimizer.audit.cat.power', 'Energia & CPU') },
-    { id: 'system', label: t('optimizer.audit.cat.system', 'Sistema & Segurança') }
-  ];
-
-  const CATEGORY_DESC: Record<string, string> = {
-    customization: t('optui.catDesc.customization', 'Aparência e comportamento do Windows: menus, barra de tarefas, explorador.'),
-    privacy: t('optui.catDesc.privacy', 'Reduz telemetria, rastreamento e recursos de IA que enviam dados.'),
-    gaming: t('optui.catDesc.gaming', 'Ajustes para mais FPS e menos latência em jogos.'),
-    storage: t('optui.catDesc.storage', 'Libera espaço removendo arquivos temporários e lixo do sistema.'),
-    memory: t('optui.catDesc.memory', 'Libera e gerencia a memória RAM.'),
-    network: t('optui.catDesc.network', 'Melhora a conexão: latência, DNS e parâmetros de rede.'),
-    power: t('optui.catDesc.power', 'Plano de energia e comportamento do processador.'),
-    system: t('optui.catDesc.system', 'Serviços, segurança e ajustes gerais do sistema.')
+  const GOAL_DESC: Record<GoalId, string> = {
+    games: t('optui.goalDesc.games', 'Mais FPS e menos atraso em jogos.'),
+    performance: t('optui.goalDesc.performance', 'Processador, memória e energia.'),
+    privacy: t('optui.goalDesc.privacy', 'Menos telemetria, anúncios e IA enviando dados.'),
+    network: t('optui.goalDesc.network', 'Latência, DNS e parâmetros de rede.'),
+    visual: t('optui.goalDesc.visual', 'Menus, barra de tarefas e explorador.'),
+    cleanup: t('optui.goalDesc.cleanup', 'Espaço em disco e arquivos temporários.'),
+    system: t('optui.goalDesc.system', 'Serviços, segurança e ajustes gerais.'),
   };
 
+  const filteredTweaks = useMemo(() => {
+    const q = searchQuery.trim();
+    const base = allTweaksList.filter((it) => {
+      const goal = goalOf(it.category);
+      if (categoryFilter !== 'all' && goal !== categoryFilter) return false;
+      if (statusFilter === 'on' && it.applied !== true) return false;
+      if (statusFilter === 'off' && it.applied === true) return false;
+      return true;
+    });
+    const list = searchItems(base, q, (it) => goalLabel(goalOf(it.category)));
+    if (q) list.sort((x, y) => scoreItem(y, q) - scoreItem(x, q));
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allTweaksList, searchQuery, categoryFilter, statusFilter, t]);
+
+  const goalCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const it of allTweaksList) {
+      const g = goalOf(it.category);
+      m.set(g, (m.get(g) || 0) + 1);
+    }
+    return m;
+  }, [allTweaksList]);
+
+  const categories: { id: 'all' | GoalId; label: string }[] = [
+    { id: 'all', label: t('optui.goal.all', 'Tudo') },
+    ...GOAL_ORDER.filter((g) => goalCounts.has(g)).map((g) => ({ id: g, label: goalLabel(g) })),
+  ];
+
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const forceOpen = searchQuery.trim() !== '' || categoryFilter !== 'all';
+  const [openDetails, setOpenDetails] = useState<Set<string>>(new Set());
+  const forceOpen = searchQuery.trim() !== '' || categoryFilter !== 'all' || statusFilter !== 'all';
 
   const groupedTweaks = useMemo(() => {
-    const order = categories.filter((c) => c.id !== 'all').map((c) => c.id);
-    const map = new Map<string, TweakItem[]>();
+    const map = new Map<GoalId, TweakItem[]>();
     for (const it of filteredTweaks) {
-      const key = it.category === 'security' ? 'system' : it.category;
+      const key = goalOf(it.category);
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(it);
     }
-    const keys = [...order.filter((k) => map.has(k)), ...[...map.keys()].filter((k) => !order.includes(k))];
-    return keys.map((k) => {
+    return GOAL_ORDER.filter((k) => map.has(k)).map((k) => {
       const items = map.get(k)!;
-      return {
-        id: k,
-        label: categories.find((c) => c.id === k)?.label || k,
-        items,
-        applied: items.filter((i) => i.applied === true).length
-      };
+      return { id: k, label: goalLabel(k), desc: GOAL_DESC[k], items, applied: items.filter((i) => i.applied === true).length };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredTweaks, t]);
@@ -1071,7 +1084,7 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
     if (action === 'disable') {
       const ok = await askConfirm({
         title: t('optimizer.audit.defender.confirmTitle', 'Desativar a proteção em tempo real?'),
-        body: t('optimizer.audit.defender.confirmBody', 'Seu computador ficará sem antivírus ativo até você reativar. O DarkHub usa apenas os mecanismos oficiais (Set-MpPreference e política) e NÃO contorna a Proteção contra Adulteração: se ela estiver ligada, o Windows ignora a alteração e a ação é recusada. Isto não desliga SmartScreen nem o Firewall.'),
+        body: t('optimizer.audit.defender.confirmBody', 'Seu computador ficará sem antivírus ativo até você reativar. O DarkHub usa apenas os mecanismos oficiais (Set-MpPreference e política) e NÃO contorna a Proteção contra Violações: se ela estiver ligada, o Windows ignora a alteração e a ação é recusada. Isto não desliga SmartScreen nem o Firewall.'),
         confirmLabel: t('optimizer.audit.defender.disableBtn', 'Desativar'),
         danger: true
       });
@@ -1079,9 +1092,11 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
     }
     await withBusy(async () => {
       setDefenderTamperBlocked(false);
+      setDefenderResult(null);
       addLog('info', action === 'disable' ? t('optimizer.audit.defender.disabling', 'Desativando a proteção em tempo real (e verificando com o próprio Defender)...') : t('optimizer.audit.defender.enabling', 'Reativando a proteção do Defender...'));
       const res = await api().applyDefenderControl({ action });
       if (res?.tamperBlocked) setDefenderTamperBlocked(true);
+      setDefenderResult({ ok: Boolean(res?.ok), text: String(res?.ok ? res?.msg || '' : res?.error || t('optimizer.audit.defender.fail', 'Falha no Defender')) });
       reportResult(res, t('optimizer.audit.defender.done', 'Concluído.'), t('optimizer.audit.defender.fail', 'Falha no Defender'));
       await loadDefenderStatus();
     });
@@ -1265,10 +1280,6 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
               <History size={16} className="text-zinc-400" />
               {t('optimizer.audit.restorePointBtn', 'Criar ponto de restauração')}
             </button>
-            <button onClick={handleSafeOptimization} disabled={busy} className="dh-btn dh-btn-primary">
-              {isOptimizing ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
-              {t('optimizer.audit.safeBtn', 'Otimização Segura')}
-            </button>
           </>
         }
       />
@@ -1295,51 +1306,14 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
           desc={t('optimizer.audit.hero.restoreDesc', 'Desfaz só o que está ativo')} />
       </div>
 
-      {/* Texture streaming notice / HAGS control */}
-      <section className="dh-card p-4 space-y-3">
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
-          <div className="flex items-start gap-2.5 min-w-0">
-            <Info size={16} className="text-amber-400 shrink-0 mt-0.5" />
-            <div className="min-w-0">
-              <h2 className="dh-section-title">{t('optimizer.audit.streaming.title', 'Texturas lentas ou modelos invisíveis em jogos? Controle do HAGS')}</h2>
-              <p className="dh-help mt-1 max-w-[75ch]">
-                {t('optimizer.audit.streaming.desc', 'Alguns jogos (como Overwatch 2) podem carregar texturas devagar quando o cache de shaders é reconstruído ou com certas combinações de driver e HAGS. Desativar ou reativar o HAGS é a única ação aqui que age diretamente nisso; o efeito varia por placa/driver e exige reiniciar o Windows.')}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0 text-[12px]">
-            <span className="text-zinc-500">{t('optimizer.audit.hags.statusLabel', 'Status HAGS:')}</span>
-            <span className={`w-1.5 h-1.5 rounded-full ${hagsDot}`} />
-            <span className="font-mono text-zinc-200">{hagsLabel}</span>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-zinc-800/80">
-          <HagsButtons variant="card" state={hagsStatus.state} disabled={busy} onToggle={handleToggleHags} onRevert={handleRevertHags} labels={hagsButtonLabels} />
-          <div className="flex items-center gap-3">
-            <span className="text-[11.5px] text-zinc-500 hidden lg:inline">{t('optimizer.hags.restartNote', 'Necessário reiniciar o Windows após alterar o HAGS.')}</span>
-            <button onClick={handleRestoreStreamingDefaults} disabled={busy} className="dh-btn dh-btn-sm">
-              {t('optimizer.audit.streaming.revertBtn', 'Restaurar Kernel & HAGS')}
-            </button>
-          </div>
-        </div>
-        <p className="text-[11.5px] text-zinc-500 lg:hidden">{t('optimizer.hags.restartNote', 'Necessário reiniciar o Windows após alterar o HAGS.')}</p>
-      </section>
-
       {/* Navigation tabs: underline control */}
-      <nav className="flex items-center overflow-x-auto [scrollbar-width:none] border-b border-zinc-800/80" role="tablist">
+      <ScrollRow as="nav"  role="tablist" innerClassName="items-center border-b border-zinc-800/80">
         <button role="tab" aria-selected={activeTab === 'tweaks'} onClick={() => setActiveTab('tweaks')} className={tabBtn(activeTab === 'tweaks')}>
           {t('optimizer.tabTweaks', 'Ajustes & Customizações')}
           <span className="font-mono text-[11px] text-zinc-500">{allTweaksList.length}</span>
         </button>
-        <button role="tab" aria-selected={activeTab === 'uninstaller'} onClick={() => { setActiveTab('uninstaller'); loadPrograms(); }} className={tabBtn(activeTab === 'uninstaller')}>
-          {t('optimizer.tabUninstaller', 'Desinstalador & Limpeza de Resíduos')}
-        </button>
         <button role="tab" aria-selected={activeTab === 'gpu'} onClick={() => { setActiveTab('gpu'); loadGpuData(); }} className={tabBtn(activeTab === 'gpu')}>
           {t('optimizer.tabGpu', 'Prioridade de GPU & Jogos')}
-        </button>
-        <button role="tab" aria-selected={activeTab === 'priority'} onClick={() => { setActiveTab('priority'); loadProcesses(); }} className={tabBtn(activeTab === 'priority')}>
-          {t('optimizer.tabPriority', 'Prioridade de Processos')}
         </button>
         <button role="tab" aria-selected={activeTab === 'network'} onClick={() => { setActiveTab('network'); refreshDnsState(); }} className={tabBtn(activeTab === 'network')}>
           {t('optimizer.tabNetwork', 'Rede Avançada & DNS')}
@@ -1353,10 +1327,16 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
         <button role="tab" aria-selected={activeTab === 'startup'} onClick={() => { setActiveTab('startup'); loadStartupItems(); }} className={tabBtn(activeTab === 'startup')}>
           {t('optimizer.audit.tabStartup', 'Inicialização')}
         </button>
+        <button role="tab" aria-selected={activeTab === 'uninstaller'} onClick={() => { setActiveTab('uninstaller'); loadPrograms(); }} className={tabBtn(activeTab === 'uninstaller')}>
+          {t('optimizer.tabUninstaller', 'Desinstalador & Limpeza de Resíduos')}
+        </button>
+        <button role="tab" aria-selected={activeTab === 'priority'} onClick={() => { setActiveTab('priority'); loadProcesses(); }} className={tabBtn(activeTab === 'priority')}>
+          {t('optimizer.tabPriority', 'Prioridade de Processos')}
+        </button>
         <button role="tab" aria-selected={activeTab === 'windows'} onClick={() => setActiveTab('windows')} className={tabBtn(activeTab === 'windows')}>
           {t('optimizer.tabWindows', 'Recursos & Reparos do Windows')}
         </button>
-      </nav>
+      </ScrollRow>
 
       {/* Backend bridge missing (renderer opened outside Electron or preload failed) */}
       {offline && (
@@ -1374,10 +1354,28 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
       {/* TAB 1: ALL TWEAKS & CUSTOMIZATIONS */}
       {!offline && activeTab === 'tweaks' && (
         <div className="space-y-5">
-          {/* Profiles */}
-          {profiles.length > 0 && (
+          {/* Quick path: one button for the safe, reversible set; everything else is "advanced" below */}
+          <section className="dh-card p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="dh-section-title flex items-center gap-2"><Zap size={15} className="text-blue-300" />{t('optui.quick.title', 'Caminho rápido: otimização recomendada')}</h2>
+              <p className="dh-help mt-1 max-w-[70ch]">
+                {fmt(t('optui.quick.desc', 'Aplica {n} ajustes de baixo risco e reversíveis, limpa temporários e o cache de DNS. Não mexe em Defender, serviços, VBS nem BitLocker.'), { n: recommendedDeepIds.length })}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button onClick={() => setShowProfiles((v) => !v)} className="dh-btn dh-btn-sm" aria-expanded={showProfiles}>
+                {t('optui.quick.profiles', 'Perfis prontos')}
+              </button>
+              <button onClick={handleSafeOptimization} disabled={busy} className="dh-btn dh-btn-primary">
+                {isOptimizing ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
+                {t('optui.quick.apply', 'Aplicar recomendados')}
+              </button>
+            </div>
+          </section>
+
+          {/* Profiles (on demand) */}
+          {showProfiles && profiles.length > 0 && (
             <section className="space-y-2.5">
-              <h2 className="dh-section-title">{t('optimizer.audit.profiles.title', 'Perfis (conjuntos prontos)')}</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-zinc-800/80 border border-zinc-800/80 rounded-xl overflow-hidden">
                 {profiles.map((p) => (
                   <div key={p.id} className="bg-zinc-950 p-3.5 flex flex-col gap-2">
@@ -1395,15 +1393,26 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
             </section>
           )}
 
-          {/* Search & categories */}
+          {/* Search, goal and status filters */}
           <div className="space-y-2.5">
-            {searchField(searchQuery, setSearchQuery, t('optimizer.audit.searchPlaceholder', 'Pesquisar ajuste (ex.: Menu Clássico, RAM, Temp, Barra de Tarefas, MMCSS, Telemetria)...'))}
-            <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none]">
-              {categories.map((c) => (
-                <button key={c.id} onClick={() => setCategoryFilter(c.id)} className={segBtn(categoryFilter === c.id)}>
-                  {c.label}
-                </button>
-              ))}
+            <h2 className="dh-section-title">{t('optui.advanced.title', 'Escolher ajustes um a um')}</h2>
+            {searchField(searchQuery, setSearchQuery, t('optui.searchPlaceholder', 'Buscar: fps, telemetria, memória, menu clássico, ping...'))}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <ScrollRow className="flex-1" innerClassName="items-center gap-1" role="tablist" ariaLabel={t('optui.goal.label', 'Objetivo')}>
+                {categories.map((c) => (
+                  <button key={c.id} role="tab" aria-selected={categoryFilter === c.id} onClick={() => setCategoryFilter(c.id)} className={segBtn(categoryFilter === c.id)}>
+                    {c.label}
+                    <span className="ml-1.5 font-mono text-[10.5px] text-zinc-500">{c.id === 'all' ? allTweaksList.length : goalCounts.get(c.id) || 0}</span>
+                  </button>
+                ))}
+              </ScrollRow>
+              <div className="flex items-center gap-1 shrink-0" role="group" aria-label={t('optui.status.label', 'Estado')}>
+                {(['all', 'on', 'off'] as const).map((k) => (
+                  <button key={k} onClick={() => setStatusFilter(k)} aria-pressed={statusFilter === k} className={segBtn(statusFilter === k)}>
+                    {k === 'all' ? t('optui.status.all', 'Todos') : k === 'on' ? t('optui.status.on', 'Ativos') : t('optui.status.off', 'Não aplicados')}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -1438,7 +1447,7 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
               <div className="flex items-center gap-2">
                 <button onClick={() => handleRunBatch('revert')} disabled={isOptimizing || selectedTweakIds.size === 0} className="dh-btn dh-btn-sm">
                   <Undo2 size={14} className="text-zinc-400" />
-                  {t('optimizer.audit.revertSelected', 'Reverter Ativos Selecionados')}
+                  {t('optui.revertSelected', 'Reverter')}
                 </button>
                 <button onClick={() => handleRunBatch('apply')} disabled={isOptimizing || selectedTweakIds.size === 0} className="dh-btn dh-btn-accent dh-btn-sm">
                   {isOptimizing ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
@@ -1458,7 +1467,16 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
             ) : listLoading ? (
               <SkeletonRows rows={6} />
             ) : filteredTweaks.length === 0 ? (
-              emptyRow(t('optimizer.audit.noMatch', 'Nenhum ajuste corresponde à busca ou à categoria escolhida.'))
+              emptyRow(
+                <span className="flex flex-col items-center gap-2">
+                  {t('optimizer.audit.noMatch', 'Nenhum ajuste corresponde à busca ou à categoria escolhida.')}
+                  {(searchQuery || categoryFilter !== 'all' || statusFilter !== 'all') && (
+                    <button className="dh-btn dh-btn-sm" onClick={() => { setSearchQuery(''); setCategoryFilter('all'); setStatusFilter('all'); }}>
+                      {t('optui.clearFilters', 'Limpar filtros')}
+                    </button>
+                  )}
+                </span>
+              )
             ) : (
               <div className="divide-y divide-zinc-800/80">
                 <div className="flex items-center justify-between gap-2 px-4 py-2 text-[11.5px] text-zinc-500">
@@ -1484,8 +1502,8 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
                         <span className="flex items-center gap-2 text-[13px] font-medium text-zinc-100">
                           <span className={`inline-block text-zinc-500 transition-transform duration-150 ${open ? 'rotate-90' : ''}`}>›</span>
                           {group.label}
+                          <span className="text-[12px] font-normal text-zinc-500 truncate">{group.desc}</span>
                         </span>
-                        <span className="block text-[12px] text-zinc-500 mt-0.5 ml-4 leading-snug">{CATEGORY_DESC[group.id] || ''}</span>
                       </span>
                       <span className="text-[11.5px] font-mono text-zinc-400 shrink-0">
                         {fmt(t('optui.groupCount', '{applied} de {total} ativos'), { applied: group.applied, total: group.items.length })}
@@ -1500,6 +1518,11 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
                   const canRevert = tweak.kind === 'deep' || Boolean(tweak.revertId);
                   const showApply = tweak.kind === 'op' ? tweak.applied !== true : tweak.applied !== true;
                   const showRevert = canRevert && (tweak.kind === 'deep' ? tweak.applied === true : tweak.applied !== false);
+                  const detailsOpen = openDetails.has(tweak.id);
+                  const toggleDetails = (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    setOpenDetails((prev) => { const next = new Set(prev); if (next.has(tweak.id)) next.delete(tweak.id); else next.add(tweak.id); return next; });
+                  };
                   return (
                     <div
                       key={tweak.id}
@@ -1511,53 +1534,54 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
                           return next;
                         });
                       }}
-                      className={`px-4 py-3 flex items-start justify-between gap-4 cursor-pointer select-none transition-colors duration-150 ease-out ${
+                      className={`px-4 py-2.5 flex items-start justify-between gap-4 cursor-pointer select-none transition-colors duration-150 ease-out ${
                         isSelected ? 'bg-blue-500/[0.06] shadow-[inset_2px_0_0_var(--color-blue-400)]' : 'hover:bg-zinc-900/50'
                       }`}
                     >
                       <div className="flex items-start gap-3 min-w-0">
-                        <input type="checkbox" checked={isSelected} onChange={() => {}} className="mt-0.5 cursor-pointer" />
+                        <input type="checkbox" checked={isSelected} onChange={() => {}} aria-label={tweak.title} className="mt-0.5 cursor-pointer" />
                         <div className="min-w-0">
-                          <div className="text-[13px] font-medium text-zinc-100">{tweak.title}</div>
-                          <div className="mt-0.5 flex items-center gap-x-2.5 gap-y-0.5 flex-wrap text-[11px]">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[13px] font-medium text-zinc-100">{tweak.title}</span>
                             {tweak.applied === true && (
-                              <span className="inline-flex items-center gap-1.5 text-emerald-400 lowercase">
+                              <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 lowercase">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                                 {t('optimizer.audit.badge.active', '✓ ATIVO (verificado)').replace(/^✓\s*/, '')}
                               </span>
                             )}
                             {tweak.applied === false && tweak.partial && (
-                              <span className="text-amber-400 lowercase">{t('optimizer.audit.badge.partial', 'PARCIAL')}</span>
-                            )}
-                            {tweak.applied === false && !tweak.partial && (
-                              <span className="text-zinc-500 lowercase">{t('optimizer.audit.badge.default', 'PADRÃO')}</span>
+                              <span className="text-[11px] text-amber-400 lowercase">{t('optimizer.audit.badge.partial', 'PARCIAL')}</span>
                             )}
                             {tweak.applied === null && isCheckingStatus && canRevert && (
-                              <span className="inline-flex items-center gap-1 text-zinc-500 lowercase">
-                                <Loader2 size={11} className="animate-spin" />
-                                {t('optimizer.audit.badge.checking', 'verificando...')}
-                              </span>
+                              <Loader2 size={11} className="animate-spin text-zinc-500" />
                             )}
-                            {tweak.applied === null && !isCheckingStatus && canRevert && (
-                              <span className="text-zinc-500 lowercase">{t('optimizer.audit.badge.unknown', 'NÃO VERIFICADO')}</span>
-                            )}
-                            {tweak.applied === null && !tweak.revertId && tweak.kind === 'op' && (
-                              <span className="text-zinc-500 lowercase">{t('optimizer.audit.badge.action', 'AÇÃO PONTUAL')}</span>
-                            )}
-                            <span className={`lowercase ${rb.cls}`}>{rb.label}</span>
+                            {tweak.risk !== 'safe' && <span className={`text-[11px] lowercase ${rb.cls}`}>{rb.label}</span>}
                             {tweak.securityRelated && (
-                              <span className="text-rose-400 lowercase">{t('optimizer.audit.badge.security', 'SEGURANÇA')}</span>
+                              <span className="text-[11px] text-rose-400 lowercase">{t('optimizer.audit.badge.security', 'SEGURANÇA')}</span>
                             )}
-                            <span className="dh-tag">{tweak.category}</span>
                             {tweak.requiresReboot && <span className="dh-tag lowercase">{t('optimizer.audit.badge.reboot', 'REINICIAR')}</span>}
-                            {tweak.requiresAdmin && <span className="dh-tag lowercase">{t('optimizer.audit.badge.admin', 'ADMIN')}</span>}
                           </div>
-                          <p className="text-[12px] text-zinc-400 mt-1.5 leading-snug max-w-[75ch]">{tweak.description}</p>
-                          {tweak.warning && (
-                            <p className="text-[12px] text-amber-300/90 mt-1 leading-snug flex items-start gap-1.5 max-w-[75ch]">
-                              <AlertTriangle size={13} className="shrink-0 mt-px" />
-                              <span>{tweak.warning}</span>
-                            </p>
+                          <button type="button" onClick={toggleDetails} aria-expanded={detailsOpen} className="mt-0.5 text-[11.5px] text-zinc-500 hover:text-zinc-300">
+                            {detailsOpen ? t('optui.details.hide', 'Ocultar detalhes') : t('optui.details.show', 'Detalhes')}
+                          </button>
+                          {detailsOpen && (
+                            <div className="mt-1.5 space-y-1 max-w-[75ch]" onClick={(e) => e.stopPropagation()}>
+                              <p className="text-[12px] text-zinc-400 leading-snug">{tweak.description}</p>
+                              {tweak.warning && (
+                                <p className="text-[12px] text-amber-300/90 leading-snug flex items-start gap-1.5">
+                                  <AlertTriangle size={13} className="shrink-0 mt-px" />
+                                  <span>{tweak.warning}</span>
+                                </p>
+                              )}
+                              <div className="flex items-center gap-2 flex-wrap text-[11px] text-zinc-500">
+                                {tweak.applied === false && !tweak.partial && <span className="lowercase">{t('optimizer.audit.badge.default', 'PADRÃO')}</span>}
+                                {tweak.applied === null && !isCheckingStatus && canRevert && <span className="lowercase">{t('optimizer.audit.badge.unknown', 'NÃO VERIFICADO')}</span>}
+                                {tweak.applied === null && !tweak.revertId && tweak.kind === 'op' && <span className="lowercase">{t('optimizer.audit.badge.action', 'AÇÃO PONTUAL')}</span>}
+                                <span className={`lowercase ${rb.cls}`}>{rb.label}</span>
+                                {tweak.requiresAdmin && <span className="dh-tag lowercase">{t('optimizer.audit.badge.admin', 'ADMIN')}</span>}
+                                <span className="font-mono">{tweak.id}</span>
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1638,6 +1662,37 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
       {/* TAB 3: GPU GAME PRIORITY */}
       {!offline && activeTab === 'gpu' && (
         <div className="space-y-4">
+          {/* Texture streaming notice / HAGS control */}
+          <section className="dh-card p-4 space-y-3">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <Info size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <h2 className="dh-section-title">{t('optimizer.audit.streaming.title', 'Texturas lentas ou modelos invisíveis em jogos? Controle do HAGS')}</h2>
+                  <p className="dh-help mt-1 max-w-[75ch]">
+                    {t('optimizer.audit.streaming.desc', 'Alguns jogos (como Overwatch 2) podem carregar texturas devagar quando o cache de shaders é reconstruído ou com certas combinações de driver e HAGS. Desativar ou reativar o HAGS é a única ação aqui que age diretamente nisso; o efeito varia por placa/driver e exige reiniciar o Windows.')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 text-[12px]">
+                <span className="text-zinc-500">{t('optimizer.audit.hags.statusLabel', 'Status HAGS:')}</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${hagsDot}`} />
+                <span className="font-mono text-zinc-200">{hagsLabel}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-zinc-800/80">
+              <HagsButtons variant="card" state={hagsStatus.state} disabled={busy} onToggle={handleToggleHags} onRevert={handleRevertHags} labels={hagsButtonLabels} />
+              <div className="flex items-center gap-3">
+                <span className="text-[11.5px] text-zinc-500 hidden lg:inline">{t('optimizer.hags.restartNote', 'Necessário reiniciar o Windows após alterar o HAGS.')}</span>
+                <button onClick={handleRestoreStreamingDefaults} disabled={busy} className="dh-btn dh-btn-sm">
+                  {t('optimizer.audit.streaming.revertBtn', 'Restaurar Kernel & HAGS')}
+                </button>
+              </div>
+            </div>
+            <p className="text-[11.5px] text-zinc-500 lg:hidden">{t('optimizer.hags.restartNote', 'Necessário reiniciar o Windows após alterar o HAGS.')}</p>
+          </section>
+
           <section className="dh-card p-5 space-y-4">
             {sectionHead(
               t('optimizer.hags.title', 'Agendamento de GPU Acelerado por Hardware (HAGS)'),
@@ -1936,7 +1991,7 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
         <section className="dh-card p-5 space-y-4">
           {sectionHead(
             t('optimizer.audit.defender.title', 'Microsoft Defender: proteção em tempo real'),
-            t('optimizer.audit.defender.desc', 'Liga ou desliga a proteção em tempo real usando só os mecanismos oficiais (Set-MpPreference e política). Se a Proteção contra Adulteração estiver ativa, o Windows ignora a alteração: o DarkHub não a contorna e mostra como desativá-la manualmente. Após a ação, o estado é conferido com o próprio Defender. Desativar deixa o PC sem antivírus; não afeta SmartScreen nem o Firewall.'),
+            t('optimizer.audit.defender.desc', 'Liga ou desliga a proteção em tempo real usando só os mecanismos oficiais (Set-MpPreference e política). Se a Proteção contra Violações estiver ativa, o Windows ignora a alteração: o DarkHub não a contorna e mostra como desativá-la manualmente. Após a ação, o estado é conferido com o próprio Defender. Desativar deixa o PC sem antivírus; não afeta SmartScreen nem o Firewall.'),
             <button onClick={loadDefenderStatus} disabled={defenderLoading} className="dh-btn dh-btn-sm">
               <RefreshCw size={14} className={`text-zinc-400 ${defenderLoading ? 'animate-spin' : ''}`} />
               {t('optimizer.audit.refresh', 'Atualizar')}
@@ -1950,7 +2005,7 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
           ) : defenderStatus ? (
             <div className="flex items-center gap-x-5 gap-y-2 flex-wrap">
               <StatusPill ok={Boolean(defenderStatus.realtimeEnabled)} label={defenderStatus.realtimeEnabled ? t('optimizer.audit.defender.rtOn', 'Tempo real: ATIVO') : t('optimizer.audit.defender.rtOff', 'Tempo real: DESATIVADO')} />
-              <StatusPill ok={!defenderStatus.tamperProtected ? null : true} label={defenderStatus.tamperProtected ? t('optimizer.audit.defender.tamperOn', 'Proteção contra Adulteração: LIGADA') : t('optimizer.audit.defender.tamperOff', 'Proteção contra Adulteração: desligada')} />
+              <StatusPill ok={!defenderStatus.tamperProtected ? null : true} label={defenderStatus.tamperProtected ? t('optimizer.audit.defender.tamperOn', 'Proteção contra Violações: LIGADA') : t('optimizer.audit.defender.tamperOff', 'Proteção contra Violações: desligada')} />
               <StatusPill
                 ok={defenderStatus.policyDisableRealtime === 1 ? false : null}
                 label={defenderStatus.policyDisableRealtime === 1 ? t('optimizer.audit.defender.policyOn', 'Política de desativação presente') : t('optimizer.audit.defender.policyOff', 'Sem política de desativação')}
@@ -1974,11 +2029,18 @@ export default function Optimizer({ onNavigate }: { onNavigate?: (page: string) 
             </div>
           )}
 
+          {defenderResult && (
+            <div role="status" className={`flex items-start gap-2 border-l-2 pl-3 py-1 text-[12.5px] ${defenderResult.ok ? 'border-emerald-400 text-emerald-300' : 'border-red-400 text-red-300'}`}>
+              {defenderResult.ok ? <CheckCircle2 size={14} className="shrink-0 mt-px" /> : <AlertTriangle size={14} className="shrink-0 mt-px" />}
+              <span>{defenderResult.text}</span>
+            </div>
+          )}
+
           {(defenderTamperBlocked || defenderStatus?.tamperProtected) && (
             <div className="px-3.5 py-3 rounded-lg border border-amber-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <span className="flex items-start gap-2 text-[12px] text-amber-200/90 max-w-[75ch]">
                 <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-px" />
-                {t('optimizer.audit.defender.tamperHelp', 'A Proteção contra Adulteração está ligada, então o Windows ignoraria o pedido. Desligue-a em Segurança do Windows > Proteção contra vírus e ameaças > Gerenciar configurações > Proteção contra Adulteração e tente de novo.')}
+                {t('optimizer.audit.defender.tamperHelp', 'A Proteção contra Violações está ligada, então o Windows ignoraria o pedido. Desligue-a em Segurança do Windows > Proteção contra vírus e ameaças > Gerenciar configurações > Proteção contra Violações e tente de novo.')}
               </span>
               <button onClick={handleOpenTamper} className="dh-btn dh-btn-sm shrink-0">
                 {t('optimizer.audit.defender.openSecurity', 'Abrir Segurança do Windows')}
