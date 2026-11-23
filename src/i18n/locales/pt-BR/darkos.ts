@@ -533,7 +533,7 @@ const dict: Record<string, string> = {
   "optimizer.audit.tweak.tweak:intelDisableAsyncFlips.desc": "Desliga a troca assíncrona de quadros do driver gráfico Intel, que em alguns jogos causa tearing ou cintilação. Vale após reiniciar.",
   "optimizer.audit.tweak.tweak:intelDisableAdaptiveVsync.title": "Intel: desativar V-Sync adaptativo do driver",
   "optimizer.audit.tweak.tweak:intelDisableAdaptiveVsync.desc": "Impede o driver Intel de ligar e desligar o V-Sync sozinho conforme o FPS, deixando o controle com o jogo. Vale após reiniciar.",
-  "optimizer.tabWindows": "Recursos & Reparos do Windows",
+  "optimizer.tabWindows": "Recursos do Windows",
   "wintools.readFail": "Não foi possível ler os recursos do Windows.",
   "wintools.reboot": "Reinicie o Windows para concluir.",
   "wintools.done": "Concluído e verificado.",
@@ -768,7 +768,9 @@ const dict: Record<string, string> = {
   "monitor.adv.off2": "Lê o sensor real de cada núcleo da CPU, ventoinhas, tensões, GPU (hot spot, memória, consumo) e discos, pelo LibreHardwareMonitor com o driver PawnIO. Ligado por padrão (o driver só é instalado quando você pede).",
   "dashboard.ramInUse": "RAM em uso",
   "dashboard.dpcRate": "DPCs por segundo",
-  "monitor.temps.gpuNoSensor": "Ative os sensores avançados"
+  "monitor.temps.gpuNoSensor": "Ative os sensores avançados",
+  "darkos.tamper.step": "O Windows exige um passo manual: abra Segurança do Windows > Proteção contra vírus e ameaças > Gerenciar configurações, desligue a Proteção contra Violações e aplique de novo.",
+  "darkos.tamper.open": "Abrir Segurança do Windows"
 };
 
 export default dict;

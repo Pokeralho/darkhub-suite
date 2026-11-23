@@ -72,6 +72,8 @@ if ($null -ne $wmi.IsTamperProtected) { $tamper = [bool]$wmi.IsTamperProtected }
   serviceStatus = [string]$winDefendSvc
   imageLevelRemoved = ($imgRemoved -eq 1)
   serviceStart = if ($null -ne $svcStart) { [int]$svcStart } else { $null }
+  servicePresent = ($null -ne $winDefendSvc)
+  runningMode = if ($wmi -and $wmi.AMRunningMode) { [string]$wmi.AMRunningMode } else { $null }
 } | ConvertTo-Json -Compress`;
       const { code, stdout, stderr } = await runPowerShell(script, { timeoutMs: 20000, trim: true });
       if (code === 0 && stdout) {
@@ -91,11 +93,23 @@ if ($null -ne $wmi.IsTamperProtected) { $tamper = [bool]$wmi.IsTamperProtected }
     Logger.info('DefenderControlEngine', `Controle do Defender (${action})`);
 
     const before = await this.getStatus();
-    if (action === 'disable' && before.ok && before.status?.tamperProtected) {
+    const b = before.ok ? before.status || {} : null;
+    // Defender is not running at all (removed by the DarkOS image, or stopped): nothing to turn off, and
+    // Set-MpPreference would only fail with 0x800106ba. Say so instead of reporting a cryptic failure.
+    if (action === 'disable' && b && (b.servicePresent === false || b.serviceRunning === false) && !b.realtimeEnabled) {
+      return { ok: true, verified: true, alreadyOff: true, status: b, msg: 'O Microsoft Defender não está em execução neste PC (removido na imagem DarkOS ou desligado): a proteção em tempo real já está desligada. Nada foi alterado.' };
+    }
+    // another antivirus is registered: Windows put Defender in passive mode and owns nothing here
+    if (action === 'disable' && b && /passive|edr/i.test(String(b.runningMode || '')) && !b.realtimeEnabled) {
+      return { ok: true, verified: true, alreadyOff: true, status: b, msg: 'Outro antivírus está ativo e o Microsoft Defender já está em modo passivo (sem proteção em tempo real). Nada foi alterado.' };
+    }
+    if (action === 'disable' && b?.tamperProtected) {
       return {
         ok: false,
+        reason: 'tamperProtection',
+        status: b,
         tamperBlocked: true,
-        error: 'A Proteção contra Adulteração está ATIVA, então o Windows ignoraria esta alteração. O DarkHub não contorna essa proteção. Desative-a manualmente em Segurança do Windows > Proteção contra vírus e ameaças > Gerenciar configurações > Proteção contra Adulteração e tente de novo.'
+        error: 'A Proteção contra Violações está ATIVA, então o Windows ignoraria esta alteração. O DarkHub não contorna essa proteção. Desative-a manualmente em Segurança do Windows > Proteção contra vírus e ameaças > Gerenciar configurações > Proteção contra Violações e tente de novo.'
       };
     }
 
@@ -118,13 +132,27 @@ if ($null -ne $wmi.IsTamperProtected) { $tamper = [bool]$wmi.IsTamperProtected }
     if (!res.ok) return { ok: false, error: res.error };
 
     // the registry is not the truth: ask Defender itself what it is doing now
-    await new Promise((r) => setTimeout(r, 2500));
-    const after = await this.getStatus();
+    // Defender notices a policy/preference change within a few seconds: poll instead of trusting one early read
+    let after = { ok: false };
+    for (let i = 0; i < 5; i++) {
+      await new Promise((r) => setTimeout(r, this.pollMs ?? 2500));
+      after = await this.getStatus();
+      if (after.ok && Boolean(after.status.realtimeEnabled) === (action === 'enable')) break;
+    }
     if (after.ok) {
       const rt = Boolean(after.status.realtimeEnabled);
       if (action === 'disable' && rt) {
         await DeepTweaksEngine.restoreChangeSet({ id: SET_ID, title: 'Defender: desfazer tentativa', fallbackChanges: POLICY_CHANGES.map((c) => ({ key: c.key, name: c.name, deleteValue: true })), commands: { revert: 'Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction Stop' } });
-        return { ok: false, error: 'O Windows gravou as políticas mas o Defender continua com a proteção em tempo real ATIVA (Proteção contra Adulteração, antivírus gerenciado ou política de TI). As alterações foram desfeitas.', status: after.status };
+        const tamper = Boolean(after.status.tamperProtected);
+        return {
+          ok: false,
+          reason: tamper ? 'tamperProtection' : 'noEffect',
+          tamperBlocked: tamper,
+          error: tamper
+            ? 'A Proteção contra Violações foi ligada e o Windows ignorou a alteração. As políticas foram desfeitas. Desligue-a em Segurança do Windows > Proteção contra vírus e ameaças > Gerenciar configurações e tente de novo.'
+            : 'O Windows gravou as políticas mas o Defender continua com a proteção em tempo real ATIVA (antivírus gerenciado pela empresa ou política de TI). As alterações foram desfeitas.',
+          status: after.status
+        };
       }
       if (action === 'enable' && !rt) {
         return { ok: false, error: 'As políticas foram removidas, mas a proteção em tempo real ainda aparece desativada. Ative-a em Segurança do Windows > Proteção contra vírus e ameaças.', status: after.status };
@@ -174,7 +202,7 @@ if ($null -ne $wmi.IsTamperProtected) { $tamper = [bool]$wmi.IsTamperProtected }
       const child = spawn('cmd.exe', ['/c', 'start', '', 'windowsdefender://threatsettings'], { windowsHide: true, detached: true, stdio: 'ignore' });
       child.once('error', (e) => Logger.warn('DefenderControlEngine', 'Falha ao abrir a Segurança do Windows', e));
       child.unref();
-      return { ok: true, msg: 'Segurança do Windows aberta. Vá em "Gerenciar configurações" > "Proteção contra Adulteração".' };
+      return { ok: true, msg: 'Segurança do Windows aberta. Vá em "Gerenciar configurações" > "Proteção contra Violações".' };
     } catch (e) {
       return { ok: false, error: e.message };
     }

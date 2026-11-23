@@ -11,6 +11,7 @@ import DarkOSSystemPanel from '../components/darkos/DarkOSSystemPanel';
 import DarkOSReleaseCard from '../components/darkos/DarkOSReleaseCard';
 import DarkOSUsbCard from '../components/darkos/DarkOSUsbCard';
 import type { DarkOSInfo, DarkOSManifest, DarkOSProfileId, DarkOSSnapshot } from '../types/darkos';
+import ScrollRow from '../components/ui/ScrollRow';
 import {
   DARKOS_PROFILES, DarkOSRow, DarkOSFailure, RemovedApp, countStatuses, mergeChanges, normalizeFailures,
   normalizeReboot, normalizeRemovedApps, normalizeSnapshots, profileDiff
@@ -18,7 +19,7 @@ import {
 
 type TabId = 'overview' | 'system' | 'changes' | 'profiles' | 'recovery' | 'snapshots' | 'failures' | 'diagnostics';
 
-interface Banner { ok: boolean; pending?: boolean; message: string }
+interface Banner { ok: boolean; pending?: boolean; message: string; tamper?: boolean }
 
 interface ConfirmState {
   title: string;
@@ -150,7 +151,8 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
         const failed = Array.isArray(res?.failed) && res.failed.length
           ? ` (${res.failed.map((f: any) => `${f.id}${f.error ? `: ${f.error}` : ''}`).slice(0, 3).join('; ')})`
           : '';
-        setBanner({ ok: false, message: `${res?.error || t('darkos.result.fail', 'Not confirmed.')}${failed}` });
+        const tamper = Array.isArray(res?.failed) && res.failed.some((f: any) => f?.reason === 'tamperProtection');
+        setBanner({ ok: false, tamper, message: `${res?.error || t('darkos.result.fail', 'Not confirmed.')}${failed}` });
       }
     } catch (e: any) {
       if (mounted.current) setBanner({ ok: false, message: e?.message ?? String(e) });
@@ -647,10 +649,18 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
           <>{loadError} <button onClick={load} disabled={loading} className="ml-1 underline underline-offset-2 text-red-200 hover:text-red-100">{t('darkos.refresh', 'Refresh')}</button></>
         ), 'alert') : null}
         {banner ? notice(banner.ok ? 'ok' : banner.pending ? 'warn' : 'err', banner.ok ? <CheckCircle size={14} /> : banner.pending ? <AlertTriangle size={14} /> : <XCircle size={14} />, banner.message) : null}
+        {banner?.tamper ? (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-amber-500/25 px-3 py-2.5 text-[12.5px] text-amber-200/90">
+            <span>{t('darkos.tamper.step', 'Windows needs one manual step: open Windows Security > Virus & threat protection > Manage settings, turn Tamper Protection off, then apply again.')}</span>
+            <button type="button" className="dh-btn dh-btn-sm shrink-0" onClick={() => { window.darkhub?.optimizer?.openTamperSettings?.(); }}>
+              {t('darkos.tamper.open', 'Open Windows Security')}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-        <nav role="tablist" aria-orientation="vertical" className="flex lg:flex-col gap-0.5 overflow-x-auto lg:overflow-visible lg:w-48 shrink-0 border-b lg:border-b-0 border-zinc-800/80 pb-2 lg:pb-0">
+        <ScrollRow as="nav" role="tablist" aria-orientation="vertical" className="lg:w-48 shrink-0" innerClassName="lg:flex-col gap-0.5 lg:overflow-visible border-b lg:border-b-0 border-zinc-800/80 pb-2 lg:pb-0">
           {tabs.map((tb) => {
             const active = tab === tb.id;
             return (
@@ -669,7 +679,7 @@ export default function DarkOSCenter({ onNavigate }: { onNavigate?: (page: strin
               </button>
             );
           })}
-        </nav>
+        </ScrollRow>
 
         <div className="min-w-0 flex-1 space-y-8">
           <div key={tab} className="animate-in">{content[tab]()}</div>

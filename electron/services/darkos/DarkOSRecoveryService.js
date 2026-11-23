@@ -212,6 +212,8 @@ export function summarizeChangeResults(data, { securityDeclined = false } = {}) 
       rebootRequired: r?.rebootRequired === true,
       pendingReboot,
       skipped,
+      // why it could not work on this PC (e.g. 'tamperProtection', 'noEffect'); the screen turns it into a step
+      reason: typeof r?.reason === 'string' && /^[A-Za-z]{1,40}$/.test(r.reason) ? r.reason : null,
       error: pendingReboot
         ? 'Aguardando reinicio para verificar.'
         : r?.ok === true && !verified ? (r?.error || 'Aplicado, mas a verificacao nao confirmou o estado.') : (r?.error ?? null)

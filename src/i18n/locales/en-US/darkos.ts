@@ -533,7 +533,7 @@ const dict: Record<string, string> = {
   "optimizer.audit.tweak.tweak:intelDisableAsyncFlips.desc": "Turns off asynchronous frame flips in the Intel graphics driver, which cause tearing or flicker in some games. Takes effect after a restart.",
   "optimizer.audit.tweak.tweak:intelDisableAdaptiveVsync.title": "Intel: disable driver adaptive V-Sync",
   "optimizer.audit.tweak.tweak:intelDisableAdaptiveVsync.desc": "Stops the Intel driver from toggling V-Sync on its own based on FPS, leaving it to the game. Takes effect after a restart.",
-  "optimizer.tabWindows": "Windows Features & Repairs",
+  "optimizer.tabWindows": "Windows features",
   "wintools.readFail": "Could not read Windows features.",
   "wintools.reboot": "Restart Windows to finish.",
   "wintools.done": "Done and verified.",
@@ -768,7 +768,9 @@ const dict: Record<string, string> = {
   "monitor.adv.off2": "Reads each CPU core's real sensor, fans, voltages, GPU (hot spot, memory, power) and disks through LibreHardwareMonitor with the PawnIO driver. On by default (the driver is only installed when you ask).",
   "dashboard.ramInUse": "RAM in use",
   "dashboard.dpcRate": "DPCs per second",
-  "monitor.temps.gpuNoSensor": "Turn on advanced sensors"
+  "monitor.temps.gpuNoSensor": "Turn on advanced sensors",
+  "darkos.tamper.step": "Windows needs one manual step: open Windows Security > Virus & threat protection > Manage settings, turn Tamper Protection off, then apply again.",
+  "darkos.tamper.open": "Open Windows Security"
 };
 
 export default dict;

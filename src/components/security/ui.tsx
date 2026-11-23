@@ -50,7 +50,7 @@ export function errorText(t: Translate, error?: string | null) {
     busy: t('secx.err.busy', 'Outra operação de segurança ainda está em andamento.'),
     'no-entries': t('secx.err.noEntries', 'Nenhuma lista ativada tem entradas. Ative e atualize ao menos uma lista.'),
     'defender-inactive': t('secx.err.defenderInactive', 'O Microsoft Defender não é o antivírus ativo neste PC; este item não se aplica.'),
-    'not-effective': t('secx.err.notEffective', 'O comando rodou, mas o Windows não manteve a configuração (Proteção contra Adulteração ou política de grupo).'),
+    'not-effective': t('secx.err.notEffective', 'O comando rodou, mas o Windows não manteve a configuração (Proteção contra Violações ou política de grupo).'),
     'no-snapshot': t('secx.err.noSnapshot', 'Não há estado anterior salvo pelo DarkHub para restaurar.'),
     'hosts-not-written': t('secx.err.hostsNotWritten', 'O arquivo hosts não manteve a alteração (antivírus ou outra ferramenta pode tê-la revertido).'),
     'unterminated-block': t('secx.err.unterminated', 'O bloco do DarkHub no arquivo hosts está incompleto; corrija o arquivo manualmente antes.'),

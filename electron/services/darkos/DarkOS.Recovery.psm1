@@ -1,5 +1,5 @@
 # DarkOS.Recovery.psm1 - DarkOS change catalog / manifest / recovery engine
-# ModuleVersion: 5   (bump on every behaviour change: DarkHub runs the newest of installed vs bundled)
+# ModuleVersion: 7   (bump on every behaviour change: DarkHub runs the newest of installed vs bundled)
 # Windows PowerShell 5.1, ASCII only. Shared by first-boot provisioning and DarkHub Suite.
 # Every system interaction goes through a backend table ($script:DK.Backend). The "Real" backend
 # touches the system; the "Fake" backend (DryRun) keeps an in-memory state persisted to
@@ -444,6 +444,17 @@ function New-DkFakeBackend {
     $b['HiveUnload'] = { param($KeyName) $s = Load-DkFakeState; if ($s.hiveLoaded.Contains($KeyName)) { $s.hiveLoaded.Remove($KeyName) | Out-Null; Save-DkFakeState $s }; return $true }
     $b['DefaultUserRoot'] = { 'HKLM:\DARKOS_DEFUSER' }
     $b['DismImportAssoc'] = { param($XmlPath) return $true }
+    # Defender as the effect check sees it. Tests seed $state.defender = @{ present; running; realtime; tamper }.
+    $b['DefenderState'] = {
+        $s = Load-DkFakeState
+        if ($s.Contains('defender') -and $s.defender) { $d = $s.defender; return @{ present = [bool]$d.present; running = [bool]$d.running; realtime = [bool]$d.realtime; tamper = [bool]$d.tamper; mode = [string]$d.mode } }
+        return @{ present = $false; running = $false; realtime = $false; tamper = $false; mode = 'absent' }
+    }
+    $b['DefenderSetRealtime'] = {
+        param($Disable)
+        $s = Load-DkFakeState
+        if ($s.Contains('defender') -and $s.defender -and -not [bool]$s.defender.tamper -and -not [bool]$s.defender.managed) { $s.defender.realtime = -not [bool]$Disable; Save-DkFakeState $s }
+    }
     return $b
 }
 
@@ -534,10 +545,18 @@ function New-DkRealBackend {
             $startVal = @{ 'Automatic' = 2; 'AutomaticDelayed' = 2; 'Manual' = 3; 'Disabled' = 4 }[$StartType]
             Set-ItemProperty -LiteralPath "HKLM:\SYSTEM\CurrentControlSet\Services\$Name" -Name Start -Value $startVal -Type DWord -ErrorAction Stop
         }
-        if ($StartType -eq 'AutomaticDelayed') {
-            New-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\$Name" -Name DelayedAutostart -PropertyType DWord -Value 1 -Force | Out-Null
-        } elseif ($StartType -eq 'Automatic') {
-            New-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\$Name" -Name DelayedAutostart -PropertyType DWord -Value 0 -Force | Out-Null
+        # Delayed start: only touched when it differs, and through the SCM first. Many service keys (TrkWks, DPS...)
+        # are read-only for Administrators, so writing DelayedAutostart there failed a revert that had already worked.
+        if ($StartType -eq 'AutomaticDelayed' -or $StartType -eq 'Automatic') {
+            $want = [int]($StartType -eq 'AutomaticDelayed')
+            $key = "HKLM:\SYSTEM\CurrentControlSet\Services\$Name"
+            $cur = (Get-ItemProperty -LiteralPath $key -Name DelayedAutostart -ErrorAction SilentlyContinue).DelayedAutostart
+            if ([int]$cur -ne $want) {
+                $mode = 'auto'; if ($want -eq 1) { $mode = 'delayed-auto' }
+                $null = & sc.exe config $Name start= $mode 2>&1
+                $cur = (Get-ItemProperty -LiteralPath $key -Name DelayedAutostart -ErrorAction SilentlyContinue).DelayedAutostart
+                if ([int]$cur -ne $want) { New-ItemProperty $key -Name DelayedAutostart -PropertyType DWord -Value $want -Force -ErrorAction Stop | Out-Null }
+            }
         }
     }
     # Bulk reads used only by the status cache (one enumeration instead of one query per catalog item).
@@ -715,6 +734,29 @@ function New-DkRealBackend {
         $ErrorActionPreference = 'Continue'
         $out = dism.exe /Online /Import-DefaultAppAssociations:$XmlPath 2>&1
         return ($LASTEXITCODE -eq 0)
+    }
+    # What Microsoft Defender is really doing (the registry policy alone proves nothing: with Tamper Protection on,
+    # Windows keeps the values but ignores them). present = WinDefend exists; running = the service runs.
+    $b['DefenderState'] = {
+        $svc = Get-Service -Name 'WinDefend' -ErrorAction SilentlyContinue
+        if (-not $svc) { return @{ present = $false; running = $false; realtime = $false; tamper = $false; mode = 'absent' } }
+        $running = ([string]$svc.Status -eq 'Running')
+        $st = $null
+        if ($running) { try { $st = Get-CimInstance -Namespace 'Root\Microsoft\Windows\Defender' -ClassName 'MSFT_MpComputerStatus' -ErrorAction Stop } catch { $st = $null } }
+        $tamper = $false
+        if ($st -and $null -ne $st.IsTamperProtected) { $tamper = [bool]$st.IsTamperProtected }
+        else {
+            $tp = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows Defender\Features' -Name 'TamperProtection' -ErrorAction SilentlyContinue).TamperProtection
+            if ($running -and $null -ne $tp) { $tamper = (($tp -eq 5) -or (($tp -band 1) -eq 1)) }
+        }
+        $rt = $false
+        if ($st -and $null -ne $st.RealTimeProtectionEnabled) { $rt = [bool]$st.RealTimeProtectionEnabled } elseif ($running) { $rt = $true }
+        $mode = 'unknown'; if ($st -and $st.AMRunningMode) { $mode = [string]$st.AMRunningMode } elseif (-not $running) { $mode = 'Not running' }
+        return @{ present = $true; running = $running; realtime = $rt; tamper = $tamper; mode = $mode }
+    }
+    $b['DefenderSetRealtime'] = {
+        param($Disable)
+        try { Set-MpPreference -DisableRealtimeMonitoring ([bool]$Disable) -ErrorAction Stop } catch { }
     }
     return $b
 }
@@ -1229,6 +1271,57 @@ function Test-DkDependencies {
 }
 
 # Core per-change apply, assumes lock held and (if needed) hive mounted.
+# ================================================================ EFFECT CHECKS
+# Some catalog items are only policies: the registry read-back can succeed while Windows ignores them. For those
+# the module also checks the real effect and never reports "applied" when nothing changed.
+function Get-DkEffectKind {
+    param($Change)
+    if ($Change.validation -and $Change.validation.Contains('effect') -and $Change.validation.effect) { return [string]$Change.validation.effect }
+    if ([string]$Change.id -like 'sec.defender.*') { return 'defenderRealtimeOff' }
+    return $null
+}
+
+$script:DkTamperHelp = 'A Protecao contra Violacoes (Tamper Protection) do Microsoft Defender esta LIGADA: o Windows ignora esta alteracao. Desligue-a a mao em Seguranca do Windows > Protecao contra virus e ameacas > Gerenciar configuracoes > Protecao contra Violacoes e tente de novo.'
+$script:DkDefenderOnHelp = 'O Windows aceitou a politica, mas o Microsoft Defender continua com a protecao em tempo real LIGADA (Protecao contra Violacoes, antivirus gerenciado pela empresa ou politica de TI). Nada foi mantido.'
+
+# $null = may proceed; otherwise a result hashtable explaining why the change cannot work on this PC.
+function Test-DkEffectPrecheck {
+    param($Change)
+    $kind = Get-DkEffectKind $Change
+    if ($kind -ne 'defenderRealtimeOff') { return $null }
+    $d = Invoke-Dk 'DefenderState' @()
+    if ($d.present -and $d.running -and $d.tamper) { return @{ reason = 'tamperProtection'; error = $script:DkTamperHelp } }
+    return $null
+}
+
+# $true when the live effect matches the applied change (always $true for items without an effect check).
+function Test-DkEffect {
+    param($Change)
+    $kind = Get-DkEffectKind $Change
+    if ($kind -ne 'defenderRealtimeOff') { return $true }
+    $d = Invoke-Dk 'DefenderState' @()
+    if (-not $d.present -or -not $d.running) { return $true }
+    return (-not [bool]$d.realtime)
+}
+
+# Push the effect (the policy alone takes a while to be noticed) and wait for it, up to ~15 s.
+function Invoke-DkEffectApply {
+    param($Change)
+    $kind = Get-DkEffectKind $Change
+    if ($kind -ne 'defenderRealtimeOff') { return $true }
+    Invoke-Dk 'DefenderSetRealtime' @($true)
+    for ($i = 0; $i -lt 6; $i++) {
+        if (Test-DkEffect $Change) { return $true }
+        if (-not $script:DK.DryRun) { Start-Sleep -Milliseconds 2500 }
+    }
+    return (Test-DkEffect $Change)
+}
+
+function Invoke-DkEffectRevert {
+    param($Change)
+    if ((Get-DkEffectKind $Change) -eq 'defenderRealtimeOff') { Invoke-Dk 'DefenderSetRealtime' @($false) }
+}
+
 function Invoke-DkChangeApplyOne {
     param($Change, $Manifest, [string]$Source)
     $id = $Change.id
@@ -1261,12 +1354,21 @@ function Invoke-DkChangeApplyOne {
     }
     # idempotency: already applied and verified?
     try {
-        if ((Test-DkApplied $Change) -and $entry.status -eq 'applied') {
+        if ((Test-DkApplied $Change) -and (Test-DkEffect $Change) -and $entry.status -eq 'applied') {
             $entry.lastResult = @{ ts = (Get-DkTimestamp); action = 'apply'; ok = $true; verified = $true; error = $null; source = $Source }
             Set-DkEntry $Manifest $entry
             return @{ id = $id; ok = $true; verified = $true; rebootRequired = [bool]$Change.rebootRequired; error = $null; noop = $true }
         }
     } catch { }
+
+    # the change cannot have any effect on this PC (e.g. Defender with Tamper Protection on): write nothing
+    $pre = $null
+    try { $pre = Test-DkEffectPrecheck $Change } catch { $pre = $null }
+    if ($pre) {
+        $entry.lastResult = @{ ts = (Get-DkTimestamp); action = 'apply'; ok = $false; verified = $false; error = $pre.error; reason = $pre.reason; source = $Source }
+        Set-DkEntry $Manifest $entry
+        return @{ id = $id; ok = $false; verified = $false; rebootRequired = $false; error = $pre.error; reason = $pre.reason }
+    }
 
     # capture original (only first time, never overwrite)
     if ($null -eq $entry.originalState) {
@@ -1309,6 +1411,20 @@ function Invoke-DkChangeApplyOne {
         Set-DkEntry $Manifest $entry
         return @{ id = $id; ok = $false; verified = $false; rebootRequired = $false; error = $entry.lastResult.error }
     }
+    # registry read-back is not enough for policy-only items: the effect itself must be there
+    $effect = $true
+    try { $effect = [bool](Invoke-DkEffectApply $Change) } catch { $effect = $false }
+    if (-not $effect) {
+        $rolled = $true
+        try { Invoke-DkRevert $Change $entry.originalState; Invoke-DkEffectRevert $Change } catch { $rolled = $false }
+        $pre = $null; try { $pre = Test-DkEffectPrecheck $Change } catch { $pre = $null }
+        $reason = 'noEffect'; $msg = $script:DkDefenderOnHelp
+        if ($pre) { $reason = $pre.reason; $msg = $pre.error }
+        $entry.status = 'failed'
+        $entry.lastResult = @{ ts = (Get-DkTimestamp); action = 'apply'; ok = $false; verified = $false; error = ("{0} (rollback={1})" -f $msg, $rolled); reason = $reason; source = $Source }
+        Set-DkEntry $Manifest $entry
+        return @{ id = $id; ok = $false; verified = $false; rebootRequired = $false; error = $entry.lastResult.error; reason = $reason }
+    }
     $entry.status = 'applied'
     $entry.appliedState = $Change.apply
     $entry.lastResult = @{ ts = (Get-DkTimestamp); action = 'apply'; ok = $true; verified = $true; error = $null; source = $Source }
@@ -1330,6 +1446,7 @@ function Invoke-DkChangeRevertOne {
     }
     try {
         Invoke-DkRevert $Change $entry.originalState
+        Invoke-DkEffectRevert $Change
     } catch {
         $entry.lastResult = @{ ts = (Get-DkTimestamp); action = 'revert'; ok = $false; verified = $false; error = ("Falha ao reverter: {0}" -f $_.Exception.Message); source = $Source }
         Set-DkEntry $Manifest $entry
@@ -1369,7 +1486,7 @@ function Get-DarkOSStatus {
         $entry = Get-DkEntry $manifest $c.id
         $status = if ($entry) { $entry.status } else { 'notApplied' }
         $live = $false
-        try { $live = [bool](Test-DkApplied $c) } catch { $live = $false }
+        try { $live = [bool](Test-DkApplied $c) -and [bool](Test-DkEffect $c) } catch { $live = $false }
         $appliedStatus = ($status -eq 'applied')
         # Services/tasks missing on this build are skipped by Apply; report it so the UI does not offer them.
         $present = $true

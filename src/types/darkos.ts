@@ -41,6 +41,8 @@ export interface DarkOSChangeResult {
   rebootRequired: boolean;
   pendingReboot?: boolean;
   skipped?: boolean;
+  /** why it could not work here ('tamperProtection' = the user must turn Tamper Protection off by hand) */
+  reason?: string | null;
   error: string | null;
 }
 

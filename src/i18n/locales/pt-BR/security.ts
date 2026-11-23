@@ -46,7 +46,7 @@ const dict: Record<string, string> = {
   "secx.err.busy": "Outra operação de segurança ainda está em andamento.",
   "secx.err.noEntries": "Nenhuma lista ativada tem entradas. Ative e atualize ao menos uma lista.",
   "secx.err.defenderInactive": "O Microsoft Defender não é o antivírus ativo neste PC; este item não se aplica.",
-  "secx.err.notEffective": "O comando rodou, mas o Windows não manteve a configuração (Proteção contra Adulteração ou política de grupo).",
+  "secx.err.notEffective": "O comando rodou, mas o Windows não manteve a configuração (Proteção contra Violações ou política de grupo).",
   "secx.err.noSnapshot": "Não há estado anterior salvo pelo DarkHub para restaurar.",
   "secx.err.hostsNotWritten": "O arquivo hosts não manteve a alteração (antivírus ou outra ferramenta pode tê-la revertido).",
   "secx.err.unterminated": "O bloco do DarkHub no arquivo hosts está incompleto; corrija o arquivo manualmente antes.",
