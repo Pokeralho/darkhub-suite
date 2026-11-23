@@ -4,6 +4,7 @@ import { Activity, Server, ShieldCheck, Zap, Play, Search, Network, RefreshCw, W
 import PageHeader from '../components/ui/PageHeader';
 import { LiveLatencyPanel, RouteMtuPanel, BufferbloatPanel, DnsBenchPanel, LatencyTweaksPanel } from '../components/network/LatencyLab';
 
+import ScrollRow from '../components/ui/ScrollRow';
 const NetworkTools = () => {
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'ping' | 'live' | 'route' | 'bloat' | 'dns' | 'tweaks' | 'ports' | 'speed' | 'diag'>('ping');
@@ -68,10 +69,22 @@ const NetworkTools = () => {
     setSpeedMetrics({ ping: 0, down: 0, up: 0 });
     setSpeedError(null);
     try {
-      const pingStart = Date.now();
-      const pingRes = await fetch('https://speed.cloudflare.com/__down?bytes=0', { cache: 'no-store' });
-      if (!pingRes.ok) throw new Error(`HTTP ${pingRes.status}`);
-      setSpeedMetrics(m => ({ ...m, ping: Date.now() - pingStart }));
+      // Real latency: ICMP ping (network:ping). One cold HTTPS fetch also counted DNS + TLS + HTTP, so it read high.
+      // If ICMP is blocked, use the second request over the already-open connection (close to one round trip).
+      let ping = -1;
+      try {
+        const pr = await window.darkhub?.network?.ping?.('speed.cloudflare.com');
+        if (pr?.ok && typeof pr.latency === 'number' && pr.latency >= 0) ping = pr.latency;
+      } catch { /* fall back below */ }
+      if (ping < 0) {
+        const warm = await fetch('https://speed.cloudflare.com/__down?bytes=0', { cache: 'no-store' });
+        if (!warm.ok) throw new Error(`HTTP ${warm.status}`);
+        const t0 = performance.now();
+        const again = await fetch('https://speed.cloudflare.com/__down?bytes=0', { cache: 'no-store' });
+        if (!again.ok) throw new Error(`HTTP ${again.status}`);
+        ping = Math.round(performance.now() - t0);
+      }
+      setSpeedMetrics(m => ({ ...m, ping }));
       setSpeedState('down');
 
       const dlStart = Date.now();
@@ -177,7 +190,7 @@ const NetworkTools = () => {
   return (
     <div className="w-full max-w-6xl mx-auto">
       <PageHeader title={t('net.toolkit', 'Toolkit de Rede')} subtitle={t('net.toolkitDesc', 'Ferramentas avançadas para análise e otimização de infraestrutura')}>
-        <div role="tablist" aria-label={t('net.toolkit', 'Toolkit de Rede')} className="flex gap-5 -mb-5 overflow-x-auto overflow-y-hidden">
+        <ScrollRow role="tablist" aria-label={t('net.toolkit', 'Toolkit de Rede')} className="-mb-5" innerClassName="gap-5">
           {tabs.map(({ id, icon: Icon, label }) => {
             const active = activeTab === id;
             return (
@@ -193,7 +206,7 @@ const NetworkTools = () => {
               </button>
             );
           })}
-        </div>
+        </ScrollRow>
       </PageHeader>
 
       {activeTab === 'ping' && (

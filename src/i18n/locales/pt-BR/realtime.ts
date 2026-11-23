@@ -183,7 +183,8 @@ const dict: Record<string, string> = {
   "rt.q.confirmDelete": "Confirmar exclusão",
   "rt.q.delete": "Excluir",
   "rt.log.title": "Atividade",
-  "rt.log.empty": "Nada aconteceu ainda. As ações e detecções aparecem aqui."
+  "rt.log.empty": "Nada aconteceu ainda. As ações e detecções aparecem aqui.",
+  "dlss5.tier.estimate": "Estimativa pela geração da placa, não medida neste PC."
 };
 
 export default dict;

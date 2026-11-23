@@ -183,7 +183,8 @@ const dict: Record<string, string> = {
   "rt.q.confirmDelete": "Confirm delete",
   "rt.q.delete": "Delete",
   "rt.log.title": "Activity",
-  "rt.log.empty": "Nothing has happened yet. Actions and detections show up here."
+  "rt.log.empty": "Nothing has happened yet. Actions and detections show up here.",
+  "dlss5.tier.estimate": "Estimate from the card generation, not measured on this PC."
 };
 
 export default dict;

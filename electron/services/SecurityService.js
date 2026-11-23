@@ -127,9 +127,6 @@ class SecurityService {
       return await this.checkRansomwareArmor();
     });
 
-    ipcMain.handle('security:enableRansomwareArmor', async () => {
-      return await this.enableRansomwareArmor();
-    });
 
     ipcMain.handle('security:getCommunityRules', async () => {
       return this.getCommunityRules();

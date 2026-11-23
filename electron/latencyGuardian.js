@@ -1266,12 +1266,17 @@ public static class Psapi {
   ipcMain.handle('latency:boostNow', async () => {
     try {
       if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
-      await runCommand('ipconfig', ['/flushdns'], { timeoutMs: 8000 }).catch(() => {})
+      // report only what really happened (both steps used to be claimed even when they failed)
+      const dns = await runCommand('ipconfig', ['/flushdns'], { timeoutMs: 8000 }).then((r) => r?.code === 0, () => false)
+      const parts = [dns ? 'cache de DNS limpo' : 'falha ao limpar o cache de DNS']
+      let ramOk = null
       if (!state.game?.pid) {
-        await smartCleanRam(null).catch(() => {})
-        return { ok: true, msg: 'BOOST NOW aplicado (DNS flush + Smart Clean)' }
-      }
-      return { ok: true, msg: 'BOOST NOW aplicado (DNS flush). Smart Clean foi pulado durante o jogo.' }
+        const r = await smartCleanRam(null).catch(() => null)
+        ramOk = Boolean(r && r.processes_cleaned !== undefined)
+        parts.push(ramOk ? `Smart Clean em ${r.processes_cleaned} processo(s)` : 'Smart Clean nao executou')
+      } else parts.push('Smart Clean pulado durante o jogo')
+      const ok = dns && ramOk !== false
+      return ok ? { ok: true, msg: `BOOST NOW: ${parts.join('; ')}.` } : { ok: false, error: `BOOST NOW incompleto: ${parts.join('; ')}.` }
     } catch (e) {
       return { ok: false, error: String(e?.message ?? e) }
     }

@@ -190,8 +190,9 @@ class UpdateService {
       const release = await this._fetchLatestGitHubRelease();
       if (!release) {
         this._setState('idle');
-        this._emit({ type: 'not-available', stage: 'idle', currentVersion: app.getVersion() });
-        return { ok: true, msg: 'App is up to date.' };
+        this._emit({ type: 'error', stage: 'error', message: 'Nao foi possivel consultar a versao mais recente.' });
+        // 404 = no public release could be read: that is "could not check", never "up to date"
+        return { ok: false, error: 'Nao foi possivel consultar a versao mais recente (nenhuma release publica encontrada).' };
       }
 
       const currentVer = app.getVersion().replace(/^v/, '');
@@ -204,7 +205,7 @@ class UpdateService {
         this._updateInfo = {
           version: latestVer,
           releaseDate: release.published_at,
-          releaseNotes: release.body || 'Performance optimizations and security improvements.',
+          releaseNotes: release.body || '',
           downloadUrl: asset?.browser_download_url || null,
           assetName: asset?.name || `DarkHub Setup ${latestVer}.exe`,
           assetSize: asset?.size || 0,

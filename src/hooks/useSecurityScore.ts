@@ -2,16 +2,8 @@ import { useState, useEffect } from 'react';
 import { visibleInterval } from '../utils/visibleInterval'
 
 export const useSecurityScore = () => {
-  const [securityScore, setSecurityScore] = useState<number | null>(() => {
-    try {
-      const raw = localStorage.getItem('darkhub.dashboard.securityScore');
-      if (!raw) return null;
-      const n = Number(raw);
-      return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.trunc(n))) : null;
-    } catch {
-      return null;
-    }
-  });
+  // No cached value: an old score shown as if it were current was misleading. "Calculating..." until the live audit.
+  const [securityScore, setSecurityScore] = useState<number | null>(null);
   const [securityChecks, setSecurityChecks] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -28,9 +20,6 @@ export const useSecurityScore = () => {
           const score = Math.max(0, Math.min(100, Math.trunc(res.score)));
           setSecurityScore(score);
           if (Array.isArray(res?.checks)) setSecurityChecks(res.checks);
-          try {
-            localStorage.setItem('darkhub.dashboard.securityScore', String(score));
-          } catch {}
         } else {
           setSecurityScore(null);
           setSecurityChecks(null);
@@ -51,7 +40,7 @@ export const useSecurityScore = () => {
       }
     };
 
-    const start = window.setTimeout(fetchSecurity, 900);
+    const start = window.setTimeout(fetchSecurity, 300);
     const stopPolling = visibleInterval(() => {
       if (disabled) return;
       return fetchSecurity();

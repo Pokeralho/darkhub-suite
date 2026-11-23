@@ -894,12 +894,10 @@ export interface DarkHubAPI {
   };
   security: {
     scanProcesses: () => Promise<any>;
-    scanMalware: () => Promise<any>;
     killProcess: (pid: number) => Promise<any>;
     auditTracking: () => Promise<any>;
     blockTracking: () => Promise<any>;
     unblockTracking: () => Promise<any>;
-    optimizeLatency: () => Promise<any>;
     getSecurityScore: () => Promise<any>;
     getTrackingDomains: () => Promise<any>;
     setCustomTrackingDomains: (payload: any) => Promise<any>;
@@ -909,7 +907,6 @@ export interface DarkHubAPI {
     getPhishingShieldStatus: () => Promise<any>;
     getLiveNetworkConnections: () => Promise<any>;
     checkRansomwareArmor: () => Promise<any>;
-    enableRansomwareArmor: () => Promise<any>;
     getCommunityRules: () => Promise<any>;
     importCommunityRules: (payload: any) => Promise<any>;
     resetCommunityRules: () => Promise<any>;

@@ -129,7 +129,7 @@ export default function Dlss5Manager() {
         </div>
         <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[12.5px]">
           <div><dt className="text-zinc-500">{t('dlss5.gpu', 'Placa de vídeo')}</dt><dd className="text-zinc-100 truncate">{gpu?.model || '--'}</dd></div>
-          <div className="sm:col-span-2"><dt className="text-zinc-500">{t('dlss5.compat', 'Compatibilidade')}</dt><dd className={tier === 'none' ? 'text-amber-200' : 'text-zinc-200'}>{tier ? tierText[tier] : '--'}</dd></div>
+          <div className="sm:col-span-2"><dt className="text-zinc-500">{t('dlss5.compat', 'Compatibilidade')}</dt><dd className={tier === 'none' ? 'text-amber-200' : 'text-zinc-200'}>{tier ? tierText[tier] : '--'}{tier && tier !== 'none' ? <span className="block text-[11.5px] text-zinc-500 mt-0.5">{t('dlss5.tier.estimate', 'Estimativa pela geração da placa, não medida neste PC.')}</span> : null}</dd></div>
         </dl>
         <p className="dh-help">
           {ap?.installed ? t('dlss5.version', 'Instalado: {v}.').replace('{v}', ap.installed.tag) + ' ' : ''}

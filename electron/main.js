@@ -2081,10 +2081,10 @@ ipcMain.handle('optimizer:runRoutine', async (_event, routineId) => {
         case 'disable-ai': res = await DeepTweaksEngine.applyTweaks(['tweak:disableAiAndAds'], () => {}); break;
         case 'revert-ai': res = await DeepTweaksEngine.undoTweaks(['tweak:disableAiAndAds']); break;
         case 'disable-gamebar': res = await DeepTweaksEngine.applyTweaks(['tweak:disableGameDvr'], () => {}); break;
-        case 'startup-optimizer': res = { ok: true, msg: 'Use a aba Gerenciador de Inicialização interativa' }; break;
-        case 'uninstall-program': res = { ok: true, msg: 'Use a aba Desinstalar Programas interativa' }; break;
-        case 'remove-bloatware': res = { ok: true, msg: 'Use a aba Debloat interativa' }; break;
-        case 'system-info': res = { ok: true, msg: 'Acesse o Painel de Controle para visualizar' }; break;
+        case 'startup-optimizer': res = { ok: false, error: 'Esta rotina não é executada daqui: use a aba Inicialização do Otimizador.' }; break;
+        case 'uninstall-program': res = { ok: false, error: 'Esta rotina não é executada daqui: use a aba Programas do Otimizador.' }; break;
+        case 'remove-bloatware': res = { ok: false, error: 'Esta rotina não é executada daqui: use a aba Apps do Windows do Otimizador.' }; break;
+        case 'system-info': res = { ok: false, error: 'Esta rotina não é executada daqui: use o Monitor do Sistema.' }; break;
         case 'disable-services': res = await ServicesEngine.applyServicesTweak(); break;
         case 'revert-services': res = await ServicesEngine.revertServicesTweak(); break;
         case 'disable-core-isolation': res = await SystemEngine.applyHardcoreGamerMode(); break;
@@ -2106,7 +2106,7 @@ ipcMain.handle('optimizer:runRoutine', async (_event, routineId) => {
         case 'defender-enable': res = await DefenderControlEngine.runNativeDefenderControl('enable'); break;
         case 'defender-restore-image': res = await DefenderControlEngine.restoreImageDefender(); break;
         case 'open-tamper-settings': res = DefenderControlEngine.openTamperSettings(); break;
-        case 'dns-benchmark': res = { ok: true, msg: 'Use a aba DNS' }; break;
+        case 'dns-benchmark': res = { ok: false, error: 'Esta rotina não é executada daqui: use a aba Rede & DNS do Otimizador.' }; break;
         default: throw new Error(`Unknown routine: ${routineId}`);
       }
     }
@@ -3000,45 +3000,6 @@ safeRegister('vaultBridge', () => registerVaultBridgeIPC({
   }
 }))
 
-ipcMain.handle('security:scanMalware', async () => {
-  try {
-    const processes = await si.processes()
-    const suspicious = []
-
-    const safeRegex = /c:\\windows\\|\/usr\/bin\/|\/bin\/|\/sbin\/|\/system\/library\/|\/usr\/sbin\//i
-
-    for (const p of processes.list) {
-      if (!p.path) continue
-
-      const isSafeLoc = safeRegex.test(p.path)
-
-      let score = 0
-      let reason = []
-
-      if (!isSafeLoc) {
-        score++
-        reason.push('Running outside standard system folders')
-      }
-
-      if (p.memRss > 4000000 && !isSafeLoc) {
-        score++
-        reason.push('High memory footprint from unknown location')
-      }
-
-      if (p.state === 'running' && p.name !== 'svchost.exe' && !isSafeLoc) {
-         score++
-      }
-
-      if (score >= 2) {
-        suspicious.push({ pid: p.pid, name: p.name, path: p.path, reason: reason.join(', ') })
-      }
-    }
-
-    return { ok: true, suspicious }
-  } catch (err) {
-    throw new Error(`Scan failed: ${err.message}`)
-  }
-})
 
 async function getSecurityScoreV2() {
   if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
@@ -3087,14 +3048,18 @@ async function getSecurityScoreV2() {
             $defenderRealtime = [bool]$s.RealTimeProtectionEnabled
           }
           $hasProvider = @($providerNames).Count -gt 0
+          # productState bit 0x1000 = real-time scanning ON (SecurityCenter2). A registered but disabled antivirus no
+          # longer counts as protection; Defender's own state comes from Get-MpComputerStatus above.
+          $activeThirdParty = @($providers | Where-Object { $_.displayName -and $_.displayName -notmatch 'Windows Defender|Microsoft Defender' -and (([int64]$_.productState -band 0x1000) -ne 0) })
           [PSCustomObject]@{
             defenderAvailable = ($null -ne $s)
             defenderAntivirus = $defenderAv
             defenderRealtime = $defenderRealtime
             providers = $providerNames
             providerCount = @($providerNames).Count
+            activeThirdParty = @($activeThirdParty | ForEach-Object { $_.displayName })
             hasAntivirus = ($defenderAv -or $hasProvider)
-            hasRealtimeProtection = ($defenderRealtime -or $hasProvider)
+            hasRealtimeProtection = ($defenderRealtime -or (@($activeThirdParty).Count -gt 0))
           } | ConvertTo-Json -Compress -Depth 4
         `
         const { code, data, stderr } = await runPowerShellJson(ps, { timeoutMs: 8000 })
@@ -3293,16 +3258,6 @@ ipcMain.handle('security:unblockTracking', async () => {
   }
 })
 
-ipcMain.handle('security:optimizeLatency', async () => {
-  if (process.platform !== 'win32') return { ok: false, error: 'Only supported on Windows' }
-  try {
-
-    await runPowerShell("Get-Process -Name 'audiodg' -ErrorAction SilentlyContinue | ForEach-Object { $_.PriorityClass = 'RealTime' }", { timeoutMs: 10000 })
-    return { ok: true, msg: 'Latency optimized (Audio/USB priority adjusted)' }
-  } catch (err) {
-    return { ok: false, error: err.message }
-  }
-})
 
 ipcMain.handle('security:killProcess', async (_event, pid) => {
   try {
